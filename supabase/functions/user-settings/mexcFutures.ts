@@ -4,6 +4,7 @@ import {
   futuresDecimal,
   validateMexcFutures,
   type MexcFutures,
+  type MexcFuturesPosition,
 } from './mexcFuturesContract.ts';
 
 // Official Futures V1 REST domain since 2026-01-19. Never accept a caller-supplied URL.
@@ -26,6 +27,53 @@ export const FUTURES_FULL_LIST_CAP = 8 * 1024 * 1024;
 export const FUTURES_PER_SYMBOL_LIMIT = 20;
 export const FUTURES_CONCURRENCY = 4;
 const SCALE = 10n ** 18n;
+const positionKeys = new Set([
+  'positionId', 'symbol', 'positionType', 'openType', 'state', 'holdVol', 'frozenVol', 'closeVol',
+  'holdAvgPrice', 'holdAvgPriceFullyScale', 'openAvgPrice', 'openAvgPriceFullyScale', 'closeAvgPrice',
+  'liquidatePrice', 'oim', 'im', 'holdFee', 'realised', 'leverage', 'adlLevel', 'createTime', 'updateTime',
+  'autoAddIm', 'marginRatio', 'profitRatio', 'newOpenAvgPrice', 'newCloseAvgPrice', 'closeProfitLoss',
+  'fee', 'totalFee', 'deductFeeList', 'zeroSaveTotalFeeBinance', 'zeroSaveTotalFeeMexc', 'version',
+  'feeRates', 'unRealizedPnl',
+]);
+const diagnosticFields = new Set([...positionKeys, 'data', 'position', 'contractSize', 'fairPrice']);
+
+/** Field names are data too: arbitrary upstream keys can contain assets or credentials. */
+export function futuresDiagnosticMetadata(value: unknown): { field?: string; positionKeys?: string[] } {
+  const row = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return {
+    ...(typeof row.field === 'string' && diagnosticFields.has(row.field) ? { field: row.field } : {}),
+    ...(Array.isArray(row.positionKeys) ? {
+      positionKeys: [...new Set(row.positionKeys.slice(0, 40).map((key) =>
+        typeof key === 'string' && positionKeys.has(key) ? key : '[other]',
+      ))].sort(),
+    } : {}),
+  };
+}
+
+class PositionFieldFailure extends Error {
+  constructor(readonly field: string) {
+    super('Invalid futures position field');
+  }
+}
+function positionField<T>(field: string, task: () => T): T {
+  try {
+    return task();
+  } catch (error) {
+    throw error instanceof PositionFieldFailure ? error : new PositionFieldFailure(field);
+  }
+}
+interface PendingPosition {
+  raw: Record<string, unknown>;
+  symbol: string;
+  side: MexcFuturesPosition['side'];
+  marginMode: MexcFuturesPosition['marginMode'];
+  contracts: string;
+  entryPrice: string;
+  leverage: string;
+  margin: string;
+  liquidationPrice: string | null;
+  reportedUnrealized: string | null;
+}
 
 export async function futuresAuth(
   auth: Credentials,
@@ -88,11 +136,19 @@ function units(value: string): bigint {
   const [whole, fraction = ''] = value.split('.');
   return BigInt(whole!) * SCALE + BigInt(fraction.padEnd(18, '0'));
 }
+/** Half-up, away from zero at ties. Never converts an amount through Number. */
+export function roundedFuturesRatio(numerator: bigint, denominator: bigint, places: number): string {
+  if (denominator <= 0n || !Number.isSafeInteger(places) || places < 0 || places > 18)
+    throw new Error('Invalid futures precision');
+  const scale = 10n ** BigInt(places);
+  const magnitude = numerator < 0n ? -numerator : numerator;
+  const rounded = (magnitude * scale + denominator / 2n) / denominator;
+  const fraction = String(rounded % scale).padStart(places, '0').replace(/0+$/, '');
+  return (numerator < 0n && rounded !== 0n ? '-' : '') + String(rounded / scale) + (fraction ? '.' + fraction : '');
+}
 function contractAmount(contracts: string, contractSize: string): string {
   const product = units(contracts) * units(contractSize);
-  if (product % SCALE) throw new Error('Inexact futures size');
-  const amount = product / SCALE;
-  return sourceDecimal(`${amount / SCALE}.${String(amount % SCALE).padStart(18, '0')}`, false, true);
+  return sourceDecimal(roundedFuturesRatio(product, SCALE * SCALE, 18), false, true);
 }
 function abortable<T>(task: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -230,8 +286,8 @@ export async function readMexcFutures(
   ): T => {
     try {
       return task(response.data);
-    } catch {
-      report(step, response.status, undefined, 'invalid-response');
+    } catch (error) {
+      report(step, response.status, error instanceof PositionFieldFailure ? { field: error.field } : undefined, 'invalid-response');
       throw new ReadFailure(false);
     }
   };
@@ -251,21 +307,57 @@ export async function readMexcFutures(
     });
     const positionsResponse = await read('/api/v1/private/position/open_positions', 'futures-positions');
     let skippedPositions = 0;
+    const skipPosition = (error: unknown, raw: unknown) => {
+      skippedPositions++;
+      diagnostic('futures-positions', positionsResponse.status, futuresDiagnosticMetadata({
+        field: error instanceof PositionFieldFailure ? error.field : 'position',
+        positionKeys: raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw) : [],
+      }), 'invalid-response');
+    };
     const pending = parse('futures-positions', positionsResponse, (data) => {
-      if (!Array.isArray(data) || data.length > 200) throw new Error();
-      return data
-        .map(holdingsObject)
-        .flatMap((p): (Record<string, unknown> & { contracts: string; symbol: string })[] => {
+      if (!Array.isArray(data) || data.length > 200) throw new PositionFieldFailure('data');
+      return data.flatMap((raw): PendingPosition[] => {
+        try {
+          const p = positionField('position', () => holdingsObject(raw));
           if (typeof p.symbol !== 'string' || !FUTURES_SYMBOL.test(p.symbol)) {
             skippedPositions++;
             return [];
           }
-          if (p.state !== '1' && p.state !== '2' && p.state !== '3') throw new Error();
+          if (p.state !== '1' && p.state !== '2' && p.state !== '3') throw new PositionFieldFailure('state');
           if (p.state === '3') return [];
-          const contracts = sourceDecimal(p.holdVol);
+          const contracts = positionField('holdVol', () => sourceDecimal(p.holdVol));
           if (contracts === '0') return [];
-          return [{ ...p, contracts, symbol: p.symbol }];
-        });
+          if (p.positionType !== '1' && p.positionType !== '2') throw new PositionFieldFailure('positionType');
+          if (p.openType !== '1' && p.openType !== '2') throw new PositionFieldFailure('openType');
+          const entryField = p.holdAvgPriceFullyScale == null || p.holdAvgPriceFullyScale === '' ? 'holdAvgPrice' : 'holdAvgPriceFullyScale';
+          const entryPrice = positionField(entryField, () => sourceDecimal(p[entryField], false, true));
+          const leverage = positionField('leverage', () => {
+            const value = sourceDecimal(p.leverage, false, true);
+            if (!/^\d+$/.test(value)) throw new Error();
+            return value;
+          });
+          const margin = positionField('im', () => sourceDecimal(p.im));
+          const liquidationPrice = positionField('liquidatePrice', () => {
+            if (p.liquidatePrice == null || p.liquidatePrice === '') return null;
+            // Cross-margin sentinels are unknown prices, including negative values
+            // outside the range of an otherwise valid displayable positive price.
+            if (typeof p.liquidatePrice === 'string' && /^-\d+(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(p.liquidatePrice))
+              return null;
+            const value = sourceDecimal(p.liquidatePrice, true);
+            return value === '0' || value.startsWith('-') ? null : value;
+          });
+          const reportedUnrealized = p.unRealizedPnl == null || p.unRealizedPnl === '' ? null
+            : positionField('unRealizedPnl', () => sourceDecimal(p.unRealizedPnl, true));
+          return [{ raw: p, contracts, symbol: p.symbol,
+            side: p.positionType === '1' ? 'long' : 'short',
+            marginMode: p.openType === '1' ? 'isolated' : 'cross',
+            entryPrice, leverage, margin, liquidationPrice, reportedUnrealized,
+          }];
+        } catch (error) {
+          skipPosition(error, raw);
+          return [];
+        }
+      });
     });
     if (!pending.length) return { status: 'ok', account, positions: [], skippedPositions };
     const wanted = [...new Set(pending.map((p) => p.symbol))];
@@ -333,28 +425,37 @@ export async function readMexcFutures(
           into.set(symbol, value);
       }
     }
+    const positions = pending.flatMap((p): MexcFuturesPosition[] => {
+      try {
+        const contractSize = sizes.get(p.symbol)!, markPrice = prices.get(p.symbol)!;
+        const size = positionField('contractSize', () => contractAmount(p.contracts, contractSize));
+        const unrealized = p.reportedUnrealized ?? positionField('unRealizedPnl', () => {
+          const difference = units(markPrice) - units(p.entryPrice);
+          const product = difference * units(p.contracts) * units(contractSize);
+          return sourceDecimal(roundedFuturesRatio(p.side === 'long' ? product : -product, SCALE * SCALE * SCALE, 8), true);
+        });
+        const candidate = { symbol: p.symbol, side: p.side, marginMode: p.marginMode, contracts: p.contracts,
+          size, entryPrice: p.entryPrice, markPrice, leverage: p.leverage, margin: p.margin,
+          unrealized, liquidationPrice: p.liquidationPrice,
+        };
+        // Validate each row before assembling the response; one bad row cannot reject its neighbours.
+        return positionField('position', () => {
+          const checked = validateMexcFutures({ status: 'ok', account, positions: [candidate], skippedPositions: 0 });
+          if (checked.status !== 'ok') throw new Error();
+          return checked.positions;
+        });
+      } catch (error) {
+        skipPosition(error, p.raw);
+        return [];
+      }
+    });
     return parse('futures-positions', positionsResponse, () =>
-      validateMexcFutures({
+      positionField('position', () => validateMexcFutures({
         status: 'ok',
         account,
         skippedPositions,
-        positions: pending.map((p) => ({
-          symbol: p.symbol,
-          side: p.positionType === '1' ? 'long' : p.positionType === '2' ? 'short' : null,
-          marginMode: p.openType === '1' ? 'isolated' : p.openType === '2' ? 'cross' : null,
-          contracts: p.contracts,
-          size: contractAmount(p.contracts, sizes.get(p.symbol)!),
-          entryPrice: sourceDecimal(p.holdAvgPriceFullyScale ?? p.holdAvgPrice, false, true),
-          markPrice: prices.get(p.symbol),
-          leverage: sourceDecimal(p.leverage, false, true),
-          margin: sourceDecimal(p.im),
-          unrealized: sourceDecimal(p.unRealizedPnl, true),
-          liquidationPrice:
-            p.liquidatePrice == null || sourceDecimal(p.liquidatePrice) === '0'
-              ? null
-              : sourceDecimal(p.liquidatePrice, false, true),
-        })),
-      }),
+        positions,
+      })),
     );
   } catch (error) {
     if (!(error instanceof ReadFailure))
