@@ -246,3 +246,26 @@ test('cloud import sends normalized positions only and reloads from the server w
   await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
   await expect(panel(page).getByRole('article')).toHaveCount(1);
 });
+
+
+test('six compact stock rows precede totals and operations, with full details on expansion', async ({ page }, info) => {
+  await open(page); await create(page, 'kgi');
+  await paste(page, '代號,股數,平均成本\n2330,1000,100\n2317,1000,100\n2454,1000,100\n2308,1000,100\n2881,1000,100\n6488,1000,100');
+  await save(page);
+  const rows = panel(page).locator('.holdings-position');
+  await expect(rows).toHaveCount(6);
+  await expect(rows.first().locator('details')).not.toHaveAttribute('open');
+  await panel(page).evaluate(el => { for (let parent: HTMLElement | null = el as HTMLElement; parent; parent = parent.parentElement) parent.scrollTop = 0; window.scrollTo(0, 0); });
+  const boxes = await rows.evaluateAll(nodes => nodes.map(node => { const r=node.getBoundingClientRect(); return { bottom:r.bottom, height:r.height }; }));
+  expect(boxes.every(b => b.height <= 72)).toBe(true);
+  if (info.project.name.includes('mobile') || info.project.name.includes('iphone'))
+    expect(boxes[4]!.bottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight - 64));
+  const totals = panel(page).getByRole('region', { name: '持股總計', exact: true });
+  expect((await totals.boundingBox())!.y).toBeGreaterThan((await rows.last().boundingBox())!.y);
+  await page.screenshot({ path: info.outputPath('holdings-compact-stocks.png') });
+  await rows.first().locator('summary').click();
+  await expect(rows.first().getByText('平均成本／股', { exact: true })).toBeVisible();
+  await expect(rows.first().getByText('今日損益', { exact: true })).toBeVisible();
+  await expect(rows.first().getByRole('button', { name: '隱藏', exact: true })).toBeVisible();
+  await layout(page);
+});

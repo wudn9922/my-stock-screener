@@ -52,7 +52,7 @@ describe('separate futures response and display', () => {
     expect(futuresReturn('1.25', '20')).toBe('+6.25%');
     expect(futuresReturn('0', '0')).toBe('—');
     const html = renderToStaticMarkup(<MexcFuturesPanel futures={sample()} />);
-    expect(html).toContain('僅供查看，未計入持股總值');
+    expect(html).toContain('合約權益計入美股總計');
     expect(html).toContain('-0.1');
     expect(html).toContain('-0.50%');
     expect(html).toContain('強平價');

@@ -57,3 +57,25 @@
 .mexc-futures-loss {
   color: #f46a75;
 }
+.mexc-futures { margin: 0 0 10px; padding: 0; border: 0; }
+.mexc-futures header small { font-size: 10px; }
+.mexc-futures > p { margin: 4px 0; font-size: 11px; }
+.mexc-futures-positions { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.mexc-futures article { padding: 6px 8px; position: relative; }
+.mexc-position-head { display: flex; gap: 6px; align-items: start; justify-content: space-between; }
+.mexc-position-head h5 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px; font-size: 13px; }
+.mexc-position-head h5 small { font-size: 10px; white-space: nowrap; }
+.mexc-position-head > div { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; overflow-wrap: anywhere; }
+.mexc-position-head > div > small { display: block; font-size: 10px; color: inherit; }
+.mexc-position-head strong small { font-size: 9px; color: inherit; }
+.mexc-position-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 5px 44px 0 0; }
+.mexc-position-grid dt { font-size: 9px; }
+.mexc-position-grid dd { margin: 2px 0 0; font-size: 11px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mexc-position-more > summary { position: absolute; right: 0; bottom: 0; width: 44px; display: grid; place-items: center; font-size: 10px; list-style: none; }
+.mexc-position-more > summary::-webkit-details-marker { display: none; }
+.mexc-position-more[open] > summary { position: static; margin-left: auto; }
+.mexc-futures-values { margin: 6px 0; }
+.mexc-position-head { line-height: 1.2; }
+.mexc-position-grid { line-height: 1.15; }
+/* Keep five normal positions above the navigation even at a 664px viewport. */
+.mexc-futures article { padding: 4px 8px; }

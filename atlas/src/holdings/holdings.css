@@ -199,3 +199,33 @@
     padding: 12px;
   }
 }
+
+/* Data first; operations and provenance below. Normal positions fit in one compact row. */
+.holdings-panel { gap: 10px; }
+.holdings-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.holdings-selectors { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); margin: 0; gap: 8px; }
+.holdings-selectors label { gap: 2px; font-size: 11px; color: var(--text-3); }
+.holdings-selectors select { font-size: 13px; padding: 6px; }
+.holdings-cards { display: block; }
+.holdings-position { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; }
+.holding-compact-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 6px; padding: 4px 0; list-style: none; min-height: 58px; font-size: 12px; }
+.holding-compact-row::-webkit-details-marker { display: none; }
+.holding-compact-row small { display: block; color: var(--text-3); font-size: 10px; }
+.holding-identity { display: grid; align-content: center; }
+.holdings-symbol { padding: 0; line-height: 16px; min-height: 44px; font-size: 14px; }
+.holding-identity small { margin-top: -8px; pointer-events: none; }
+.holding-number { text-align: right; align-content: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.holdings-position dl { margin: 8px 0; padding: 8px; }
+.holdings-retained { margin: 0 0 4px; color: var(--text-3); font-size: 11px; }
+.portfolio-total-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.portfolio-total-groups h4 { margin: 4px 0; }
+.portfolio-total-groups h4 small { color: var(--text-3); font-size: 11px; }
+.portfolio-total-values { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.portfolio-total-values div:last-child { grid-column: 1 / -1; }
+.portfolio-total-values dt { color: var(--text-3); font-size: 11px; }
+.portfolio-total-values dd { margin: 2px 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mexc-connected-status { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.mexc-connected-status span { font-size: 11px; color: var(--text-3); }
+.mexc-connected-status button { flex-shrink: 0; font-size: 12px; }
+.mexc-settings > summary { color: var(--text-3); font-size: 12px; }
+.mexc-settings[open] { display: grid; gap: 12px; }

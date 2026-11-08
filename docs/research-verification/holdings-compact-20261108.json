@@ -1,0 +1,23 @@
+{
+  "branch": "codex/holdings-compact-retained-values",
+  "base": "36ba6a42a8",
+  "tests": {
+    "vitestFiles": 164,
+    "vitestTests": 2156,
+    "desktopAnd390BrowserTests": 93,
+    "phone375BrowserTests": 62
+  },
+  "rootCause": "Missing symbol in a successful ticker batch replaced the entire quote map; pending revision mismatch also masked old prices. Frontend refresh itself did not clear valid futures. Reproduced offline; no production private response inspected.",
+  "conversion": "USDT/TWD divided by USD/TWD, otherwise native currencies separately. Futures equity once; capital basis equity minus account unrealized.",
+  "backendChanged": false,
+  "productionAccess": false,
+  "independentReview": false,
+  "sha256": {
+    "atlas/src/holdings/HoldingsPanel.tsx": "bbb58d9d04e358dff89ba60a755d37150ae5d64c046aab763d2816085c871ac9",
+    "atlas/src/holdings/MexcPanel.tsx": "70f8bbc8cef4595eac1a50b12bcaf2d56e61d7eba0b96c37d57500eaf1ae7b73",
+    "atlas/src/holdings/MexcFuturesPanel.tsx": "1df90bbfe330a178fe67b002975d31282046b3df1ea7bb5b55b71addb736f33f",
+    "atlas/src/holdings/mexc.ts": "43a2a490cc72e215c86739e56d3328ed16d886b959f54376849e052d8e574cce",
+    "atlas/src/holdings/portfolioTotals.ts": "e94111d001cf20865542c34adffc731fcf3c07d65851c08130ed4553111bbfcc",
+    "atlas/src/holdings/quoteRetention.ts": "546d189a6de0de1bcd4bb3e948e0cb59a0d1812a79515edd661f609fded2c712"
+  }
+}

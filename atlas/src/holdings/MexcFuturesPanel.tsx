@@ -34,7 +34,7 @@ export function MexcFuturesPanel({
     <section className="mexc-futures" aria-label="合約部位">
       <header>
         <h4>合約部位</h4>
-        <small>僅供查看，未計入持股總值</small>
+        <small>合約權益計入美股總計</small>
       </header>
       {loading && <p role="status">合約部位讀取中…</p>}
       {updatedAt && (
@@ -58,24 +58,6 @@ export function MexcFuturesPanel({
         <p role="status">合約資料暫時無法讀取。</p>
       ) : (
         <>
-          <dl className="mexc-futures-values" aria-label="合約帳戶摘要">
-            <div>
-              <dt>合約帳戶權益</dt>
-              <dd>{text(futures.account.equity)} USDT</dd>
-            </div>
-            <div>
-              <dt>可用</dt>
-              <dd>{text(futures.account.available)} USDT</dd>
-            </div>
-            <div>
-              <dt>已用保證金</dt>
-              <dd>{text(futures.account.positionMargin)} USDT</dd>
-            </div>
-            <div>
-              <dt>未實現盈虧合計</dt>
-              <dd className={tone(futures.account.unrealized)}>{signed(futures.account.unrealized)} USDT</dd>
-            </div>
-          </dl>
           {futures.skippedPositions > 0 && (
             <p role="note">有 {futures.skippedPositions} 筆合約資料格式不支援，未顯示。</p>
           )}
@@ -90,54 +72,103 @@ export function MexcFuturesPanel({
                   key={`${p.symbol}:${p.side}:${index}`}
                   aria-label={`${p.symbol} ${p.side === 'long' ? '多單' : '空單'} 合約部位`}
                 >
-                  <h5>
-                    {p.symbol}{' '}
-                    <span className={`mexc-futures-${p.side}`}>{p.side === 'long' ? '多' : '空'}</span>
-                  </h5>
-                  <dl className="mexc-futures-values">
-                    <div>
-                      <dt>張數</dt>
-                      <dd>{text(p.contracts)} 張</dd>
+                  <div className="mexc-position-head">
+                    <h5>
+                      {p.symbol}{' '}
+                      <span className={`mexc-futures-${p.side}`}>{p.side === 'long' ? '多' : '空'}</span>
+                      <small>
+                        {text(p.leverage)}× · {p.marginMode === 'isolated' ? '逐倉' : '全倉'}
+                      </small>
+                    </h5>
+                    <div className={tone(p.unrealized)} aria-label="未實現盈虧／報酬率">
+                      <strong>
+                        {signed(p.unrealized)} <small>USDT</small>
+                      </strong>
+                      <small>{futuresReturn(p.unrealized, p.margin)}</small>
                     </div>
+                  </div>
+                  <dl className="mexc-position-grid">
                     <div>
-                      <dt>幣數</dt>
-                      <dd>
-                        {text(p.size)} {p.symbol.slice(0, -5)}
-                      </dd>
+                      <dt>數量（{p.symbol.slice(0, -5)}）</dt>
+                      <dd>{text(p.size)}</dd>
                     </div>
                     <div>
                       <dt>開倉均價</dt>
-                      <dd>{text(p.entryPrice)} USDT</dd>
+                      <dd>{text(p.entryPrice)}</dd>
                     </div>
                     <div>
                       <dt>標記價</dt>
-                      <dd>{text(p.markPrice)} USDT</dd>
-                    </div>
-                    <div>
-                      <dt>槓桿與保證金模式</dt>
-                      <dd>
-                        {text(p.leverage)}× · {p.marginMode === 'isolated' ? '逐倉' : '全倉'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>保證金</dt>
-                      <dd>{text(p.margin)} USDT</dd>
-                    </div>
-                    <div>
-                      <dt>未實現盈虧／報酬率</dt>
-                      <dd className={tone(p.unrealized)}>
-                        {signed(p.unrealized)} USDT · {futuresReturn(p.unrealized, p.margin)}
-                      </dd>
+                      <dd>{text(p.markPrice)}</dd>
                     </div>
                     <div>
                       <dt>強平價</dt>
-                      <dd>{p.liquidationPrice === null ? '—' : text(p.liquidationPrice) + ' USDT'}</dd>
+                      <dd>{p.liquidationPrice === null ? '—' : text(p.liquidationPrice)}</dd>
                     </div>
                   </dl>
+                  <details className="mexc-position-more">
+                    <summary>更多</summary>
+                    <dl className="mexc-futures-values">
+                      <div>
+                        <dt>張數</dt>
+                        <dd>{text(p.contracts)} 張</dd>
+                      </div>
+                      <div>
+                        <dt>幣數</dt>
+                        <dd>
+                          {text(p.size)} {p.symbol.slice(0, -5)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>槓桿與保證金模式</dt>
+                        <dd>
+                          {text(p.leverage)}× · {p.marginMode === 'isolated' ? '逐倉' : '全倉'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>保證金</dt>
+                        <dd>{text(p.margin)} USDT</dd>
+                      </div>
+                      <div>
+                        <dt>開倉均價</dt>
+                        <dd>{text(p.entryPrice)} USDT</dd>
+                      </div>
+                      <div>
+                        <dt>標記價</dt>
+                        <dd>{text(p.markPrice)} USDT</dd>
+                      </div>
+                      <div>
+                        <dt>強平價</dt>
+                        <dd>{p.liquidationPrice === null ? '—' : text(p.liquidationPrice) + ' USDT'}</dd>
+                      </div>
+                    </dl>
+                  </details>
                 </article>
               ))}
             </div>
           )}
+          <details>
+            <summary>合約帳戶摘要</summary>
+            <dl className="mexc-futures-values" aria-label="合約帳戶摘要">
+              <div>
+                <dt>合約帳戶權益</dt>
+                <dd>{text(futures.account.equity)} USDT</dd>
+              </div>
+              <div>
+                <dt>可用</dt>
+                <dd>{text(futures.account.available)} USDT</dd>
+              </div>
+              <div>
+                <dt>已用保證金</dt>
+                <dd>{text(futures.account.positionMargin)} USDT</dd>
+              </div>
+              <div>
+                <dt>未實現盈虧合計</dt>
+                <dd className={tone(futures.account.unrealized)}>
+                  {signed(futures.account.unrealized)} USDT
+                </dd>
+              </div>
+            </dl>
+          </details>
         </>
       )}
     </section>

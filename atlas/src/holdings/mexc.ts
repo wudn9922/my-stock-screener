@@ -8,6 +8,7 @@ import {
   type MexcState,
 } from '../../../supabase/functions/user-settings/mexcContract';
 import { holdingsStore } from './store';
+import { retainQuotes } from './quoteRetention';
 import {
   validateMexcFutures,
   type MexcFutures,
@@ -27,6 +28,7 @@ const inactive = {
   accountErrors: {} as Record<string, string>,
   accountSkippedAssets: {} as Record<string, number>,
   accountSkippedAssetNames: {} as Record<string, string[]>,
+  accountRetainedQuotes: {} as Record<string, string[]>,
   accountFutures: {} as Record<string, MexcFutures>,
   futuresLoading: {} as Record<string, boolean>,
   futuresErrors: {} as Record<string, boolean>,
@@ -43,6 +45,7 @@ export class MexcStore {
     accountErrors: {} as Record<string, string>,
     accountSkippedAssets: {} as Record<string, number>,
     accountSkippedAssetNames: {} as Record<string, string[]>,
+    accountRetainedQuotes: {} as Record<string, string[]>,
     accountFutures: {} as Record<string, MexcFutures>,
     futuresLoading: {} as Record<string, boolean>,
     futuresErrors: {} as Record<string, boolean>,
@@ -147,6 +150,19 @@ export class MexcStore {
     this.snapshot = { ...this.snapshot, ...update };
     this.listeners.forEach((listener) => listener());
   }
+  private acceptState(state: MexcState, resetAccount?: string) {
+    const accountRetainedQuotes: Record<string, string[]> = {};
+    const connections = state.connections.map((connection) => {
+      const previous =
+        resetAccount === connection.accountId
+          ? undefined
+          : this.snapshot.state.connections.find((row) => row.accountId === connection.accountId);
+      const result = retainQuotes(previous?.quotes ?? {}, connection.quotes);
+      accountRetainedQuotes[connection.accountId] = result.retained;
+      return { ...connection, quotes: result.quotes };
+    });
+    this.set({ state: { ...state, connections }, accountRetainedQuotes });
+  }
   async load() {
     if (this.mode !== 'cloud') return;
     this.active();
@@ -155,7 +171,8 @@ export class MexcStore {
     try {
       const state = validateMexcState(await holdingsContextApi(this.context, 'holdings.mexc.status'));
       this.active();
-      this.set({ state, error: '' });
+      this.acceptState(state);
+      this.set({ error: '' });
     } catch {
       this.set({ error: '無法載入 MEXC 連線狀態，請確認同步服務已啟用。' });
     } finally {
@@ -218,8 +235,8 @@ export class MexcStore {
       if (accountId && action === 'disconnect') delete accountSkippedAssets[accountId];
       if (accountId && action === 'disconnect') delete accountSkippedAssetNames[accountId];
       if (accountId && action === 'disconnect') delete accountFutures[accountId];
+      this.acceptState(state, action === 'connect' ? accountId : undefined);
       this.set({
-        state,
         accountErrors,
         accountSkippedAssets,
         accountSkippedAssetNames,
@@ -262,7 +279,8 @@ export class MexcStore {
         try {
           const state = validateMexcState(await holdingsContextApi(this.context, 'holdings.mexc.status'));
           this.active();
-          this.set({ state, ...errorUpdate });
+          this.acceptState(state);
+          this.set(errorUpdate);
         } catch {
           /* Keep the local cooldown and fixed error when metadata is unavailable. */
         }

@@ -403,3 +403,54 @@ describe('independent RAM-only futures reads', () => {
     expect(store.getSnapshot().futuresUpdatedAt[accountId]).toBeUndefined();
   });
 });
+
+describe('spot quote refresh never blanks a held asset', () => {
+  const q = { price: '10', previous: null, source: 'MEXC fixture', asOf: '2026-11-08T00:00:00Z' };
+  const withQuote = { ...state, connections: [{ ...state.connections[0]!, quotes: { 'BTC/USDT': q } }] };
+  it('keeps the old price while sync is pending, after an omitted quote and after a metadata reload, then recovers', async () => {
+    const store = new MexcStore();
+    h.api.mockResolvedValueOnce(withQuote);
+    await store.load();
+    let finish!: (raw: unknown) => void;
+    h.api.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = store.call('sync', { accountId });
+    expect(store.getSnapshot().busy).toBe(true);
+    expect(store.getSnapshot().state.connections[0]!.quotes['BTC/USDT']).toEqual(q);
+    finish({ ...state, document: {} });
+    await pending;
+    expect(store.getSnapshot().state.connections[0]!.quotes['BTC/USDT']).toEqual(q);
+    expect(store.getSnapshot().accountRetainedQuotes[accountId]).toEqual(['BTC/USDT']);
+    h.api.mockResolvedValueOnce(state);
+    await store.load();
+    expect(store.getSnapshot().state.connections[0]!.quotes['BTC/USDT']!.asOf).toBe(q.asOf);
+    h.api.mockResolvedValueOnce({
+      ...withQuote,
+      document: {},
+      connections: [
+        {
+          ...withQuote.connections[0]!,
+          quotes: { 'BTC/USDT': { ...q, price: '12', asOf: '2026-11-08T00:01:00Z' } },
+        },
+      ],
+    });
+    await store.call('sync', { accountId });
+    expect(store.getSnapshot().state.connections[0]!.quotes['BTC/USDT']!.price).toBe('12');
+    expect(store.getSnapshot().accountRetainedQuotes[accountId]).toEqual([]);
+  });
+  it('does not carry a quote into a replacement key or a disconnected account', async () => {
+    const store = new MexcStore();
+    h.api.mockResolvedValueOnce(withQuote);
+    await store.load();
+    h.api.mockResolvedValueOnce({ ...state, document: {} });
+    await store.call('connect', { account: { id: accountId } });
+    expect(store.getSnapshot().state.connections[0]!.quotes).toEqual({});
+    h.api.mockResolvedValueOnce({ ...state, connections: [], document: {} });
+    await store.call('disconnect', { accountId });
+    expect(store.getSnapshot().accountRetainedQuotes).toEqual({});
+  });
+});

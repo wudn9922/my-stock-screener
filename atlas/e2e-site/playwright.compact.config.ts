@@ -5,7 +5,7 @@ const chromiumLaunch = process.env.ATLAS_CHROMIUM_PATH ? { launchOptions: { exec
 export default defineConfig({
   ...base,
   testDir: '.',
-  testMatch: ['mexc.spec.ts', 'index-volume.spec.ts', 'breakouts.spec.ts', 'pr-a-*.spec.ts', 'live-quotes.spec.ts', 'market-details.spec.ts', 'legacy-import.spec.ts', 'watchlist-board.spec.ts', 'workspace-refinements.spec.ts'],
+  testMatch: ['mexc.spec.ts', 'holdings.spec.ts', 'holdings-hide.spec.ts', 'index-volume.spec.ts', 'breakouts.spec.ts', 'pr-a-*.spec.ts', 'live-quotes.spec.ts', 'market-details.spec.ts', 'legacy-import.spec.ts', 'watchlist-board.spec.ts', 'workspace-refinements.spec.ts'],
   outputDir: '../test-results/site-compact',
   projects: [
     { name: 'mobile375-chromium', use: { ...devices['iPhone SE'], viewport: { width: 375, height: 667 }, ...chromiumLaunch, defaultBrowserType: 'chromium' } },
