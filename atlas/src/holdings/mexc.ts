@@ -8,7 +8,10 @@ import {
   type MexcState,
 } from '../../../supabase/functions/user-settings/mexcContract';
 import { holdingsStore } from './store';
-import { validateMexcFutures, type MexcFutures } from '../../../supabase/functions/user-settings/mexcFuturesContract';
+import {
+  validateMexcFutures,
+  type MexcFutures,
+} from '../../../supabase/functions/user-settings/mexcFuturesContract';
 export type { MexcConnection, MexcState } from '../../../supabase/functions/user-settings/mexcContract';
 
 const blank = {
@@ -25,6 +28,9 @@ const inactive = {
   accountSkippedAssets: {} as Record<string, number>,
   accountSkippedAssetNames: {} as Record<string, string[]>,
   accountFutures: {} as Record<string, MexcFutures>,
+  futuresLoading: {} as Record<string, boolean>,
+  futuresErrors: {} as Record<string, boolean>,
+  futuresUpdatedAt: {} as Record<string, string>,
 };
 export class MexcStore {
   private readonly context = getStorageContextKey();
@@ -38,8 +44,93 @@ export class MexcStore {
     accountSkippedAssets: {} as Record<string, number>,
     accountSkippedAssetNames: {} as Record<string, string[]>,
     accountFutures: {} as Record<string, MexcFutures>,
+    futuresLoading: {} as Record<string, boolean>,
+    futuresErrors: {} as Record<string, boolean>,
+    futuresUpdatedAt: {} as Record<string, string>,
   };
   private listeners = new Set<() => void>();
+  private futuresAttempts = new Map<string, number>();
+  private futuresRequests = new Map<string, Promise<void>>();
+  private futuresGeneration = new Map<string, number>();
+  private invalidateFutures(accountId: string) {
+    this.futuresGeneration.set(accountId, (this.futuresGeneration.get(accountId) ?? 0) + 1);
+  }
+  private acceptFutures(accountId: string, value: unknown, timestamp: unknown, reset = false) {
+    let futures: MexcFutures;
+    try {
+      futures = validateMexcFutures(value);
+    } catch {
+      futures = { status: 'unavailable' };
+    }
+    const validTime =
+      typeof timestamp === 'string' &&
+      /^\d{4}-\d{2}-\d{2}T/.test(timestamp) &&
+      timestamp.length <= 35 &&
+      Number.isFinite(Date.parse(timestamp));
+    const failed = futures.status === 'unavailable' || !validTime;
+    const accountFutures = { ...this.snapshot.accountFutures };
+    const futuresUpdatedAt = { ...this.snapshot.futuresUpdatedAt };
+    if (reset) {
+      delete accountFutures[accountId];
+      delete futuresUpdatedAt[accountId];
+    }
+    if (!failed) {
+      accountFutures[accountId] = futures;
+      futuresUpdatedAt[accountId] = timestamp as string;
+    } else if (!accountFutures[accountId]) accountFutures[accountId] = { status: 'unavailable' };
+    this.set({
+      accountFutures,
+      futuresUpdatedAt,
+      futuresErrors: { ...this.snapshot.futuresErrors, [accountId]: failed },
+    });
+  }
+  loadFutures(accountId: string): Promise<void> {
+    if (this.context !== getStorageContextKey() || this.mode !== 'cloud') return Promise.resolve();
+    const existing = this.futuresRequests.get(accountId);
+    if (existing) return existing;
+    if (
+      this.snapshot.busy ||
+      this.snapshot.loading ||
+      !this.snapshot.state.connections.some((c) => c.accountId === accountId) ||
+      Date.now() - (this.futuresAttempts.get(accountId) ?? -Infinity) < 60000
+    )
+      return Promise.resolve();
+    this.futuresAttempts.set(accountId, Date.now());
+    this.invalidateFutures(accountId);
+    const generation = this.futuresGeneration.get(accountId);
+    this.set({
+      futuresLoading: { ...this.snapshot.futuresLoading, [accountId]: true },
+    });
+    const request = (async () => {
+      try {
+        const raw = await holdingsContextApi<Record<string, unknown>>(this.context, 'holdings.mexc.futures', {
+          accountId,
+        });
+        this.active();
+        if (generation !== this.futuresGeneration.get(accountId)) return;
+        this.acceptFutures(accountId, raw.futures, raw.fetchedAt);
+      } catch {
+        if (generation === this.futuresGeneration.get(accountId))
+          this.set({
+            futuresErrors: {
+              ...this.snapshot.futuresErrors,
+              [accountId]: true,
+            },
+          });
+      } finally {
+        this.futuresRequests.delete(accountId);
+        if (generation === this.futuresGeneration.get(accountId))
+          this.set({
+            futuresLoading: {
+              ...this.snapshot.futuresLoading,
+              [accountId]: false,
+            },
+          });
+      }
+    })();
+    this.futuresRequests.set(accountId, request);
+    return request;
+  }
   getSnapshot = () => (this.context === getStorageContextKey() ? this.snapshot : inactive);
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -81,6 +172,12 @@ export class MexcStore {
         : typeof account?.id === 'string'
           ? account.id
           : undefined;
+    if (accountId && action !== 'apply') {
+      this.invalidateFutures(accountId);
+      this.set({
+        futuresLoading: { ...this.snapshot.futuresLoading, [accountId]: false },
+      });
+    }
     this.set({
       busy: true,
       error: '',
@@ -111,19 +208,40 @@ export class MexcStore {
       holdingsStore().acceptCloudDocument(raw.document);
       const accountErrors = { ...this.snapshot.accountErrors };
       const accountSkippedAssets = { ...this.snapshot.accountSkippedAssets };
-      const accountSkippedAssetNames = { ...this.snapshot.accountSkippedAssetNames };
+      const accountSkippedAssetNames = {
+        ...this.snapshot.accountSkippedAssetNames,
+      };
       const accountFutures = { ...this.snapshot.accountFutures };
-      if (accountId && syncing) {
-        try { accountFutures[accountId] = validateMexcFutures(raw.futures); }
-        catch { accountFutures[accountId] = { status: 'unavailable' }; }
-      }
       if (accountId) delete accountErrors[accountId];
       if (accountId && syncing) accountSkippedAssets[accountId] = Number(skippedAssets);
       if (accountId && syncing) accountSkippedAssetNames[accountId] = skippedAssetNames;
       if (accountId && action === 'disconnect') delete accountSkippedAssets[accountId];
       if (accountId && action === 'disconnect') delete accountSkippedAssetNames[accountId];
       if (accountId && action === 'disconnect') delete accountFutures[accountId];
-      this.set({ state, accountErrors, accountSkippedAssets, accountSkippedAssetNames, accountFutures });
+      this.set({
+        state,
+        accountErrors,
+        accountSkippedAssets,
+        accountSkippedAssetNames,
+        accountFutures,
+      });
+      if (accountId && syncing) {
+        this.futuresAttempts.set(accountId, Date.now());
+        this.acceptFutures(
+          accountId,
+          raw.futures,
+          raw.futuresFetchedAt ?? state.connections.find((c) => c.accountId === accountId)?.syncedAt,
+          action === 'connect',
+        );
+      }
+      if (accountId && action === 'disconnect') {
+        const futuresErrors = { ...this.snapshot.futuresErrors },
+          futuresUpdatedAt = { ...this.snapshot.futuresUpdatedAt };
+        delete futuresErrors[accountId];
+        delete futuresUpdatedAt[accountId];
+        this.futuresAttempts.delete(accountId);
+        this.set({ futuresErrors, futuresUpdatedAt });
+      }
       return state;
     } catch (error) {
       const message =

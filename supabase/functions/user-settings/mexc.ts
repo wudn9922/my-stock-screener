@@ -368,10 +368,11 @@ async function database(
   owner: string,
   operation: string,
   payload: Record<string, unknown> = {},
+  rpc = 'atlas_mexc_action',
 ) {
   let result;
   try {
-    result = await db.rpc('atlas_mexc_action', {
+    result = await db.rpc(rpc, {
       operation,
       owner_id: owner,
       payload,
@@ -585,6 +586,55 @@ export async function handleMexc(
       document: validateHoldingsDocument(row.document),
     };
   }
+  if (operation === 'futures') {
+    const key = await encryptionKey(master);
+    const requestId = crypto.randomUUID();
+    const claim = await database(db, owner, 'claim', { accountId, requestId }, 'atlas_mexc_futures_read');
+    const auth = await decryptMexcCredentials(claim.credential, key, owner, accountId);
+    const controller = new AbortController(),
+      timeout = setTimeout(() => controller.abort(), 9000);
+    try {
+      const info = await readMexc('/api/v3/apiKeyInfo', fetcher, controller.signal, now(), auth);
+      assertReadOnlyKey(info.value, auth.apiKey, info.status, info.diagnosticValue);
+      const permitted = String(holdingsObject(info.value).permissions)
+        .split(',')
+        .map((p) => p.trim())
+        .includes('CONTRACT_ACCOUNT_READ');
+      const futures = await readMexcFutures(auth, permitted, fetcher, controller.signal, now, diagnostic);
+      try {
+        await authorize();
+      } catch {
+        throw new MexcError('authorization', 403);
+      }
+      // A disconnect/key change while the GETs were in flight invalidates this read.
+      await database(
+        db,
+        owner,
+        'verify',
+        { accountId, requestId, credential: claim.credential },
+        'atlas_mexc_futures_read',
+      );
+      return { futures, fetchedAt: new Date(now()).toISOString() };
+    } catch (error) {
+      if (error instanceof MexcError && error.retryAfter) {
+        try {
+          await database(
+            db,
+            owner,
+            'backoff',
+            { accountId, requestId, seconds: error.retryAfter },
+            'atlas_mexc_futures_read',
+          );
+        } catch {
+          /* Independent backoff must never consume a spot reservation. */
+        }
+      }
+      if (error instanceof MexcError) throw error;
+      throw new MexcError('source', 502);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
   if (operation !== 'connect' && operation !== 'sync') throw new MexcError('invalid');
   const key = await encryptionKey(master);
   let auth: Credentials | undefined, account;
@@ -648,6 +698,7 @@ export async function handleMexc(
       skippedAssets,
       skippedAssetNames,
       futures,
+      futuresFetchedAt: new Date(now()).toISOString(),
     };
   } catch (error) {
     // No raw network errors, signed URLs, credentials, or balances enter logs.
