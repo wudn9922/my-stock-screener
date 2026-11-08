@@ -73,6 +73,7 @@ interface PendingPosition {
   margin: string;
   liquidationPrice: string | null;
   reportedUnrealized: string | null;
+  invalidReportedPnl: boolean;
 }
 
 export async function futuresAuth(
@@ -111,7 +112,7 @@ export function futuresJson(text: string): unknown {
     ),
   );
 }
-export function sourceDecimal(value: unknown, signed = false, positive = false): string {
+export function sourceDecimal(value: unknown, signed = false, positive = false, round = true): string {
   if (typeof value !== 'string' || !/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(value))
     throw new Error('Invalid futures number');
   const negative = value.startsWith('-');
@@ -120,7 +121,7 @@ export function sourceDecimal(value: unknown, signed = false, positive = false):
   const [whole, fraction = ''] = coefficient!.split('.');
   const point = whole!.length + Number(exponent),
     digits = whole! + fraction;
-  if (Math.abs(Number(exponent)) > 60 || digits.length > 100) throw new Error('Invalid futures range');
+  if (Math.abs(Number(exponent)) > 60) throw new Error('Invalid futures range');
   const expanded =
     point <= 0
       ? '0.' + '0'.repeat(-point) + digits
@@ -128,8 +129,14 @@ export function sourceDecimal(value: unknown, signed = false, positive = false):
         ? digits + '0'.repeat(point - digits.length)
         : digits.slice(0, point) + '.' + digits.slice(point);
   const [integer, decimal = ''] = expanded.split('.');
-  const magnitude =
-    integer!.replace(/^0+(?=\d)/, '') + (decimal.replace(/0+$/, '') ? '.' + decimal.replace(/0+$/, '') : '');
+  const normalizedInteger = integer!.replace(/^0+(?=\d)/, '');
+  if (normalizedInteger.length > 15) throw new Error('Invalid futures range');
+  if (round && decimal.replace(/0+$/, '').length > 18) {
+    // Only the nineteenth digit decides rounding: keep the BigInt allocation bounded.
+    const numerator = BigInt(normalizedInteger + decimal.slice(0, 19));
+    return futuresDecimal(roundedFuturesRatio(negative ? -numerator : numerator, 10n ** 19n, 18), signed, positive);
+  }
+  const magnitude = normalizedInteger + (decimal.replace(/0+$/, '') ? '.' + decimal.replace(/0+$/, '') : '');
   return futuresDecimal((negative && /[1-9]/.test(magnitude) ? '-' : '') + magnitude, signed, positive);
 }
 function units(value: string): bigint {
@@ -332,7 +339,7 @@ export async function readMexcFutures(
           const entryField = p.holdAvgPriceFullyScale == null || p.holdAvgPriceFullyScale === '' ? 'holdAvgPrice' : 'holdAvgPriceFullyScale';
           const entryPrice = positionField(entryField, () => sourceDecimal(p[entryField], false, true));
           const leverage = positionField('leverage', () => {
-            const value = sourceDecimal(p.leverage, false, true);
+            const value = sourceDecimal(p.leverage, false, true, false);
             if (!/^\d+$/.test(value)) throw new Error();
             return value;
           });
@@ -346,12 +353,15 @@ export async function readMexcFutures(
             const value = sourceDecimal(p.liquidatePrice, true);
             return value === '0' || value.startsWith('-') ? null : value;
           });
-          const reportedUnrealized = p.unRealizedPnl == null || p.unRealizedPnl === '' ? null
-            : positionField('unRealizedPnl', () => sourceDecimal(p.unRealizedPnl, true));
+          let reportedUnrealized: string | null = null, invalidReportedPnl = false;
+          if (p.unRealizedPnl != null && p.unRealizedPnl !== '') {
+            try { reportedUnrealized = sourceDecimal(p.unRealizedPnl, true); }
+            catch { invalidReportedPnl = true; }
+          }
           return [{ raw: p, contracts, symbol: p.symbol,
             side: p.positionType === '1' ? 'long' : 'short',
             marginMode: p.openType === '1' ? 'isolated' : 'cross',
-            entryPrice, leverage, margin, liquidationPrice, reportedUnrealized,
+            entryPrice, leverage, margin, liquidationPrice, reportedUnrealized, invalidReportedPnl,
           }];
         } catch (error) {
           skipPosition(error, raw);
@@ -442,6 +452,8 @@ export async function readMexcFutures(
         return positionField('position', () => {
           const checked = validateMexcFutures({ status: 'ok', account, positions: [candidate], skippedPositions: 0 });
           if (checked.status !== 'ok') throw new Error();
+          if (p.invalidReportedPnl) diagnostic('futures-positions', positionsResponse.status,
+            futuresDiagnosticMetadata({ field: 'unRealizedPnl', positionKeys: Object.keys(p.raw) }), 'pnl-fallback');
           return checked.positions;
         });
       } catch (error) {

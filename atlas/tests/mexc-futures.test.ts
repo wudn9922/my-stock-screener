@@ -1,6 +1,11 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { futuresAuth, futuresJson, roundedFuturesRatio, sourceDecimal } from '../../supabase/functions/user-settings/mexcFutures';
+import {
+  futuresAuth,
+  futuresJson,
+  roundedFuturesRatio,
+  sourceDecimal,
+} from '../../supabase/functions/user-settings/mexcFutures';
 import { validateMexcFutures } from '../../supabase/functions/user-settings/mexcFuturesContract';
 import { createMexcFixture, MEXC_ACCOUNT, TEST_KEY, TEST_SECRET } from './fixtures/mexcHarness';
 import {
@@ -44,7 +49,9 @@ afterEach(() => {
     const event = JSON.parse(line);
     if (event.step.startsWith('futures-')) {
       expect(
-        Object.keys(event).every((key) => ['step', 'status', 'reason', 'code', 'msg', 'field', 'positionKeys'].includes(key)),
+        Object.keys(event).every((key) =>
+          ['step', 'status', 'reason', 'code', 'msg', 'field', 'positionKeys'].includes(key),
+        ),
       ).toBe(true);
       if (event.positionKeys) {
         expect(Array.isArray(event.positionKeys)).toBe(true);
@@ -64,6 +71,79 @@ const fixture = () => {
 };
 
 describe('read-only Futures V1', () => {
+  it.each([
+    ['1.123456789012345678995', '1.123456789012345679'],
+    ['-1.123456789012345678995', '-1.123456789012345679'],
+    ['1.234567890123456789950123456789e-2', '0.012345678901234568'],
+  ])('rounds high-precision source PnL %s to %s without skipping the position', async (raw, expected) => {
+    const f = fixture(),
+      data = futuresResponses();
+    (data[positionsPath] as Record<string, unknown>[])[0]!.unRealizedPnl = raw;
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures).toMatchObject({
+      status: 'ok',
+      skippedPositions: 0,
+      positions: [{ unrealized: expected }, { unrealized: '1.25' }],
+    });
+    expect(warnings).toEqual([]);
+  });
+  it.each(['PRIVATE_BAD_FIELD', '1000000000000000', '--1', 'NaN'])(
+    'derives PnL when the reported PnL is invalid (%s), without losing the position',
+    async (raw) => {
+      const f = fixture(),
+        data = futuresResponses();
+      (data[positionsPath] as Record<string, unknown>[])[0]!.unRealizedPnl = raw;
+      f.setFutures(data);
+      const result = await f.handler()(connect);
+      expect(result.body.data.futures).toMatchObject({
+        status: 'ok',
+        skippedPositions: 0,
+        positions: [{ unrealized: '-0.5' }, { unrealized: '1.25' }],
+      });
+      expect(warnings).toHaveLength(1);
+      expect(JSON.parse(warnings[0]!)).toMatchObject({
+        reason: 'pnl-fallback',
+        field: 'unRealizedPnl',
+      });
+      expect(warnings[0]).not.toContain(raw);
+    },
+  );
+  it('rounds long fractions with bounded BigInt inputs and rejects integer overflow and leverage fractions', () => {
+    expect(sourceDecimal('1.' + '0'.repeat(300) + '1')).toBe('1');
+    expect(sourceDecimal('-0.0000000000000000005', true)).toBe('-0.000000000000000001');
+    expect(() => sourceDecimal('999999999999999.9999999999999999995')).toThrow();
+    expect(() => sourceDecimal('1000000000000000')).toThrow();
+    expect(() => sourceDecimal('-1')).toThrow();
+    expect(() => sourceDecimal('10.000000000000000000001', false, true, false)).toThrow();
+  });
+  it.each([
+    'holdVol',
+    'holdAvgPrice',
+    'holdAvgPriceFullyScale',
+    'im',
+    'liquidatePrice',
+    'fairPrice',
+    'contractSize',
+  ])('rounds financial source field %s beyond 18 decimal places', async (field) => {
+    const f = fixture(),
+      data = futuresResponses();
+    const row =
+      field === 'fairPrice'
+        ? (data[tickerPath] as Record<string, unknown>[])[0]!
+        : field === 'contractSize'
+          ? (data[detailPath] as Record<string, unknown>[])[0]!
+          : (data[positionsPath] as Record<string, unknown>[])[0]!;
+    const raw =
+      field === 'contractSize' ? '0.00010000000000000000000000001' : '30.00000000000000000000000000001';
+    row[field] = raw;
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures.status).toBe('ok');
+    expect(result.body.data.futures.skippedPositions).toBe(0);
+    expect(result.body.data.futures.positions).toHaveLength(2);
+    expect(warnings).toEqual([]);
+  });
   it('supports documented positions without unRealizedPnl and with nonpositive liquidation prices', async () => {
     const f = createMexcFixture();
     f.setFutures(documentedFuturesResponses());
@@ -79,84 +159,110 @@ describe('read-only Futures V1', () => {
     });
     expect(warnings).toEqual([]);
   });
-  it.each(['state', 'positionType', 'openType', 'unRealizedPnl', 'holdAvgPriceFullyScale', 'liquidatePrice'])(
-    'skips only the position with invalid %s and reports safe field metadata', async (field) => {
-    const f = fixture(), data = futuresResponses();
-    (data[positionsPath] as Record<string, unknown>[])[0]![field] = 'PRIVATE_BAD_FIELD';
-    f.setFutures(data);
-    const response = await f.handler()(connect);
-    expect(response.body.data.futures).toMatchObject({
-      status: 'ok', skippedPositions: 1, positions: [{ symbol: 'ETH_USDT' }],
-    });
-    expect(response.body.data.futures.positions).toHaveLength(1);
-    expect(warnings).toHaveLength(1);
-    expect(JSON.parse(warnings[0]!)).toMatchObject({
-      step: 'futures-positions', status: 200, reason: 'invalid-response', field,
-      positionKeys: expect.arrayContaining(['state', 'symbol', 'holdVol']),
-    });
-  });
+  it.each(['state', 'positionType', 'openType', 'holdAvgPriceFullyScale', 'liquidatePrice'])(
+    'skips only the position with invalid %s and reports safe field metadata',
+    async (field) => {
+      const f = fixture(),
+        data = futuresResponses();
+      (data[positionsPath] as Record<string, unknown>[])[0]![field] = 'PRIVATE_BAD_FIELD';
+      f.setFutures(data);
+      const response = await f.handler()(connect);
+      expect(response.body.data.futures).toMatchObject({
+        status: 'ok',
+        skippedPositions: 1,
+        positions: [{ symbol: 'ETH_USDT' }],
+      });
+      expect(response.body.data.futures.positions).toHaveLength(1);
+      expect(warnings).toHaveLength(1);
+      expect(JSON.parse(warnings[0]!)).toMatchObject({
+        step: 'futures-positions',
+        status: 200,
+        reason: 'invalid-response',
+        field,
+        positionKeys: expect.arrayContaining(['state', 'symbol', 'holdVol']),
+      });
+    },
+  );
   it.each([undefined, null, '', 0, '0', '-0', '-1', '-1e30'])(
-    'normalizes missing or nonpositive liquidation price %j without losing a position', async (value) => {
-      const f = fixture(), data = documentedFuturesResponses();
+    'normalizes missing or nonpositive liquidation price %j without losing a position',
+    async (value) => {
+      const f = fixture(),
+        data = documentedFuturesResponses();
       for (const row of data[positionsPath] as Record<string, unknown>[]) row.liquidatePrice = value;
       f.setFutures(data);
       const result = await f.handler()(connect);
       expect(result.body.data.futures).toMatchObject({
-        status: 'ok', skippedPositions: 0,
+        status: 'ok',
+        skippedPositions: 0,
         positions: [{ liquidationPrice: null }, { liquidationPrice: null }],
       });
       expect(warnings).toEqual([]);
     },
   );
   it('preserves supplied unrealized PnL, including zero and 18-decimal values', async () => {
-    const f = fixture(), data = documentedFuturesResponses();
+    const f = fixture(),
+      data = documentedFuturesResponses();
     const rows = data[positionsPath] as Record<string, unknown>[];
     rows[0]!.unRealizedPnl = '0';
     rows[1]!.unRealizedPnl = '-0.123456789012345678';
     f.setFutures(data);
     const result = await f.handler()(connect);
-    expect(result.body.data.futures.positions.map((p: { unrealized: string }) => p.unrealized))
-      .toEqual(['0', '-0.123456789012345678']);
+    expect(result.body.data.futures.positions.map((p: { unrealized: string }) => p.unrealized)).toEqual([
+      '0',
+      '-0.123456789012345678',
+    ]);
   });
   it('uses the full-scale entry price and exact decimal differences without a Number round trip', async () => {
-    const f = fixture(), data = documentedFuturesResponses();
+    const f = fixture(),
+      data = documentedFuturesResponses();
     Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, {
-      holdVol: '1', holdAvgPriceFullyScale: '900719925474099.123456789012345678',
+      holdVol: '1',
+      holdAvgPriceFullyScale: '900719925474099.123456789012345678',
     });
     (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '1';
     (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '900719925474099.123456808888888888';
     f.setFutures(data);
     const result = await f.handler()(connect);
     expect(result.body.data.futures.positions[0]).toMatchObject({
-      entryPrice: '900719925474099.123456789012345678', size: '1', unrealized: '0.00000002',
+      entryPrice: '900719925474099.123456789012345678',
+      size: '1',
+      unrealized: '0.00000002',
     });
     expect(result.body.data.futures.skippedPositions).toBe(0);
   });
   it('rounds fractional contract products and PnL instead of rejecting excess decimal places', async () => {
-    const f = fixture(), data = documentedFuturesResponses();
+    const f = fixture(),
+      data = documentedFuturesResponses();
     Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, {
-      holdVol: '0.123456789012345678', holdAvgPrice: '1',
+      holdVol: '0.123456789012345678',
+      holdAvgPrice: '1',
     });
     (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.123456789012345678';
     (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '2.111111111';
     f.setFutures(data);
     const result = await f.handler()(connect);
     expect(result.body.data.futures.positions[0]).toMatchObject({
-      size: '0.015241578753238837', unrealized: '0.01693509',
+      size: '0.015241578753238837',
+      unrealized: '0.01693509',
     });
     expect(result.body.data.futures.skippedPositions).toBe(0);
   });
-  it.each([['1.000000005', '0.00000001'], ['0.999999995', '-0.00000001']])(
-    'rounds a computed mark price %s to PnL %s', async (mark, pnl) => {
-      const f = fixture(), data = documentedFuturesResponses();
-      Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, { holdVol: '1', holdAvgPrice: '1' });
-      (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '1';
-      (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = mark;
-      f.setFutures(data);
-      const result = await f.handler()(connect);
-      expect(result.body.data.futures.positions[0].unrealized).toBe(pnl);
-    },
-  );
+  it.each([
+    ['1.000000005', '0.00000001'],
+    ['0.999999995', '-0.00000001'],
+  ])('rounds a computed mark price %s to PnL %s', async (mark, pnl) => {
+    const f = fixture(),
+      data = documentedFuturesResponses();
+    Object.assign((data[positionsPath] as Record<string, unknown>[])[0]!, {
+      holdVol: '1',
+      holdAvgPrice: '1',
+    });
+    (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '1';
+    (data[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = mark;
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.body.data.futures.positions[0].unrealized).toBe(pnl);
+  });
   it('rounds recurring ratios with signed half-up arithmetic', () => {
     expect(roundedFuturesRatio(1n, 3n, 8)).toBe('0.33333333');
     expect(roundedFuturesRatio(2n, 3n, 8)).toBe('0.66666667');
@@ -165,19 +271,33 @@ describe('read-only Futures V1', () => {
     expect(roundedFuturesRatio(-1n, 1000000000n, 8)).toBe('0');
   });
   it('never logs position values or arbitrary keys, and caps the key list at 40 names', async () => {
-    const f = fixture(), data = documentedFuturesResponses();
+    const f = fixture(),
+      data = documentedFuturesResponses();
     const row = (data[positionsPath] as Record<string, unknown>[])[0]!;
-    Object.assign(row, { state: 'PRIVATE_BAD_FIELD', [TEST_SECRET]: TEST_KEY,
-      BTC_USDT: '123456789.987654321', '123456789.987654321': TEST_SECRET });
+    Object.assign(row, {
+      state: 'PRIVATE_BAD_FIELD',
+      [TEST_SECRET]: TEST_KEY,
+      BTC_USDT: '123456789.987654321',
+      '123456789.987654321': TEST_SECRET,
+    });
     for (let i = 0; i < 50; i++) row[`PRIVATE_BAD_FIELD_${i}`] = TEST_KEY;
     f.setFutures(data);
     const result = await f.handler()(connect);
-    expect(result.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1 });
+    expect(result.body.data.futures).toMatchObject({
+      status: 'ok',
+      skippedPositions: 1,
+    });
     const event = JSON.parse(warnings[0]!);
-    expect(event).toMatchObject({ field: 'state', positionKeys: expect.arrayContaining(['positionId', '[other]']) });
+    expect(event).toMatchObject({
+      field: 'state',
+      positionKeys: expect.arrayContaining(['positionId', '[other]']),
+    });
     expect(Object.keys(event).sort()).toEqual(['field', 'positionKeys', 'reason', 'status', 'step']);
-    expect(Object.values(row).filter(v => typeof v === 'string' && v.length > 4)
-      .every(v => !warnings.join('\n').includes(v as string))).toBe(true);
+    expect(
+      Object.values(row)
+        .filter((v) => typeof v === 'string' && v.length > 4)
+        .every((v) => !warnings.join('\n').includes(v as string)),
+    ).toBe(true);
   });
   it('signs the exact sorted GET parameter string, excluding nulls, with fixed-time headers', async () => {
     const timestamp = 1794000000000;
@@ -206,7 +326,7 @@ describe('read-only Futures V1', () => {
     expect(sourceDecimal('-1.25', true)).toBe('-1.25');
     expect(() => sourceDecimal('-1.25')).toThrow();
     expect(() => sourceDecimal('1e100')).toThrow();
-    expect(() => sourceDecimal('0.0000000000000000001')).toThrow();
+    expect(sourceDecimal('0.0000000000000000001')).toBe('0');
   });
   it('maps long/short and isolated/cross, computes coin size exactly and never persists contract data', async () => {
     const f = fixture(),
@@ -310,7 +430,11 @@ describe('read-only Futures V1', () => {
     f.setFutures(source);
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
-    expect(response.body.data.futures).toMatchObject({ status: 'ok', positions: [], skippedPositions: 2 });
+    expect(response.body.data.futures).toMatchObject({
+      status: 'ok',
+      positions: [],
+      skippedPositions: 2,
+    });
     expect(f.upstream.filter((c) => new URL(c.url).pathname.startsWith('/api/v1/'))).toHaveLength(2);
     expect(warnings).toEqual([]);
   });
@@ -357,7 +481,11 @@ describe('read-only Futures V1', () => {
     const f = fixture(),
       data = futuresResponses();
     data[positionsPath] = () =>
-      Response.json({ success: false, code, message: 'No permission to access the endpoint' });
+      Response.json({
+        success: false,
+        code,
+        message: 'No permission to access the endpoint',
+      });
     f.setFutures(data);
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
@@ -372,7 +500,9 @@ describe('read-only Futures V1', () => {
         if (failure === 'http') return Response.json({ success: false, code: 500 }, { status: 500 });
         if (failure === 'network') throw new Error(TEST_SECRET);
         if (failure === 'oversize')
-          return new Response('private', { headers: { 'Content-Length': '2097153' } });
+          return new Response('private', {
+            headers: { 'Content-Length': '2097153' },
+          });
         if (failure === 'stream-size') return new Response(' '.repeat(2097153));
         if (failure === 'invalid-json') return new Response(TEST_SECRET);
         return Response.json({ success: 'true', code: 0, data: [] });
@@ -420,34 +550,43 @@ describe('read-only Futures V1', () => {
     },
   );
   it('skips a position whose positive size is too small to represent, preserving its neighbour', async () => {
-      const f = fixture(),
-        data = futuresResponses();
-      (data[positionsPath] as Record<string, unknown>[])[0]!.holdVol = '0.1';
-      (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.000000000000000001';
-      f.setFutures(data);
-      const result = await f.handler()(connect);
-      expect(result.status).toBe(200);
-      expect(result.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1,
-        positions: [{ symbol: 'ETH_USDT' }] });
-      expect(result.body.data.futures.positions).toHaveLength(1);
-      expect(JSON.parse(warnings[0]!)).toMatchObject({ field: 'contractSize' });
+    const f = fixture(),
+      data = futuresResponses();
+    (data[positionsPath] as Record<string, unknown>[])[0]!.holdVol = '0.1';
+    (data[detailPath] as Record<string, unknown>[])[0]!.contractSize = '0.000000000000000001';
+    f.setFutures(data);
+    const result = await f.handler()(connect);
+    expect(result.status).toBe(200);
+    expect(result.body.data.futures).toMatchObject({
+      status: 'ok',
+      skippedPositions: 1,
+      positions: [{ symbol: 'ETH_USDT' }],
+    });
+    expect(result.body.data.futures.positions).toHaveLength(1);
+    expect(JSON.parse(warnings[0]!)).toMatchObject({ field: 'contractSize' });
   });
   it('retains unavailable for a public mark-price response missing all requested contracts', async () => {
-    const f = fixture(), data = futuresResponses();
+    const f = fixture(),
+      data = futuresResponses();
     data[tickerPath] = [];
     f.setFutures(data);
     expect((await f.handler()(connect)).body.data.futures.status).toBe('unavailable');
   });
   it.each([null, {}, 'PRIVATE_BAD_FIELD'])(
-    'rejects a malformed positions container %j without logging its contents', async (positions) => {
-      const f = fixture(), data = futuresResponses();
+    'rejects a malformed positions container %j without logging its contents',
+    async (positions) => {
+      const f = fixture(),
+        data = futuresResponses();
       data[positionsPath] = positions;
       f.setFutures(data);
       const result = await f.handler()(connect);
       expect(result.status).toBe(200);
       expect(result.body.data.futures).toEqual({ status: 'unavailable' });
       expect(JSON.parse(warnings[0]!)).toEqual({
-        step: 'futures-positions', status: 200, reason: 'invalid-response', field: 'data',
+        step: 'futures-positions',
+        status: 200,
+        reason: 'invalid-response',
+        field: 'data',
       });
     },
   );
@@ -460,8 +599,11 @@ describe('read-only Futures V1', () => {
       f.setFutures(data);
       const response = await f.handler()(connect);
       expect(response.status).toBe(200);
-      expect(response.body.data.futures).toMatchObject({ status: 'ok', skippedPositions: 1,
-        positions: [{ symbol: 'ETH_USDT' }] });
+      expect(response.body.data.futures).toMatchObject({
+        status: 'ok',
+        skippedPositions: 1,
+        positions: [{ symbol: 'ETH_USDT' }],
+      });
       expect(response.body.data.futures.positions).toHaveLength(1);
       expect(JSON.parse(warnings[0]!)).toMatchObject({ field });
     },
@@ -489,10 +631,15 @@ describe('read-only Futures V1', () => {
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
     expect(response.body.data.futures.status).toBe('ok');
-    expect(response.body.data.futures.positions.map((p: { size: string }) => p.size)).toEqual(['0.0005', '0.025']);
+    expect(response.body.data.futures.positions.map((p: { size: string }) => p.size)).toEqual([
+      '0.0005',
+      '0.025',
+    ]);
     // The oversized unfiltered list (the production failure) is never requested.
     const unfiltered = f.upstream.filter(
-      (c) => [detailPath, tickerPath].includes(new URL(c.url).pathname) && !new URL(c.url).searchParams.has('symbol'),
+      (c) =>
+        [detailPath, tickerPath].includes(new URL(c.url).pathname) &&
+        !new URL(c.url).searchParams.has('symbol'),
     );
     expect(unfiltered).toHaveLength(0);
     expect(warnings).toEqual([]);
@@ -511,13 +658,21 @@ describe('read-only Futures V1', () => {
   it('refuses a per-symbol answer for a different contract', async () => {
     const f = fixture(),
       data = futuresResponses();
-    data[tickerPath] = () => Response.json({ success: true, code: 0, data: { symbol: 'OTHER_USDT', fairPrice: '1' } });
+    data[tickerPath] = () =>
+      Response.json({
+        success: true,
+        code: 0,
+        data: { symbol: 'OTHER_USDT', fairPrice: '1' },
+      });
     f.setFutures(data);
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
     expect(response.body.data.futures.status).toBe('unavailable');
     expect(warnings).toHaveLength(1);
-    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'invalid-response' });
+    expect(JSON.parse(warnings[0]!)).toMatchObject({
+      step: 'futures-detail',
+      reason: 'invalid-response',
+    });
   });
   it('caps per-symbol concurrency for 20 distinct symbols and still avoids the full lists', async () => {
     const f = fixture(),
@@ -553,9 +708,14 @@ describe('read-only Futures V1', () => {
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
     expect(response.body.data.futures.status).toBe('unavailable');
-    expect(f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname)).length).toBeLessThan(24);
+    expect(
+      f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname)).length,
+    ).toBeLessThan(24);
     expect(warnings).toHaveLength(1);
-    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'upstream-http' });
+    expect(JSON.parse(warnings[0]!)).toMatchObject({
+      step: 'futures-detail',
+      reason: 'upstream-http',
+    });
   });
   it('falls back to the two full lists with an 8 MiB cap above 20 distinct symbols', async () => {
     const f = fixture(),
@@ -569,7 +729,10 @@ describe('read-only Futures V1', () => {
     expect(response.body.data.futures.status).toBe('ok');
     expect(response.body.data.futures.positions).toHaveLength(21);
     const publicCalls = f.upstream.filter((c) => [detailPath, tickerPath].includes(new URL(c.url).pathname));
-    expect(publicCalls.map((c) => new URL(c.url).pathname + new URL(c.url).search)).toEqual([detailPath, tickerPath]);
+    expect(publicCalls.map((c) => new URL(c.url).pathname + new URL(c.url).search)).toEqual([
+      detailPath,
+      tickerPath,
+    ]);
     expect(warnings).toEqual([]);
   });
   it.each(['content-length', 'stream'] as const)(
@@ -579,14 +742,20 @@ describe('read-only Futures V1', () => {
         data = manyFuturesResponses(21);
       data[detailPath] =
         kind === 'content-length'
-          ? () => new Response('{}', { headers: { 'Content-Length': String(8 * 1024 * 1024 + 1) } })
+          ? () =>
+              new Response('{}', {
+                headers: { 'Content-Length': String(8 * 1024 * 1024 + 1) },
+              })
           : publicList(data[detailPath] as Record<string, unknown>[], 8 * 1024 * 1024 + 1);
       f.setFutures(data);
       const response = await f.handler()(connect);
       expect(response.status).toBe(200);
       expect(response.body.data.futures.status).toBe('unavailable');
       expect(warnings).toHaveLength(1);
-      expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'response-size-or-empty' });
+      expect(JSON.parse(warnings[0]!)).toMatchObject({
+        step: 'futures-detail',
+        reason: 'response-size-or-empty',
+      });
     },
   );
   it('keeps the 2 MiB cap on per-symbol and private reads', async () => {
@@ -597,6 +766,9 @@ describe('read-only Futures V1', () => {
     const response = await f.handler()(connect);
     expect(response.status).toBe(200);
     expect(response.body.data.futures.status).toBe('unavailable');
-    expect(JSON.parse(warnings[0]!)).toMatchObject({ step: 'futures-detail', reason: 'response-size-or-empty' });
+    expect(JSON.parse(warnings[0]!)).toMatchObject({
+      step: 'futures-detail',
+      reason: 'response-size-or-empty',
+    });
   });
 });
