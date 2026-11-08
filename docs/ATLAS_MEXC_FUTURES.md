@@ -27,7 +27,19 @@
 3. 超過 20 個代號時，逐代號請求在共用 9 秒期限內不可行（最多 400 個請求，也會撞到公開端點頻率限制），改回各讀一次全清單；**只有這兩個公開全清單**上限放寬為 **8 MiB**（2026-11 前實測 1.4 MB／0.6 MB，保留約 6 倍成長空間），私有端點與逐代號讀取仍為 2 MiB。超過 8 MiB 仍降級 unavailable，不截斷。
 4. 其他不變：固定 `https://api.mexc.com`、GET、`redirect: error`、no-store、no-referrer、宣告與串流雙重大小檢查、共用 9 秒 AbortController、嚴格解析與精度。診斷仍只記 step／status／固定 reason／允許的 code 與 msg，不記代號、金額、query 或 Key。
 
-**官方文件核對的限制**：本次工作環境的網路政策封鎖 `www.mexc.com`、`api.mexc.com` 與 MEXC 文件鏡像，無法直接開啟官方頁面或打公開端點。端點與 `symbol` 參數是由搜尋引擎索引的上述兩個官方頁面內容確認（2026-11-07），並與先前已核對的路徑一致。部署前建議維護者以瀏覽器打開兩頁並以 `curl 'https://api.mexc.com/api/v1/contract/ticker?symbol=BTC_USDT'` 確認 `data` 形狀；程式已同時接受物件或陣列。
+**2026-11-07 核對時的限制**：當時工作環境的網路政策封鎖 `www.mexc.com`、`api.mexc.com` 與 MEXC 文件鏡像，端點與 `symbol` 參數由搜尋引擎索引的上述兩個官方頁面確認。2026-11-08 的解析修訂已直接讀取官方 open_positions 與 ticker 文件，但沒有呼叫公開行情或私人帳戶；程式仍同時接受公開端點的物件或陣列回應。
+
+## 2026-11-08 修正：持倉欄位缺漏與逐筆隔離
+
+正式記錄出現 `futures-positions`／HTTP 200／`invalid-response`，現貨及合約資產已成功。此次使用假回應覆蓋缺漏欄位的情況；不讀取真實持倉。現行官方 open_positions 文件列有 `unRealizedPnl`，但實際回應不能以它為必填條件；`liquidatePrice` 的官方描述為逐倉強平價，不能把全倉的非正哨兵當成有效價格。
+
+- `unRealizedPnl` 有有效值時原樣保留，包含零與18位小數。缺少、null或空字串時，優先用 `holdAvgPriceFullyScale`，缺省用 `holdAvgPrice`；配合公開 ticker 的 `fairPrice`、`holdVol × contractSize` 計算。多單為 `(fairPrice − entryPrice) × holdVol × contractSize`，空單方向相反。沒有用已實現損益或報酬比例代替。
+- 金融運算使用18位固定尺度的BigInt，輸入數值不經Number。合約幣數四捨五入至18位；推算未實現盈虧直接使用未先行捨入的原始乘積，最後四捨五入至8位，負數在恰好一半時遠離零。共用比值工具也能處理1/3等循環小數；不再因乘積超出18位小數就拒絕整份資料。
+- 強平價缺少、null、空字串、零或負數均回null，畫面顯示「—」。其他單筆格式錯誤（方向／模式／狀態、均價、張數、保證金等）只跳過該筆，計入 `skippedPositions`。每筆都通過原回應契約後才合併；全部跳過時顯示「目前沒有可顯示的合約持倉」。原本閉倉、零張數與不支援代號規則保留。
+- positions容器不是陣列、超過200筆，或既有上游／公開行情整份回應失敗時，仍回unavailable；沒有用估計的標記價補缺。現貨流程、skippedAssetNames、20檔以下逐檔讀取、4個並行及2 MiB上限不變；超過20檔既有的兩個8 MiB公開全清單備援也不變。
+- 逐筆 `invalid-response` 只額外記固定 `field` 及該筆 `positionKeys`。最多讀前40個欄位名，已知官方鍵名保留，未知鍵名替換為 `[other]` 並去重；不記任何持倉欄位值、幣名、金額、數量或Key。整份positions結構錯誤只記 `field: data`，不記原始內容。HTTP status及原有技術錯誤碼／白名單訊息沿用既有規則。
+
+此修訂不需SQL或新環境變數。維護者審查後更新user-settings（`mexcFutures.ts`及`mexc.ts`）與Atlas提示文案；本次只推PR，不部署。沒有改金鑰加密、雲端授權、限流、背景同步或現貨快照，合約仍只在RAM中顯示。
 
 ## 執行順序與隔離
 
@@ -50,13 +62,13 @@
 | entryPrice | holdAvgPriceFullyScale，缺省時 holdAvgPrice |
 | markPrice | 該代號 ticker.fairPrice |
 | leverage／margin | leverage／im |
-| unrealized | unRealizedPnl，允許負數 |
-| liquidationPrice | liquidatePrice；缺漏、null 或零表示未知，回 null |
+| unrealized | 優先unRealizedPnl；缺省依fairPrice、持倉均價與張數×contractSize推算，允許負數 |
+| liquidationPrice | liquidatePrice；缺漏、null、零或負數表示未知，回 null |
 | marginMode | openType 1 逐倉、2 全倉 |
 
-上游金融數字常是 JSON number。解析時先驗證 JSON 與成功 envelope，再保留原始數字 token 轉成十進位字串，避免經過 JavaScript Number 而丟失精度。科學記號精確展開，數值使用原持股規則的 15 位整數／18 位小數上限；只允許未實現盈虧為負數。張數乘 contractSize 使用 BigInt 固定小數，超出精度或範圍即降級 unavailable，不截斷或捏造幣數。
+上游金融數字常是 JSON number。解析時先驗證 JSON 與成功 envelope，再保留原始數字 token 轉成十進位字串，避免經過 JavaScript Number 而丟失精度。科學記號精確展開，輸入與可顯示數值沿用原持股規則的15位整數／18位小數上限；只有輸出的未實現盈虧可為負數，負強平哨兵先歸null。張數乘contractSize使用BigInt固定小數並四捨五入，範圍無法顯示或幣數小到捨入為零時只跳過該筆，不捏造正幣數。合約帳戶摘要仍取assets來源，不以可能略過部分部位的清單反推。
 
-嚴格要求 `success === true` 且 `code === 0`。部位原始清單最多 200 筆；超量回 unavailable，不截斷。代號不符合規則的項目跳過，只回 skippedPositions 計數；已平倉 state=3 或零張數不顯示。缺少有效 contractSize／fairPrice、方向／模式不合法或其他財務欄位不合法時，整個合約區塊回 unavailable，現貨仍完成。
+嚴格要求 `success === true` 且 `code === 0`。部位原始清單最多200筆；超量回unavailable，不截斷。代號不符合規則或單筆財務欄位無效的項目跳過並計數；已平倉state=3或零張數不顯示。公開回應缺少有效contractSize／fairPrice等既有來源檢查保留，來源無法成立時不顯示估計數值，現貨仍完成。
 
 ## 顯示與安全記錄
 
@@ -64,7 +76,7 @@
 
 手動與既有可見頁自動同步都更新該帳戶的 RAM 資料。重新讀現貨 status 或確認成本時保留；成功同步拿到 unavailable／no-permission 時取代舊數字，中斷連線、身份切換與整頁刷新不保留。沿用既有成本確認與五分鐘輪詢條件，不新增同步頻率。
 
-錯誤沿用 `diagnostic()`，步驟僅為 futures-assets／futures-positions／futures-detail，後者包含公開 ticker。只記 step、HTTP status、固定 reason、有效數字 MEXC code 與既有白名單內的訊息；未知訊息省略。沒有合約代號、金額、數量、Key、簽名、URL、原始錯誤或回應內容。成功與跳過代號不輸出私人資料記錄。
+錯誤沿用 `diagnostic()`，步驟僅為futures-assets／futures-positions／futures-detail，後者包含公開ticker。只記step、HTTP status、固定reason、有效數字MEXC code與既有白名單訊息；逐筆解析失敗另有固定field及最多40個安全欄位名。未知鍵名遮蔽、未知訊息省略。沒有合約代號、金額、數量、Key、簽名、URL、原始錯誤或回應內容。成功與原有跳過代號不輸出私人資料記錄。
 
 ## 驗證方法
 

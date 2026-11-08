@@ -1,3 +1,15 @@
+## MEXC 合約缺漏欄位、精度與逐筆隔離（2026-11-08）
+
+從最新main `b65eea0b46` 開 `codex/mexc-futures-position-resilience`。只有primary self-review，沒有獨立簽核；只開PR，不合併、不部署、不執行SQL、不讀取真實MEXC帳戶。
+
+unRealizedPnl有值（含零）沿用，缺少／null／空字串才依fairPrice、優先全精度均價及張數×contractSize推算多空損益。金融運算全程BigInt，推算盈虧最後四捨五入8位，幣數18位，循環比值也可捨入；來源損益原精度保留。缺少、零或負強平價回null。單筆state／方向／模式／財務欄位不合法只略過計數，逐筆通過原契約後合併；全數略過有明確提示，整份容器或上游來源錯誤仍維持unavailable。
+
+診斷增加固定field與最多40個安全positionKeys，未知鍵名遮蔽為[other]；單元測試掃描日誌確認沒有欄位值、幣名、金額、持倉ID或Key。現貨、skippedAssetNames、唯讀授權／加密／RPC、9秒期限、20檔逐代號、並行4、2 MiB及原有8 MiB全清單備援保持不變。
+
+實測：tsc、Deno check／lint、完整Vitest162檔／2,112項（合約專項73項）、lint與production build通過。MEXC全檔Playwright桌機／390px Chromium／WebKit42項、375px兩引擎28項，合計70項全部通過。新增375px案例先取摘要再等到匯率更新，首輪2項失敗；補上既有案例相同的匯率就緒斷言後完整重跑通過，原整段總計相等斷言、10秒expect及60秒case timeout都保留，沒有新增skip。
+
+[計算／診斷／部署說明](../docs/ATLAS_MEXC_FUTURES.md)、[測試與SHA證據](../docs/research-verification/mexc-futures-resilience-20261108.json)。[桌機](docs/screenshots/mexc-futures-resilience/desktop.png)、[390px Chromium](docs/screenshots/mexc-futures-resilience/chromium390.png)、[390px WebKit](docs/screenshots/mexc-futures-resilience/iphone390.png)、[375px Chromium](docs/screenshots/mexc-futures-resilience/chromium375.png)、[375px WebKit](docs/screenshots/mexc-futures-resilience/iphone375.png)全是假資料與模擬裝置，非實體iPhone／正式帳戶驗收。現行官方文件雖有unRealizedPnl欄位，本次兼容實際缺漏；沒有宣稱已讀到使用者真實回應。
+
 ## MEXC 合約逐代號讀取、跳過資產名稱與隱藏持股（2026-11-07）
 
 只做 primary self-review，沒有獨立簽核；不合併、不部署。合併後須重新部署 Edge Function `user-settings`。
