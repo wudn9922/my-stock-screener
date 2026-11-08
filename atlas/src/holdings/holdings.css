@@ -208,13 +208,14 @@
 .holdings-selectors select { font-size: 13px; padding: 6px; }
 .holdings-cards { display: block; }
 .holdings-position { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; }
-.holding-compact-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 6px; padding: 4px 0; list-style: none; min-height: 58px; font-size: 12px; }
+.holding-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; padding: 4px 0; list-style: none; min-height: 58px; font-size: 12px; }
 .holding-compact-row::-webkit-details-marker { display: none; }
 .holding-compact-row small { display: block; color: var(--text-3); font-size: 10px; }
-.holding-identity { display: grid; align-content: center; }
-.holdings-symbol { padding: 0; line-height: 16px; min-height: 44px; font-size: 14px; }
+.holding-identity { display: grid; align-content: center; min-width: 0; }
+.holding-identity > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.holdings-symbol { padding: 0; line-height: 16px; min-height: 44px; font-size: 14px; justify-self: start; width: auto; max-width: 100%; }
 .holding-identity small { margin-top: -8px; pointer-events: none; }
-.holding-number { text-align: right; align-content: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.holding-number { text-align: right; align-content: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .holdings-position dl { margin: 8px 0; padding: 8px; }
 .holdings-retained { margin: 0 0 4px; color: var(--text-3); font-size: 11px; }
 .portfolio-total-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }

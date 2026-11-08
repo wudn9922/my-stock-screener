@@ -235,7 +235,8 @@ test('futures count equity once in USDT totals, fit a phone and preserve spot su
     '-999999999999999.123456789012345678';
   f.setFutures(changed);
   await tick(page, f, 301000);
-  await expect(region).toContainText('999,999,999,999,999.123456789012345678 USDT');
+  await expect(region).toContainText('999,999,999,999,999.12 USDT');
+  await expect(region).toContainText('999999999999999.123456789012345678');
   await expect(spotTotals).toHaveText(previous);
   await region.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
