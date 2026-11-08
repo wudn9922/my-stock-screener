@@ -1,3 +1,6 @@
+顯示格式修訂：金額／盈虧兩位；價格≥1兩位、<1四位有效數字。原值保留於title與明細，計算／儲存／加總未變。
+相關格式與持股測試、lint、build及假MEXC格式瀏覽器案例驗證；只有primary self-review，無獨立簽核。
+
 ## 持股精簡、刷新保留與分區總計（2026-11-08）
 
 從最新main `36ba6a42a8` 開 `codex/holdings-compact-retained-values`。只有primary self-review，沒有獨立簽核；不合併、不部署、不操作正式帳戶。API、Supabase程式／SQL、帳號授權與資料格式不變。

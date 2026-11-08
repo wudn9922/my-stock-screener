@@ -111,7 +111,7 @@ test('connected futures load on reopen, refresh each minute and retain data/time
   await expect(region).toContainText('合約部位讀取中…');
   resume();
   f.onUpstream();
-  await expect(region).toContainText('-0.12345679 USDT');
+  await expect(region).toContainText('-0.12 USDT');
   await expect(region).toContainText('+1.25 USDT');
   const reads = () => f.bodies.filter((b) => b.action === 'holdings.mexc.futures').length;
   expect(reads()).toBe(1);
@@ -129,7 +129,7 @@ test('connected futures load on reopen, refresh each minute and retain data/time
   f.setFutures({ ...preciseFuturesResponses(), [assetsPath]: null });
   await tick(page, f, 61000);
   await expect(region).toContainText('合約資料暫時無法讀取，保留上次成功資料。');
-  await expect(region).toContainText('-0.12345679 USDT');
+  await expect(region).toContainText('-0.12 USDT');
   await expect(time).toHaveText(successfulTime);
   expect(f.documents).toEqual(previousDocuments);
   expect(f.connections).toEqual(previousConnections);
@@ -215,7 +215,7 @@ test('futures count equity once in USDT totals, fit a phone and preserve spot su
   const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
   await expect(long).toContainText('0.0005 BTC');
   await expect(long).toContainText('10× · 逐倉');
-  await expect(long).toContainText('-0.5 USDT');
+  await expect(long).toContainText('-0.50 USDT');
   await expect(long).toContainText('-1.67%');
   await expect(long).toContainText('54,000 USDT');
   await expect(short).toContainText('5× · 全倉');
@@ -268,7 +268,7 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   const short = region.getByRole('article', { name: 'ETH_USDT 空單 合約部位' });
   await expect(region.getByRole('article')).toHaveCount(2);
   await expect(region.getByRole('note')).toContainText('有 1 筆合約資料格式不支援，未顯示。');
-  await expect(long).toContainText('-0.5 USDT');
+  await expect(long).toContainText('-0.50 USDT');
   await expect(long).toContainText('-1.67%');
   await expect(short).toContainText('+1.25 USDT');
   await expect(short).toContainText('+6.25%');
@@ -287,7 +287,7 @@ test('documented futures without PnL retain valid rows, display unknown liquidat
   (next[tickerPath] as Record<string, unknown>[])[1]!.fairPrice = '3550';
   f.setFutures(next);
   await tick(page, f, 301000);
-  await expect(long).toContainText('+0.5 USDT');
+  await expect(long).toContainText('+0.50 USDT');
   await expect(long).toContainText('+1.67%');
   await expect(short).toContainText('-1.25 USDT');
   await expect(short).toContainText('-6.25%');
@@ -443,7 +443,7 @@ test('website connects a read-only MEXC key once, reviews costs and shows actual
   await expect(panel(page).getByRole('article')).toHaveCount(0);
   await confirmCosts(page);
   const btc = panel(page).getByRole('article', { name: 'BTC/USDT 持股' });
-  await expect(btc).toContainText('65,000.0000');
+  await expect(btc).toContainText('65,000.00');
   await expect(btc).toContainText('+1,800.00');
   await expect(btc).toContainText('MEXC 現貨');
   await expect(btc).toContainText('0.12');
@@ -484,7 +484,7 @@ test('increases require cost review, decreases preserve costs, and disconnect de
     .getByRole('button', { name: /^同步餘額/ })
     .click();
   await expect(panel(page).getByRole('article')).toContainText('0.06');
-  await expect(panel(page).getByRole('article')).toContainText('55,000.0000');
+  await expect(panel(page).getByRole('article')).toContainText('55,000.00');
   page.once('dialog', (dialog) => dialog.accept());
   await mexc(page)
     .locator('summary')
@@ -707,4 +707,23 @@ test('six compact futures fit the phone, total equity once, and keep connection 
   await expect(totals.locator('[aria-label="USDT 分列總計"]')).toContainText('14,900.00 USDT');
   await expect(region.getByRole('article').first()).toHaveText(before);
   await privateStorage(page);
+});
+
+
+test('display rounds money and low prices while More and hover preserve raw futures precision', async ({ page }) => {
+  const f = await setup(page); const source = futuresResponses();
+  const positions = source[positionsPath] as Record<string, unknown>[];
+  positions[0]!.unRealizedPnl = '-0.534999123456';
+  positions[0]!.holdAvgPrice = '0.0432123456';
+  (source[tickerPath] as Record<string, unknown>[])[0]!.fairPrice = '0.000123456789';
+  f.setFutures(source); await enterKeys(page); await confirmCosts(page);
+  const row = panel(page).getByRole('article', { name: 'BTC_USDT 多單 合約部位' });
+  await expect(row.locator('.mexc-position-head strong')).toHaveText('-0.53 USDT');
+  await expect(row.locator('.mexc-position-head strong')).toHaveAttribute('title', '-0.534999123456');
+  await expect(row.locator('.mexc-position-grid')).toContainText('0.04321');
+  await expect(row.locator('.mexc-position-grid')).toContainText('0.0001235');
+  await row.getByText('更多', { exact: true }).click();
+  await expect(row.getByText(/原始精度/)).toContainText('-0.534999123456');
+  await expect(row.locator('.mexc-position-more')).toContainText('0.0432123456 USDT');
+  expect(JSON.stringify(f.documents.get(MEXC_USER))).not.toContain('0.0432123456');
 });

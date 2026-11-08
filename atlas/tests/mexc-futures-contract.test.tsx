@@ -53,7 +53,7 @@ describe('separate futures response and display', () => {
     expect(futuresReturn('0', '0')).toBe('—');
     const html = renderToStaticMarkup(<MexcFuturesPanel futures={sample()} />);
     expect(html).toContain('合約權益計入美股總計');
-    expect(html).toContain('-0.1');
+    expect(html).toContain('-0.10');
     expect(html).toContain('-0.50%');
     expect(html).toContain('強平價');
     expect(html).toContain('—');
@@ -77,7 +77,7 @@ describe('separate futures response and display', () => {
   });
 });
 
-it('shows loading and last successful data time beside a failure while rounding displayed PnL to eight places', () => {
+it('shows loading and last successful data time beside a failure while rounding displayed PnL to two places', () => {
   const data = sample();
   data.positions[0]!.unrealized = '-0.123456789012345679';
   const html = renderToStaticMarkup(
@@ -86,7 +86,7 @@ it('shows loading and last successful data time beside a failure while rounding 
   expect(html).toContain('合約部位讀取中…');
   expect(html).toContain('合約資料暫時無法讀取，保留上次成功資料。');
   expect(html).toContain('合約資料時間');
-  expect(html).toContain('-0.12345679');
-  expect(html).not.toContain('-0.123456789012345679');
+  expect(html).toContain('-0.12');
+  expect(html).toContain('title="-0.123456789012345679"');
   expect(html).toContain('BTC_USDT');
 });
