@@ -19,8 +19,8 @@ This is the accepted Phase 1 architecture with authorized Phase 2 extensions of 
 
 ## Verification and review
 
-Run `npm test`, `npm run lint`, `npm run build`; use `npm ci` for clean dependency validation. For drawing/gesture/storage/symbol changes also run the appropriate Playwright regressions on desktop and mobile/WebKit. Do not skip a failed interaction gate to implement the next tool.
+Follow the cost rules in the repository root `AGENTS.md`. Run `npm run lint`, `npm run build` and the tests related to the change; CI runs the full suites. For drawing/gesture/storage/symbol changes also run the related Playwright regressions on mobile/WebKit. Do not skip a failed interaction gate to implement the next tool.
 
-Update ADRs deliberately when architecture changes; do not silently replace the engine or canonical models. Reviewer findings must return to the primary engineer for explicit accept/reject triage before changes. Reviewer tools cannot directly modify code. If independent review is unavailable, maintain REVIEW_PACKAGE.md and do not claim independent sign-off.
+Update ADRs only when architecture changes; do not silently replace the engine or canonical models. Reviewer findings must return to the primary engineer for explicit accept/reject triage before changes. Reviewer tools cannot directly modify code. If independent review is unavailable, add at most 3 lines to REVIEW_PACKAGE.md and do not claim independent sign-off.
 
 Report actual test results. Headless RAF scheduling is not device FPS or a physical Safari verification. Keep limitations and data provenance visible.
