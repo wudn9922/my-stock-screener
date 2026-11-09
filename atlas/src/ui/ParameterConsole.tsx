@@ -293,7 +293,7 @@ export function ParameterConsole() {
               </label>
               <p>
                 填入 1～4 個不重複的整數（1～1000），用逗號分隔。
-                {dialog.stock.group_id !== FIXED_STOCK_GROUP &&
+                {stockParameterRows(stocks, dialog.stock.ticker).some(stock => stock.group_id !== FIXED_STOCK_GROUP) &&
                   stockParameterRows(stocks, dialog.stock.ticker).some(stock => stock.group_id === FIXED_STOCK_GROUP) &&
                   '此股票另有舊的無分組重複參數；確認儲存會覆蓋分組列的均線，並清除無分組重複筆。'}
               </p>
