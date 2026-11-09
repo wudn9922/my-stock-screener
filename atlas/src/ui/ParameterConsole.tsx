@@ -248,12 +248,19 @@ export function ParameterConsole() {
             </p>
           )}
           {cleanupFailure && <button type="button" className="ghost-button" disabled={busy}
-            onClick={() => void run(async () => {
-              await retryStockParameterCleanup(cleanupFailure);
-              await reload();
-              setDialog(null);
-              setMessage('個股均線已覆蓋，重複資料也已清除。');
-            })}>重試清除重複資料</button>}
+            onClick={() => {
+              setBusy(true);
+              setMessage('');
+              void retryStockParameterCleanup(cleanupFailure)
+                .then(async () => {
+                  await reload();
+                  setCleanupFailure(null);
+                  setDialog(null);
+                  setMessage('個股均線已覆蓋，重複資料也已清除。');
+                })
+                .catch(error => setMessage(error instanceof Error ? error.message : '重複資料清除失敗'))
+                .finally(() => setBusy(false));
+            }}>重試清除重複資料</button>}
           {dialog.mode === 'edit' ? (
             <form
               onSubmit={(event) => {
