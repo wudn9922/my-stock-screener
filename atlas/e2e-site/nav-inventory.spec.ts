@@ -211,8 +211,8 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(result).toContainText('目前入選');
   await expect(result.getByRole('switch', { name: '監控此清單的突破提醒' })).toBeVisible();
   await expect(result.getByRole('textbox', { name: '清單突破監控均線' })).toBeVisible();
-  await result.getByRole('button', { name: '設定 NVDA 固定均線參數' }).click();
-  await expect(page.getByRole('dialog', { name: 'NVDA 固定均線參數' })).toBeVisible();
+  await result.getByRole('button', { name: '設定 NVDA 個股均線（所有清單共用）' }).click();
+  await expect(page.getByRole('dialog', { name: 'NVDA 個股均線（所有清單共用）' })).toBeVisible();
   await page.getByRole('button', { name: '取消編輯', exact: true }).click();
   await expect(page.getByText('SEC 8-K 重大事件雷達', { exact: false }).first()).toBeVisible();
   const exported = page.waitForEvent('download');
