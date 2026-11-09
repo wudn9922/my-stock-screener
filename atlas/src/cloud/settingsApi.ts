@@ -74,7 +74,8 @@ export async function settingsApi<T>(action: string, payload: Record<string, unk
   const unsubscribe = accessState.subscribe(() => {
     if (context !== getStorageContextKey()) controller.abort(new Error('帳號或儲存權限已變更。'));
   });
-  const timeout = setTimeout(() => controller.abort(new Error('設定讀寫逾時。')), 15000);
+  // Broker login + two accounting queries run in this request; keep ordinary settings reads at 15s.
+  const timeout = setTimeout(() => controller.abort(new Error(action === 'holdings.sinopac.sync' ? '永豐同步逾時，請稍後再試' : '設定讀寫逾時。')), action === 'holdings.sinopac.sync' ? 125000 : 15000);
   try {
     const response = await fetch(import.meta.env.VITE_SETTINGS_API_URL || SETTINGS_API_URL, {
       method: 'POST',

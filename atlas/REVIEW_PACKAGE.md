@@ -1,3 +1,6 @@
+永豐唯讀同步：primary self-review，沒有獨立簽核；owner/IAM/共享密鑰、Decimal、CAS、跨 instance 限流及 API 唯讀邊界已檢查。
+部署步驟見 sinopac_sync/README.md；所有 broker／Google／資料庫測試用假回應，沒有連線永豐、部署或執行 SQL。
+相關 Python、TypeScript、Playwright、lint、build 的實際結果列於本次 PR；本 PR 接續尚未合併的 #250。
 ## 新增持股帳戶方式簡化（2026-11-08）
 
 Primary self-review only；沒有獨立簽核。新增表單只分 API 自動同步與匯入 CSV。CSV 自填名稱、選台股／美股／加密貨幣，存 broker=other；MEXC API 沿用原連線與成本確認，存 broker=mexc。永豐台股即將推出且按鈕停用，永豐美股明示匯入 CSV。

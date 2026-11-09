@@ -1,0 +1,12 @@
+**
+!sinopac_sync/
+!sinopac_sync/**
+!scripts/
+!scripts/build_market_calendar.py
+!data/
+!data/*.csv
+**/__pycache__
+**/*.pyc
+
+**/.env
+**/.env.*

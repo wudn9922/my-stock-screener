@@ -1,0 +1,64 @@
+name: Deploy read-only SinoPac sync
+on:
+  push:
+    branches: [main]
+    paths: ['sinopac_sync/**', 'Dockerfile.sinopac-sync*', 'data/*.TW.csv', 'data/*.TWO.csv', 'scripts/build_market_calendar.py', '.github/workflows/sinopac-sync.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: sinopac-sync-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.SINOPAC_SYNC_SERVICE }}
+      IMAGE: ${{ vars.SINOPAC_SYNC_IMAGE }}
+      RUNTIME_SA: ${{ vars.SINOPAC_RUNTIME_SA }}
+      OWNER: ${{ vars.SINOPAC_OWNER_ID }}
+      ACCOUNT: ${{ vars.SINOPAC_ACCOUNT_ID }}
+      SECRETS: ${{ vars.SINOPAC_SECRET_BINDINGS }}
+      SUPABASE_URL: ${{ vars.SINOPAC_SUPABASE_URL }}
+      SCHEDULER_EMAIL: ${{ vars.SINOPAC_SCHEDULER_EMAIL }}
+    steps:
+      - name: Check optional configuration
+        id: config
+        shell: bash
+        run: |
+          for field in WIF_PROVIDER DEPLOY_SA PROJECT_ID REGION SERVICE IMAGE RUNTIME_SA OWNER ACCOUNT SECRETS SUPABASE_URL SCHEDULER_EMAIL; do
+            if [ -z "${!field}" ]; then
+              echo '::notice::SinoPac configuration incomplete; skipping deployment.'
+              echo 'ready=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+      - uses: google-github-actions/auth@v2
+        if: steps.config.outputs.ready == 'true'
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.config.outputs.ready == 'true'
+      - name: Build and deploy private service
+        if: steps.config.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${IMAGE%%/*}" --quiet
+          docker build -f Dockerfile.sinopac-sync -t "${IMAGE}:${GITHUB_SHA}" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          gcloud run deploy "$SERVICE" --image "${IMAGE}:${GITHUB_SHA}" --project "$PROJECT_ID" --region "$REGION" \
+            --service-account "$RUNTIME_SA" --no-allow-unauthenticated --min-instances 0 --max-instances 1 --concurrency 1 --timeout 120 \
+            --update-secrets "$SECRETS" --update-env-vars "SINOPAC_OWNER_ID=${OWNER},SINOPAC_ACCOUNT_ID=${ACCOUNT},SUPABASE_URL=${SUPABASE_URL},SINOPAC_SCHEDULER_EMAIL=${SCHEDULER_EMAIL}" --quiet
+          url=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
+          gcloud run services update "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --update-env-vars "SINOPAC_AUDIENCE=${url}" --quiet

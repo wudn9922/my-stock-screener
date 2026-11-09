@@ -1,3 +1,5 @@
+import { getStorageContextKey } from '../auth/storage';
+import { SinopacPanel } from './SinopacPanel';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { chartList } from '../app/listContext';
 import type { PageProps } from '../pages/pageProps';
@@ -209,6 +211,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     .sort((a, b) => a.holding.symbol.localeCompare(b.holding.symbol));
   const blocked = snapshot.loading || !!snapshot.error || busy || mexcSnapshot.busy;
   const importAccount = draft ?? selected?.account;
+  const [sinopacManaged, setSinopacManaged] = useState<{
+    key: string;
+    id: string | null;
+  }>();
+  const sinopacKey = getStorageContextKey() + ':' + selected?.account.id;
+  const sinopacReadOnly =
+    selected?.account.broker === 'sinopac' &&
+    (sinopacManaged?.key !== sinopacKey ||
+      sinopacManaged.id === selected.account.id ||
+      selected.holdings.some((h) => h.source === 'api'));
   const subtotal = (items: typeof all) => (
     <>
       {[...summarizeHoldings(items, rates).currencies].map(([currency, value]) => (
@@ -416,9 +428,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           onSubmit={(event) => {
             event.preventDefault();
             if (method !== 'csv' || !name.trim()) return;
-            const chosen = CSV_MARKETS.find(
-              (entry) => entry.key === marketKey,
-            )!;
+            const chosen = CSV_MARKETS.find((entry) => entry.key === marketKey)!;
             setDraft({
               id: crypto.randomUUID(),
               name: name.trim(),
@@ -434,11 +444,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           <h3>新增帳戶</h3>
           <label>
             新增方式
-            <select
-              aria-label="新增方式"
-              value={method}
-              onChange={(event) => setMethod(event.target.value)}
-            >
+            <select aria-label="新增方式" value={method} onChange={(event) => setMethod(event.target.value)}>
               <option value="api">API 自動同步</option>
               <option value="csv">匯入 CSV</option>
             </select>
@@ -454,7 +460,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   onChange={(event) => setBrokerKey(event.target.value)}
                 >
                   <option value="mexc">MEXC（加密貨幣）</option>
-                  <option value="sinopac">永豐證券（台股）· 即將推出</option>
+                  <option value="sinopac">永豐證券（台股）</option>
                 </select>
               </label>
             ) : (
@@ -482,7 +488,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required={method === 'csv'}
-                placeholder={method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'}
+                placeholder={
+                  method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'
+                }
               />
             </label>
           </div>
@@ -497,9 +505,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               </button>
             )}
             {method === 'api' && brokerKey === 'sinopac' && (
-              <button type="button" className="primary-button" disabled>
-                即將推出
-              </button>
+              <p>由維護者設定永豐服務後，使用下方同步按鈕建立擁有者帳戶。</p>
             )}
             {method === 'api' && brokerKey === 'mexc' && (
               <button
@@ -527,31 +533,30 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 使用 MEXC API 連線
               </button>
             )}
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setCreating(false)}
-            >
+            <button type="button" className="ghost-button" onClick={() => setCreating(false)}>
               取消
             </button>
           </div>
-          {method === 'api' &&
-            brokerKey === 'mexc' &&
-            access.storageMode !== 'cloud' && (
-              <p className="holdings-muted">
-                自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。
-              </p>
-            )}
+          {method === 'api' && brokerKey === 'mexc' && access.storageMode !== 'cloud' && (
+            <p className="holdings-muted">自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。</p>
+          )}
           {method === 'api' &&
             brokerKey === 'mexc' &&
             access.storageMode === 'cloud' &&
             !mexcSnapshot.state.configured && (
-              <p role="note">
-                MEXC API
-                服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。
-              </p>
+              <p role="note">MEXC API 服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。</p>
             )}
         </form>
+      )}
+      {creating && method === 'api' && brokerKey === 'sinopac' && (
+        <SinopacPanel onCreated={() => setCreating(false)} />
+      )}
+      {selected?.account.broker === 'sinopac' && (
+        <SinopacPanel
+          key={selected.account.id}
+          accountId={selected.account.id}
+          onManaged={(id) => setSinopacManaged({ key: sinopacKey, id })}
+        />
       )}
       {directoryError && (
         <p role="alert">
@@ -575,7 +580,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="primary-button"
-              disabled={blocked || !directory?.length || editing || creating || connecting}
+              disabled={sinopacReadOnly || blocked || !directory?.length || editing || creating || connecting}
               onClick={() => {
                 setDraft(null);
                 setEditing(true);
@@ -587,7 +592,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="ghost-button"
-              disabled={blocked || !directory?.length || editing || creating || connecting}
+              disabled={sinopacReadOnly || blocked || !directory?.length || editing || creating || connecting}
               onClick={() => {
                 setDraft(null);
                 setEditing(true);
@@ -644,7 +649,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           disabled={snapshot.loading || !!snapshot.error || busy || editing || creating}
         />
       )}
-      {editing && importAccount && directory && (
+      {editing && importAccount && directory && (draft || !sinopacReadOnly) && (
         <ImportHoldings
           key={importAccount.id}
           account={importAccount}
