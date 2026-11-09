@@ -1,5 +1,18 @@
 # ADR-015: Automatic watchlist writes and dormant stock parameters
 
+## 2026-11-10 修訂：單一個股參數列（取代 2026-10-29 的分組優先）
+
+**Accepted decision**：每帳號、每 `parameterTickerKey` 正規化代號最多一筆 MA1–MA4 列；`2330`＝`2330.TW`，`.TWO` 獨立，`BRK.B`＝`BRK-B`。若股票屬於分組，以既有分組列 ID 直接覆蓋均線，儲存成功後清除無分組舊副本；若不屬於分組，覆蓋既有 `ungrouped` ID 或新增一筆。不得新增無分組 shadow copy。加入分組改同一 ID 的 `group_id`，退出分組改回 `ungrouped`；只有明確「刪除個股均線」會刪資料。自選清單出榜或刪除清單不刪此參數。
+
+**Reason**：2026-11-09 正式資料中 2408.TW、AGM、TSM 的最新無分組固定值被 #205 分組優先邏輯遮住；三筆已由維護者另行修復，不在本 PR 遷移。為防清理失敗或歷史重複導致新值不可見，Atlas 和 Python 過渡期一律**無分組列優先、其後分組列按 ID**。此優先序只選均線，並不使 `ungrouped` 成為報告／監控成員；無個股參數的清單成員才繼承清單預設。
+
+**Safety**：重讀、快照衝突拒絕、帳號切換中止、先成功寫入再清理舊資料；清理失敗清楚回報部分成功且提供核對後重試。沿用原 `stocks.list`／`stocks.save`（ID 更新 `group_id`）／`stocks.delete`。不修改 SQL、schema、Edge Function、開關或圖表資料結構。未設正規化 ticker 的 DB 唯一約束，因此同時新增的跨客戶端競態無法僅憑 App 邏輯絕對排除。
+
+詳見 [STOCK_PARAMETER_CONSISTENCY](../STOCK_PARAMETER_CONSISTENCY.md)；下方為 2026-10-29 與更早的歷史決策。
+
+---
+
+
 ## 2026-10-29 修訂：保留原分組股票列
 
 此修訂取代下文舊的「無分組優先／加入分組另建一筆」決策。原有分組的個股參數優先於無分組固定列及清單預設；多筆分組保留最小 ID 的原筆為共同來源。圖表讀取並補入已保存的日線 SMA。編輯先顯示原值，使用既有 ID 更新；若使用者確認畫面明列的無分組重複筆，先更新原筆成功再刪重複筆。取消、載入失敗及主要寫入失敗均不刪資料，不做背景遷移。詳見 [STOCK_PARAMETER_CONSISTENCY](../STOCK_PARAMETER_CONSISTENCY.md)。沒有新增 SQL 或 Edge Function 變更。
