@@ -55,7 +55,7 @@ async function movingAveragePixels(host: ReturnType<Page['locator']>) {
 async function openFixed(page: Page, symbol = '2330.TW') {
   await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  return page.getByRole('dialog', { name: `${symbol} 固定均線參數` });
+  return page.getByRole('dialog', { name: `${symbol} 個股均線（所有清單共用）` });
 }
 
 test('cloud grouped MAs render on a fresh chart; confirm updates the original row and consolidates the dormant duplicate', async ({ page }, testInfo) => {
