@@ -47,6 +47,7 @@ export async function retryStockParameterCleanup(failure: StockParameterCleanupE
       await settingsApi('stocks.delete', { id: duplicate.id });
     }
   } catch {
+    ensureContext();
     throw new Error('均線已覆蓋，重複資料尚未清除；清除失敗，請重新載入後重試。');
   } finally {
     stockParametersChanged();
@@ -99,6 +100,7 @@ export async function saveStockParameters(
       await settingsApi('stocks.delete', { id: duplicate.id });
     }
   } catch {
+    ensureContext();
     throw new StockParameterCleanupError(ticker, target?.id ?? saved[0].id, mas, destination, duplicates, context);
   } finally {
     if (duplicates.length) stockParametersChanged();
