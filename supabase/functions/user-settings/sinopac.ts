@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { HoldingsError } from './holdings.ts';
+/** Dashboard-pasted secrets often carry a trailing newline or space; never let that break a header or URL. */
+const env = (name: string) => Deno.env.get(name)?.trim();
 const fail = () => new HoldingsError(503, '永豐同步服務尚未就緒，請聯絡維護者。');
 const base64url = (value: Uint8Array) =>
   btoa(String.fromCharCode(...value))
@@ -9,8 +11,8 @@ const base64url = (value: Uint8Array) =>
 /** Runtime-only invoker identity; deployment still uses GitHub Workload Identity. */
 async function googleToken(audience: string, fetcher: typeof fetch): Promise<string> {
   try {
-    const email = Deno.env.get('SINOPAC_INVOKER_EMAIL')!;
-    const pem = Deno.env.get('SINOPAC_INVOKER_PRIVATE_KEY')!;
+    const email = env('SINOPAC_INVOKER_EMAIL')!;
+    const pem = env('SINOPAC_INVOKER_PRIVATE_KEY')!;
     const key = Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '')), (c) =>
       c.charCodeAt(0),
     );
@@ -61,8 +63,8 @@ export async function handleSinopac(
   body: Record<string, unknown>,
   fetcher: typeof fetch = fetch,
 ) {
-  const ownerId = Deno.env.get('SINOPAC_OWNER_ID'),
-    accountId = Deno.env.get('SINOPAC_ACCOUNT_ID');
+  const ownerId = env('SINOPAC_OWNER_ID'),
+    accountId = env('SINOPAC_ACCOUNT_ID');
   if (
     !ownerId ||
     owner !== ownerId ||
@@ -72,8 +74,8 @@ export async function handleSinopac(
     throw new HoldingsError(403, '此帳號無永豐同步權限。');
   if (body.action === 'holdings.sinopac.sync') {
     try {
-      const secret = Deno.env.get('SINOPAC_SHARED_SECRET') ?? '';
-      const url = new URL(Deno.env.get('SINOPAC_SYNC_URL') ?? '');
+      const secret = env('SINOPAC_SHARED_SECRET') ?? '';
+      const url = new URL(env('SINOPAC_SYNC_URL') ?? '');
       if (
         new TextEncoder().encode(secret).length < 32 ||
         url.protocol !== 'https:' ||
