@@ -4,7 +4,7 @@
 
 ## 資料與權限
 
-Shioaji 1.7.10 官方 agent 的 ACCOUNTING / PREPARE / CONCEPTS 為介面依據。建立只勾「行情/資料、帳務、正式環境」、不勾「交易」的金鑰，限定適用的台股帳戶。程式登入時關閉交易訂閱並強制刷新 session，僅查詢 Common / Share 兩份持倉；finally 登出。不啟用憑證、不讀取商品合約、不提供交易介面。請勿把金鑰交給網頁。
+Shioaji 1.7 官方 agent 的 ACCOUNTING / PREPARE / CONCEPTS 為介面依據。建立只勾「行情/資料、帳務、正式環境」、不勾「交易」的金鑰，限定適用的台股帳戶。程式登入時關閉交易訂閱並強制刷新 session，僅查詢 Common / Share 兩份持倉；finally 登出。不啟用憑證、不讀取商品合約、不提供交易介面。請勿把金鑰交給網頁。
 
 Common 張數 ×1000 與 Share 股數以 Decimal 合併，price 為成本，加權均價四捨五入至 holdings 既有的 18 位小數，保存字串。Sell / ShortSelling / SBLShortSelling 略過並計數；MarginTrading 買進視為多頭。優先 TSE / OTC，無市場欄位則以 repo `data/*.TW.csv` / `*.TWO.csv` 代號清單判斷；無法辨識會整次失敗，保留既有持股，不猜市場。
 

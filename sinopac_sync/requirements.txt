@@ -1,7 +1,7 @@
 Flask==3.1.2
 gunicorn==23.0.0
 requests==2.32.5
-shioaji==1.7.10
+shioaji==1.7.*
 exchange-calendars==4.13.2
 google-auth==2.43.0
 pandas==2.3.3
