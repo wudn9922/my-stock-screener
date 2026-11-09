@@ -143,6 +143,31 @@ it('signs an audience-bound ID token exchange, then sends both private credentia
   ).resolves.toMatchObject({ accountId: account });
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+it('ignores whitespace and line breaks pasted around dashboard secrets', async () => {
+  const s = await configured();
+  Object.assign(s.env, {
+    SINOPAC_SHARED_SECRET: 'x'.repeat(48) + '\r\n',
+    SINOPAC_SYNC_URL: ' https://fake-service.run.app\n',
+    SINOPAC_INVOKER_EMAIL: s.env.SINOPAC_INVOKER_EMAIL + '\n',
+  });
+  const fetcher = vi.fn(async (url: URL | RequestInfo, init?: RequestInit) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      const payload = new URLSearchParams(String(init?.body)).get('assertion')!.split('.')[1]!;
+      expect(JSON.parse(Buffer.from(payload, 'base64url').toString())).toMatchObject({
+        iss: 'fake-invoker@example.iam.gserviceaccount.com',
+        target_audience: 'https://fake-service.run.app',
+      });
+      return Response.json({ id_token: 'fake-google-id-token' });
+    }
+    expect(String(url)).toBe('https://fake-service.run.app/sync');
+    expect(init?.headers).toMatchObject({ 'X-Sinopac-Secret': 'x'.repeat(48) });
+    return Response.json({ code: 'ok', message: '正常' });
+  });
+  await expect(
+    s.handle(s.db, owner, { action: 'holdings.sinopac.sync', accountId: account }, fetcher),
+  ).resolves.toMatchObject({ accountId: account });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
 it('returns a fixed quota message and never relays upstream private errors', async () => {
   const s = await configured();
   const fetcher = vi
