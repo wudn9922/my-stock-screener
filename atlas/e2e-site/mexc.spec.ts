@@ -45,7 +45,8 @@ async function setup(page: Page, mode: 'cloud' | 'device' | 'none' = 'cloud') {
     .getByRole('button', { name: '持股', exact: true })
     .click();
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
-  await panel(page).getByRole('combobox', { name: '券商／交易所' }).selectOption('mexc');
+  await panel(page).getByRole('combobox', { name: '新增方式' }).selectOption('api');
+  await panel(page).getByRole('combobox', { name: 'API 服務' }).selectOption('mexc');
   return { ...fixture, bodies, urls };
 }
 async function enterKeys(page: Page) {
@@ -536,7 +537,10 @@ for (const mode of ['none', 'device'] as const)
   }) => {
     const f = await setup(page, mode);
     await expect(panel(page)).toContainText('自動讀取 MEXC 需要雲端儲存授權');
-    await expect(panel(page).getByRole('button', { name: '使用 MEXC API 連線' })).toHaveCount(0);
+    await expect(panel(page).getByRole('button', { name: '使用 MEXC API 連線' })).toBeDisabled();
+    await panel(page).getByRole('combobox', { name: '新增方式' }).selectOption('csv');
+    await panel(page).getByRole('combobox', { name: '帳戶市場' }).selectOption('crypto');
+    await panel(page).getByLabel('帳戶名稱', { exact: true }).fill('MEXC CSV');
     await panel(page).getByRole('button', { name: '繼續匯入' }).click();
     await expect(panel(page).getByRole('textbox', { name: '貼上庫存表格' })).toBeVisible();
     expect(f.bodies.filter((body) => String(body.action).startsWith('holdings.mexc.'))).toHaveLength(0);

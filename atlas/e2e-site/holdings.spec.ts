@@ -20,7 +20,7 @@ async function open(page: Page) {
 }
 async function create(page: Page, broker = 'cathay') {
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
-  await panel(page).getByRole('combobox', { name: '券商／交易所' }).selectOption(broker);
+  await panel(page).getByRole('combobox', { name: '帳戶市場' }).selectOption(broker === 'mexc' ? 'crypto' : (broker.endsWith('-us') || broker === 'firstrade') ? 'us' : 'tw');
   await panel(page).getByRole('textbox', { name: '帳戶名稱' }).fill('PRIVATE-LOCAL-ONLY');
   await panel(page).getByRole('button', { name: '繼續匯入', exact: true }).click();
 }
@@ -178,9 +178,8 @@ test('undeployed cloud holdings fail clearly and never fall back to device persi
 test('a Taiwan broker 複委託 account holds US stocks in USD', async ({ page }) => {
   await open(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
-  const brokers = panel(page).getByRole('combobox', { name: '券商／交易所' });
-  for (const label of ['國泰證券 複委託美股 · USD', '永豐金證券 複委託美股 · USD', '凱基證券 複委託美股 · USD', '口袋證券 複委託美股 · USD', '其他台灣券商 複委託美股 · USD'])
-    await expect(brokers.getByRole('option', { name: label, exact: true })).toHaveCount(1);
+  await expect(panel(page)).toContainText('永豐美股請用匯入 CSV');
+  await expect(panel(page).getByRole('combobox', { name: '帳戶市場' }).getByRole('option')).toHaveText(['台股', '美股', '加密貨幣']);
   await panel(page).getByRole('button', { name: '取消', exact: true }).click();
   await create(page, 'cathay-us');
   await paste(page, 'Symbol,Quantity,Avg Cost\nAAPL,10,150\n2330,1,500');
@@ -268,4 +267,28 @@ test('six compact stock rows precede totals and operations, with full details on
   await expect(rows.first().getByText('今日損益', { exact: true })).toBeVisible();
   await expect(rows.first().getByRole('button', { name: '隱藏', exact: true })).toBeVisible();
   await layout(page);
+});
+
+
+test('account creation offers CSV markets and only supported API connections', async ({ page }, info) => {
+  await mockDeviceAccount(page);
+  await open(page);
+  await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
+  await expect(panel(page).getByLabel('新增方式').getByRole('option')).toHaveText(['API 自動同步', '匯入 CSV']);
+  await expect(panel(page).getByRole('button', { name: '繼續匯入', exact: true })).toBeDisabled();
+  await expect(panel(page)).toContainText('永豐美股請用匯入 CSV');
+  await panel(page).getByLabel('新增方式').selectOption('api');
+  await panel(page).getByLabel('API 服務').selectOption('sinopac');
+  await expect(panel(page).getByRole('button', { name: '即將推出', exact: true })).toBeDisabled();
+  await expect(importer(page)).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('account-methods-390.png') });
+  await panel(page).getByLabel('新增方式').selectOption('csv');
+  await panel(page).getByLabel('帳戶名稱', { exact: true }).fill('永豐美股');
+  await panel(page).getByLabel('帳戶市場').selectOption('us');
+  await panel(page).getByRole('button', { name: '繼續匯入', exact: true }).click();
+  await paste(page, 'Symbol,Quantity,Avg Cost\nAAPL,10,150');
+  await save(page);
+  await expect(panel(page).getByRole('article', { name: 'AAPL 持股' })).toBeVisible();
+  const saved = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.endsWith(':holdings:v1')).map(([, value]) => JSON.parse(value)));
+  expect(saved[0].accounts[0].account).toMatchObject({ broker: 'other', kind: 'us-broker', currency: 'USD', name: '永豐美股' });
 });

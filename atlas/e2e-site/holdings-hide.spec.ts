@@ -54,7 +54,8 @@ async function connectMexc(page: Page) {
   await page.goto('./?page=watchlist');
   await openHoldings(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
-  await panel(page).getByRole('combobox', { name: '券商／交易所' }).selectOption('mexc');
+  await panel(page).getByRole('combobox', { name: '新增方式' }).selectOption('api');
+  await panel(page).getByRole('combobox', { name: 'API 服務' }).selectOption('mexc');
   await panel(page).getByRole('button', { name: '使用 MEXC API 連線' }).click();
   await mexc(page).getByLabel('MEXC API Key', { exact: true }).fill(TEST_KEY);
   await mexc(page).getByLabel('MEXC Secret Key', { exact: true }).fill(TEST_SECRET);
@@ -158,7 +159,8 @@ test('device account: a manual hide is kept after re-import and reload, and leav
   await page.goto('./?page=watchlist');
   await openHoldings(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
-  await panel(page).getByRole('combobox', { name: '券商／交易所' }).selectOption('kgi');
+  await panel(page).getByRole('combobox', { name: '帳戶市場' }).selectOption('tw');
+  await panel(page).getByLabel('帳戶名稱', { exact: true }).fill('凱基台股');
   await panel(page).getByRole('button', { name: '繼續匯入', exact: true }).click();
   const importer = panel(page).getByRole('region', { name: '匯入持股', exact: true });
   const paste = async (value: string) => {

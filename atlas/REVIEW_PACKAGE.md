@@ -1,3 +1,9 @@
+## 新增持股帳戶方式簡化（2026-11-08）
+
+Primary self-review only；沒有獨立簽核。新增表單只分 API 自動同步與匯入 CSV。CSV 自填名稱、選台股／美股／加密貨幣，存 broker=other；MEXC API 沿用原連線與成本確認，存 broker=mexc。永豐台股即將推出且按鈕停用，永豐美股明示匯入 CSV。
+
+既有帳戶的 broker／kind／currency 不變，未改 schema、後端驗證或正式資料。ImportHoldings 邏輯完全保留；測試改用新的建立入口，保留 mapping、交易紀錄重建、成本確認、權限與同步斷言。操作與390px截圖見 [HOLDINGS_ACCOUNT_METHODS.md](docs/HOLDINGS_ACCOUNT_METHODS.md)。實際測試計數列於 PR；只推 PR，不合併或部署。
+
 顯示格式修訂：金額／盈虧兩位；價格≥1兩位、<1四位有效數字。原值保留於title與明細，計算／儲存／加總未變。
 相關格式與持股測試、lint、build及假MEXC格式瀏覽器案例驗證；只有primary self-review，無獨立簽核。
 

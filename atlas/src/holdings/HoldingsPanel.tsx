@@ -11,7 +11,6 @@ import {
   formatAmount,
   summarizeHoldings,
   valueHolding,
-  type Broker,
   type FxRate,
   type Holding,
   type HoldingAccount,
@@ -38,96 +37,17 @@ import {
   type HiddenReason,
 } from './visibility';
 
-/**
- * Account choices. Taiwan brokers also offer 複委託 (sub-brokerage) accounts that hold US stocks
- * priced in USD; they are ordinary 'us-broker' accounts that keep the Taiwan broker's id.
- */
-const BROKERS: {
+const CSV_MARKETS: {
   key: string;
-  id: Broker;
-  name: string;
   label: string;
   kind: HoldingAccount['kind'];
   currency: HoldingAccount['currency'];
 }[] = [
+  { key: 'tw', label: '台股', kind: 'tw-broker', currency: 'TWD' },
+  { key: 'us', label: '美股', kind: 'us-broker', currency: 'USD' },
   {
-    key: 'cathay',
-    id: 'cathay',
-    name: '國泰證券',
-    label: '國泰證券 台股',
-    kind: 'tw-broker',
-    currency: 'TWD',
-  },
-  {
-    key: 'cathay-us',
-    id: 'cathay',
-    name: '國泰證券 複委託',
-    label: '國泰證券 複委託美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  {
-    key: 'sinopac',
-    id: 'sinopac',
-    name: '永豐金證券',
-    label: '永豐金證券 台股',
-    kind: 'tw-broker',
-    currency: 'TWD',
-  },
-  {
-    key: 'sinopac-us',
-    id: 'sinopac',
-    name: '永豐金證券 複委託',
-    label: '永豐金證券 複委託美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  { key: 'kgi', id: 'kgi', name: '凱基證券', label: '凱基證券 台股', kind: 'tw-broker', currency: 'TWD' },
-  {
-    key: 'kgi-us',
-    id: 'kgi',
-    name: '凱基證券 複委託',
-    label: '凱基證券 複委託美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  {
-    key: 'pocket',
-    id: 'pocket',
-    name: '口袋證券',
-    label: '口袋證券 台股',
-    kind: 'tw-broker',
-    currency: 'TWD',
-  },
-  {
-    key: 'pocket-us',
-    id: 'pocket',
-    name: '口袋證券 複委託',
-    label: '口袋證券 複委託美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  {
-    key: 'other-us',
-    id: 'other',
-    name: '其他券商 複委託',
-    label: '其他台灣券商 複委託美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  {
-    key: 'firstrade',
-    id: 'firstrade',
-    name: 'Firstrade',
-    label: 'Firstrade 美股',
-    kind: 'us-broker',
-    currency: 'USD',
-  },
-  {
-    key: 'mexc',
-    id: 'mexc',
-    name: 'MEXC',
-    label: 'MEXC 加密貨幣',
+    key: 'crypto',
+    label: '加密貨幣',
     kind: 'crypto-exchange',
     currency: 'USDT',
   },
@@ -165,7 +85,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const [accountId, setAccountId] = useState(''),
     [draft, setDraft] = useState<HoldingAccount | null>(null),
     [creating, setCreating] = useState(false);
-  const [brokerKey, setBrokerKey] = useState('cathay'),
+  const [method, setMethod] = useState('csv');
+  const [brokerKey, setBrokerKey] = useState('mexc');
+  const [marketKey, setMarketKey] = useState('tw'),
     [name, setName] = useState(''),
     [editing, setEditing] = useState(false),
     [initial, setInitial] = useState<Holding[] | undefined>(),
@@ -493,11 +415,14 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           aria-label="新增持股帳戶"
           onSubmit={(event) => {
             event.preventDefault();
-            const chosen = BROKERS.find((entry) => entry.key === brokerKey)!;
+            if (method !== 'csv' || !name.trim()) return;
+            const chosen = CSV_MARKETS.find(
+              (entry) => entry.key === marketKey,
+            )!;
             setDraft({
               id: crypto.randomUUID(),
-              name: name.trim() || chosen.name,
-              broker: chosen.id,
+              name: name.trim(),
+              broker: 'other',
               kind: chosen.kind,
               currency: chosen.currency,
             });
@@ -506,22 +431,48 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             setInitial(undefined);
           }}
         >
-          <h3>選擇帳戶</h3>
+          <h3>新增帳戶</h3>
+          <label>
+            新增方式
+            <select
+              aria-label="新增方式"
+              value={method}
+              onChange={(event) => setMethod(event.target.value)}
+            >
+              <option value="api">API 自動同步</option>
+              <option value="csv">匯入 CSV</option>
+            </select>
+          </label>
+          <p className="holdings-muted">永豐美股請用匯入 CSV</p>
           <div className="holdings-fields">
-            <label>
-              券商／交易所
-              <select
-                aria-label="券商／交易所"
-                value={brokerKey}
-                onChange={(event) => setBrokerKey(event.target.value)}
-              >
-                {BROKERS.map((entry) => (
-                  <option key={entry.key} value={entry.key}>
-                    {entry.label} · {entry.currency}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {method === 'api' ? (
+              <label>
+                API 服務
+                <select
+                  aria-label="API 服務"
+                  value={brokerKey}
+                  onChange={(event) => setBrokerKey(event.target.value)}
+                >
+                  <option value="mexc">MEXC（加密貨幣）</option>
+                  <option value="sinopac">永豐證券（台股）· 即將推出</option>
+                </select>
+              </label>
+            ) : (
+              <label>
+                市場
+                <select
+                  aria-label="帳戶市場"
+                  value={marketKey}
+                  onChange={(event) => setMarketKey(event.target.value)}
+                >
+                  {CSV_MARKETS.map((entry) => (
+                    <option key={entry.key} value={entry.key}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               帳戶名稱
               <input
@@ -530,19 +481,36 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 autoComplete="off"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder={BROKERS.find((entry) => entry.key === brokerKey)?.name}
+                required={method === 'csv'}
+                placeholder={method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'}
               />
             </label>
           </div>
           <div className="holdings-toolbar">
-            <button type="submit" className="primary-button" disabled={!directory?.length || blocked}>
-              繼續匯入
-            </button>
-            {brokerKey === 'mexc' && access.storageMode === 'cloud' && (
+            {method === 'csv' && (
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={!name.trim() || !directory?.length || blocked}
+              >
+                繼續匯入
+              </button>
+            )}
+            {method === 'api' && brokerKey === 'sinopac' && (
+              <button type="button" className="primary-button" disabled>
+                即將推出
+              </button>
+            )}
+            {method === 'api' && brokerKey === 'mexc' && (
               <button
                 type="button"
                 className="primary-button"
-                disabled={blocked || mexcSnapshot.loading || !mexcSnapshot.state.configured}
+                disabled={
+                  access.storageMode !== 'cloud' ||
+                  blocked ||
+                  mexcSnapshot.loading ||
+                  !mexcSnapshot.state.configured
+                }
                 onClick={() => {
                   setDraft({
                     id: crypto.randomUUID(),
@@ -559,16 +527,30 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 使用 MEXC API 連線
               </button>
             )}
-            <button type="button" className="ghost-button" onClick={() => setCreating(false)}>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setCreating(false)}
+            >
               取消
             </button>
           </div>
-          {brokerKey === 'mexc' && access.storageMode !== 'cloud' && (
-            <p className="holdings-muted">自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。</p>
-          )}
-          {brokerKey === 'mexc' && access.storageMode === 'cloud' && !mexcSnapshot.state.configured && (
-            <p role="note">MEXC API 服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。</p>
-          )}
+          {method === 'api' &&
+            brokerKey === 'mexc' &&
+            access.storageMode !== 'cloud' && (
+              <p className="holdings-muted">
+                自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。
+              </p>
+            )}
+          {method === 'api' &&
+            brokerKey === 'mexc' &&
+            access.storageMode === 'cloud' &&
+            !mexcSnapshot.state.configured && (
+              <p role="note">
+                MEXC API
+                服務尚未啟用，維護者完成設定後即可連線；目前可先匯入持股。
+              </p>
+            )}
         </form>
       )}
       {directoryError && (
