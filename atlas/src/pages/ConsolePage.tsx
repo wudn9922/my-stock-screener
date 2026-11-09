@@ -34,7 +34,7 @@ import { loadScreenerFixedMAs } from './screenerFixedMAs';
 import { HoldingsPanel } from '../holdings/HoldingsPanel';
 import { getStorageContextKey } from '../auth/storage';
 import { useStockParameters } from '../cloud/useStockParameters';
-import { stockParameterMap } from '../cloud/stockParameters';
+import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters';
 import { loadPeRiverFile } from '../fundamentals/peRiverRank';
 import { useWhileActive } from '../app/pageActivity';
 import { chartList } from '../app/listContext';
@@ -450,7 +450,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                 {selected.kind === 'manual'
                   ? `手動固定 ${selected.symbols.length} 檔`
                   : `來源：${sourceName} · ${
-                      activeChips(parseFilters(selected.filters), undefined, selected.market, !!activeVisit?.members.some(member => fixedParameters[member.symbol]?.length))
+                      activeChips(parseFilters(selected.filters), undefined, selected.market, !!activeVisit?.members.some(member => fixedParameters[parameterTickerKey(member.symbol)]?.length))
                         .map((chip) => chip.label)
                         .join('、') || '不限制條件'
                     }`}
@@ -546,7 +546,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                     </div>
                   </div>
                   <WatchlistChanges key={`${activeVisit.list.id}:${activeVisit.previousDate}:${activeVisit.list.history.at(-1)?.date}`} visit={activeVisit} reasons={activeVisit.reasons}
-                    onOpen={(entry, kind) => openChart({ symbol: entry.symbol, name: entry.name, maList: fixedParameters[entry.symbol] ?? selected.maList,
+                    onOpen={(entry, kind) => openChart({ symbol: entry.symbol, name: entry.name, maList: fixedParameters[parameterTickerKey(entry.symbol)] ?? selected.maList,
                       list: chartList(`${selected.name} · ${kind === 'entered' ? '新入選' : '出榜'}`, activeVisit[kind]) })} />
                   <ul className="saved-member-list">
                     {activeVisit.members.slice(0, visibleCount).map((entry) => (
@@ -559,9 +559,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                               symbol: entry.symbol,
                               name: entry.name,
                               tf: '1D',
-                              maList: fixedParameters[entry.symbol] ?? selected.maList,
+                              maList: fixedParameters[parameterTickerKey(entry.symbol)] ?? selected.maList,
                               list: chartList(selected.name, activeVisit.members.map((member) => ({
-                                symbol: member.symbol, name: member.name, maList: fixedParameters[member.symbol] ?? selected.maList,
+                                symbol: member.symbol, name: member.name, maList: fixedParameters[parameterTickerKey(member.symbol)] ?? selected.maList,
                               }))),
                             })
                           }
@@ -575,9 +575,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
                           type="button"
                           className="text-button member-parameter-button"
                           onClick={() => setEditingStock(entry.symbol)}
-                          aria-label={`設定 ${entry.symbol} 固定均線參數`}
+                          aria-label={`設定 ${entry.symbol} 個股均線（所有清單共用）`}
                         >
-                          {fixedParameters[entry.symbol] ? `固定均線 ${fixedParameters[entry.symbol].join(' / ')}` : '設定個股均線'}
+                          {fixedParameters[parameterTickerKey(entry.symbol)] ? `個股均線 ${fixedParameters[parameterTickerKey(entry.symbol)].join(' / ')}` : '設定個股均線'}
                         </button>
                       </li>
                     ))}
@@ -703,11 +703,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           {editingStock && selected && (
             <FixedStockParameters
               ticker={editingStock}
-              defaults={fixedParameters[editingStock] ?? selected.maList}
+              defaults={fixedParameters[parameterTickerKey(editingStock)] ?? selected.maList}
               onClose={() => setEditingStock(null)}
               onSaved={() => {
                 setEditingStock(null);
-                setCloudMessage(parameterStorageMessage(`${editingStock} 固定均線`));
+                setCloudMessage(parameterStorageMessage(`${editingStock} 個股均線`));
               }}
             />
           )}
