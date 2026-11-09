@@ -157,7 +157,7 @@ test('each rule-list member can save permanent ungrouped parameters that survive
     name: `${ticker} 固定均線參數`,
     exact: true,
   });
-  await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13, 34, 89');
+  await dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13, 34, 89');
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).not.toBeVisible();
   expect(cloud.stocks.find((stock) => stock.ticker === ticker && stock.group_id === 'ungrouped')).toMatchObject({
@@ -201,17 +201,17 @@ test('existing parameter stocks support search, group filters, a five-row scroll
   await dialog.getByRole('button', { name: '確認編輯' }).click();
   await expect(dialog).not.toBeVisible();
   await expect(row).toContainText('7 / 21');
-  await row.getByRole('button', { name: '刪除', exact: true }).click();
+  await row.getByRole('button', { name: '刪除個股均線', exact: true }).click();
   const confirmation = page.getByRole('dialog', {
-    name: '確定刪除？',
+    name: '確定刪除個股均線？',
     exact: true,
   });
   await expect(confirmation).toContainText('STOCK8');
   await confirmation.getByRole('button', { name: '取消刪除' }).click();
   await expect(row).toBeVisible();
-  await row.getByRole('button', { name: '刪除', exact: true }).click();
+  await row.getByRole('button', { name: '刪除個股均線', exact: true }).click();
   cloud.state.failDelete = true;
-  await confirmation.getByRole('button', { name: '確認刪除' }).click();
+  await confirmation.getByRole('button', { name: '確認刪除個股均線' }).click();
   await expect(confirmation.getByRole('alert')).toContainText('刪除暫時失敗');
   await expect(confirmation).toBeVisible();
   cloud.state.failDelete = false;
