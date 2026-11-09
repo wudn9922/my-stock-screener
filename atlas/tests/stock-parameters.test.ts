@@ -94,6 +94,19 @@ describe('one normalized ticker, one shared MA source', () => {
     expect(mocked.api.mock.calls.map(call => call[0])).toEqual(['stocks.list', 'stocks.delete']);
   });
 
+  it('refuses to retry cleanup if the primary MA or legacy duplicate changed after partial success', async () => {
+    const failure = new StockParameterCleanupError('2330', 12, [13, 34], 'tw_g1', [duplicate], 'account-a');
+    mocked.api.mockResolvedValue([{ ...grouped, ma1: 15, ma2: 34, ma3: 0, ma4: 0 }, duplicate]);
+    await expect(retryStockParameterCleanup(failure)).rejects.toThrow('已變更');
+    expect(mocked.api.mock.calls.map(call => call[0])).toEqual(['stocks.list']);
+    mocked.api.mockReset().mockResolvedValue([
+      { ...grouped, ma1: 13, ma2: 34, ma3: 0, ma4: 0 },
+      { ...duplicate, ma1: 99 },
+    ]);
+    await expect(retryStockParameterCleanup(failure)).rejects.toThrow('已變更');
+    expect(mocked.api.mock.calls.map(call => call[0])).toEqual(['stocks.list']);
+  });
+
   it('rejects stale values, newly inserted duplicates and account switching', async () => {
     mocked.api.mockResolvedValue([{ ...grouped, ma1: 99 }]);
     await expect(saveStockParameters('2330', [13], grouped, undefined, [grouped])).rejects.toThrow('已變更');
