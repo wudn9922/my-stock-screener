@@ -61,17 +61,17 @@ async function openFixed(page: Page, symbol = '2330.TW') {
 test('cloud grouped MAs render on a fresh chart; confirm updates the original row and consolidates the dormant duplicate', async ({ page }, testInfo) => {
   const cloud = await cloudParameters(page, [stock('2330.TW', 'ungrouped', 9, [20, 50]), stock('2330', 'tw_g1', 4, [29, 34, 73])]);
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await expect(chipNames(page)).toHaveText(['SMA 29', 'SMA 34', 'SMA 73']);
+  await expect(chipNames(page)).toHaveText(['SMA 20', 'SMA 50']);
   await expect.poll(() => movingAveragePixels(page.getByTestId('chart'))).toBeGreaterThan(20);
   let dialog = await openFixed(page);
-  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('29, 34, 73');
-  await expect(dialog).toContainText('20 / 50'); await expect(dialog).toContainText('原有分組');
-  await page.screenshot({ path: testInfo.outputPath('original-grouped-parameters.png') });
+  await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 50');
+  await expect(dialog).toContainText('個股均線（所有清單共用）：20 / 50');
+  await page.screenshot({ path: testInfo.outputPath('effective-legacy-fixed-parameters.png') });
   await dialog.getByRole('button', { name: '取消編輯' }).click();
   expect(cloud.writes).toHaveLength(0); expect(cloud.stocks).toHaveLength(2);
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
-  await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13, 34');
+  dialog = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
+  await dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13, 34');
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
   expect(cloud.writes).toEqual([
@@ -88,10 +88,10 @@ test('editing an original grouped stock remains effective even when legacy dorma
   const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 34, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
   await page.goto('./?page=console');
   const table = page.getByRole('table', { name: '個人股票參數' });
-  await expect(table.locator('tbody tr')).toHaveCount(2);
+  await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.locator('tbody tr').first().getByRole('button', { name: '編輯', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '編輯 NVDA 均線參數' });
-  await expect(dialog.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('29, 34, 73');
+  await expect(dialog.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('20, 50');
   await expect(dialog).toContainText('清除無分組重複筆');
   await dialog.getByRole('textbox', { name: '編輯股票均線參數' }).fill('17, 43');
   await dialog.getByRole('button', { name: '確認編輯' }).click();
@@ -105,10 +105,10 @@ test('a failed save leaves both rows intact and a load error prevents saving gue
   const original = [stock('2330.TW', 'tw_g1', 4, [29, 34]), stock('2330.TW', 'ungrouped', 9, [20, 50])];
   const cloud = await cloudParameters(page, original);
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await expect(chipNames(page)).toHaveText(['SMA 29', 'SMA 34']);
+  await expect(chipNames(page)).toHaveText(['SMA 20', 'SMA 50']);
   let dialog = await openFixed(page);
   cloud.state.failSave = true;
-  await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13');
+  await dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13');
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog.getByRole('alert')).toContainText('測試連線失敗');
   expect(cloud.stocks).toEqual(original);
@@ -116,7 +116,7 @@ test('a failed save leaves both rows intact and a load error prevents saving gue
   await dialog.getByRole('button', { name: '取消編輯' }).click();
   cloud.state.failRead = true;
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
+  dialog = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
   await expect(dialog.getByRole('alert')).toContainText('測試連線失敗');
   await expect(dialog.getByRole('button', { name: '確認並儲存到雲端' })).toBeDisabled();
 });
