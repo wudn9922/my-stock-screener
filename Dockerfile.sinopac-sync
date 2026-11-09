@@ -1,0 +1,16 @@
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+COPY sinopac_sync/requirements.txt /app/requirements.txt
+RUN --mount=type=secret,id=pip_ca \
+    if [ -s /run/secrets/pip_ca ]; then PIP_CERT=/run/secrets/pip_ca pip install --no-cache-dir -r requirements.txt; \
+    else pip install --no-cache-dir -r requirements.txt; fi
+FROM runtime AS catalog
+# Context is allowlisted by Dockerfile.sinopac-sync.dockerignore.
+COPY . /app
+RUN python scripts/build_market_calendar.py --output /app/calendar.json \
+ && python -c "import pathlib,json,collections; d=collections.defaultdict(list); [(d[p.name.split('.')[0]].append(p.name[:-4])) for p in pathlib.Path('data').glob('*.csv') if p.name.endswith(('.TW.csv','.TWO.csv'))];json.dump({k:v[0] for k,v in d.items() if len(v)==1},open('catalog.json','w'))" \
+ && rm -rf /app/data /app/scripts
+FROM runtime
+COPY --from=catalog /app /app
+ENV PYTHONUNBUFFERED=1
+CMD ["sh", "-c", "exec gunicorn --bind :${PORT:-8080} --workers 1 --threads 1 --timeout 120 --log-level critical sinopac_sync.app:app"]

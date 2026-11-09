@@ -3,6 +3,7 @@ name: System failure notification fallback
 on:
   workflow_run:
     workflows:
+      - Deploy read-only SinoPac sync
       - "Atlas Research Terminal"
       - "Recalibrate US breadth signals"
       - "Deploy Cloud Run (breakout alert)"

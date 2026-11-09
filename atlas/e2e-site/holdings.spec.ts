@@ -279,7 +279,8 @@ test('account creation offers CSV markets and only supported API connections', a
   await expect(panel(page)).toContainText('永豐美股請用匯入 CSV');
   await panel(page).getByLabel('新增方式').selectOption('api');
   await panel(page).getByLabel('API 服務').selectOption('sinopac');
-  await expect(panel(page).getByRole('button', { name: '即將推出', exact: true })).toBeDisabled();
+  await expect(panel(page).getByRole('region', { name: '永豐台股自動同步' })).toContainText('不勾「交易」');
+  await expect(panel(page).getByRole('button', { name: '同步', exact: true })).toBeDisabled();
   await expect(importer(page)).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('account-methods-390.png') });
   await panel(page).getByLabel('新增方式').selectOption('csv');

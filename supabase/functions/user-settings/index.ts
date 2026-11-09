@@ -1,3 +1,4 @@
+import { handleSinopac } from './sinopac.ts';
 import { createClient } from "@supabase/supabase-js";
 import { HoldingsError, handleHoldings } from "./holdings.ts";
 import { MexcError, handleMexc } from "./mexc.ts";
@@ -313,6 +314,16 @@ Deno.serve(async (request: Request) => {
     // This gate also covers legacy clients and reads of former cloud data after revocation.
     // It is intentionally checked on every request, not cached at login.
     await requireCloudStorage(supabase, lineUserId, adminId);
+
+    if (action.startsWith('holdings.sinopac.')) {
+      try {
+        const data = await handleSinopac(supabase, lineUserId, body);
+        return new Response(JSON.stringify({ok:true,data}), {headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+      } catch (error) {
+        const known = error instanceof HoldingsError;
+        return new Response(JSON.stringify({ok:false,error:known ? error.message : '永豐同步暫時無法使用'}), {status:known ? error.status : 503,headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+      }
+    }
 
     if (action.startsWith('holdings.mexc.')) {
       try {
