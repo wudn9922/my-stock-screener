@@ -92,7 +92,7 @@ export function SinopacPanel({
                 onCreated?.();
               }
             })
-            .catch((error: unknown) => {
+            .catch(async (error: unknown) => {
               if (context === getStorageContextKey()) {
                 const message = error instanceof Error ? error.message : '';
                 setError(
@@ -100,6 +100,15 @@ export function SinopacPanel({
                     ? message
                     : '永豐同步未完成，請重新載入狀態後再試。',
                 );
+                // The failed attempt has its own metadata; keep the displayed time/status current.
+                try {
+                  const next = await holdingsContextApi<Status>(context, 'holdings.sinopac.status', {
+                    accountId: status!.accountId,
+                  });
+                  if (context === getStorageContextKey()) setStatus(next);
+                } catch {
+                  /* Preserve the last known status if permissions or connectivity changed. */
+                }
               }
             })
             .finally(() => setBusy(false));

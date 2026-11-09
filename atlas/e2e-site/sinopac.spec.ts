@@ -68,9 +68,9 @@ test('owner SinoPac status, manual sync, error and read-only imported portfolio'
             : b.action === 'holdings.sinopac.status'
               ? {
                   accountId: id,
-                  lastSyncAt: '2026-11-09T01:00:00Z',
+                  lastSyncAt: synced ? '2026-11-09T01:05:00Z' : '2026-11-09T01:00:00Z',
                   lastSuccessAt: null,
-                  code: 'closed',
+                  code: synced ? 'timeout' : 'closed',
                   skippedShorts: 2,
                 }
               : [],
@@ -88,6 +88,8 @@ test('owner SinoPac status, manual sync, error and read-only imported portfolio'
   await expect(page.getByRole('button', { name: '修正持股', exact: true })).toBeDisabled();
   await panel.getByRole('button', { name: '同步', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('永豐同步逾時');
+  await expect(panel.getByRole('status')).toContainText('永豐同步逾時');
+  await expect(panel).toContainText('2026/11/09 09:05');
   expect(synced).toBe(1);
   await panel.getByRole('button', { name: '同步', exact: true }).click();
   await expect(panel.getByRole('status')).toHaveText('正常');
