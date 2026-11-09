@@ -242,16 +242,18 @@ def parameter_ticker_key(ticker):
 
 
 def fixed_parameter_map(stocks, user_id):
-    """Original grouped stock rows win over legacy dormant duplicates.
+    """One MA row per normalized ticker, shared across every list and monitor.
 
-    This only resolves parameters, never membership or notification consent.
-    Keep the ordering and ticker keys aligned with Atlas stockParameters.ts.
+    Transitional duplicates use the legacy ungrouped last-fixed values first,
+    then grouped rows ordered by id. This only resolves parameters, never
+    membership or notification consent: ungrouped alone cannot trigger alerts.
+    Keep ordering and ticker keys aligned with Atlas stockParameters.ts.
     """
     result = {}
     seen = set()
     owned = [stock for stock in stocks if stock.get("line_user_id") == user_id
              and str(stock.get("group_id") or "").strip() not in {"", "admin_index"}]
-    owned.sort(key=lambda stock: (stock.get("group_id") == FIXED_STOCK_GROUP_ID,
+    owned.sort(key=lambda stock: (stock.get("group_id") != FIXED_STOCK_GROUP_ID,
                                  safe_int(stock.get("id")) or 0))
     for stock in owned:
         ticker = parameter_ticker_key(stock.get("ticker"))
