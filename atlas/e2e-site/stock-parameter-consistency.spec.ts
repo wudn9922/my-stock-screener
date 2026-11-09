@@ -101,6 +101,46 @@ test('editing an original grouped stock remains effective even when legacy dorma
   await expect(chipNames(page)).toHaveText(['SMA 17', 'SMA 43']);
 });
 
+test('moving out of a group and then joining another group reuses the same id and MAs', async ({ page }) => {
+  const cloud = await cloudParameters(page, [stock('AAPL', 'us_g1', 4, [17, 43])]);
+  await page.goto('./?page=console');
+  const table = page.getByRole('table', { name: '個人股票參數' });
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await table.getByRole('button', { name: '移出分組' }).click();
+  const removal = page.getByRole('dialog', { name: '移出分組（保留均線）？' });
+  await expect(removal).toContainText('保留個股均線');
+  await removal.getByRole('button', { name: '確認移出分組' }).click();
+  await expect(removal).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('AAPL', 'ungrouped', 4, [17, 43])]);
+  expect(cloud.writes.some(write => write.action === 'stocks.delete')).toBe(false);
+  await page.getByRole('textbox', { name: '參數股票代號' }).fill('AAPL');
+  await page.getByRole('combobox', { name: '參數股票分組' }).selectOption('us_g2');
+  await page.getByRole('button', { name: '編輯已有參數' }).click();
+  const editor = page.getByRole('dialog', { name: '編輯 AAPL 均線參數' });
+  await expect(editor.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('17, 43');
+  await expect(editor.getByRole('combobox', { name: '編輯股票組別' })).toHaveValue('us_g2');
+  await editor.getByRole('button', { name: '確認編輯' }).click();
+  await expect(editor).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('AAPL', 'us_g2', 4, [17, 43])]);
+  expect(cloud.writes.filter(write => write.action === 'stocks.save')).toHaveLength(2);
+});
+
+test('duplicate cleanup failure reports partial success and supports a safe explicit retry', async ({ page }) => {
+  const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
+  await page.goto('./?page=chart&symbol=NVDA&tf=1D');
+  const editor = await openFixed(page, 'NVDA');
+  cloud.state.failDelete = true;
+  await editor.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13, 34');
+  await editor.getByRole('button', { name: '確認並儲存到雲端' }).click();
+  await expect(editor.getByRole('alert')).toContainText('均線已覆蓋，重複資料尚未清除');
+  expect(cloud.stocks).toHaveLength(2);
+  expect(cloud.stocks.find(row => row.id === 4)).toMatchObject({ ma1: 13, ma2: 34 });
+  cloud.state.failDelete = false;
+  await editor.getByRole('button', { name: '重試清除重複資料' }).click();
+  await expect(editor).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('NVDA', 'us_g1', 4, [13, 34])]);
+});
+
 test('a failed save leaves both rows intact and a load error prevents saving guessed defaults', async ({ page }) => {
   const original = [stock('2330.TW', 'tw_g1', 4, [29, 34]), stock('2330.TW', 'ungrouped', 9, [20, 50])];
   const cloud = await cloudParameters(page, original);
