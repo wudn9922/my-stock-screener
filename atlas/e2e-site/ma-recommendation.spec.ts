@@ -111,8 +111,8 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(applied20).toBeEnabled();
   await expect(applied20).toHaveAttribute('aria-pressed', 'true');
   await card.getByRole('button', { name: '固定為個股參數' }).click();
-  const onlyApplied = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
-  await expect(onlyApplied.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20');
+  const onlyApplied = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
+  await expect(onlyApplied.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20');
   await onlyApplied.getByRole('button', { name: '取消編輯' }).click();
   await applied20.click();
   await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(0);
@@ -132,16 +132,16 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
 
   stocks.push({ id: 7, ticker: '2330.TW', group_id: 'ungrouped', ma1: 20, ma2: 60, ma3: 0, ma4: 0 });
   await card.getByRole('button', { name: '固定為個股參數' }).click();
-  const dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
-  await expect(dialog.getByRole('status')).toContainText('目前已保存：20 / 60；保留無分組');
-  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20, 60');
+  const dialog = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
+  await expect(dialog.getByRole('status')).toContainText('個股均線（所有清單共用）：20 / 60；確認後直接覆蓋');
+  await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 60');
   await dialog.getByRole('button', { name: /改用目前圖表的均線/ }).click();
-  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('20, 24, 38, 89');
+  await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 24, 38, 89');
   await page.screenshot({ path: testInfo.outputPath('ma-recommendation-fix.png') });
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [20, 24, 38, 89] })]);
-  await expect(page.getByText('2330.TW 固定均線 20 / 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
+  await expect(page.getByText('2330.TW 個股均線 20 / 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
   // The recommendation menu stays open across the dialog; a sibling control dismisses it.
   await expect(card).toBeVisible();
   await page.getByTestId('stock-tab-chart').click();
