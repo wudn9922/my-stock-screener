@@ -64,11 +64,7 @@ def health():
 
 def is_run_request_authorized():
     """
-    選用的簡易驗證。
-
-    未設定環境變數 RUN_TOKEN 時維持原行為（不驗證）。
-    設定後，呼叫端必須帶上標頭：X-Run-Token: <RUN_TOKEN>
-    （Cloud Scheduler 可在 HTTP headers 欄位加入）。
+    /run 必須提供正確的 X-Run-Token。未設定 RUN_TOKEN 時一律拒絕。
     """
     expected_token = os.environ.get(
         "RUN_TOKEN",
@@ -76,7 +72,7 @@ def is_run_request_authorized():
     ).strip()
 
     if not expected_token:
-        return True
+        return False
 
     provided_token = request.headers.get(
         "X-Run-Token",
@@ -91,6 +87,15 @@ def is_run_request_authorized():
 
 @app.post("/run")
 def run_monitor():
+    if not os.environ.get("RUN_TOKEN", "").strip():
+        logger.error("/run disabled: RUN_TOKEN is not configured")
+        return jsonify(
+            {
+                "status": "unavailable",
+                "message": "RUN_TOKEN 未設定，監控觸發端點暫不可用"
+            }
+        ), 503
+
     if not is_run_request_authorized():
         return jsonify(
             {
