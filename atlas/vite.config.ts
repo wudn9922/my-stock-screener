@@ -6,11 +6,14 @@ import { marketProxyCsp } from './src/app/marketProxyCsp';
 import react from '@vitejs/plugin-react';
 import { versionedServiceWorker } from './src/app/buildPlugins';
 import { yahooProxy } from './src/market-data/yahooProxy';
-const isStaticHosting = process.env.VITE_STATIC_HOSTING === '1';
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITE_');
+  const isStaticHosting = process.env.VITE_STATIC_HOSTING === '1';
+  return {
   base: process.env.VITE_PUBLIC_BASE || '/',
   plugins: [
     react(),
+    marketProxyCsp(process.env.VITE_MARKET_PROXY_URL || env.VITE_MARKET_PROXY_URL),
     ...(!isStaticHosting ? [yahooProxy(), secProxy()] : []),
     versionedServiceWorker(),
   ],
@@ -41,4 +44,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });
