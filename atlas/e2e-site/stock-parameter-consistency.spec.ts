@@ -55,23 +55,23 @@ async function movingAveragePixels(host: ReturnType<Page['locator']>) {
 async function openFixed(page: Page, symbol = '2330.TW') {
   await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  return page.getByRole('dialog', { name: `${symbol} 固定均線參數` });
+  return page.getByRole('dialog', { name: `${symbol} 個股均線（所有清單共用）` });
 }
 
 test('cloud grouped MAs render on a fresh chart; confirm updates the original row and consolidates the dormant duplicate', async ({ page }, testInfo) => {
   const cloud = await cloudParameters(page, [stock('2330.TW', 'ungrouped', 9, [20, 50]), stock('2330', 'tw_g1', 4, [29, 34, 73])]);
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await expect(chipNames(page)).toHaveText(['SMA 29', 'SMA 34', 'SMA 73']);
+  await expect(chipNames(page)).toHaveText(['SMA 20', 'SMA 50']);
   await expect.poll(() => movingAveragePixels(page.getByTestId('chart'))).toBeGreaterThan(20);
   let dialog = await openFixed(page);
-  await expect(dialog.getByRole('textbox', { name: '個股固定均線參數' })).toHaveValue('29, 34, 73');
-  await expect(dialog).toContainText('20 / 50'); await expect(dialog).toContainText('原有分組');
-  await page.screenshot({ path: testInfo.outputPath('original-grouped-parameters.png') });
+  await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 50');
+  await expect(dialog).toContainText('個股均線（所有清單共用）：20 / 50');
+  await page.screenshot({ path: testInfo.outputPath('effective-legacy-fixed-parameters.png') });
   await dialog.getByRole('button', { name: '取消編輯' }).click();
   expect(cloud.writes).toHaveLength(0); expect(cloud.stocks).toHaveLength(2);
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
-  await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13, 34');
+  dialog = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
+  await dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13, 34');
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
   expect(cloud.writes).toEqual([
@@ -79,36 +79,77 @@ test('cloud grouped MAs render on a fresh chart; confirm updates the original ro
     expect.objectContaining({ action: 'stocks.delete', id: 9 }),
   ]);
   expect(cloud.stocks).toEqual([stock('2330', 'tw_g1', 4, [13, 34])]);
-  await expect(chipNames(page)).toHaveText(['SMA 34', 'SMA 13']);
+  await expect(chipNames(page)).toHaveText(['SMA 13', 'SMA 34']);
   await page.reload(); await page.getByTestId('stock-tab-chart').click();
-  await expect(chipNames(page)).toHaveText(['SMA 34', 'SMA 13']);
+  await expect(chipNames(page)).toHaveText(['SMA 13', 'SMA 34']);
 });
 
 test('editing an original grouped stock remains effective even when legacy dormant duplicates exist', async ({ page }) => {
   const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 34, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
   await page.goto('./?page=console');
   const table = page.getByRole('table', { name: '個人股票參數' });
-  await expect(table.locator('tbody tr')).toHaveCount(2);
+  await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.locator('tbody tr').first().getByRole('button', { name: '編輯', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '編輯 NVDA 均線參數' });
-  await expect(dialog.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('29, 34, 73');
+  await expect(dialog.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('20, 50');
   await expect(dialog).toContainText('清除無分組重複筆');
   await dialog.getByRole('textbox', { name: '編輯股票均線參數' }).fill('17, 43');
   await dialog.getByRole('button', { name: '確認編輯' }).click();
+  await expect(dialog).toBeHidden();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   expect(cloud.stocks).toEqual([stock('NVDA', 'us_g1', 4, [17, 43])]);
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   await expect(chipNames(page)).toHaveText(['SMA 17', 'SMA 43']);
 });
 
+test('moving out of a group and then joining another group reuses the same id and MAs', async ({ page }) => {
+  const cloud = await cloudParameters(page, [stock('AAPL', 'us_g1', 4, [17, 43])]);
+  await page.goto('./?page=console');
+  const table = page.getByRole('table', { name: '個人股票參數' });
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await table.getByRole('button', { name: '移出分組' }).click();
+  const removal = page.getByRole('dialog', { name: '移出分組（保留均線）？' });
+  await expect(removal).toContainText('保留個股均線');
+  await removal.getByRole('button', { name: '確認移出分組' }).click();
+  await expect(removal).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('AAPL', 'ungrouped', 4, [17, 43])]);
+  expect(cloud.writes.some(write => write.action === 'stocks.delete')).toBe(false);
+  await page.getByRole('textbox', { name: '參數股票代號' }).fill('AAPL');
+  await page.getByRole('combobox', { name: '參數股票分組' }).selectOption('us_g2');
+  await page.getByRole('button', { name: '編輯已有參數' }).click();
+  const editor = page.getByRole('dialog', { name: '編輯 AAPL 均線參數' });
+  await expect(editor.getByRole('textbox', { name: '編輯股票均線參數' })).toHaveValue('17, 43');
+  await expect(editor.getByRole('combobox', { name: '編輯股票組別' })).toHaveValue('us_g2');
+  await editor.getByRole('button', { name: '確認編輯' }).click();
+  await expect(editor).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('AAPL', 'us_g2', 4, [17, 43])]);
+  expect(cloud.writes.filter(write => write.action === 'stocks.save')).toHaveLength(2);
+});
+
+test('duplicate cleanup failure reports partial success and supports a safe explicit retry', async ({ page }) => {
+  const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
+  await page.goto('./?page=chart&symbol=NVDA&tf=1D');
+  const editor = await openFixed(page, 'NVDA');
+  cloud.state.failDelete = true;
+  await editor.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13, 34');
+  await editor.getByRole('button', { name: '確認並儲存到雲端' }).click();
+  await expect(editor.getByRole('alert')).toContainText('均線已覆蓋，重複資料尚未清除');
+  expect(cloud.stocks).toHaveLength(2);
+  expect(cloud.stocks.find(row => row.id === 4)).toMatchObject({ ma1: 13, ma2: 34 });
+  cloud.state.failDelete = false;
+  await editor.getByRole('button', { name: '重試清除重複資料' }).click();
+  await expect(editor).toBeHidden();
+  expect(cloud.stocks).toEqual([stock('NVDA', 'us_g1', 4, [13, 34])]);
+});
+
 test('a failed save leaves both rows intact and a load error prevents saving guessed defaults', async ({ page }) => {
   const original = [stock('2330.TW', 'tw_g1', 4, [29, 34]), stock('2330.TW', 'ungrouped', 9, [20, 50])];
   const cloud = await cloudParameters(page, original);
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
-  await expect(chipNames(page)).toHaveText(['SMA 29', 'SMA 34']);
+  await expect(chipNames(page)).toHaveText(['SMA 20', 'SMA 50']);
   let dialog = await openFixed(page);
   cloud.state.failSave = true;
-  await dialog.getByRole('textbox', { name: '個股固定均線參數' }).fill('13');
+  await dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' }).fill('13');
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog.getByRole('alert')).toContainText('測試連線失敗');
   expect(cloud.stocks).toEqual(original);
@@ -116,7 +157,7 @@ test('a failed save leaves both rows intact and a load error prevents saving gue
   await dialog.getByRole('button', { name: '取消編輯' }).click();
   cloud.state.failRead = true;
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
-  dialog = page.getByRole('dialog', { name: '2330.TW 固定均線參數' });
+  dialog = page.getByRole('dialog', { name: '2330.TW 個股均線（所有清單共用）' });
   await expect(dialog.getByRole('alert')).toContainText('測試連線失敗');
   await expect(dialog.getByRole('button', { name: '確認並儲存到雲端' })).toBeDisabled();
 });

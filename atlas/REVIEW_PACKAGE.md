@@ -1,3 +1,7 @@
+## 2026-11-10 PR review: one shared MA row per normalized ticker
+Implementation: overwrite the grouped ID or reuse the dormant ID, convert group membership without deleting MAs, explicit parameter deletion, legacy ungrouped-first reads in Atlas/Python, and guarded cleanup/retry; 2408.TW/AGM/TSM were fixed separately by the maintainer, with no production SQL in this PR.
+Verification: code/test updates submitted for Atlas typecheck/lint/Vitest/build/Pages, Playwright site desktop/mobile Chromium (WebKit CI), and Python monitor/report checks; actual CI pass/fail is reported in the PR, not inferred from historical records.
+
 永豐唯讀同步：primary self-review，沒有獨立簽核；owner/IAM/共享密鑰、Decimal、CAS、跨 instance 限流及 API 唯讀邊界已檢查。
 部署步驟見 sinopac_sync/README.md；所有 broker／Google／資料庫測試用假回應，沒有連線永豐、部署或執行 SQL。
 相關 Python、TypeScript、Playwright、lint、build 的實際結果列於本次 PR；本 PR 接續尚未合併的 #250。

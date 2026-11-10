@@ -260,7 +260,7 @@ function DailyMaRecommendation({
             ? `日線至 ${result.data.asof}${result.data.limited ? ' · 資料不足 3.5 年，中長期僅供參考' : ''}`
             : result.message}
       </p>
-      {savedStock && <p className="ws-ma-reco-status">已保存均線：{parameterMAs(savedStock).join(' / ')}（{savedStock.group_id === 'ungrouped' ? '固定參數' : '原有分組'}）</p>}
+      {savedStock && <p className="ws-ma-reco-status">個股均線（所有清單共用）：{parameterMAs(savedStock).join(' / ')}</p>}
       {parameterError && <p role="status">{parameterError}</p>}
       <button type="button" className="ghost-button" disabled={!applied.length && !savedStock}
         title="先查看已保存的參數，再決定是否使用目前圖表的均線" onClick={() => setFixing(true)}>固定為個股參數</button>
@@ -334,7 +334,7 @@ function DailyMaRecommendation({
           onClose={() => setFixing(false)}
           onSaved={(values) => {
             setFixing(false);
-            onNotice(parameterStorageMessage(`${symbol} 固定均線 ${values.join(' / ')}`));
+            onNotice(parameterStorageMessage(`${symbol} 個股均線 ${values.join(' / ')}`));
           }}
         />
       )}

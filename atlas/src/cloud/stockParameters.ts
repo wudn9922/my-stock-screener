@@ -2,7 +2,7 @@ import type { ParameterStock } from './settingsApi';
 
 export const FIXED_STOCK_GROUP = 'ungrouped';
 
-/** Match the collector's ticker keys without confusing TWSE with TPEx. */
+/** Match Python parameter_ticker_key without confusing TWSE with TPEx. */
 export function parameterTickerKey(ticker: string): string {
   const key = ticker.trim().toUpperCase();
   if (/^\d+$/.test(key)) return `${key}.TW`;
@@ -13,11 +13,16 @@ export function parameterMAs(stock: Pick<ParameterStock, 'ma1' | 'ma2' | 'ma3' |
   return [stock.ma1, stock.ma2, stock.ma3, stock.ma4].filter(n => n > 0);
 }
 
-/** Preserve the original grouped record; legacy dormant duplicates must not override it. */
+/**
+ * One normalized ticker has one shared MA row: grouped if a member, ungrouped otherwise.
+ * Transitional duplicate reads prefer the legacy ungrouped last-fixed values, then grouped.
+ * Keep this ordering and ticker normalization aligned with Python fixed_parameter_map.
+ * Ungrouped values never grant report/alert membership.
+ */
 export function stockParameterRows(stocks: readonly ParameterStock[], ticker: string): ParameterStock[] {
   const key = parameterTickerKey(ticker);
   return stocks.filter(stock => parameterTickerKey(stock.ticker) === key && stock.group_id && stock.group_id !== 'admin_index')
-    .sort((a, b) => Number(a.group_id === FIXED_STOCK_GROUP) - Number(b.group_id === FIXED_STOCK_GROUP) || a.id - b.id);
+    .sort((a, b) => Number(b.group_id === FIXED_STOCK_GROUP) - Number(a.group_id === FIXED_STOCK_GROUP) || a.id - b.id);
 }
 
 export function stockParameterMap(stocks: readonly ParameterStock[]): Record<string, number[]> {

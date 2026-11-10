@@ -14,9 +14,10 @@ import {
 import { DEFAULT_LIFF_ID } from '../cloud/lineIdentity';
 import { ConsoleDialog } from './ConsoleDialog';
 import { accessState } from '../auth/access';
-import { stockParameterRows } from '../cloud/stockParameters';
-import { saveStockParameters } from '../cloud/saveStockParameters';
+import { parameterTickerKey, stockParameterRows } from '../cloud/stockParameters';
+import { saveStockParameters, retryStockParameterCleanup, StockParameterCleanupError } from '../cloud/saveStockParameters';
 import { stockParametersChanged } from '../cloud/useStockParameters';
+import { getStorageContextKey } from '../auth/storage';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
 export function ParameterConsole() {
@@ -33,17 +34,20 @@ export function ParameterConsole() {
   const [filterGroup, setFilterGroup] = useState('all');
   const [dialog, setDialog] = useState<{
     stock: ParameterStock;
-    mode: 'edit' | 'delete';
+    mode: 'edit' | 'delete' | 'remove';
   } | null>(null);
   const [editMas, setEditMas] = useState('');
   const [editGroup, setEditGroup] = useState('');
+  const [cleanupFailure, setCleanupFailure] = useState<StockParameterCleanupError | null>(null);
   const [groupName, setGroupName] = useState('');
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setMessage('');
+    setCleanupFailure(null);
     try {
       await action();
     } catch (error) {
+      if (error instanceof StockParameterCleanupError) setCleanupFailure(error);
       setMessage(error instanceof Error ? error.message : '設定讀寫失敗');
     } finally {
       setBusy(false);
@@ -64,12 +68,12 @@ export function ParameterConsole() {
     event.preventDefault();
     void run(async () => {
       if (existingForTicker) {
-        setEditGroup(existingForTicker.group_id);
+        setEditGroup(stockParameterRows(stocks, ticker).find(row => row.group_id !== FIXED_STOCK_GROUP)?.group_id ?? groupId);
         setEditMas(parameterMAs(existingForTicker).join(', '));
         setDialog({ stock: existingForTicker, mode: 'edit' });
         return;
       }
-      await saveStockParameters(ticker.trim().toUpperCase(), parseMovingAverages(mas), existingForTicker, groupId);
+      await saveStockParameters(ticker.trim().toUpperCase(), parseMovingAverages(mas), existingForTicker, groupId, stockParameterRows(stocks, ticker));
       await reload();
       setTicker('');
       setMessage(parameterStorageMessage('股票與均線參數'));
@@ -77,18 +81,25 @@ export function ParameterConsole() {
   };
   const names: Record<string, string> = {
     ...FIXED_PARAMETER_GROUPS,
-    [FIXED_STOCK_GROUP]: '無分組（固定參數）',
+    [FIXED_STOCK_GROUP]: '無分組（保留個股均線）',
     ...Object.fromEntries(groups.map((group) => [`custom_${group.id}`, group.name])),
   };
   const existingForTicker = stockParameterRows(stocks, ticker)[0];
-  const filteredStocks = stocks.filter(
-    (stock) =>
-      (filterGroup === 'all' || stock.group_id === filterGroup) &&
+  // One visible row per normalized ticker. Legacy last-fixed values override display,
+  // while membership is determined only by the grouped row.
+  const uniqueStocks = [...new Set(stocks.filter(stock => stock.group_id !== 'admin_index').map(stock => parameterTickerKey(stock.ticker)))].map(key => {
+    const rows = stockParameterRows(stocks, key);
+    const effective = rows[0];
+    const member = rows.find(row => row.group_id !== FIXED_STOCK_GROUP) ?? effective;
+    return { ...member, ma1: effective.ma1, ma2: effective.ma2, ma3: effective.ma3, ma4: effective.ma4 };
+  });
+  const filteredStocks = uniqueStocks.filter(
+    stock => (filterGroup === 'all' || stock.group_id === filterGroup) &&
       `${stock.ticker} ${names[stock.group_id] ?? stock.group_id}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
   );
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
-      <h2>均線參數與個人分組</h2>
+      <h2>個股均線（所有清單共用）與個人分組</h2>
       <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>
       {message && (
         <p role="status" className="console-message">
@@ -141,7 +152,7 @@ export function ParameterConsole() {
       </form>
       {existingForTicker && (
         <p className="muted">
-          此股票已有均線 {parameterMAs(existingForTicker).join(' / ')}，請確認原有參數後再編輯，不會另外新增無分組參數。
+          此股票已有共用個股均線 {parameterMAs(existingForTicker).join(' / ')}，請確認原有參數後再編輯，不會新增第二筆。
         </p>
       )}
       <div className="console-actions parameter-filters">
@@ -168,8 +179,8 @@ export function ParameterConsole() {
         </label>
         <span className="muted">{filteredStocks.length} 筆</span>
       </div>
-      <HelpDisclosure label="固定參數與保存說明">
-        優先使用原有分組的股票參數；沒有分組才使用無分組固定參數。依目前授權選擇暫存、裝置或雲端保存。只有允許雲端保存且啟用監控的帳號才會使用服務端提醒。
+      <HelpDisclosure label="個股均線（所有清單共用）保存說明">
+        每個正規化代號只用一筆均線：有分組用該分組列，沒有分組則保留無分組列。舊資料若有重複，以最後固定的無分組均線為準。所有清單及圖表共用；無分組本身不會觸發每日報告或監控。
       </HelpDisclosure>
       <div className="research-table-scroll parameter-stock-scroll" role="region" aria-label="已有參數股票清單" tabIndex={0}>
         <table className="research-table" aria-label="個人股票參數">
@@ -193,25 +204,30 @@ export function ParameterConsole() {
                     className="text-button"
                     disabled={busy}
                     onClick={() => {
-                      const editable = stock.group_id === FIXED_STOCK_GROUP ? stockParameterRows(stocks, stock.ticker)[0]! : stock;
+                      const rows = stockParameterRows(stocks, stock.ticker);
+                      const editable = rows[0];
                       setMessage('');
-                      setEditGroup(editable.group_id);
+                      setEditGroup(rows.find(row => row.group_id !== FIXED_STOCK_GROUP)?.group_id ?? FIXED_STOCK_GROUP);
                       setEditMas(parameterMAs(editable).join(', '));
                       setDialog({ stock: editable, mode: 'edit' });
                     }}
                   >
                     編輯
                   </button>
+                  {stock.group_id !== FIXED_STOCK_GROUP && <button type="button" className="text-button" disabled={busy}
+                    onClick={() => { setMessage(''); setDialog({ stock: stocks.find(row => row.id === stock.id)!, mode: 'remove' }); }}>
+                    移出分組
+                  </button>}
                   <button
                     type="button"
                     className="text-button"
                     disabled={busy}
                     onClick={() => {
                       setMessage('');
-                      setDialog({ stock, mode: 'delete' });
+                      setDialog({ stock: stocks.find(row => row.id === stock.id)!, mode: 'delete' });
                     }}
                   >
-                    刪除
+                    刪除個股均線
                   </button>
                 </td>
               </tr>
@@ -222,7 +238,7 @@ export function ParameterConsole() {
       </div>
       {dialog && (
         <ConsoleDialog
-          title={dialog.mode === 'edit' ? `編輯 ${dialog.stock.ticker} 均線參數` : '確定刪除？'}
+          title={dialog.mode === 'edit' ? `編輯 ${dialog.stock.ticker} 均線參數` : dialog.mode === 'remove' ? '移出分組（保留均線）？' : '確定刪除個股均線？'}
           busy={busy}
           onClose={() => setDialog(null)}
         >
@@ -231,12 +247,26 @@ export function ParameterConsole() {
               {message}
             </p>
           )}
+          {cleanupFailure && <button type="button" className="ghost-button" disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              setMessage('');
+              void retryStockParameterCleanup(cleanupFailure)
+                .then(async () => {
+                  await reload();
+                  setCleanupFailure(null);
+                  setDialog(null);
+                  setMessage('個股均線已覆蓋，重複資料也已清除。');
+                })
+                .catch(error => setMessage(error instanceof Error ? error.message : '重複資料清除失敗'))
+                .finally(() => setBusy(false));
+            }}>重試清除重複資料</button>}
           {dialog.mode === 'edit' ? (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
-                  await saveStockParameters(dialog.stock.ticker, parseMovingAverages(editMas), dialog.stock, editGroup);
+                  await saveStockParameters(dialog.stock.ticker, parseMovingAverages(editMas), dialog.stock, editGroup, stockParameterRows(stocks, dialog.stock.ticker));
                   await reload();
                   setDialog(null);
                   setMessage(parameterStorageMessage('股票均線參數'));
@@ -270,9 +300,9 @@ export function ParameterConsole() {
               </label>
               <p>
                 填入 1～4 個不重複的整數（1～1000），用逗號分隔。
-                {dialog.stock.group_id !== FIXED_STOCK_GROUP &&
+                {stockParameterRows(stocks, dialog.stock.ticker).some(stock => stock.group_id !== FIXED_STOCK_GROUP) &&
                   stockParameterRows(stocks, dialog.stock.ticker).some(stock => stock.group_id === FIXED_STOCK_GROUP) &&
-                  '此股票另有無分組重複參數；確認儲存會保留此分組，並清除無分組重複筆。'}
+                  '此股票另有舊的無分組重複參數；確認儲存會覆蓋分組列的均線，並清除無分組重複筆。'}
               </p>
               <div className="console-actions">
                 <button type="submit" className="primary-button" disabled={busy}>
@@ -283,38 +313,40 @@ export function ParameterConsole() {
                 </button>
               </div>
             </form>
+          ) : dialog.mode === 'remove' ? (
+            <>
+              <p>將 {dialog.stock.ticker} 移出「{names[dialog.stock.group_id] ?? dialog.stock.group_id}」，並保留個股均線（所有清單共用）。移出後不再以這個分組取得報告或提醒資格。</p>
+              <div className="console-actions">
+                <button type="button" className="primary-button" disabled={busy} onClick={() => void run(async () => {
+                  await saveStockParameters(dialog.stock.ticker, parameterMAs(dialog.stock), dialog.stock, FIXED_STOCK_GROUP, stockParameterRows(stocks, dialog.stock.ticker));
+                  await reload();
+                  setDialog(null);
+                  setMessage('已移出分組；個股均線仍保留，所有清單共用。');
+                })}>確認移出分組</button>
+                <button type="button" className="ghost-button" disabled={busy} onClick={() => setDialog(null)}>取消移出</button>
+              </div>
+            </>
           ) : (
             <>
-              <p>
-                確定刪除 {dialog.stock.ticker} 在「
-                {names[dialog.stock.group_id] ?? dialog.stock.group_id}
-                」的參數？
-                {dialog.stock.group_id === FIXED_STOCK_GROUP
-                  ? '刪除固定參數後，仍在分組或清單內的股票會改用該分組或清單的均線。'
-                  : '其他組別與已保存的固定參數會保留。'}
-              </p>
+              <p>確定刪除 {dialog.stock.ticker} 的所有個股均線參數（包含舊重複列）？
+                此操作也移除分組資格；仍在自選清單內的股票將改用清單預設均線。</p>
               <div className="console-actions">
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await settingsApi('stocks.delete', {
-                        id: dialog.stock.id,
-                      });
-                      stockParametersChanged();
-                      await reload();
-                      setDialog(null);
-                      setMessage('這筆股票參數已刪除。');
-                    })
+                <button type="button" className="primary-button" disabled={busy} onClick={() => void run(async () => {
+                  const context = getStorageContextKey();
+                  const expected = stockParameterRows(stocks, dialog.stock.ticker);
+                  const latest = stockParameterRows(await settingsApi<ParameterStock[]>('stocks.list'), dialog.stock.ticker);
+                  if (context !== getStorageContextKey()) throw new Error('帳號或儲存權限已變更，請重新操作。');
+                  if (JSON.stringify(latest) !== JSON.stringify(expected)) throw new Error('原有參數已變更，請重新載入後再操作。');
+                  for (const row of latest) {
+                    if (context !== getStorageContextKey()) throw new Error('帳號或儲存權限已變更，請重新操作。');
+                    await settingsApi('stocks.delete', { id: row.id });
+                    stockParametersChanged();
                   }
-                >
-                  確認刪除
-                </button>
-                <button type="button" className="ghost-button" disabled={busy} onClick={() => setDialog(null)}>
-                  取消刪除
-                </button>
+                  await reload();
+                  setDialog(null);
+                  setMessage('此股票的個股均線參數已刪除。');
+                })}>確認刪除個股均線</button>
+                <button type="button" className="ghost-button" disabled={busy} onClick={() => setDialog(null)}>取消刪除</button>
               </div>
             </>
           )}
