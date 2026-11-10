@@ -2008,6 +2008,30 @@
   line-height: 1.6;
   box-shadow: 0 8px 28px #0006;
 }
+/* The share action lives inside the existing data menu, without affecting header height. */
+.ws-share-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-share-link:hover { border-color: var(--accent-text); }
+.ws-share-status:not(:empty) {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
 .ws-stats-panel[hidden] {
   display: none;
 }
