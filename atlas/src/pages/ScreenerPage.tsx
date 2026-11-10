@@ -22,6 +22,7 @@ import {
   STATUS_VIEW_LABELS,
   filterAndSortItems,
   gateForPill,
+  isRedundantRowNote,
   itemsForView,
   metricPill,
   resultCountText,
@@ -238,7 +239,8 @@ function Row({
             </span>
           );
         })}
-        {item.note && <span className="row-note">{item.note}</span>}
+        {/* Repeats the close and MA pills, so it is hidden; search still reads the note. */}
+        {item.note && !isRedundantRowNote(item.note) && <span className="row-note">{item.note}</span>}
       </span>
       <span className="row-pe" title={pe?.reason ?? (pe ? `本益比 ${formatRatio(pe.pe)} · TTM ${formatRatio(pe.peTtm)}` : '')}>
         {pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss) ? (

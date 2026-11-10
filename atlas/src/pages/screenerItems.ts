@@ -316,3 +316,16 @@ function growthDetail(record: GrowthRecord, eps: boolean): string {
     `來源：季度 ${originText(origin)}、年度 ${originText(record.originY)}`,
   ].join('；');
 }
+
+// ---------------------------------------------------------------- row note
+
+/**
+ * A daily-report note that only repeats the close and the MA distances a row already shows: `現價:<n>`, then
+ * optional `距MA<n>:<±n>%` segments behind `|`. Numbers end at a fixed delimiter, so the match cannot backtrack badly.
+ */
+const REDUNDANT_ROW_NOTE = /^現價[:：][+-]?\d[\d,]*(?:\.\d+)?(?:\s*\|\s*距MA\d+[:：][+-]?\d[\d,]*(?:\.\d+)?%)*$/;
+
+/** True when the row can leave its note out because the note only repeats numbers the row shows. Search still reads it. */
+export function isRedundantRowNote(note: string | undefined | null): boolean {
+  return REDUNDANT_ROW_NOTE.test(note?.trim() ?? '');
+}
