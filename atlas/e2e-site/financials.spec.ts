@@ -16,6 +16,8 @@ const fixtures: Record<string, string> = Object.fromEntries(
     ['TSM', 'tsmc-twd.json'],
   ].map(([key, file]) => [key, readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials', file!), 'utf8')]),
 );
+// These FY2025 layout assertions must not follow the daily-updated report file.
+const stableAAPL2025 = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/aapl-through-fy2025.json'), 'utf8');
 const trackedAAPL = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AAPL.json'), 'utf8');
 const trackedNVDA = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/NVDA.json'), 'utf8');
 const trackedAD = readFileSync(resolve(import.meta.dirname, '../../docs/report/financials/AD.json'), 'utf8');
@@ -429,7 +431,7 @@ test('K線｜財務 keeps the symbol, timeframe and quarterly selection', async 
 });
 
 test('key metrics card: seven tiles on the newest period, with YoY and eight mini bars', async ({ page }) => {
-  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await mockFinancials(page, {}, { AAPL: stableAAPL2025 });
   await page.goto('./?page=financials&symbol=AAPL&p=a');
   const key = page.locator('.fin-key');
   await openFold(key);
@@ -618,7 +620,7 @@ test('foreign file with EPS on the ADR basis: the basis note replaces the per-or
 test('layout: annual growth (EPS first) and profitability (ratios first), then folded sections', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
-  await mockFinancials(page, {}, { AAPL: trackedAAPL });
+  await mockFinancials(page, {}, { AAPL: stableAAPL2025 });
   await page.goto('./?page=financials&symbol=AAPL&p=a');
   await expect(page.getByRole('group', { name: '期間' })).toHaveCount(1);
   await expect(page.locator('.fin-quarter')).toHaveCount(1);
