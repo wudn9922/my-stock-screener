@@ -79,9 +79,9 @@ test('cloud grouped MAs render on a fresh chart; confirm updates the original ro
     expect.objectContaining({ action: 'stocks.delete', id: 9 }),
   ]);
   expect(cloud.stocks).toEqual([stock('2330', 'tw_g1', 4, [13, 34])]);
-  await expect(chipNames(page)).toHaveText(['SMA 34', 'SMA 13']);
+  await expect(chipNames(page)).toHaveText(['SMA 13', 'SMA 34']);
   await page.reload(); await page.getByTestId('stock-tab-chart').click();
-  await expect(chipNames(page)).toHaveText(['SMA 34', 'SMA 13']);
+  await expect(chipNames(page)).toHaveText(['SMA 13', 'SMA 34']);
 });
 
 test('editing an original grouped stock remains effective even when legacy dormant duplicates exist', async ({ page }) => {
@@ -95,6 +95,7 @@ test('editing an original grouped stock remains effective even when legacy dorma
   await expect(dialog).toContainText('清除無分組重複筆');
   await dialog.getByRole('textbox', { name: '編輯股票均線參數' }).fill('17, 43');
   await dialog.getByRole('button', { name: '確認編輯' }).click();
+  await expect(dialog).toBeHidden();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   expect(cloud.stocks).toEqual([stock('NVDA', 'us_g1', 4, [17, 43])]);
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
