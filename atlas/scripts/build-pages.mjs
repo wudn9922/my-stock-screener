@@ -19,3 +19,8 @@ function runNodeScript(script, args = []) {
 
 runNodeScript('typescript/bin/tsc', ['-b']);
 runNodeScript('vite/bin/vite.js', ['build', '--outDir', 'dist-pages']);
+execFileSync(process.execPath, [resolve(projectRoot, 'scripts/verify-csp-build.mjs'), 'dist-pages'], {
+  cwd: projectRoot,
+  env,
+  stdio: 'inherit',
+});
