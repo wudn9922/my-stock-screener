@@ -56,6 +56,7 @@ import { useStockParameters } from '../cloud/useStockParameters';
 import { parameterMAs, stockParameterRows } from '../cloud/stockParameters';
 import { reconcileParameterIndicators } from './stockParameterIndicators';
 import { StockStatsMenu } from '../ui/StockStatsMenu';
+import { ShareStockLink } from '../ui/ShareStockLink';
 import { DrawingToolGlyph, DrawingToolPicker } from '../ui/DrawingToolPicker';
 import { Watchlist, companies } from '../ui/Watchlist';
 import { IndicatorPanel } from '../ui/IndicatorPanel';
@@ -1296,6 +1297,7 @@ export function App({
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
+              {!isIndex && providerId !== 'demo' && <ShareStockLink symbol={symbol} timeframe={tf} />}
               {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
             </div>}
           </StockStatsMenu>
