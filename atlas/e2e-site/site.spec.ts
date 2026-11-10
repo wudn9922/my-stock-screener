@@ -27,7 +27,7 @@ test('lands on 大盤 / 台灣 with report cards, LINE summary and mini charts',
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockSite(page);
-  await page.goto('./');
+  await page.goto('./?page=markets&market=tw');
   await expect(page.getByRole('tab', { name: /台灣/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.index-card')).toHaveCount(2);
   await expect(page.locator('.index-card').first()).toContainText('台灣加權指數');
@@ -139,7 +139,7 @@ test('world page compares indices and isolates per-row failures', async ({ page 
 
 test('a missing or broken report shows a friendly state and search still works', async ({ page }) => {
   await mockSite(page, { report: 'missing' });
-  await page.goto('./');
+  await page.goto('./?page=markets&market=tw');
   await expect(page.getByRole('status').filter({ hasText: '今日報告尚未產生' })).toBeVisible();
   await page.unroute('**/my-stock-screener/report/latest.json');
   await page.route('**/my-stock-screener/report/latest.json', (route) =>
