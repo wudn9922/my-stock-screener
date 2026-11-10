@@ -75,3 +75,7 @@
   .research-disclosure > summary > span { display: block; margin-left: 14px; margin-top: 5px; }
   .health-entries { grid-template-columns: 1fr; }
 }
+
+/* 我的: section heading sized like the other cards' titles, and the empty table message inside the frame. */
+.parameter-console > h2 { margin: 0 0 4px; font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
+.parameter-stock-scroll > p.muted { margin: 0; padding: 14px 12px; }

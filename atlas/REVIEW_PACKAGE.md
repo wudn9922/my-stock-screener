@@ -1,3 +1,7 @@
+## 2026-11-10 Site review polish: 我的 account card, screener toolbar and CSV export
+Primary self-review only; no independent sign-off. Presentation-only CSS/markup for the 我的 account card and heading, pinned 台股/美股 chip labels, short phone search placeholder, tab-bar marker, search-row glyphs, Open Graph tags; new `screenerCsv` export (formula-injection guarded) with unit tests.
+Verification: lint, typecheck, Pages build, `tests/screener-csv.test.ts`, and the related e2e-site specs on desktop/mobile Chromium; `workspace-refinements.spec.ts:6` (header 124.3px vs 124) and the non-CI `site.spec.ts` landing tests fail identically on unmodified main in this container. WebKit not run locally.
+
 ## 2026-11-10 PR review: one shared MA row per normalized ticker
 Implementation: overwrite the grouped ID or reuse the dormant ID, convert group membership without deleting MAs, explicit parameter deletion, legacy ungrouped-first reads in Atlas/Python, and guarded cleanup/retry; 2408.TW/AGM/TSM were fixed separately by the maintainer, with no production SQL in this PR.
 Verification: code/test updates submitted for Atlas typecheck/lint/Vitest/build/Pages, Playwright site desktop/mobile Chromium (WebKit CI), and Python monitor/report checks; actual CI pass/fail is reported in the PR, not inferred from historical records.

@@ -159,7 +159,7 @@ export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' 
     <input type="checkbox" checked={remember} disabled={busy} onChange={event => setRemember(event.target.checked)} />
     記住這台裝置（{DEVICE_SESSION_DAYS} 天內免登入）
   </label>;
-  return <div className={`source-note storage-policy-note${variant === 'gate' ? ' storage-policy-gate' : ''}`}>
+  return <div className={`source-note storage-policy-note${variant === 'gate' ? ' storage-policy-gate' : ' storage-policy-account'}`} data-signed-in={access.userId ? 'true' : 'false'}>
     {variant === 'gate'
       ? message && <p role="alert">{message}</p>
       : <p role="status" data-storage-mode={access.storageMode}>

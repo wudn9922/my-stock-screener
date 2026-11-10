@@ -12,7 +12,8 @@
   }
   .site .site-mobile-search { width: 44px; height: 44px; min-width: 44px; flex: none; }
 }
-.console-watchlist-link { display: block; margin-bottom: 12px; color: var(--accent-text); }
+.console-watchlist-link { display: block; margin-bottom: 12px; color: var(--accent-text); font-weight: 600; text-decoration: none; transition: background 0.15s var(--ease), border-color 0.15s var(--ease); }
+.console-watchlist-link:hover { background: var(--surface-2); border-color: var(--border-strong); }
 /* 市場 sections: one row of five equal segments, sticky under the top bar while the page scrolls. */
 .market-section-nav {
   position: sticky;
