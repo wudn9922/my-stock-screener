@@ -22,7 +22,7 @@ Status: **PROPOSAL ONLY**. No production theme or stylesheet has been changed. S
 | `--border-strong` | `#303846` | `#b5c2d5` |
 | `--text` | `#e3e7ee` | `#172338` |
 | `--text-2` | `#a9b1bf` | `#485971` |
-| `--text-3` | `#7f8898` | `#627289` |
+| `--text-3` | `#7f8898` | `#596a80` |
 | `--accent` | `#3d8bfd` | `#2563eb` |
 | `--accent-text` | `#79adff` | `#174cb5` |
 | `--accent-soft` | blue/0.14 | blue/0.10 |
@@ -34,6 +34,10 @@ Status: **PROPOSAL ONLY**. No production theme or stylesheet has been changed. S
 | `--up-soft` / `--down-soft` | red/green 0.14 | red/green 0.10 |
 
 US convention swaps up and down *after* theme resolution, including text and translucent semantic tokens. Geometry, type scale, radii and layout tokens remain unchanged.
+
+## Static contrast verification (2026-11-10)
+
+Computed the WCAG relative-luminance contrast ratio for proposed text/semantic colors against the proposed light `--surface` (`#ffffff`), `--surface-2` (`#f7f9fc`), and `--surface-3` (`#edf2f7`). The original proposed `--text-3: #627289` scored **4.35:1** on `--surface-3`, below WCAG AA's **4.5:1** normal-text criterion, so the proposal now uses `#596a80` (**4.91:1** against `--surface-3`, **5.53:1** against white). Both proposed TW candle semantic colors exceed **4.6:1** against `--surface-3`. This checks color-pair math only, not actual DOM contrast, translucency/compositing, focus states or screenshots; those must be verified after implementation.
 
 Canvas palette for light: primary chart background `#ffffff`, axis `#485971`, grid `#e8eef5`, crosshair `#7e8ea4`, border `#ccd5e2`; mini-chart grid `#e8eef5`; heat-map canvas label and tile scale need separate visual evaluation. Refactor hard-coded values in `src/chart/ChartEngine.ts`, `src/ui/MiniChart.tsx` and heat-map canvases in `src/pages/` without changing stored drawing anchors.
 
