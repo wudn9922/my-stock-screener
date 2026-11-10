@@ -1,6 +1,8 @@
 import { secProxy } from './src/fundamentals/secProxy';
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
+import { marketProxyCsp } from './src/app/marketProxyCsp';
 import react from '@vitejs/plugin-react';
 import { versionedServiceWorker } from './src/app/buildPlugins';
 import { yahooProxy } from './src/market-data/yahooProxy';
