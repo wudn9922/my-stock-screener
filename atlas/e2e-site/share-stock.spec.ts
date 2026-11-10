@@ -43,7 +43,7 @@ test('clipboard fallback copies the exact public URL and confirms success', asyn
   await openShare(page);
   await expect.poll(() => page.evaluate(() => (window as Window & { __copied?: string }).__copied))
     .toBe(new URL(expectedPath, page.url()).href);
-  await expect(page.getByRole('status')).toContainText('連結已複製');
+  await expect(page.getByRole('region', { name: '行情資料說明' }).getByRole('status')).toContainText('連結已複製');
 });
 
 test('dismissed native share sheet does not show an error', async ({ page }) => {
@@ -54,5 +54,5 @@ test('dismissed native share sheet does not show an error', async ({ page }) => 
     });
   });
   await openShare(page);
-  await expect(page.getByRole('status')).toBeEmpty();
+  await expect(page.getByRole('region', { name: '行情資料說明' }).getByRole('status')).toBeEmpty();
 });
