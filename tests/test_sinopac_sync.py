@@ -297,6 +297,19 @@ class Boundaries(unittest.TestCase):
             with self.assertRaisesRegex(SyncError, "暫時"):
                 repo.list(OWNER)
 
+    def test_void_finish_rpc_accepts_204_no_content(self):
+        from sinopac_sync.repository import Repository
+        from unittest.mock import patch
+
+        repo = Repository("https://fake.test", "fake-key")
+        with patch("sinopac_sync.repository.requests.post") as post:
+            post.return_value.ok = True
+            post.return_value.status_code = 204
+            post.return_value.content = b""
+            post.return_value.json.side_effect = ValueError("no body")
+            repo.finish(OWNER, ACCOUNT, "ok", 0, True)
+            self.assertEqual(post.call_args.args[0], "https://fake.test/rest/v1/rpc/atlas_sinopac_finish")
+
     def test_http_authenticated_rate_limited_request_never_imports_sdk(self):
         from sinopac_sync import app
         from unittest.mock import patch
