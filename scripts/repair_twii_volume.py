@@ -11,6 +11,7 @@ import base64
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import gzip
+import io
 import json
 from pathlib import Path
 import sys
@@ -196,9 +197,13 @@ def recent_yahoo_backfill(root, base, now=None, yahoo_v8=None, log=print):
     if now.tzinfo is None:
         raise ValueError("Timezone-aware clock required")
     today = now.astimezone(timezone.utc).date()
-    recent = sorted(day for day in sessions.exchange_sessions(
-        "tw", (today - timedelta(days=45)).isoformat(), today.isoformat())
-        if uc.session_done(day, "TW", now))[-10:]
+    try:
+        recent = sorted(day for day in sessions.exchange_sessions(
+            "tw", (today - timedelta(days=45)).isoformat(), today.isoformat())
+            if uc.session_done(day, "TW", now))[-10:]
+    except Exception as exc:  # noqa: BLE001 - optional repair must not halt other archive updates
+        log(f"^TWII daily backfill skipped: calendar unavailable ({type(exc).__name__})")
+        return []
     recent = {day for day in recent if day >= volume.START_DATE}
     if not recent:
         return []
@@ -229,11 +234,14 @@ def recent_yahoo_backfill(root, base, now=None, yahoo_v8=None, log=print):
         try:
             baseline_bytes = subprocess.check_output(
                 ["git", "-C", str(root), "show", f"{base}:{relative}"])
-        except subprocess.CalledProcessError as exc:
-            raise ValueError("Cannot audit TWII daily fill against baseline") from exc
+        except subprocess.CalledProcessError:
+            # A first-ever annual file has no old commit to correct. Leave its
+            # newly appended zeros to the next run, after a baseline exists.
+            log(f"^TWII daily backfill skipped: no baseline file for {year}")
+            continue
         # A normal append may have preceded this repair; verify will check the
         # union is append-only except exactly these old 0->positive changes.
-        old = archive._read_rows(__import__("io").StringIO(baseline_bytes.decode()),
+        old = archive._read_rows(io.StringIO(baseline_bytes.decode()),
                                  relative, strict=True)
         before = {r[0]: r for r in old}
         if any(c["date"] not in before or before[c["date"]][5] not in ("", "0")
