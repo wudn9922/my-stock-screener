@@ -23,7 +23,7 @@ test('Taiwan margin temperature displays exact latest values, history and phone-
   await expect(card).toContainText('僅描述融資水位偏熱／偏冷，非買賣訊號。');
   await expect(card.locator('.mt-gauge-track')).toHaveCount(2);
   await expect(card.locator('.mt-price-chart')).toBeVisible();
-  await expect(card.locator('.mt-chart-legend')).toContainText('過熱週');
+  await expect(card.locator('.mt-chart-legend').first()).toContainText('過熱週');
   await expect(card.locator('.mt-chart-legend')).toContainText('過冷週');
   await card.getByRole('combobox', { name: '融資溫度歷史區間' }).selectOption('3y');
   await expect(card.locator('.mt-price-chart')).toBeVisible();
