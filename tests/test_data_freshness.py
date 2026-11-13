@@ -125,22 +125,52 @@ class SourceDateTest(unittest.TestCase):
 
 
 class TWIIVolumeWatchdogTest(unittest.TestCase):
-    def test_zero_on_latest_completed_session_notifies_and_positive_recovers(self):
+    def test_latest_zero_gets_one_trading_day_grace_then_notifies_and_recovers(self):
         zero = ("Date,Open,High,Low,Close,Volume\n"
                 "2026-11-04,1.0000,2.0000,1.0000,2.0000,4161800\n"
                 "2026-11-05,1.0000,2.0000,1.0000,2.0000,0\n")
         issues, checked = health.twii_volume_issue(calendar(), zero, clock())
-        self.assertEqual(set(issues), {"volume/^TWII"})
+        self.assertEqual(issues, {})  # 11/05 only just closed
         self.assertEqual(checked, {"volume/^TWII"})
+        # 11/06 has completed; even though its volume is positive, 11/05
+        # still being zero proves the previous day was not recovered.
+        next_day = zero + "2026-11-06,1.0000,2.0000,1.0000,2.0000,6000000\n"
+        issues, checked = health.twii_volume_issue(
+            calendar(), next_day, clock("2026-11-06T08:00:00+00:00"))
+        self.assertEqual(set(issues), {"volume/^TWII"})
         self.assertIn("2026-11-05", issues["volume/^TWII"])
-        state, events = health.plan(None, issues, checked, clock())
+        state, events = health.plan(None, issues, checked, clock("2026-11-06T08:00:00+00:00"))
         self.assertEqual([e["kind"] for e in events], ["failure"])
-        positive = zero.replace(",0\n", ",3500000\n")
-        issues, checked = health.twii_volume_issue(calendar(), positive, clock())
+        positive = next_day.replace("2.0000,0\n", "2.0000,4239400\n")
+        issues, checked = health.twii_volume_issue(
+            calendar(), positive, clock("2026-11-06T08:00:00+00:00"))
         self.assertEqual(issues, {})
         self.assertEqual(checked, {"volume/^TWII"})
-        _, events = health.plan(state, issues, checked, clock())
+        _, events = health.plan(state, issues, checked, clock("2026-11-06T08:00:00+00:00"))
         self.assertEqual([e["kind"] for e in events], ["recovered"])
+
+    def test_weekend_does_not_count_as_extra_session(self):
+        first = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-05,1,2,1,2,4000000\n"
+                 "2026-11-06,1,2,1,2,0\n")
+        friday = clock("2026-11-06T08:00:00+00:00")
+        self.assertEqual(health.twii_volume_issue(calendar(), first, friday)[0], {})
+        self.assertEqual(health.twii_volume_issue(
+            calendar(), first, clock("2026-11-08T08:00:00+00:00"))[0], {})
+        monday = first + "2026-11-09,1,2,1,2,0\n"
+        issues, _ = health.twii_volume_issue(
+            calendar(), monday, clock("2026-11-09T08:00:00+00:00"))
+        self.assertIn("2026-11-06", issues["volume/^TWII"])
+
+    def test_older_unrepaired_zero_does_not_silently_recover_after_ten_days(self):
+        older = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-05,1,2,1,2,0\n"
+                 "2026-11-06,1,2,1,2,6000000\n"
+                 "2026-11-09,1,2,1,2,7000000\n")
+        issues, checked = health.twii_volume_issue(
+            calendar(), older, clock("2026-11-09T08:00:00+00:00"))
+        self.assertIn("2026-11-05", issues["volume/^TWII"])
+        self.assertEqual(checked, {"volume/^TWII"})
 
     def test_old_session_or_unavailable_archive_never_signals_false_recovery(self):
         prior = ("Date,Open,High,Low,Close,Volume\n"
