@@ -4,6 +4,8 @@ Only session dates and producer status are inspected. Never changes prices,
 archive contents, calculated metrics or the normal daily report delivery.
 """
 import argparse
+import csv
+import io
 import copy
 from datetime import date, datetime, timedelta, timezone
 import json
@@ -109,6 +111,29 @@ def evaluate(calendar, sources, now):
     return issues, checked
 
 
+def twii_volume_issue(calendar, raw_csv, now):
+    """Latest *completed* TW session only; absence cannot imply recovery."""
+    key = "volume/^TWII"
+    if not isinstance(raw_csv, str):
+        return {}, set()
+    try:
+        expected = completed_sessions(calendar, "TW", now)[-1].isoformat()
+        reader = csv.DictReader(io.StringIO(raw_csv))
+        if reader.fieldnames != ["Date", "Open", "High", "Low", "Close", "Volume"]:
+            return {}, set()
+        rows = list(reader)
+        if not rows or rows[-1]["Date"] != expected:
+            return {}, set()  # Archive is delayed: existing freshness check handles its date.
+        value = rows[-1]["Volume"]
+        if value is None or not re.fullmatch(r"\d+", value):
+            return {}, set()
+        if int(value) == 0:
+            return {key: f"^TWII 最近已收盤日 {expected} 的日線成交量為 0（K 線封存）"}, {key}
+        return {}, {key}
+    except (ValueError, KeyError, csv.Error):
+        return {}, set()
+
+
 def daily_report_issue(runs, now):
     """Keep the existing six-hour report-day window and Sunday-Friday policy."""
     target = (now.astimezone(ZoneInfo('Asia/Taipei')) - timedelta(hours=6)).date()
@@ -173,6 +198,20 @@ def github_json(repo, ref, path, token, opener=urllib.request.urlopen):
         return None
 
 
+def github_text(repo, ref, path, token, opener=urllib.request.urlopen):
+    """Bounded read of a dedicated archive CSV. API outage must not mark recovery."""
+    safe_path = urllib.parse.quote(path, safe="/")
+    url = f'https://api.github.com/repos/{repo}/contents/{safe_path}?ref={urllib.parse.quote(ref, safe="")}'
+    request = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}',
+                'Accept': 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28'})
+    try:
+        with opener(request, timeout=25) as response:
+            body = response.read(1024 * 1024 + 1)
+        return body.decode("utf-8") if len(body) <= 1024 * 1024 else None
+    except Exception:
+        return None
+
+
 def github_daily_runs(repo, token, now, opener=urllib.request.urlopen):
     target = (now.astimezone(ZoneInfo('Asia/Taipei')) - timedelta(hours=6)).date()
     start = datetime.combine(target, datetime.min.time(), ZoneInfo('Asia/Taipei')).astimezone(timezone.utc)
@@ -216,6 +255,14 @@ def main(argv=None):
     calendar = github_json(repo, ref, 'docs/report/market-calendar.json', token)
     sources = {name: github_json(repo, branch or ref, path, token) for name, (branch, path, _) in DATASETS.items()}
     issues, checked = evaluate(calendar, sources, now)
+    try:
+        expected_tw = completed_sessions(calendar, "TW", now)[-1]
+        twii_csv = github_text(repo, "kline-archive", f"tw/^TWII/{expected_tw.year}.csv", token)
+        volume_issues, volume_checked = twii_volume_issue(calendar, twii_csv, now)
+        issues.update(volume_issues)
+        checked.update(volume_checked)
+    except ValueError:
+        pass  # A broken calendar is already reported; never falsely resolve volume.
     report_issues, report_checked = daily_report_issue(github_daily_runs(repo, token, now), now)
     issues.update(report_issues)
     checked.update(report_checked)

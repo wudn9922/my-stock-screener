@@ -98,6 +98,34 @@ class SourceDateTest(unittest.TestCase):
         self.assertEqual(checked, set(issues))
 
 
+
+class TWIIVolumeWatchdogTest(unittest.TestCase):
+    def test_zero_on_latest_completed_session_notifies_and_positive_recovers(self):
+        zero = ("Date,Open,High,Low,Close,Volume\n"
+                "2026-11-04,1.0000,2.0000,1.0000,2.0000,4161800\n"
+                "2026-11-05,1.0000,2.0000,1.0000,2.0000,0\n")
+        issues, checked = health.twii_volume_issue(calendar(), zero, clock())
+        self.assertEqual(set(issues), {"volume/^TWII"})
+        self.assertEqual(checked, {"volume/^TWII"})
+        self.assertIn("2026-11-05", issues["volume/^TWII"])
+        state, events = health.plan(None, issues, checked, clock())
+        self.assertEqual([e["kind"] for e in events], ["failure"])
+        positive = zero.replace(",0\n", ",3500000\n")
+        issues, checked = health.twii_volume_issue(calendar(), positive, clock())
+        self.assertEqual(issues, {})
+        self.assertEqual(checked, {"volume/^TWII"})
+        _, events = health.plan(state, issues, checked, clock())
+        self.assertEqual([e["kind"] for e in events], ["recovered"])
+
+    def test_old_session_or_unavailable_archive_never_signals_false_recovery(self):
+        prior = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-04,1.0000,2.0000,1.0000,2.0000,0\n")
+        for data in (prior, None, "<html>invalid</html>"):
+            self.assertEqual(health.twii_volume_issue(calendar(), data, clock()), ({}, set()))
+        self.assertEqual(health.twii_volume_issue(
+            calendar(), prior, clock("2026-11-06T08:00:00+00:00")), ({}, set()))
+
+
 class DedupeRecoveryTest(unittest.TestCase):
     def test_same_problem_only_once_per_taipei_day_then_notifies_next_day(self):
         issues={'archive/TW':'封存台股落後'}
@@ -162,6 +190,7 @@ class DedupeRecoveryTest(unittest.TestCase):
             env = {'GITHUB_REPOSITORY': 'example/repository', 'GH_TOKEN': 'PRIVATE-TEST-TOKEN',
                    'GENERATED_BRANCH_MODE': '1', 'GITHUB_OUTPUT': str(root / 'output')}
             with patch.dict(os.environ, env), patch.object(health, 'github_json', side_effect=fetch), \
+                 patch.object(health, 'github_text', return_value=None), \
                  patch.object(health, 'github_daily_runs', return_value=[{'conclusion': 'success'}]):
                 self.assertEqual(health.main(args), 0)
                 first = health.read_json(root / 'events.json')

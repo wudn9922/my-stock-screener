@@ -212,10 +212,16 @@ class ExpansionTests(_ArchiveCase):
                 return {'quoteResponse': {'result': [{'symbol': symbol, 'quoteType': 'INDEX' if symbol.startswith('^') else 'ETF', 'exchangeTimezoneName': metadata(symbol)['timezone'], 'regularMarketTime': int(datetime(2026, 11, 4, 5 if symbol == '^TWII' else 6 if symbol == '^N225' else 21, 30, tzinfo=timezone.utc).timestamp()), 'regularMarketOpen': 100, 'regularMarketDayHigh': 102, 'regularMarketDayLow': 99, 'regularMarketPrice': 101, 'regularMarketPreviousClose': 100, 'regularMarketVolume': None} for symbol in symbols]}}
             def chart(self, symbol, range_):
                 chart_calls.append(symbol)
-                raise AssertionError('Consecutive completed quotes should use the batch fast path')
+                if symbol != '^TWII':
+                    raise AssertionError('Other consecutive completed quotes should use batch fast path')
+                stamp = int(datetime(2026, 11, 4, 5, 30, tzinfo=timezone.utc).timestamp())
+                return {'chart': {'result': [{'meta': {'exchangeTimezoneName': 'Asia/Taipei'},
+                    'timestamp': [stamp], 'indicators': {'quote': [{
+                    'open': [100], 'high': [102], 'low': [99], 'close': [101],
+                    'volume': [None]}]}}]}}
         result = daily.refresh(self.archive, self.cache, budget=300, now=NOW, net=Net(), selected=selected, sleep=lambda _: None)
         self.assertEqual(result['appended'], 3)
-        self.assertEqual(chart_calls, [])
+        self.assertEqual(chart_calls, ['^TWII'])
         self.assertEqual(before_log, self.log.read_bytes())
         daily.stage(self.archive, self.cache, self.payload, now=NOW)
         ka.apply_operations(self.archive, self.payload, now=NOW)
@@ -226,6 +232,38 @@ class ExpansionTests(_ArchiveCase):
         self.assertEqual(manifest['markets']['us']['symbols'], ['SPY'])
         self.assertEqual(manifest['markets']['global']['symbols'], ['^N225'])
         ka.verify(self.archive)
+
+    def test_twii_ignores_index_quote_zero_when_chart_has_real_volume(self):
+        self.seed('^TWII', [row('2026-11-04', close=100, volume=4641300)])
+        selected = {'^TWII': metadata('^TWII')}
+        calls = []
+        class Net:
+            def connect_yahoo(self): pass
+            def quote(self, symbols):
+                calls.extend(symbols)
+                # This provider path previously produced zero-volume index bars.
+                return {'quoteResponse': {'result': [{'symbol': '^TWII',
+                    'regularMarketVolume': 0}]}}
+            def chart(self, symbol, range_):
+                self_range = range_
+                assert symbol == '^TWII' and self_range == bu.FULL_RANGE
+                stamps = [int(datetime(2026, 11, day, 5, 30, tzinfo=timezone.utc).timestamp())
+                          for day in (5, 6)]
+                return {'chart': {'result': [{'meta': {'exchangeTimezoneName': 'Asia/Taipei'},
+                    'timestamp': stamps, 'indicators': {'quote': [{
+                    'open': [100, 100], 'high': [101, 101], 'low': [99, 99],
+                    'close': [100, 100], 'volume': [4239400, 5813000]}]}}]}}
+        now = datetime(2026, 11, 7, 1, tzinfo=timezone.utc)
+        result = daily.refresh(self.archive, self.cache, now=now, net=Net(),
+                               selected=selected, sleep=lambda _: None)
+        self.assertEqual(result['appended'], 1)
+        self.assertEqual(result['charts'], 1)
+        self.assertNotIn('^TWII', calls)
+        daily.stage(self.archive, self.cache, self.payload, now=now)
+        ka.apply_operations(self.archive, self.payload, now=now)
+        actual = ka.symbol_rows(self.archive, '^TWII')
+        self.assertEqual([(r[0], r[5]) for r in actual[-2:]],
+                         [('2026-11-05', '4239400'), ('2026-11-06', '5813000')])
 
     def test_primary_stock_payload_survives_empty_supplemental_source(self):
         self.cache_rows('AAPL', [row('2026-01-02')], now=NOW)
