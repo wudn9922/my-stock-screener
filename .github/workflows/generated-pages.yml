@@ -21,6 +21,7 @@ on:
       - Taiwan Theme Rotation
       - Refresh US Rates
       - MA Recommendations
+      - TW Margin Temperature
       - Squash generated snapshot
       - 🔄 GitHub Actions 永久續命腳本
     types: [completed]
