@@ -137,6 +137,16 @@ class TWIIVolumeWatchdogTest(unittest.TestCase):
             calendar(), monday, clock("2026-11-09T08:00:00+00:00"))
         self.assertIn("2026-11-06", issues["volume/^TWII"])
 
+    def test_older_unrepaired_zero_does_not_silently_recover_after_ten_days(self):
+        older = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-05,1,2,1,2,0\n"
+                 "2026-11-06,1,2,1,2,6000000\n"
+                 "2026-11-09,1,2,1,2,7000000\n")
+        issues, checked = health.twii_volume_issue(
+            calendar(), older, clock("2026-11-09T08:00:00+00:00"))
+        self.assertIn("2026-11-05", issues["volume/^TWII"])
+        self.assertEqual(checked, {"volume/^TWII"})
+
     def test_old_session_or_unavailable_archive_never_signals_false_recovery(self):
         prior = ("Date,Open,High,Low,Close,Volume\n"
                  "2026-11-04,1.0000,2.0000,1.0000,2.0000,0\n")
