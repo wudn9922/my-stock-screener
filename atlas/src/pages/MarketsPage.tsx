@@ -11,6 +11,7 @@ import { LineTextCard } from '../ui/LineTextCard';
 import { BreadthCard } from '../ui/BreadthCard';
 import { BreakoutCard } from '../ui/BreakoutCard';
 import { MarketWarningCard } from '../ui/MarketWarningCard';
+import { MarginTemperatureCard } from '../ui/MarginTemperatureCard';
 import { MiniChart } from '../ui/MiniChart';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import { formatDateTime, formatPercent, formatPrice, maDistance, maValue, toneClass } from '../ui/format';
@@ -143,6 +144,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
         ) : (
           <p className="muted-text">此市場沒有啟用的指數。</p>
         )}
+        {market === 'tw' && <MarginTemperatureCard />}
       </section>
       <aside className="markets-side">
         {(market === 'tw' || market === 'us') && (

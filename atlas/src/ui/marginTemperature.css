@@ -1,0 +1,51 @@
+.margin-temperature-card { min-width: 0; overflow: hidden; padding: 16px; }
+.margin-temperature-card h2 { margin: 0 0 12px; font-size: 17px; }
+.margin-temperature-card h2 small { color: var(--text-3); font-size: 12px; font-weight: 400; }
+.mt-status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; font-size: 12px; }
+.mt-status-line time { color: var(--text-2); }
+.mt-status-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.mt-label { display: inline-flex; align-items: center; padding: 4px 9px; border: 1px solid transparent; border-radius: 30px; font-weight: 650; }
+.mt-label.mt-hot { color: #f5be81; border-color: #956328; background: #df923b1b; }
+.mt-label.mt-cold { color: #a4ccfd; border-color: #286cb8; background: #398fe41b; }
+.mt-label.mt-neutral { color: var(--text-2); border-color: var(--border-strong); }
+.mt-provisional { color: #dfb550; }
+.mt-gauge-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.mt-gauge { min-width: 0; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+.mt-gauge-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; }
+.mt-gauge-head span { font-size: 12px; color: var(--text-2); }
+.mt-gauge-head b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.mt-gauge-track { height: 9px; border-radius: 5px; position: relative; background: #2b3442; }
+.mt-gauge-fill { display: block; height: 100%; border-radius: inherit; }
+.mt-gauge-threshold { position: absolute; height: 18px; width: 2px; top: -4px; background: #eef1f7; }
+.mt-gauge-ticks { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; font-size: 10px; color: var(--text-3); margin-top: 7px; }
+.mt-fixed { font-size: 12px; color: var(--text-2); margin: 14px 0; }
+.mt-chart-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.mt-chart-tools h3 { font-size: 14px; margin: 0; }
+.mt-chart-tools label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.mt-chart-tools select { font-size: 12px; }
+.mt-history { margin: 0; min-width: 0; }
+.mt-history svg { display: block; width: 100%; min-width: 0; height: auto; }
+.mt-history .mt-price-chart { aspect-ratio: 900/215; min-height: 150px; max-height: 235px; }
+.mt-history > svg:not(.mt-price-chart) { aspect-ratio: 900/124; min-height: 90px; max-height: 140px; }
+.mt-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: var(--text-2); margin: 8px 0; }
+.mt-chart-legend > span { display: flex; align-items: center; gap: 6px; }
+.mt-chart-legend i { display: inline-block; height: 4px; width: 20px; flex: none; }
+.mt-legend-index { background: #d3ddec; }
+.mt-legend-hot { border-left: 6px solid #df923b; background: #df923b3a; }
+.mt-legend-cold { border-left: 6px dashed #398fe4; background: #398fe445; }
+.mt-legend-hot-line { border-top: 3px dashed #edb06e; }
+.mt-legend-cold-line { border-top: 3px dashed #86b7eb; }
+.mt-plot-foot { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--text-3); }
+.mt-inspector { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+.mt-inspector input { flex: 1; min-width: 0; }
+.mt-inspector-detail { overflow-wrap: anywhere; color: var(--text-2); font-size: 12px; margin: 5px 0 14px; }
+.mt-data-table { margin-top: 12px; font-size: 12px; }
+.mt-data-table summary { cursor: pointer; padding: 8px 0; }
+.mt-table-scroll { max-height: 320px; overflow: auto; }
+.mt-data-table table { width: 100%; border-collapse: collapse; min-width: 420px; font-variant-numeric: tabular-nums; }
+.mt-data-table th, .mt-data-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.mt-data-table th:first-child, .mt-data-table td:first-child { text-align: left; }
+.mt-data-table th { position: sticky; top: 0; background: var(--surface-2); }
+.mt-notes { color: var(--text-2); font-size: 12px; line-height: 1.7; }
+.mt-notes p { margin: 9px 0; }
+@media (max-width: 520px) { .margin-temperature-card { padding: 12px; } .mt-gauge-grid { grid-template-columns: 1fr; gap: 8px; } .mt-history .mt-price-chart { min-height: 135px; } .mt-history > svg:not(.mt-price-chart) { min-height: 86px; } }
