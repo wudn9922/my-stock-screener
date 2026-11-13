@@ -62,7 +62,7 @@ job, not a design job.
 ## Steps (one draft PR each, in this order)
 
 1. **Tokens, fonts and shell.** The table above, the font, the top bar and the bottom tab bar
-   (64px high, 22px icons, 12px labels, active tab in the accent colour). No page layout changes.
+   (a 52px top bar and a 64px tab bar, 22px tab icons, 12px labels, active tab in the accent colour). No page layout changes.
 2. **自選** (`watchlist.html`). Underline tabs for the lists; 88px rows: ticker and name, a 104x36 daily
    sparkline, then price, change pill and, for US stocks with one, the after-hours line. No index tiles and no
    summary strip above the list (the owner rejected both). 清單｜持股 moves into the underline tabs as

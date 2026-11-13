@@ -1565,3 +1565,8 @@ No layout assertions were changed. Lint, build and responsive/browser checks rem
 
 ### Claude review 6857550965 — requested changes
 Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px without weakening the navigation test; synchronized five reference files and handoff; added numeric-role font rules for watchlist/market/stock/account; removed residual blue focus, brand gradient, old swatches and login splash colors. Price axis reverted to its proportional system face to protect chart plot width. Still requires independent main-vs-branch axis pixel measurement, 390px US-convention screenshot and WebKit verification.
+
+### Claude CI review 6867292969
+- Fixed actual mobile viewport regression: 52px phone top bar, 64px bottom bar, 44px header actions. Preserves compact futures fifth-card viewport; `mexc.spec.ts:661` stays unchanged.
+- Spec-driven E2E updates: candle pixel RGB detection now matches `#FF5A5F` / `#2BC8A8`; phone watchlist heading expectation now matches the visible `自選` title. Handoff step 1 synchronized.
+- Claude locally verified targeted compact and nav cases; this push has not independently rerun CI or WebKit. `workspace-refinements.spec.ts:6` reported as a pre-existing main failure by reviewer, not altered.

@@ -1756,10 +1756,10 @@ h3 {
 }
 @media (max-width: 767px) {
   :root {
-    --topbar: 64px;
+    --topbar: 52px;
     --tabbar: 64px;
   }
-  /* Phone shell: same dimensions as the five approved 390px reference screens. */
+  /* Phone shell: 52px header preserves chart and compact-card viewport height. */
   .site-topbar {
     padding: var(--safe-top) calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
     gap: 4px;
