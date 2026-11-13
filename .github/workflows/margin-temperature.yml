@@ -1,0 +1,54 @@
+name: TW Margin Temperature
+on:
+  schedule:
+    # 22:30 Taipei = 14:30 UTC, Mon-Fri (holidays are ignored by the updater).
+    - cron: '30 14 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Optional Taiwan date YYYY-MM-DD; empty means today'
+        required: false
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: margin-temperature-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify historical fixture
+        run: python -m unittest discover -s tests -p 'test_margin_temperature.py' -v
+      - name: Fetch and build
+        env:
+          TARGET_DATE: ${{ inputs.date }}
+        run: |
+          if [[ -n "$TARGET_DATE" ]]; then
+            python scripts/margin_temperature.py update --date "$TARGET_DATE"
+          else
+            python scripts/margin_temperature.py update
+          fi
+      - name: Commit updated snapshots
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/margin_temperature docs/report/margin-temperature.json
+          if git diff --cached --quiet; then
+            echo 'No data changes (holiday or already current).'
+            exit 0
+          fi
+          git commit -m 'data: update TWSE margin temperature'
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then exit 0; fi
+            sleep $((attempt * 10))
+          done
+          exit 1
