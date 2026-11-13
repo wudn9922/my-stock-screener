@@ -4,30 +4,30 @@
  */
 :root {
   color-scheme: dark;
-  --bg: #0b0e13;
-  --surface: #11151b;
-  --surface-2: #161b23;
-  --surface-3: #1d232d;
-  --border: #232a35;
-  --border-strong: #303846;
-  --text: #e3e7ee;
-  --text-2: #a9b1bf;
-  --text-3: #7f8898;
-  --accent: #3d8bfd;
-  --accent-text: #79adff;
-  --accent-soft: rgba(61, 139, 253, 0.14);
+  --bg: #0E1014;
+  --surface: #161A20;
+  --surface-2: #1E232B;
+  --surface-3: #2A303A;
+  --border: #1E232B;
+  --border-strong: #2A303A;
+  --text: #EEF1F5;
+  --text-2: #A4ADBA;
+  --text-3: #8A94A3;
+  --accent: #F5B544;
+  --accent-text: #F5B544;
+  --accent-soft: rgba(245, 181, 68, 0.14);
   --warn: #e0a43a;
-  --up: #f23645;
-  --down: #22ab94;
-  --up-text: #ff5c68;
-  --down-text: #2fc2a8;
-  --up-soft: rgba(242, 54, 69, 0.14);
-  --down-soft: rgba(34, 171, 148, 0.14);
+  --up: #FF5A5F;
+  --down: #2BC8A8;
+  --up-text: #FF5A5F;
+  --down-text: #2BC8A8;
+  --up-soft: rgba(255, 90, 95, 0.14);
+  --down-soft: rgba(43, 200, 168, 0.14);
   --radius: 12px;
   --radius-sm: 8px;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Noto Sans TC',
     'Microsoft JhengHei', 'Heiti TC', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-num: var(--font-ui);
+  --font-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
   --rail: 76px;
   --topbar: 56px;
   --tabbar: 58px;
@@ -48,10 +48,10 @@
 }
 /* 綠漲紅跌 (US convention). The default is 紅漲綠跌. */
 :root[data-colors='us'] {
-  --up: #22ab94;
-  --down: #f23645;
-  --up-text: #2fc2a8;
-  --down-text: #ff5c68;
+  --up: #2BC8A8;
+  --down: #FF5A5F;
+  --up-text: #2BC8A8;
+  --down-text: #FF5A5F;
   --up-soft: rgba(34, 171, 148, 0.14);
   --down-soft: rgba(242, 54, 69, 0.14);
 }
@@ -185,10 +185,10 @@ h3 {
 .primary-button {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #fff;
+  color: #14110A;
 }
 .primary-button:hover:not(:disabled) {
-  background: #5598ff;
+  background: #F5B544;
 }
 .ghost-button {
   border: 1px solid var(--border-strong);
@@ -1755,6 +1755,41 @@ h3 {
   }
 }
 @media (max-width: 767px) {
+  :root {
+    --topbar: 64px;
+    --tabbar: 64px;
+  }
+  /* Phone shell: same dimensions as the five approved 390px reference screens. */
+  .site-topbar {
+    padding: var(--safe-top) calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+    gap: 4px;
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  .site-brand { display: none; }
+  .site-page-title {
+    padding: 0;
+    border: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .site-topbar-end { gap: 4px; }
+  .site-topbar-end > .icon-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .site-tabbar {
+    background: #12151A;
+    border-top: 1px solid var(--border-strong);
+  }
+  .site-tabbar button { gap: 4px; font-size: 11px; }
+  .site-tabbar button svg { width: 22px; height: 22px; }
+  /* The reference marks the active item by amber icon and label, not a top stripe. */
+  .site-tabbar button.active::before { display: none; }
   .page {
     padding: 14px 16px 20px;
   }
@@ -1888,4 +1923,12 @@ h3 {
 }
 .legend-more {
   margin: -6px 10px 10px;
+}
+
+/* Quote, percentage, ticker and date typography; no CJK web-font download. */
+.num, .report-date, .row-id b, .row-quote, .row-pe, .change-pill,
+.index-score b, .index-value, .index-change, .tile-value,
+.asset-list-row b, .asset-list-row strong, time {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
 }

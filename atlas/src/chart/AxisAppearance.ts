@@ -4,8 +4,8 @@
  * and a brighter colour. Width is still kept small with minimumWidth 0 and trimmed trailing zeros.
  */
 export const AXIS_FONT_FAMILY =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans TC", Arial, sans-serif';
-export const AXIS_TEXT_COLOR = '#c3cad5';
+  '"IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace';
+export const AXIS_TEXT_COLOR = '#8A94A3';
 export const AXIS_FONT_SIZE = 12;
 export const AXIS_FONT_SIZE_NARROW = 13;
 const NARROW_QUERY = '(max-width: 640px)';

@@ -106,7 +106,7 @@ export interface UpDownColors {
 }
 /** Candle/volume colors; also mirrored as CSS variables `--up` / `--down`. */
 export function upDownColors(colors: ColorConvention = current.colors): UpDownColors {
-  return colors === 'tw' ? { up: '#f23645', down: '#22ab94' } : { up: '#22ab94', down: '#f23645' };
+  return colors === 'tw' ? { up: '#FF5A5F', down: '#2BC8A8' } : { up: '#2BC8A8', down: '#FF5A5F' };
 }
 
 export function applyColorConvention(colors: ColorConvention = current.colors) {
