@@ -3,8 +3,21 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { mockSite } from './mocks';
 
-// Real supplied weekly readings; no live TWSE connection during page regression.
-const history = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../docs/report/margin-temperature.json'), 'utf8')) as unknown;
+// Immutable supplied golden fixture: scheduled updates never make this UI test stale.
+const golden = readFileSync(resolve(import.meta.dirname, '../../tests/fixtures/margin_temperature/gauge_golden.csv'), 'utf8').trim().split(/\r?\n/);
+const cols = golden[0]!.split(',');
+const field = (parts: string[], name: string) => parts[cols.indexOf(name)]!;
+const rows = golden.slice(1).map(line => {
+  const parts = line.split(',');
+  const pct = field(parts, 'pct') === '' ? null : Number(field(parts, 'pct'));
+  const mdd = field(parts, 'mdd') === '' ? null : Number(field(parts, 'mdd'));
+  return {
+    date: field(parts, 'date'), close: Number(field(parts, 'close')), pct, mdd,
+    hot: pct !== null && pct >= 90, cold: mdd !== null && mdd <= -30,
+  };
+});
+const latest = rows.at(-1)!;
+const history = { version: 1, asOf: latest.date, provisional: true, scope: 'TWSE listed', latest, rows };
 
 test('Taiwan margin temperature displays exact latest values, history and phone-safe layout', async ({ page }, info) => {
   const errors: string[] = [];
