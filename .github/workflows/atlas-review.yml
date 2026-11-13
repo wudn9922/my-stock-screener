@@ -306,6 +306,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_market_volume_scope.py' -v
           python -m unittest discover -s tests -p 'test_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_full_market_breakouts.py' -v
+          python -m unittest discover -s tests -p 'test_entry_success_schedule.py' -v
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_breakout_outcomes.py' -v
           python -m unittest discover -s tests -p 'test_market_warnings.py' -v
