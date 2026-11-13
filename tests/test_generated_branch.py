@@ -300,8 +300,8 @@ class GeneratedStorageTests(unittest.TestCase):
         self.git('branch', '--set-upstream-to=origin/main', 'main')
         old = self.remote('main')
         workflow = (REPO / '.github/workflows/universe-full.yml').read_text()
-        block = workflow.split('      - name: Commit and Push changes\\n', 1)[1]
-        command = textwrap.dedent(block.split('        run: |\\n', 1)[1])
+        block = workflow.split('      - name: Commit and Push changes\n', 1)[1]
+        command = textwrap.dedent(block.split('        run: |\n', 1)[1])
         with patch.dict(os.environ, {'GENERATED_BRANCH_MODE': ''}):
             subprocess.run(['bash', '-e', '-c', command], check=True, capture_output=True)
         self.assertEqual(self.remote('main'), old)
