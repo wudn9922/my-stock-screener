@@ -1,6 +1,6 @@
 """Offline, exchange-calendar-shaped fixtures. No production workflows or APIs."""
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import importlib.util
 import os
 from pathlib import Path
@@ -42,9 +42,34 @@ class SourceDateTest(unittest.TestCase):
 
     def test_three_completed_session_lag_alerts_each_market_source(self):
         issues, _ = health.evaluate(calendar(), sources('2026-11-03'), clock('2026-11-06T08:00:00+00:00'))
-        self.assertEqual(len(issues), 9)
+        self.assertEqual(len(issues), 7)
+        self.assertNotIn('breakouts/TW', issues)
+        self.assertNotIn('breakouts/US', issues)
         self.assertIn('3 個交易日', issues['archive/TW'])
         self.assertIn('2 個交易日', issues['archive/US'])
+
+    def test_weekly_breakouts_allow_five_sessions_but_alert_after_six(self):
+        cal = calendar()
+        for market, suffix in [('TW', 'T05:30:00+00:00'), ('US', 'T21:00:00+00:00')]:
+            sessions = cal['markets'][market]['sessions']
+            day = datetime(2026, 11, 10)
+            while day.date() <= datetime(2026, 11, 20).date():
+                if day.weekday() < 5:
+                    key = day.date().isoformat()
+                    sessions[key] = {'close': int(clock(key + suffix).timestamp())}
+                day += timedelta(days=1)
+        now = clock('2026-11-20T23:00:00+00:00')
+        data = sources('2026-11-20')
+        data['breakouts']['markets']['tw']['asOf'] = '2026-11-13'
+        data['breakouts']['markets']['us']['asOf'] = '2026-11-13'
+        issues, _ = health.evaluate(cal, data, now)
+        self.assertNotIn('breakouts/TW', issues)
+        self.assertNotIn('breakouts/US', issues)
+        data['breakouts']['markets']['tw']['asOf'] = '2026-11-09'
+        data['breakouts']['markets']['us']['asOf'] = '2026-11-09'
+        issues, _ = health.evaluate(cal, data, now)
+        self.assertEqual(set(issues), {'breakouts/TW', 'breakouts/US'})
+        self.assertIn('每週更新一次', issues['breakouts/TW'])
 
     def test_warning_unavailable_always_alerts_but_current_retained_does_not(self):
         data = sources()
@@ -194,7 +219,7 @@ class DedupeRecoveryTest(unittest.TestCase):
                  patch.object(health, 'github_daily_runs', return_value=[{'conclusion': 'success'}]):
                 self.assertEqual(health.main(args), 0)
                 first = health.read_json(root / 'events.json')
-                self.assertEqual(len(first), 9)
+                self.assertEqual(len(first), 7)
                 self.assertFalse((root / 'state.json').exists())
                 self.assertEqual(health.main(args), 0)
                 self.assertEqual(health.read_json(root / 'events.json'), first)

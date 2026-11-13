@@ -67,6 +67,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await page.goto('./?page=markets&market=tw');
   const section = card(page);
   await expect(section.getByRole('heading', { name: /全市場進場成功率/ })).toContainText('台股');
+  await expect(section).toContainText('每週更新一次（週六）');
   await expect(section.locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   const order = await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.map(node => node.className));
   expect(order.slice(0, 3)).toEqual(['card market-warning-card', 'card breakout-card', 'card breadth-card']);

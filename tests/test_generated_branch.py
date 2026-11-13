@@ -275,6 +275,37 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.body(self.remote("main"), log.PATH), forward)
         self.assertEqual(self.remote("generated"), self.seed)
 
+    def test_universe_publish_without_breakout_changes_preserves_all_three_outputs(self):
+        files = {
+            'docs/report/breakouts.json': b'{"asOf":"2026-10-22","markets":{}}',
+            'docs/report/breakouts-history.json': b'{"version":1,"snapshots":[]}',
+            'docs/report/breakouts-archive/2026-10-22.json': b'{"asOf":"2026-10-22"}',
+        }
+        for path, content in files.items():
+            self.write(path, content)
+        self.store.publish('universe')
+        tip = self.remote('generated')
+        self.write('docs/report/breadth.json', b'{"market":"updated without breakouts"}')
+        self.store.publish('universe')
+        newer = self.remote('generated')
+        self.assertNotEqual(tip, newer)
+        for path, content in files.items():
+            self.assertEqual(self.body(newer, path), content)
+        self.store.publish('universe')
+        self.assertEqual(self.remote('generated'), newer)
+
+    def test_legacy_universe_commit_with_no_changes_succeeds(self):
+        import textwrap
+        self.write('scripts/market_warnings_log.py', (REPO / 'scripts/market_warnings_log.py').read_bytes())
+        self.git('branch', '--set-upstream-to=origin/main', 'main')
+        old = self.remote('main')
+        workflow = (REPO / '.github/workflows/universe-full.yml').read_text()
+        block = workflow.split('      - name: Commit and Push changes\\n', 1)[1]
+        command = textwrap.dedent(block.split('        run: |\\n', 1)[1])
+        with patch.dict(os.environ, {'GENERATED_BRANCH_MODE': ''}):
+            subprocess.run(['bash', '-e', '-c', command], check=True, capture_output=True)
+        self.assertEqual(self.remote('main'), old)
+
     def test_archive_snapshots_are_append_only_and_survive_daily_squash(self):
         old = "docs/report/breakouts-archive/2026-09-01.json"
         new = "docs/report/breakouts-archive/2026-10-22.json"

@@ -33,6 +33,8 @@
 
 ## 20 日勝率快照
 
+2026-11-14 起，全市場進場成功率在台北時間週六排程／workflow_run 更新（若任一市場 asOf 滿 7 個日曆天或檔案無效，其他執行也會補跑；workflow_dispatch 可選 auto／force／skip）。全市場清單、寬度及風險警示每次照跑。跳過計算時不呼叫 builder，不修改 breakouts.json、breakouts-history.json、breakouts-archive/*.json；generated 的 owner delta 只發布有變更的路徑，append_only 仍拒絕刪除或覆寫快照。
+
 `build_full_market_breakouts.py` 成功建立 `breakouts.json` 後，以報告層級 `asOf` 判斷快照日期；這個欄位是各市場 `asOf` 的**最新日期**，各市場自己的日期保留不變。判斷不使用 `generatedAt`、執行日期、交易日數或 run 次數。市場頁繼續讀取原本的 `breakouts.json`，不改 panel URL 或統計內容。
 
 - 沒有快照：建立 `docs/report/breakouts-archive/<asOf>.json`。
