@@ -29,6 +29,7 @@ on:
       - "Trim Git History (disabled)"
       - "Taiwan Chips"
       - "Full-Market Universe"
+      - "TW Margin Temperature"
     types: [completed]
 permissions:
   contents: read
