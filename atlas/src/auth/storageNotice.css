@@ -18,3 +18,21 @@
 /* Shown only when LINE did not take over the page ~1.5 s after the login gesture. */
 .line-launch-missed { display: block; margin-top: 6px; color: var(--accent-text); }
 a.line-launch-link { margin: 6px 0; text-decoration: none; }
+
+/* 我的: the account controls read as one card on the page column, not loose text against the edge. */
+.site-account-flow > .storage-policy-account {
+  box-sizing: border-box;
+  width: min(1312px, calc(100% - 48px));
+  margin: 16px auto 0;
+  padding: 10px 14px;
+  gap: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.storage-policy-account > p[data-storage-mode] { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text-2); }
+.storage-policy-account > p[data-storage-mode]::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); transform: translateY(-1px); }
+.storage-policy-account[data-signed-in='true'] > p[data-storage-mode]::before { background: #34c38f; }
+@media (max-width: 767px) {
+  .site-account-flow > .storage-policy-account { width: calc(100% - 32px); margin-top: 12px; padding: 10px 12px; }
+}

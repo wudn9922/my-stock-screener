@@ -538,6 +538,9 @@ h3 {
   font-size: 14px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .result-text small {
   color: var(--text-2);
@@ -1413,11 +1416,19 @@ h3 {
 .chip-row::-webkit-scrollbar {
   display: none;
 }
+/* Pinned while the row scrolls (the active chip is centred), so the market name is never cut off. */
 .chip-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   font-size: 12px;
   color: var(--text-3);
   width: 34px;
   flex-shrink: 0;
+  background: var(--bg);
 }
 .chip {
   display: inline-flex;
@@ -1705,9 +1716,22 @@ h3 {
     font-size: 11px;
     font-weight: 600;
     transition: color 0.15s;
+    position: relative;
   }
   .site-tabbar button.active {
     color: var(--accent-text);
+  }
+  /* A marker on the bar's top edge, so the current tab reads without relying on colour alone. */
+  .site-tabbar button.active::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    width: 28px;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: var(--accent);
+    transform: translateX(-50%);
   }
   .search-sheet-backdrop {
     align-items: stretch;

@@ -1,4 +1,5 @@
 import { PageFooterNote } from '../ui/PageFooterNote';
+import { screenerCsv, screenerCsvName } from './screenerCsv';
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import { ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
@@ -21,6 +22,7 @@ import {
   STATUS_VIEW_LABELS,
   filterAndSortItems,
   gateForPill,
+  isRedundantRowNote,
   itemsForView,
   metricPill,
   resultCountText,
@@ -237,7 +239,8 @@ function Row({
             </span>
           );
         })}
-        {item.note && <span className="row-note">{item.note}</span>}
+        {/* Repeats the close and MA pills, so it is hidden; search still reads the note. */}
+        {item.note && !isRedundantRowNote(item.note) && <span className="row-note">{item.note}</span>}
       </span>
       <span className="row-pe" title={pe?.reason ?? (pe ? `本益比 ${formatRatio(pe.pe)} · TTM ${formatRatio(pe.peTtm)}` : '')}>
         {pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss) ? (
@@ -548,7 +551,8 @@ function ScreenerView({
           <input
             type="search"
             aria-label="在群組內篩選"
-            placeholder={`在「${group.name}」中篩選`}
+            // The phone toolbar leaves this field about six characters wide; the long form was cut mid-word.
+            placeholder={window.matchMedia('(max-width: 767px)').matches ? '代號／名稱' : `在「${group.name}」中篩選`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -582,6 +586,15 @@ function ScreenerView({
       <div className="save-watchlist">
         <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
         <button type="button" className="text-button" onClick={() => navigate({ page: 'watchlist' })}>開啟自選清單</button>
+        {/* Public market rows exactly as listed (filters, search and sort applied); nothing personal. */}
+        <button type="button" className="text-button" disabled={groupPending || !items.length} title="下載目前列表（已套用篩選與排序）" onClick={() => {
+          const url = URL.createObjectURL(new Blob([screenerCsv(items)], { type: 'text/csv;charset=utf-8' }));
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = screenerCsvName(group.key, observationDate);
+          anchor.click();
+          URL.revokeObjectURL(url);
+        }}>匯出 CSV</button>
         {savingList && <form className="save-watchlist" onSubmit={(event) => {
           event.preventDefault();
           try {
