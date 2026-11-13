@@ -117,18 +117,26 @@ def twii_volume_issue(calendar, raw_csv, now):
     if not isinstance(raw_csv, str):
         return {}, set()
     try:
-        expected = completed_sessions(calendar, "TW", now)[-1].isoformat()
+        sessions = completed_sessions(calendar, "TW", now)
+        expected = sessions[-1].isoformat()
         reader = csv.DictReader(io.StringIO(raw_csv))
         if reader.fieldnames != ["Date", "Open", "High", "Low", "Close", "Volume"]:
             return {}, set()
         rows = list(reader)
         if not rows or rows[-1]["Date"] != expected:
-            return {}, set()  # Archive is delayed: existing freshness check handles its date.
-        value = rows[-1]["Volume"]
+            return {}, set()  # Delayed/unavailable archive cannot imply recovery.
+        by_date = {r["Date"]: r["Volume"] for r in rows}
+        # The most recently closed day gets one FULL trading-session grace.
+        # Still-zero volume on a previous session is a confirmed backlog.
+        aged = [day.isoformat() for day in sessions[-11:-1]
+                if by_date.get(day.isoformat()) == "0"]
+        if aged:
+            return {key: f"^TWII {aged[0]} 成交量隔一個交易日仍為 0（封存尚未補回）"}, {key}
+        value = by_date.get(expected)
         if value is None or not re.fullmatch(r"\d+", value):
             return {}, set()
-        if int(value) == 0:
-            return {key: f"^TWII 最近已收盤日 {expected} 的日線成交量為 0（K 線封存）"}, {key}
+        # Fresh same-session zero: intentionally no failure; prior stale
+        # problems can recover if all older inspected sessions are positive.
         return {}, {key}
     except (ValueError, KeyError, csv.Error):
         return {}, set()
