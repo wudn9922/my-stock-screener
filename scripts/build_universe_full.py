@@ -40,6 +40,7 @@ for path in (ROOT, os.path.join(ROOT, "scripts")):
 import report_metrics  # noqa: E402
 import universe_cache as uc  # noqa: E402
 import universe_sources as src  # noqa: E402
+import twii_volume  # noqa: E402
 import kline_integrity as kline  # noqa: E402
 import market_sessions as sessions  # noqa: E402
 
@@ -615,6 +616,8 @@ class Run:
             if self.yahoo_ready:
                 try:
                     rows, _, _ = src.parse_yahoo_chart(self.net.chart(symbol, FULL_RANGE), symbol)
+                    if symbol == '^TWII':
+                        rows = twii_volume.fill_yahoo_rows(symbol, rows, self.net.get_json, self.log)
                     fresh = uc.drop_unfinished(uc.frame_from_rows(rows), market, self.now)
 
                     if len(fresh) >= report_metrics.BENCH_MIN_BARS:
