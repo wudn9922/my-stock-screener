@@ -73,11 +73,9 @@ job, not a design job.
    distances as a three-cell grid. Order on the page: index cards, 多頭末期警示 summary, then the rest.
    The existing chart controls (zoom, reset, bar count) stay available from the card.
 4. **選股** (`screener.html`). Rows become a four-column grid: code and name, distance to MA20 as a
-   bar with its value, an intraday line, close and change. The P/E column leaves the phone row (filters
-   and sorting by P/E stay). Actions dock above the tab bar: 連續看圖, 存成清單, CSV.
-   The intraday line needs data the page does not load today: fetch 5-minute bars only for rows that are
-   on screen, cap concurrency, cache per session, draw the previous close as a dashed baseline, and show an
-   empty cell (no spinner, no fake line) when the series is unavailable. Describe the request volume in the PR.
+   bar with its value, P/E, close and change. Actions dock above the tab bar: 連續看圖, 存成清單, CSV.
+   Use only data the page already loads: the owner dropped an intraday line for this column because it
+   would add requests. Do not add any per-row fetch.
 5. **個股** (`stock.html`). The chart is the page: the header shrinks to one row plus the price row, the
    view tabs sit under it, and the plot fills everything down to a 56px toolbar (timeframes, 指標, 繪圖)
    docked above the tab bar. At 390x844 the chart area must be at least 60% of the viewport height.
