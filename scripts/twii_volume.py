@@ -185,6 +185,53 @@ def fill_rows(rows, official, factor):
     return output, changes
 
 
+
+def fill_archive_from_yahoo(rows, yahoo_rows, allowed_dates=None):
+    """Copy *raw v8 Chart* volume only: archived zero/blank, same day and close.
+
+    Yahoo v8 observations must be supplied separately from the merged cache,
+    which can contain FMTQIK estimates or stale values. Never copy Yahoo OHLC.
+    """
+    observations = {}
+    for row in yahoo_rows:
+        try:
+            day = str(row[0])[:10]
+            close = Decimal(str(row[4]))
+            raw = Decimal(str(row[5]))
+            if (date.fromisoformat(day).isoformat() != day or not close.is_finite()
+                    or close <= 0 or not raw.is_finite() or raw <= 0
+                    or raw != raw.to_integral_value()):
+                continue
+            if day in observations:
+                observations.pop(day)
+                continue  # Reject duplicate/ambiguous source dates.
+            observations[day] = (close, int(raw))
+        except (ValueError, TypeError, InvalidOperation, IndexError):
+            continue
+    output, changes = [], []
+    for row in rows:
+        row = tuple(row)
+        day = str(row[0])[:10]
+        if (day < START_DATE or not _missing_or_zero(row[5])
+                or (allowed_dates is not None and day not in allowed_dates)
+                or day not in observations):
+            output.append(row)
+            continue
+        try:
+            close, value = observations[day]
+            archived_close = Decimal(str(row[4]))
+            if (not archived_close.is_finite() or archived_close <= 0
+                    or abs(close / archived_close - 1) > Decimal(str(CLOSE_TOLERANCE))):
+                output.append(row)
+                continue
+            output.append((*row[:5], value))
+            changes.append({"date": day, "old": row[5], "new": value,
+                            "source": "yahoo-v8", "yahooClose": str(close)})
+        except (InvalidOperation, ValueError, TypeError, ZeroDivisionError):
+            output.append(row)
+    return output, changes
+
+
 def _missing_or_zero(value):
     if value is None or str(value).strip().lower() in ("", "none", "nan", "<na>"):
         return True
