@@ -185,6 +185,7 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
       {data?.scope === 'full' && data.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
     </header>
     <div className="bo-body">
+      <p className="bo-note">每週更新一次（週六）；平日顯示上次完成的計算結果。</p>
       <div className="bo-history">
         <label>測試紀錄<select aria-label="進場成功率測試日期" value={activeDate} onChange={event => setSelectedDate(event.target.value)}>
           <option value="latest">今天／最新一次</option>

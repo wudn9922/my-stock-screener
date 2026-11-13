@@ -8,6 +8,8 @@ name: Full-Market Universe
 # - 冷啟動（快取還沒建好）每次在 --budget 秒內盡量補，沒補完的下次繼續；某市場完整歷史未達 90% 前不寫入，
 #   選股頁照舊顯示 main.py 的流動性名單。可手動執行（workflow_dispatch）加快冷啟動。
 # - 逐市場寫入：某市場來源失敗時保留檔案裡該市場原本的內容，並讓這次執行標為失敗。
+# - 全市場名單、寬度、風險警示仍每次更新；進場成功率改於台北週六計算，
+#   asOf 任一市場滿 7 個日曆天或來源缺損時補跑；手動可選 auto／force／skip。
 on:
   workflow_run:
     workflows: ["Daily Stock Screener"]
@@ -23,6 +25,14 @@ on:
       markets:
         description: '市場（TW,US）'
         default: 'TW,US'
+      entry_success:
+        description: '進場成功率：auto 週六或逾期補跑；force 強制；skip 略過'
+        type: choice
+        options:
+          - auto
+          - force
+          - skip
+        default: auto
 
 env:
   GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
@@ -57,6 +67,15 @@ jobs:
         id: generated_restore
         if: vars.GENERATED_BRANCH_MODE == '1'
         run: python scripts/generated_branch.py restore
+
+      # Gate runs after generated restore, so it reads the actual owner copy.
+      # Always semantics keep later risk warnings/publish independent of a skip.
+      - name: Check weekly entry success schedule
+        id: entry_success_gate
+        if: always() && !cancelled() && (vars.GENERATED_BRANCH_MODE != '1' || steps.generated_restore.outcome == 'success')
+        env:
+          ENTRY_SUCCESS_MODE: ${{ inputs.entry_success || 'auto' }}
+        run: python scripts/entry_success_schedule.py
 
       # These derived calibration inputs are checked in beside their code as a read-only
       # seed. Restore the durable generated copy when it exists; initialize it once
@@ -200,7 +219,7 @@ jobs:
             --out docs/report/breadth-signals.json
 
       - name: Build full-market entry success rates
-        if: always() && !cancelled()
+        if: always() && !cancelled() && steps.entry_success_gate.outputs.run == 'true'
         run: python -u scripts/build_full_market_breakouts.py --cache-dir .cache/universe-full
 
       - id: notice_soft_06
@@ -222,7 +241,8 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           python scripts/market_warnings_log.py --verify-against HEAD
-          git add docs/report/universe.json docs/report/breakouts.json
+          if [ -f docs/report/universe.json ]; then git add -f -- docs/report/universe.json; fi
+          if [ -f docs/report/breakouts.json ]; then git add -f -- docs/report/breakouts.json; fi
           if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
           if [ -f docs/report/market-warnings.json ]; then git add -f -- docs/report/market-warnings.json; fi
           if [ -f docs/report/market-closures.json ]; then git add -f -- docs/report/market-closures.json; fi
@@ -234,7 +254,7 @@ jobs:
           if [ -f docs/report/kline-corrections.json ]; then git add -- docs/report/kline-corrections.json; fi
           # The same immutable 20-calendar-day snapshots are committed before cutover too.
           if [ -d docs/report/breakouts-archive ]; then
-            git add -- docs/report/breakouts-archive
+            git add --ignore-removal -- docs/report/breakouts-archive
           fi
           git commit -m "Auto-update full-market universe" || { echo "No changes to commit"; exit 0; }
           # 每日報告與 Atlas workflow 也會推送到 main，失敗時重新 rebase 後重試
