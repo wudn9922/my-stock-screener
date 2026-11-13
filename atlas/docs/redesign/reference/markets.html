@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Atlas 市場</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8A94A3;text-decoration:none}a:hover{color:#EEF1F5}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 1160px; box-sizing: border-box; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #0E1014; color: #EEF1F5; font-family: 'Noto Sans TC', system-ui, sans-serif; font-size: 14px; line-height: 1.4">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px">市場</h1>
+      <span style="font-size: 12px; color: #A4ADBA">資料日 2026/11/09</span>
+    </div>
+    <div role="group" aria-label="市場分類" style="display: flex; padding: 2px; border-radius: 12px; background: #161A20">
+      <button type="button" aria-pressed="true" style="height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: #2A303A; color: #EEF1F5; font-size: 14px; font-weight: 700">大盤</button>
+      <button type="button" aria-pressed="false" style="height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: none; color: #A4ADBA; font-size: 14px">全球</button>
+      <button type="button" aria-pressed="false" style="height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: none; color: #A4ADBA; font-size: 14px">題材</button>
+    </div>
+  </header>
+
+  <nav aria-label="地區" style="display: flex; gap: 8px; padding: 2px 16px 0">
+    <button type="button" aria-current="true" style="height: 36px; padding: 0 14px; border: 1px solid #F5B544; border-radius: 18px; background: none; color: #F5B544; font-size: 13px; font-weight: 700">台灣</button>
+    <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #2A303A; border-radius: 18px; background: none; color: #A4ADBA; font-size: 13px">日本</button>
+    <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #2A303A; border-radius: 18px; background: none; color: #A4ADBA; font-size: 13px">韓國</button>
+    <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #2A303A; border-radius: 18px; background: none; color: #A4ADBA; font-size: 13px">歐洲</button>
+    <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #2A303A; border-radius: 18px; background: none; color: #A4ADBA; font-size: 13px">美國</button>
+  </nav>
+
+  <section aria-label="台灣加權指數" style="display: flex; flex-direction: column; gap: 10px; margin: 12px 16px 0; padding: 16px; border-radius: 16px; background: #161A20">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+      <span style="font-size: 14px; font-weight: 700">台灣加權指數 <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 400; color: #8A94A3">^TWII</span></span>
+      <span style="padding: 2px 10px; border-radius: 6px; background: rgba(255,90,95,0.14); color: #FF5A5F; font-size: 12px">多頭趨勢中的多頭走勢</span>
+    </div>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 32px; font-weight: 600; line-height: 1">41,661.70</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; color: #FF5A5F">▲ 4.94%</span>
+    </div>
+    <svg width="326" height="150" viewBox="0 0 326 150" role="img" aria-label="加權指數日 K 線：六月起上漲至十月高點，十一月連續下跌後最新一根收紅">
+      <path d="M0 30H326M0 75H326M0 120H326" stroke="#2A303A" stroke-width="1"/>
+      <path d="M8 114v14M36.8 106v18M51.2 100v14M80 92v19M94.4 84v16M123.2 76v19M137.6 68v16M166.4 60v20M180.8 50v18M195.2 40v18M209.6 30v18M224 22v16M238.4 16v14M310.4 98v28" stroke="#FF5A5F" stroke-width="1.2"/>
+      <path d="M4 118h8v6h-8zM32.8 110h8v10h-8zM47.2 104h8v6h-8zM76 96h8v11h-8zM90.4 88h8v8h-8zM119.2 80h8v11h-8zM133.6 72h8v8h-8zM162.4 64h8v12h-8zM176.8 54h8v10h-8zM191.2 44h8v10h-8zM205.6 34h8v10h-8zM220 26h8v8h-8zM234.4 22h8v4h-8zM306.4 102h8v18h-8z" fill="#FF5A5F"/>
+      <path d="M22.4 114v10M65.6 100v11M108.8 84v11M152 68v12M252.8 18v26M267.2 36v34M281.6 62v42M296 94v40" stroke="#2BC8A8" stroke-width="1.2"/>
+      <path d="M18.4 118h8v2h-8zM61.6 104h8v3h-8zM104.8 88h8v3h-8zM148 72h8v4h-8zM248.8 22h8v18h-8zM263.2 40h8v26h-8zM277.6 66h8v32h-8zM292 98h8v24h-8z" fill="#2BC8A8"/>
+      <path d="M0 122 C60 112 120 92 180 70 S270 52 318 66" fill="none" stroke="#F5B544" stroke-width="1.5"/>
+    </svg>
+    <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8A94A3">
+      <span>6月</span><span>8月</span><span>10月</span><span>11月</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA23</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−9.9%</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA29</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−10.7%</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA62</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−10.0%</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="台灣櫃買指數" style="display: flex; flex-direction: column; gap: 10px; margin: 10px 16px 0; padding: 16px; border-radius: 16px; background: #161A20">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+      <span style="font-size: 14px; font-weight: 700">台灣櫃買指數 <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 400; color: #8A94A3">^TWOII</span></span>
+      <span style="padding: 2px 10px; border-radius: 6px; background: rgba(245,181,68,0.14); color: #F5B544; font-size: 12px">空頭趨勢中的多頭走勢</span>
+    </div>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 32px; font-weight: 600; line-height: 1">321.97</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; color: #FF5A5F">▲ 5.90%</span>
+    </div>
+    <svg width="326" height="150" viewBox="0 0 326 150" role="img" aria-label="櫃買指數日 K 線：九月見高後一路走低，最新一根收紅反彈">
+      <path d="M0 30H326M0 75H326M0 120H326" stroke="#2A303A" stroke-width="1"/>
+      <path d="M8 50v14M36.8 46v16M51.2 40v14M80 36v16M94.4 30v14M123.2 26v16M166.4 34v12M209.6 44v12M252.8 66v12M310.4 104v30" stroke="#FF5A5F" stroke-width="1.2"/>
+      <path d="M4 54h8v6h-8zM32.8 50h8v8h-8zM47.2 44h8v6h-8zM76 40h8v8h-8zM90.4 34h8v6h-8zM119.2 30h8v8h-8zM162.4 38h8v4h-8zM205.6 48h8v4h-8zM248.8 70h8v4h-8zM306.4 108h8v20h-8z" fill="#FF5A5F"/>
+      <path d="M22.4 50v12M65.6 40v12M108.8 30v12M137.6 26v14M152 32v14M180.8 34v16M195.2 42v14M224 44v20M238.4 56v22M267.2 66v28M281.6 86v30M296 108v30" stroke="#2BC8A8" stroke-width="1.2"/>
+      <path d="M18.4 54h8v4h-8zM61.6 44h8v4h-8zM104.8 34h8v4h-8zM133.6 30h8v6h-8zM148 36h8v6h-8zM176.8 38h8v8h-8zM191.2 46h8v6h-8zM220 48h8v12h-8zM234.4 60h8v14h-8zM263.2 70h8v20h-8zM277.6 90h8v22h-8zM292 112h8v18h-8z" fill="#2BC8A8"/>
+      <path d="M0 56 C60 44 120 34 180 40 S270 62 318 78" fill="none" stroke="#F5B544" stroke-width="1.5"/>
+    </svg>
+    <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8A94A3">
+      <span>7月</span><span>9月</span><span>10月</span><span>11月</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA23</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−16.6%</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA29</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−17.9%</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: #1E232B">
+        <span style="font-size: 11px; color: #A4ADBA">距 MA62</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #2BC8A8">−18.7%</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="多頭末期警示" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 16px 0; padding: 12px 16px; border-radius: 16px; border: 1px solid #2A303A">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 14px; font-weight: 700">多頭末期警示</span>
+      <span style="font-size: 12px; color: #A4ADBA">3 項觀察 · 1 項資料不足</span>
+    </div>
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600">0<span style="font-family: 'Noto Sans TC', sans-serif; font-size: 12px; font-weight: 400; color: #A4ADBA"> 項亮燈</span></span>
+  </section>
+
+  <section aria-label="美股題材近一月" style="display: flex; flex-direction: column; gap: 8px; margin: 10px 16px 0; padding: 14px 16px; border-radius: 16px; background: #161A20">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">美股題材 · 近 1 月</h2>
+      <a href="#themes" style="display: flex; align-items: center; min-height: 24px; font-size: 13px; color: #F5B544">全部 30 個</a>
+    </div>
+    <span style="margin-top: -6px; font-size: 12px; color: #A4ADBA">同期大盤 SPY <span style="font-family: 'IBM Plex Mono', monospace; color: #2BC8A8">−5.0%</span></span>
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) 60px; align-items: center; gap: 6px 10px; font-size: 13px">
+      <span>醫療器材</span>
+      <div style="display: flex; height: 8px"><div style="width: 50%"></div><div style="width: 12%; border-radius: 0 4px 4px 0; background: #FF5A5F"></div></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; text-align: right; color: #FF5A5F">+10.2%</span>
+      <span>生技製藥</span>
+      <div style="display: flex; height: 8px"><div style="width: 50%"></div><div style="width: 12%; border-radius: 0 4px 4px 0; background: #FF5A5F"></div></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; text-align: right; color: #FF5A5F">+9.9%</span>
+      <span>記憶體與儲存</span>
+      <div style="display: flex; justify-content: flex-end; height: 8px"><div style="width: 44%; border-radius: 4px 0 0 4px; background: #2BC8A8"></div><div style="width: 50%"></div></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; text-align: right; color: #2BC8A8">−36.3%</span>
+      <span>光通訊</span>
+      <div style="display: flex; justify-content: flex-end; height: 8px"><div style="width: 50%; border-radius: 4px 0 0 4px; background: #2BC8A8"></div><div style="width: 50%"></div></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; text-align: right; color: #2BC8A8">−41.0%</span>
+    </div>
+  </section>
+
+  <nav aria-label="主要分頁" style="position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #12151A; border-top: 1px solid #2A303A">
+    <a href="watchlist.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></svg>自選
+    </a>
+    <a href="markets.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 700; color: #F5B544">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>市場
+    </a>
+    <a href="screener.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>選股
+    </a>
+    <a href="stock.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v4M8 15v6M16 3v6M16 17v4M5.5 7h5v8h-5zM13.5 9h5v8h-5z"/></svg>個股
+    </a>
+    <a href="me.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 20.5c1-3.6 4-5.5 7.5-5.5s6.5 1.9 7.5 5.5"/></svg>我的
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#F5B544","options":["#F5B544","#5B9DFF","#B7F36B"]},"$preview":{"width":390,"height":1160}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#F5B544' };
+}
+}
+</script>
+</body>
+</html>
