@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import base64
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 import gzip
 import json
 from pathlib import Path
@@ -56,9 +57,21 @@ def official_for_archive(fetch_json, rows, log=print):
 
 def plan(rows, official, yahoo_v8=()):
     """Try same-unit raw Yahoo v8 first; only residual zeros use calibrated FMTQIK."""
+    yahoo_v8 = list(yahoo_v8)
     first, direct = volume.fill_archive_from_yahoo(rows, yahoo_v8)
+    # FMTQIK is a fallback ONLY when raw v8 has no positive volume.
+    # A v8 price mismatch is a rejection, never a license to prefer FMTQIK.
+    yahoo_has_volume = set()
+    for row in yahoo_v8:
+        try:
+            if Decimal(str(row[5])).is_finite() and Decimal(str(row[5])) > 0:
+                yahoo_has_volume.add(str(row[0])[:10])
+        except (IndexError, InvalidOperation, ValueError, TypeError):
+            continue
     factor, stats = volume.calibrated_ratio({r[0]: r[5] for r in rows}, official)
-    proposed, fallback = volume.fill_rows(first, official, factor)
+    fallback_official = {day: item for day, item in official.items()
+                         if day not in yahoo_has_volume}
+    proposed, fallback = volume.fill_rows(first, fallback_official, factor)
     changes = sorted(direct + [{**item, "source": "fmtqik"} for item in fallback],
                      key=lambda item: item["date"])
     targets = [r for r in rows if r[0] >= volume.START_DATE and volume._missing_or_zero(r[5])]
