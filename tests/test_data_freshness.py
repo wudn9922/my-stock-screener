@@ -46,17 +46,27 @@ class SourceDateTest(unittest.TestCase):
         self.assertIn('3 個交易日', issues['archive/TW'])
         self.assertIn('2 個交易日', issues['archive/US'])
 
-    def test_warning_retained_and_unavailable_alert_even_with_a_fresh_asof(self):
-        for status in ('retained', 'unavailable'):
-            data = sources()
-            data['warnings']['markets']['us']['update'] = {'status': status, 'reason': 'must not copy arbitrary source text'}
-            issues, _ = health.evaluate(calendar(), data, clock())
-            self.assertEqual(set(issues), {'warnings/US'})
-            self.assertIn(status, issues['warnings/US'])
-            self.assertNotIn('arbitrary', str(issues))
+    def test_warning_unavailable_always_alerts_but_current_retained_does_not(self):
+        data = sources()
+        data['warnings']['markets']['us']['update'] = {'status': 'unavailable', 'reason': 'must not copy arbitrary source text'}
+        issues, _ = health.evaluate(calendar(), data, clock())
+        self.assertEqual(set(issues), {'warnings/US'})
+        self.assertIn('unavailable', issues['warnings/US'])
+        self.assertNotIn('arbitrary', str(issues))
+        # Retained data that already covers the latest closed session is current.
+        data = sources()
+        data['warnings']['markets']['us']['update'] = {'status': 'retained', 'reason': 'must not copy arbitrary source text'}
+        self.assertEqual(health.evaluate(calendar(), data, clock())[0], {})
+        # Retained data one session behind alerts, stricter than the normal one-session grace.
+        data = sources('2026-11-04')
+        data['warnings']['markets']['us']['update'] = {'status': 'retained', 'reason': 'must not copy arbitrary source text'}
+        issues, _ = health.evaluate(calendar(), data, clock())
+        self.assertEqual(set(issues), {'warnings/US'})
+        self.assertIn('retained', issues['warnings/US'])
+        self.assertNotIn('arbitrary', str(issues))
         data['warnings']['markets']['us'].pop('asOf')
         issues, _ = health.evaluate(calendar(), data, clock())
-        self.assertIn('unavailable', issues['warnings/US'])
+        self.assertIn('缺少有效資料日', issues['warnings/US'])
 
     def test_weekends_holidays_and_new_york_early_close_use_published_timestamps(self):
         cal = calendar()
