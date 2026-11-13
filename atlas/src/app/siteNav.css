@@ -100,7 +100,7 @@
 .list-nav-position b { color: var(--text); font-weight: 600; }
 .financials-list-nav { margin: 0 0 4px; }
 
-/* Reference phone tab labels are 11px; keep the existing tablet geometry. */
+/* Reference phone tab labels are 12px; keep the existing tablet geometry. */
 @media (max-width: 767px) {
-  .site .site-tabbar button { gap: 4px; font-size: 11px; }
+  .site .site-tabbar button { gap: 4px; font-size: 12px; }
 }

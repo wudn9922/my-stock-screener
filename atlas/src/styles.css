@@ -296,9 +296,9 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: linear-gradient(135deg, #3d8bfd 0%, #6a5cf6 100%);
-  box-shadow: 0 4px 14px rgba(61, 139, 253, 0.25);
+  color: #14110A;
+  background: #F5B544;
+  box-shadow: none;
 }
 .site-brand b {
   font-size: 17px;
@@ -724,10 +724,10 @@ h3 {
   width: 18px;
   height: 12px;
   border-radius: 3px;
-  background: linear-gradient(90deg, #f23645 50%, #22ab94 50%);
+  background: linear-gradient(90deg, #FF5A5F 50%, #2BC8A8 50%);
 }
 .swatch.us {
-  background: linear-gradient(90deg, #22ab94 50%, #f23645 50%);
+  background: linear-gradient(90deg, #2BC8A8 50%, #FF5A5F 50%);
 }
 .dialog-facts {
   margin: 0 0 12px;
@@ -1466,7 +1466,7 @@ h3 {
 .chip-kind {
   font-size: 10px;
   color: var(--accent-text);
-  border: 1px solid rgba(61, 139, 253, 0.4);
+  border: 1px solid rgba(245, 181, 68, 0.4);
   border-radius: 4px;
   padding: 0 4px;
 }
@@ -1786,7 +1786,7 @@ h3 {
     background: #12151A;
     border-top: 1px solid var(--border-strong);
   }
-  .site-tabbar button { gap: 4px; font-size: 11px; }
+  .site-tabbar button { gap: 4px; font-size: 12px; }
   .site-tabbar button svg { width: 22px; height: 22px; }
   /* The reference marks the active item by amber icon and label, not a top stripe. */
   .site-tabbar button.active::before { display: none; }
@@ -1929,6 +1929,18 @@ h3 {
 .num, .report-date, .row-id b, .row-quote, .row-pe, .change-pill,
 .index-score b, .index-value, .index-change, .tile-value,
 .asset-list-row b, .asset-list-row strong, time {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numeric-role typography shared across page families; preserve Chinese labels. */
+.site :is(time, output, data, [data-numeric], [data-ticker], [data-price], [data-percent],
+  .wb-name b, .wb-quote, .wb-change, .wb-extended, .wb-live-time,
+  .index-card-quote, .ma-chip em, .index-score, .count-pill,
+  .ws-symbol-text b, .ws-quote, .ws-extended-line, .ws-valuation dd,
+  .ws-volatility-values dd, .ohlc-header, .stock-chart-quote, .stock-chart-date,
+  .fin-quarter-change, .watchlist-counts, .status-counts,
+  .console-page .saved-member-list time) {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
 }

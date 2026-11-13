@@ -1562,3 +1562,6 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 ## Atlas phone redesign — step 1 (tokens / shell)
 Independent Claude visual sign-off and actual 390px compiled screenshots are pending; no independent approval is claimed.
 No layout assertions were changed. Lint, build and responsive/browser checks remain to be confirmed by CI/reviewer before merge.
+
+### Claude review 6857550965 — requested changes
+Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px without weakening the navigation test; synchronized five reference files and handoff; added numeric-role font rules for watchlist/market/stock/account; removed residual blue focus, brand gradient, old swatches and login splash colors. Price axis reverted to its proportional system face to protect chart plot width. Still requires independent main-vs-branch axis pixel measurement, 390px US-convention screenshot and WebKit verification.

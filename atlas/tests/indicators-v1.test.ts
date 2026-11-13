@@ -37,9 +37,9 @@ it('Volume returns each bar volume with its original timestamp', () => {
 it('colors volume by candle direction and starts its rolling mean after a full window', () => {
   const mixed = [bars[0], { ...bars[1], open: 5, close: 4 }, { ...bars[2], open: 6, close: 6 }];
   expect(coloredVolume(mixed)).toEqual([
-    { time: 10, value: 100, color: '#39baa0b3' },
-    { time: 20, value: 200, color: '#ef6b7bb3' },
-    { time: 30, value: 300, color: '#39baa0b3' },
+    { time: 10, value: 100, color: '#FF5A5Fb3' },
+    { time: 20, value: 200, color: '#2BC8A8b3' },
+    { time: 30, value: 300, color: '#FF5A5Fb3' },
   ]);
   expect(volumeSma(bars, 3)).toEqual([
     { time: 30, value: 200 },
