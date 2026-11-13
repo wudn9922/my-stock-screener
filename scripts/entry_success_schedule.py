@@ -73,9 +73,13 @@ def decide(report: Path, now: datetime, event_name: str, mode: str = "auto") -> 
     invalid = dates is None or any(day > today for day in dates.values())
     aged = dates is not None and any((today - day).days >= MAX_AGE_DAYS for day in dates.values())
     saturday = event_name in EVENTS_WITH_SATURDAY_RUN and today.weekday() == 5
-    # A second Saturday run with an already-published Saturday result is not
-    # another weekly run; a genuinely stale market still takes precedence.
-    weekly = saturday and generated_day != today
+    # Taipei Saturday starts before Friday's NYSE close. An early Saturday
+    # run may still contain Thursday's US bars; permit the later Saturday
+    # schedule to refresh it. Deduplicate only a Saturday result that already
+    # includes Friday's US session; genuine asOf expiry still takes precedence.
+    friday = today - timedelta(days=1)
+    already_complete = generated_day == today and dates is not None and dates["us"] >= friday
+    weekly = saturday and not already_complete
     if mode == "skip":
         run, reason = False, "manual skip"
     elif mode == "force":

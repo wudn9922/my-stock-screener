@@ -71,10 +71,13 @@ class EntrySuccessScheduleTests(unittest.TestCase):
         self.assertFalse(self.decision("2026-11-13T15:59:59Z").run)
         self.assertTrue(self.decision("2026-11-13T16:00:00Z").run)
 
-    def test_second_saturday_run_uses_existing_saturday_generation(self):
+    def test_second_saturday_run_retries_when_us_friday_has_not_closed(self):
         self.save("2026-11-13", "2026-11-13", "2026-11-13T17:00:00Z")
         self.assertFalse(self.decision("2026-11-13T17:30:00Z", "workflow_run").run)
         self.assertTrue(self.decision("2026-11-13T17:30:00Z", "workflow_run", "force").run)
+        # Report generated Saturday Taipei but only has US Thursday's close.
+        self.save("2026-11-13", "2026-11-12", "2026-11-13T17:00:00Z")
+        self.assertTrue(self.decision("2026-11-14T03:17:00Z", "schedule").run)
 
     def test_skip_writes_actions_summary_but_never_touches_report(self):
         original = self.report.read_bytes()
