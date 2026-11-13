@@ -828,6 +828,16 @@ class Run:
             try:
                 market = completed_market or market_of(symbol)
                 raw = self.fetch_raw_chart_once(symbol, range_)
+                if symbol == '^TWII' and not raw.empty:
+                    # Index-only archive refresh uses the chart, not Yahoo's v7 quote.
+                    # The official conversion is a second line of defense for v8 zeros.
+                    observations = [(day.strftime('%Y-%m-%d'), *values)
+                                    for day, values in zip(raw.index, raw.itertuples(index=False, name=None))]
+                    filled = twii_volume.fill_yahoo_rows(
+                        symbol, observations, lambda url: self.net.get_json(url), self.log)
+                    if filled is not observations:
+                        raw = pd.DataFrame([row[1:] for row in filled],
+                            index=pd.to_datetime([row[0] for row in filled]), columns=uc.PRICE_COLUMNS)
                 checked = kline.accept_frame(raw, symbol, refetch=lambda:self.fetch_raw_chart_once(symbol, range_), now=self.now,
                     source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol)
                 return sessions.analysis_prices(uc.drop_unfinished(checked, market, self.now),self.closed_dates(market))
