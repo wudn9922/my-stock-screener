@@ -185,10 +185,19 @@ def fill_rows(rows, official, factor):
     return output, changes
 
 
+def _missing_or_zero(value):
+    if value is None or str(value).strip().lower() in ("", "none", "nan", "<na>"):
+        return True
+    try:
+        return float(value) == 0
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def fill_yahoo_rows(symbol, rows, fetch_json, log=lambda message: None):
     """Network-bound adapter for the normal Yahoo benchmark path; all other symbols untouched."""
     if symbol != "^TWII" or not any(
-        str(r[0])[:10] >= START_DATE and (r[5] is None or r[5] == 0) for r in rows
+        str(r[0])[:10] >= START_DATE and _missing_or_zero(r[5]) for r in rows
     ):
         return rows
     official, errors = fetch_official(fetch_json, rows[-1][0], log)
