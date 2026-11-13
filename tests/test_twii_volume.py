@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "scripts")]
@@ -127,6 +128,15 @@ class CalibrationTest(unittest.TestCase):
         self.assertFalse(called)
         self.assertEqual(tv.fill_yahoo_rows("^TWII", rows, fetch), rows)
         self.assertTrue(called)
+
+    def test_chart_nan_missing_volume_uses_calibrated_official_data(self):
+        rows, official = fixture()
+        rows[-1] = (*rows[-1][:5], float('nan'))  # pandas chart frame
+        with patch.object(tv, 'fetch_official', return_value=(official, [])) as fetch:
+            result = tv.fill_yahoo_rows('^TWII', rows, lambda url: None)
+        fetch.assert_called_once()
+        self.assertEqual(result[-1][-1], 3333333)
+        self.assertEqual(result[-2][-1], 3333333)
 
     def test_repair_plan_scopes_to_zero_volumes_only(self):
         rows, official = fixture()
