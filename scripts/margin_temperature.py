@@ -23,7 +23,7 @@ from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "margin_temperature"
+DATA = ROOT / "research_data" / "margin_temperature"
 OUTPUT = ROOT / "docs" / "report" / "margin-temperature.json"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json,text/plain,*/*", "Accept-Language": "zh-TW,zh;q=0.9"}

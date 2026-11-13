@@ -28,8 +28,9 @@ test('Taiwan margin temperature displays exact latest values, history and phone-
 
   const card = page.getByTestId('margin-temperature-card');
   await expect(card).toBeVisible();
-  await expect(card.getByText('85.2%', { exact: true })).toBeVisible();
-  await expect(card.getByText('-17.5%', { exact: true })).toBeVisible();
+  // The gauge headline repeats in the history table; assert the gauge value itself.
+  await expect(card.locator('.mt-gauge-head b').getByText('85.2%', { exact: true })).toBeVisible();
+  await expect(card.locator('.mt-gauge-head b').getByText('-17.5%', { exact: true })).toBeVisible();
   await expect(card.locator('.mt-status-tags')).toContainText('中性');
   await expect(card).toContainText('資料日期 2026-11-12');
   await expect(card).toContainText('本週暫計');
@@ -37,7 +38,7 @@ test('Taiwan margin temperature displays exact latest values, history and phone-
   await expect(card.locator('.mt-gauge-track')).toHaveCount(2);
   await expect(card.locator('.mt-price-chart')).toBeVisible();
   await expect(card.locator('.mt-chart-legend').first()).toContainText('過熱週');
-  await expect(card.locator('.mt-chart-legend')).toContainText('過冷週');
+  await expect(card.locator('.mt-chart-legend').first()).toContainText('過冷週');
   await card.getByRole('combobox', { name: '融資溫度歷史區間' }).selectOption('3y');
   await expect(card.locator('.mt-price-chart')).toBeVisible();
   await card.getByText('表格檢視', { exact: false }).click();
