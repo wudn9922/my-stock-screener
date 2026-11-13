@@ -52,8 +52,8 @@
   --down: #FF5A5F;
   --up-text: #2BC8A8;
   --down-text: #FF5A5F;
-  --up-soft: rgba(34, 171, 148, 0.14);
-  --down-soft: rgba(242, 54, 69, 0.14);
+  --up-soft: rgba(43, 200, 168, 0.14);
+  --down-soft: rgba(255, 90, 95, 0.14);
 }
 * {
   box-sizing: border-box;
