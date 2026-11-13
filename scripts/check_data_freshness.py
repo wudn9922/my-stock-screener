@@ -128,8 +128,8 @@ def twii_volume_issue(calendar, raw_csv, now):
         by_date = {r["Date"]: r["Volume"] for r in rows}
         # The most recently closed day gets one FULL trading-session grace.
         # Still-zero volume on a previous session is a confirmed backlog.
-        aged = [day.isoformat() for day in sessions[-11:-1]
-                if by_date.get(day.isoformat()) == "0"]
+        aged = sorted(day for day, value in by_date.items()
+                     if "2026-11-05" <= day < expected and value == "0")
         if aged:
             return {key: f"^TWII {aged[0]} 成交量隔一個交易日仍為 0（封存尚未補回）"}, {key}
         value = by_date.get(expected)
