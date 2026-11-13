@@ -25,7 +25,7 @@ import json,os,runpy,sys
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import URLError
-calls=[];texts=[]
+calls=[];texts=[];agents=[]
 class Response:
     status=204
     def __enter__(self): return self
@@ -36,6 +36,7 @@ class Fake:
         kind='discord' if url.startswith('https://discord.com/api/webhooks/') else 'line' if url=='https://api.line.me/v2/bot/message/push' else 'unexpected'
         assert kind!='unexpected','network forbidden'
         calls.append(kind)
+        agents.append(request.get_header('User-agent') or '')
         payload=json.loads(request.data)
         texts.append(json.dumps(payload['embeds'] if kind=='discord' else payload['messages'],ensure_ascii=False))
         case=os.environ['OFFLINE_CASE']
@@ -46,7 +47,7 @@ sys.path.insert(0,str(Path(sys.argv[1]).parent))
 with patch('urllib.request.build_opener',return_value=Fake()):
     try: runpy.run_path(sys.argv[1],run_name='__main__')
     except SystemExit as result: code=result.code
-print('OFFLINE_RESULT='+json.dumps({'calls':calls,'texts':texts,'exit':code}))
+print('OFFLINE_RESULT='+json.dumps({'calls':calls,'texts':texts,'agents':agents,'exit':code}))
 '''
 
 
@@ -84,6 +85,12 @@ class CompositeDeliveryTest(unittest.TestCase):
         self.assertEqual(embed['fields'][1]['value'], 'schedule')
         self.assertIn('台北', embed['fields'][-1]['value'])
         self.assertEqual(embed['url'], RUN)
+
+    def test_discord_gets_a_non_default_agent_and_a_trimmed_webhook(self):
+        result, output, _ = self.execute(webhook=WEBHOOK + '\n')
+        self.assertEqual(result['calls'], ['discord'])
+        self.assertTrue(result['agents'][0].startswith('DiscordBot ('))
+        self.assertIn('delivered=true', output)
 
     def test_discord_failure_falls_back_to_line(self):
         result, output, _ = self.execute('discord-fail')

@@ -88,7 +88,7 @@ def evaluate(calendar, sources, now):
                 continue
             observed = iso_day(row.get('lastDate' if source == 'archive' else 'asOf'))
             status = row.get('update', {}).get('status') if isinstance(row.get('update'), dict) else None
-            if source == 'warnings' and status in ('retained', 'unavailable'):
+            if source == 'warnings' and status == 'unavailable':
                 issues[key] = f'{LABELS[source]} {market}：本次未更新（{status}），資料日 {observed or "未知"}'
                 continue
             if observed is None:
@@ -97,6 +97,11 @@ def evaluate(calendar, sources, now):
             # The 30-day left edge can undercount a long outage, but >=2 known
             # closed sessions still proves the requested >1-session threshold.
             lag = sum(session > observed for session in sessions)
+            # A retained file that already covers the latest closed session is
+            # current: a later rerun failing to refetch the same day is not stale.
+            if source == 'warnings' and status == 'retained' and lag >= 1:
+                issues[key] = f'{LABELS[source]} {market}：本次未更新（retained），資料日 {observed}，應至 {expected}'
+                continue
             if observed > expected:
                 issues[key] = f'{LABELS[source]} {market}：資料日晚於最近已收盤交易日 {expected}'
             elif lag > 1:
