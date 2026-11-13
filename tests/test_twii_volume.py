@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "scripts")]
 import twii_volume as tv
 import repair_twii_volume as repair
+import kline_archive as archive
+from test_kline_archive import _ArchiveCase
 
 
 def trading_days(end, count):
@@ -135,6 +137,37 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(skipped, {})
         self.assertEqual(proposed[0][5], str(rows[0][5]))
         self.assertEqual(proposed[-1][5], 3333333)
+
+
+class ArchiveTWIIVolumeRepairTest(_ArchiveCase):
+    def test_backup_audit_verification_and_unrelated_rows_unchanged(self):
+        rows, official = fixture()
+        source = [archive.normalize(r) for r in rows]
+        self.seed("^TWII", source)
+        self.seed("2330.TW", [archive.normalize(
+            ("2026-11-05", 100, 101, 99, 100, 456789))])
+        self.checkpoint()
+        other_path = self.archive / "tw/2330.TW/2026.csv"
+        other = other_path.read_bytes()
+        before = self.archive / "tw/^TWII/2026.csv"
+        before_sha = archive.digest(before.read_bytes())
+        proposed, changes, skipped, stats = repair.plan(
+            archive.symbol_rows(self.archive, "^TWII", {"2026"}), official)
+        backup = self.root / repair.BACKUP_NAME
+        self.assertTrue(repair.apply(self.archive, source, proposed, changes, stats, backup))
+        self.assertTrue(backup.exists())
+        self.assertEqual(archive.digest(before.read_bytes()) != before_sha, True)
+        self.assertEqual(other_path.read_bytes(), other)
+        evidence = archive.json_read(backup, {})
+        self.assertEqual(evidence["operation"], "twii-volume")
+        self.assertEqual(evidence["archiveCommit"], repair.git(self.archive, "rev-parse", "HEAD"))
+        self.assertEqual(len(evidence["files"]), 4)
+        self.assertEqual(archive.symbol_rows(self.archive, "^TWII", {"2026"})[-1][-1], "3333333")
+        archive.verify(self.archive, base="HEAD")
+        self.checkpoint()
+        archive.verify(self.archive, base="HEAD^")
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            repair.make_backup(self.archive, backup, repair.git(self.archive, "rev-parse", "HEAD"), [])
 
 
 if __name__ == "__main__":
