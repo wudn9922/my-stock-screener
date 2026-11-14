@@ -184,3 +184,12 @@
   .wb-action-sheet button { min-height: 44px; text-align: left; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); color: var(--text); }
   .watchlist-page .console-actions:has(> .primary-button) { display: none; }
 }
+
+/* Desktop retains the original 清單｜持股 control order; phones show 持股 as the fourth source tab. */
+@media (min-width: 768px) {
+  .watchlist-board .wb-toolbar .wb-view-switch { order: -1; }
+}
+@media (max-width: 767px) {
+  .watchlist-page:has(.watchlist-board) .wb-view-switch button:first-child { display: none; }
+  .watchlist-page > .page-footer-note { display: none; }
+}
