@@ -207,3 +207,9 @@
 .wb-extended .down { color: var(--down-text); }
 [data-colors='us'] .wb-extended .up { color: var(--down-text); }
 [data-colors='us'] .wb-extended .down { color: var(--up-text); }
+
+@media (max-width: 767px) {
+  .watchlist-page .wb-toolbar { min-height: 44px; height: 44px; }
+  .watchlist-page .wb-list-toolbar { box-sizing: border-box; }
+  .watchlist-page .wb-action-sheet { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -67,7 +67,11 @@ test('guest paste previews errors, supports correction/skip, shows P&L and leaks
   expect(requests.join('\n')).not.toMatch(/PRIVATE-LOCAL-ONLY|123\.4567890123|815\.252525252525/);
   expect(logs.join('\n')).not.toMatch(/PRIVATE-LOCAL-ONLY|123\.4567890123|815\.252525252525/);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('holdings:v1');
-  await page.getByRole('button', { name: '清單', exact: true }).click();
+  if (await page.getByRole('button', { name: '新增清單' }).isVisible()) {
+    await page.getByRole('group', { name: '行情來源' }).getByRole('button', { name: '我的清單' }).click();
+  } else {
+    await page.getByRole('button', { name: '清單', exact: true }).click();
+  }
   await openListActions(page);
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
   await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();

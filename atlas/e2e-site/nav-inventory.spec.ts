@@ -197,6 +197,7 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '匯入備份', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '匯出清單備份', exact: true })).toBeEnabled();
+  if (await page.getByRole('dialog', { name: '清單操作' }).isVisible()) await page.getByRole('button', { name: '關閉清單操作' }).click();
   for (const [name, symbol] of [['導覽 NVDA', 'NVDA'], ['導覽 AAPL', 'AAPL']]) {
     await openListActions(page);
     await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
