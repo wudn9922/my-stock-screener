@@ -1,10 +1,13 @@
 import 'fake-indexeddb/auto';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AppStore } from '../src/app/AppStore';
 import { IndexedDBStore } from '../src/storage/IndexedDBStore';
 import {
   fetchMaRecommendation,
   maRecommendationUrl,
+  maMetaParts,
   maSelectorLink,
   parseMaRecommendation,
   recommendedPeriods,
@@ -12,7 +15,7 @@ import {
 } from '../src/report/maRecommendation';
 import withSecond from './fixtures/ma-selector/2330.TW.with-second.json';
 import noSecond from './fixtures/ma-selector/2330.TW.no-second.json';
-import { appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
+import { MaMetaLine, MaRangeNotes, appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
 
 // Shape written by ma-selector scripts/build_recommendations.py (core/recommend.py).
 const file = (ticker = '2330.TW') => ({
@@ -188,5 +191,119 @@ describe('ma-selector VERSION 2 extras (ranking, 2-year score, selector v2)', ()
     expect(result.data.ranges.every((r) => r.rank === null)).toBe(true);
     const v1 = parseMaRecommendation(file(), '2330.TW');
     expect(v1.status === 'ok' && v1.data.v2 === null && v1.data.ranges.every((r) => r.rank === null)).toBe(true);
+  });
+});
+
+// VERSION 3 adds optional fields (market, costPct, referencePool, adjusted, scoring; per range unsuitable, held, previousFinal, computedFinal).
+describe('ma-selector VERSION 3 optional fields', () => {
+  const v3Ranges = () => file().ranges.map((range) => ({ ...range, unsuitable: false, held: false, previousFinal: range.final, computedFinal: range.final }));
+  const v3 = (overrides: Record<string, unknown> = {}) => ({
+    ...file(),
+    version: 3,
+    market: 'TW',
+    costPct: 0.585,
+    referencePool: 'US',
+    adjusted: true,
+    scoring: 'structure-v3',
+    ranges: v3Ranges(),
+    ...overrides,
+  });
+  const parse = (data: unknown) => {
+    const result = parseMaRecommendation(data, '2330.TW');
+    if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
+    return result.data;
+  };
+  const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
+  const notes = (range: ReturnType<typeof parse>['ranges'][number]) => html(createElement(MaRangeNotes, { range }));
+  const meta = (data: ReturnType<typeof parse>) => html(createElement(MaMetaLine, { data }));
+
+  it('reads a VERSION 2 file as before: defaults everywhere and nothing extra rendered', () => {
+    for (const fixture of [withSecond, noSecond]) {
+      const data = parse(fixture);
+      expect(data).toMatchObject({ market: null, costPct: null, referencePool: null, adjusted: false, scoring: null });
+      for (const range of data.ranges) {
+        expect(range).toMatchObject({ unsuitable: false, held: false, previousFinal: null, computedFinal: range.final });
+        expect(notes(range)).toBe('');
+      }
+      expect(maMetaParts(data)).toEqual([]);
+      expect(meta(data)).toBe('');
+    }
+    expect(recommendedPeriods(parse(withSecond))).toEqual([33, 36, 66]);
+  });
+
+  it('parses a VERSION 3 file with every new field', () => {
+    const ranges = v3Ranges().map((range, index) => (index === 0 ? { ...range, unsuitable: true, held: true, previousFinal: 24, computedFinal: 20, final: 24 } : range));
+    const data = parse(v3({ ranges }));
+    expect(data).toMatchObject({ market: 'TW', costPct: 0.585, referencePool: 'US', adjusted: true, scoring: 'structure-v3' });
+    expect(data.ranges[0]).toMatchObject({ unsuitable: true, held: true, previousFinal: 24, computedFinal: 20, final: 24 });
+    expect(data.ranges[1]).toMatchObject({ unsuitable: false, held: false, previousFinal: 34, computedFinal: 34 });
+    expect(recommendedPeriods(data)).toEqual([24, 34, 89]);
+    expect(maMetaParts(data)).toEqual(['回測成本 來回 0.585%', '基準池：美股', '已還原股利']);
+    expect(meta(data)).toContain('回測成本 來回 0.585% · 基準池：美股 · 已還原股利');
+  });
+
+  it('tolerates each new top-level field being absent on its own', () => {
+    const full = parse(v3());
+    for (const key of ['market', 'costPct', 'referencePool', 'adjusted', 'scoring'] as const) {
+      const input: Record<string, unknown> = v3();
+      delete input[key];
+      const data = parse(input);
+      expect(data[key]).toBe(key === 'adjusted' ? false : null);
+      expect(data.ranges).toEqual(full.ranges);
+    }
+    expect(maMetaParts(parse({ ...v3(), costPct: undefined }))).toEqual(['基準池：美股', '已還原股利']);
+    expect(maMetaParts(parse({ ...v3(), referencePool: undefined }))).toEqual(['回測成本 來回 0.585%', '已還原股利']);
+    expect(maMetaParts(parse({ ...v3(), adjusted: undefined }))).toEqual(['回測成本 來回 0.585%', '基準池：美股']);
+    expect(maMetaParts(parse({ ...v3(), referencePool: 'TW', costPct: 0.1, adjusted: false }))).toEqual(['回測成本 來回 0.1%', '基準池：台股']);
+  });
+
+  it('tolerates each new per-range field being absent on its own', () => {
+    for (const key of ['unsuitable', 'held', 'previousFinal', 'computedFinal'] as const) {
+      const ranges = v3Ranges().map((range) => {
+        const copy: Record<string, unknown> = { ...range };
+        delete copy[key];
+        return copy;
+      });
+      const data = parse(v3({ ranges }));
+      expect(data.ranges.map((range) => range[key])).toEqual(
+        key === 'previousFinal' ? [null, null, null] : key === 'computedFinal' ? [24, 34, 89] : [false, false, false],
+      );
+      expect(data.ranges.map((range) => range.final)).toEqual([24, 34, 89]);
+    }
+    const noPrevious = parse(v3({ ranges: v3Ranges().map((range) => ({ ...range, previousFinal: null })) }));
+    expect(noPrevious.ranges.map((range) => range.previousFinal)).toEqual([null, null, null]);
+  });
+
+  it('drops invalid optional values instead of rejecting the file', () => {
+    const data = parse(v3({
+      market: 'JP', costPct: 'x', referencePool: 5, adjusted: 'yes', scoring: 7,
+      ranges: v3Ranges().map((range) => ({ ...range, unsuitable: 'true', held: 1, previousFinal: 1.5, computedFinal: 0 })),
+    }));
+    expect(data).toMatchObject({ market: null, costPct: null, referencePool: null, adjusted: false, scoring: null });
+    expect(data.ranges.map((range) => [range.unsuitable, range.held, range.previousFinal, range.computedFinal])).toEqual([
+      [false, false, null, 24], [false, false, null, 34], [false, false, null, 89],
+    ]);
+  });
+
+  it('shows the caution on an unsuitable range without hiding the recommended period', () => {
+    const range = parse(v3({ ranges: v3Ranges().map((r, i) => (i === 1 ? { ...r, unsuitable: true } : r)) })).ranges[1]!;
+    expect(notes(range)).toContain('反手回測為負，此區間均線僅供參考');
+    expect(notes(range)).not.toContain('沿用上次');
+    expect(range.final).toBe(34);
+    expect(notes(parse(v3()).ranges[1]!)).toBe('');
+  });
+
+  it('shows the held note only when held and computedFinal differs from final', () => {
+    const held = (extra: Record<string, unknown>) =>
+      parse(v3({ ranges: v3Ranges().map((r, i) => (i === 0 ? { ...r, ...extra } : r)) })).ranges[0]!;
+    expect(notes(held({ held: true, previousFinal: 24, computedFinal: 20 }))).toContain('沿用上次（本次試算 MA20，差距未達換線門檻）');
+    expect(notes(held({ held: true, computedFinal: 24 }))).toBe('');
+    expect(notes(held({ held: true, computedFinal: undefined }))).toBe('');
+    expect(notes(held({ held: false, computedFinal: 20 }))).toBe('');
+    expect(notes(held({ unsuitable: true, held: true, computedFinal: 20 }))).toContain('反手回測為負');
+  });
+
+  it('does not gate on the version number: later additive versions keep reading', () => {
+    for (const version of [1, 2, 3, 4]) expect(parseMaRecommendation({ ...v3(), version }, '2330.TW').status).toBe('ok');
   });
 });
