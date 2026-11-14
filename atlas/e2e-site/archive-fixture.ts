@@ -26,6 +26,7 @@ export async function archives(page: Page, symbols: string[]) {
   return requests;
 }
 export async function manualList(page:Page,symbols:string[]) {
+  await openListActions(page);
   await page.getByRole('button',{name:'建立手動清單',exact:true}).click();
   await page.getByRole('textbox',{name:'手動清單名稱'}).fill('封存驗收');
   await page.getByRole('combobox',{name:'手動清單市場'}).selectOption('US');
@@ -56,4 +57,10 @@ export async function live(page:Page) {
     return route.fulfill({json:{results:Object.fromEntries(symbols.map(symbol=>[symbol,packet(symbol,batches.length)])),errors:{}}});
   });
   return {batches,dailyFiveYears};
+}
+
+/** Opens the phone-only list actions sheet; desktop actions remain in the page. */
+export async function openListActions(page: Page) {
+  const add = page.getByRole('button', { name: '新增清單', exact: true });
+  if (await add.isVisible()) await add.click();
 }

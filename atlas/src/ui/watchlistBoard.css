@@ -182,7 +182,16 @@
   .wb-action-sheet { box-sizing: border-box; width: 100%; padding: 16px 16px calc(24px + var(--safe-bottom)); border-radius: 16px 16px 0 0; background: var(--surface); display: grid; gap: 8px; }
   .wb-action-sheet-title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
   .wb-action-sheet button { min-height: 44px; text-align: left; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); color: var(--text); }
-  .watchlist-page .console-actions:has(> .primary-button) { display: none; }
+  .watchlist-page .wb-legacy-actions { display: none; }
+  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { box-sizing: border-box; flex-shrink: 0; height: 44px; min-height: 44px; align-self: flex-start; }
+  .watchlist-page .wb-list-toolbar { flex-wrap: nowrap; height: 40px; min-height: 40px; padding: 0; }
+  .watchlist-page .wb-chart-toggle { height: 32px; min-height: 32px; padding: 0 10px; font-size: 12px; border-radius: 8px; background: var(--surface-3); }
+  .watchlist-page .wb-live-time { order: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .watchlist-page .wb-list-picker { flex: 0 1 115px; min-width: 0; }
+  .watchlist-page .wb-list-picker select { height: 32px; min-height: 32px; padding: 0 4px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-quote { max-width: 132px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-spark { min-width: 50px; }
+  .watchlist-page .wb-extended { font-size: 10px; }
 }
 
 /* Desktop retains the original 清單｜持股 control order; phones show 持股 as the fourth source tab. */
@@ -193,3 +202,8 @@
   .watchlist-page:has(.watchlist-board) .wb-view-switch button:first-child { display: none; }
   .watchlist-page > .page-footer-note { display: none; }
 }
+
+.wb-extended .up { color: var(--up-text); }
+.wb-extended .down { color: var(--down-text); }
+[data-colors='us'] .wb-extended .up { color: var(--down-text); }
+[data-colors='us'] .wb-extended .down { color: var(--up-text); }

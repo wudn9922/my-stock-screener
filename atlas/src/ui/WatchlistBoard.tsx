@@ -212,7 +212,9 @@ function useTrending(wanted: boolean) {
  * 自選 home: a quote board (saved list / LINE 熱門 / monitor signals with daily change and a
  * 30-day path) above the unchanged list management. Display only: it writes nothing to storage.
  */
-export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+export function WatchlistBoard({ viewSwitch, holdingsActive = false, onShowLists, list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+  holdingsActive?: boolean;
+  onShowLists?: () => void;
   viewSwitch?: ReactNode;
   parameters: readonly ParameterStock[];
   parameterError?: string | null;
@@ -226,6 +228,7 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
   const [tab, setTab] = useState<BoardTab>(hasLists ? 'list' : 'trending');
   const [expanded, setExpanded] = useState(false);
   const [charts, setCharts] = useState(false);
+  const chooseTab = (key: BoardTab) => { onShowLists?.(); setTab(key); };
   const { state: trending, retry } = useTrending(tab === 'trending');
   const liveAt = useLiveUpdatedAt();
   useEffect(() => { setExpanded(false); setCharts(false); }, [tab, list?.id]);
@@ -264,14 +267,14 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
     <section className="watchlist-board" aria-label="自選行情">
       <div className="wb-toolbar"><div className="wb-tabs" role="group" aria-label="行情來源">
         {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破訊號']] as const).map(([key, label]) => (
-          <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
-            setTab(key);
+          <button key={key} type="button" aria-pressed={!holdingsActive && tab === key} className={!holdingsActive && tab === key ? 'active' : ''} onClick={() => {
+            chooseTab(key);
             if (key === 'list' && lists[0] && list?.id !== lists[0].id) onSelectList(lists[0].id);
           }}>{label}</button>
         ))}
       </div>{viewSwitch}
       </div>
-      {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
+      {!holdingsActive && (tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
       <div className="wb-list-toolbar">
       {tab === 'list' && hasLists && <div className="wb-list-picker" role="group" aria-label="我的自選清單">
         <label><span className="sr-only">自選清單</span><select aria-label="選擇自選清單" value={list?.id ?? lists[0]!.id} onChange={event => onSelectList(event.target.value)}>
@@ -297,7 +300,7 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
       {!charts && rows.length > shown.length && (
         <button type="button" className="text-button wb-more" onClick={() => setExpanded(true)}>顯示全部 {rows.length} 檔</button>
       )}
-      </>}
+      </>)}
     </section>
   );
 }

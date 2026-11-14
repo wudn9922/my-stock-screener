@@ -1,3 +1,4 @@
+import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, mockDeviceAccount } from './account-fixture';
@@ -67,6 +68,7 @@ test('guest paste previews errors, supports correction/skip, shows P&L and leaks
   expect(logs.join('\n')).not.toMatch(/PRIVATE-LOCAL-ONLY|123\.4567890123|815\.252525252525/);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('holdings:v1');
   await page.getByRole('button', { name: '清單', exact: true }).click();
+  await openListActions(page);
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
   await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
   await expect(panel(page).getByRole('article')).toHaveCount(2);
