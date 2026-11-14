@@ -76,7 +76,7 @@
   min-height: 32px;
   padding: 0 6px 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(61, 139, 253, 0.45);
+  border: 1px solid rgba(245, 181, 68, 0.45);
   background: var(--accent-soft);
   color: var(--text);
   font-size: 12px;
@@ -636,10 +636,10 @@
   cursor: grab;
 }
 .fs-range-track input[type='range']:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(61, 139, 253, 0.5);
+  box-shadow: 0 0 0 3px rgba(245, 181, 68, 0.5);
 }
 .fs-range-track input[type='range']:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px rgba(61, 139, 253, 0.5);
+  box-shadow: 0 0 0 3px rgba(245, 181, 68, 0.5);
 }
 .fs-range-scale {
   display: flex;

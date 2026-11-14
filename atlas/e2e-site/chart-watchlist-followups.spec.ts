@@ -12,8 +12,8 @@ async function candlePixels(page: Page) {
       const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, Math.floor(canvas.height * 0.7)).data;
       let count = 0;
       for (let i = 0; i < data.length; i += 16) {
-        if (data[i + 3]! > 200 && ((data[i] === 242 && data[i + 1] === 54 && data[i + 2] === 69)
-          || (data[i] === 34 && data[i + 1] === 171 && data[i + 2] === 148))) count++;
+        if (data[i + 3]! > 200 && ((data[i] === 255 && data[i + 1] === 90 && data[i + 2] === 95)
+          || (data[i] === 43 && data[i + 1] === 200 && data[i + 2] === 168))) count++;
       }
       return sum + count;
     }, 0);

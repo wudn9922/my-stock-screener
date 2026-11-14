@@ -80,12 +80,12 @@ function OverlayChart({
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#8a93a3',
+        textColor: '#8A94A3',
         fontSize: 11,
-        fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+        fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
         attributionLogo: false,
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: '#1b212b' } },
+      grid: { vertLines: { visible: false }, horzLines: { color: '#1E232B' } },
       crosshair: {
         mode: CrosshairMode.Magnet,
         vertLine: { color: '#6b7587', labelBackgroundColor: '#2b3340' },

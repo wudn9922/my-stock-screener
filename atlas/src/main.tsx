@@ -7,6 +7,9 @@ import { retireScreenerWorker } from './auth/retireWorker';
 import { DEFAULT_LIFF_ID, hasLineLoginCallback, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
 import { completeRememberAfterRedirect } from './cloud/deviceSession';
 import { PUBLIC_BASE } from './app/HostingMode';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles.css';
 import { prepareIncomingLineHandoff } from './cloud/lineLoginHandoff';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.

@@ -53,13 +53,13 @@ const NAV: { page: NavPage; label: string; icon: typeof Star }[] = [
   { page: 'console', label: '我的', icon: UserRound },
 ];
 const PAGE_TITLES: Record<Page, string> = {
-  markets: '大盤',
+  markets: '市場',
   world: '世界指數',
   themes: '題材輪動',
   screener: '選股',
   chart: '圖表',
   financials: '財報分析',
-  watchlist: '自選清單',
+  watchlist: '自選',
   console: '我的',
 };
 const RATES_TITLE = '美債與利率';
@@ -415,7 +415,7 @@ export function Site() {
             aria-current={navPageOf(route.page) === page ? 'page' : undefined}
             onClick={() => go(page)}
           >
-            <Icon size={21} aria-hidden="true" />
+            <Icon size={22} aria-hidden="true" />
             <span>{label}</span>
           </button>
         ))}

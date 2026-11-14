@@ -81,7 +81,7 @@ export class ChartEngine {
   private header: HTMLElement;
   private sourceLabel: HTMLElement;
   private legend: HTMLElement | null;
-  private upDown = { up: '#39baa0', down: '#ef6b7b' };
+  private upDown = { up: '#FF5A5F', down: '#2BC8A8' };
   constructor(
     readonly host: HTMLElement,
     header: HTMLElement,
@@ -95,25 +95,25 @@ export class ChartEngine {
     this.chart = createChart(host, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: '#0f1319' },
+        background: { type: ColorType.Solid, color: '#0E1014' },
         textColor: AXIS_TEXT_COLOR,
         fontFamily: AXIS_FONT_FAMILY,
         fontSize: axisFontSize(),
         attributionLogo: true,
       },
-      grid: { vertLines: { color: '#1a1f28' }, horzLines: { color: '#1a1f28' } },
+      grid: { vertLines: { color: '#1E232B' }, horzLines: { color: '#1E232B' } },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: { color: '#6b7587', width: 1, labelBackgroundColor: '#2b3340' },
         horzLine: { color: '#6b7587', width: 1, labelBackgroundColor: '#2b3340' },
       },
       rightPriceScale: {
-        borderColor: '#242b36',
+        borderColor: '#2A303A',
         minimumWidth: 0,
         scaleMargins: { top: 0.05, bottom: 0.22 },
       },
       timeScale: {
-        borderColor: '#242b36',
+        borderColor: '#2A303A',
         rightOffset: 40,
         barSpacing: 6,
         timeVisible: true,
@@ -129,11 +129,11 @@ export class ChartEngine {
       localization: { locale: 'en-US', priceFormatter: compactAxisPrice },
     });
     this.candles = this.chart.addSeries(CandlestickSeries, {
-      upColor: '#39baa0',
-      downColor: '#ef6b7b',
+      upColor: '#FF5A5F',
+      downColor: '#2BC8A8',
       borderVisible: false,
-      wickUpColor: '#39baa0',
-      wickDownColor: '#ef6b7b',
+      wickUpColor: '#FF5A5F',
+      wickDownColor: '#2BC8A8',
       priceLineColor: '#6b7587',
     });
     this.markers = createSeriesMarkers(this.candles, [], { autoScale: false });
