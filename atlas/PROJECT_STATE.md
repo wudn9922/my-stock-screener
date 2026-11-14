@@ -1,3 +1,5 @@
+> 註：本檔是 Atlas 併入 my-stock-screener 之前（至 2026-10-08、原 lightweight-drawing-lab repo）的歷史進度紀錄，內容不代表目前狀態；現況請看 `atlas/README.md` 與 `atlas/docs/`。
+
 # Atlas V1 — current workspace state
 
 ## Active authorized extension — SEC Pages snapshots, Taiwan stocks and narrower price axis (2026-10-08)
