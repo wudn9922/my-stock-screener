@@ -205,8 +205,6 @@
 
 .wb-extended .up { color: var(--up-text); }
 .wb-extended .down { color: var(--down-text); }
-[data-colors='us'] .wb-extended .up { color: var(--down-text); }
-[data-colors='us'] .wb-extended .down { color: var(--up-text); }
 
 @media (max-width: 767px) {
   .watchlist-page .wb-toolbar { min-height: 44px; height: 44px; }
