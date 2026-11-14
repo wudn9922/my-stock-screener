@@ -66,8 +66,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   useEffect(() => {
     if (!actionsOpen) return;
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setActionsOpen(false); } };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
+    globalThis.document.addEventListener('keydown', close);
+    return () => globalThis.document.removeEventListener('keydown', close);
   }, [actionsOpen]);
   useEffect(() => {
     if (section !== 'lists') return;
