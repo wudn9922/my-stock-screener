@@ -8,12 +8,18 @@ const readingSchema = z.object({
   mdd: z.number().finite().nullable(),
   hot: z.boolean(),
   cold: z.boolean(),
+  // Additive fields (absent in files generated before the relative gauge existed).
+  ratioPct: z.number().finite().nullable().optional(),
+  relHot: z.boolean().optional(),
+  hotWeeks: z.number().int().nonnegative().optional(),
 });
 const temperatureSchema = z.object({
   version: z.literal(1),
   asOf: z.iso.date(),
   provisional: z.boolean(),
   scope: z.string(),
+  firstDate: z.iso.date().optional(),
+  hotEpisodes: z.number().int().nonnegative().optional(),
   latest: readingSchema,
   rows: z.array(readingSchema).min(1),
 });
@@ -30,6 +36,9 @@ export function parseMarginTemperature(raw: unknown): TemperatureResult {
   if (data.rows.some(row => row.hot !== (row.pct !== null && row.pct >= 90) ||
     row.cold !== (row.mdd !== null && row.mdd <= -30)))
     return { error: '融資溫度狀態與門檻不一致。' };
+  if (data.rows.some(row => (row.relHot !== undefined && row.ratioPct !== undefined && row.relHot !== (row.ratioPct !== null && row.ratioPct >= 90)) ||
+    (row.hotWeeks !== undefined && row.hot !== row.hotWeeks > 0)))
+    return { error: '融資溫度相對指標與門檻不一致。' };
   return { data };
 }
 export async function loadMarginTemperature(signal?: AbortSignal, fetcher: typeof fetch = fetch): Promise<TemperatureResult> {

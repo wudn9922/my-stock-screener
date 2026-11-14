@@ -73,16 +73,30 @@ def build_rows(index_rows: list[dict[str, str]], margin_rows: list[dict[str, str
                 values[j] = original[before]
     clean = [dict(row, mrg_amt=v) for row, v in zip(rows, values) if v is not None]
     logs = [math.log(row["mrg_amt"]) for row in clean]
+    # Relative gauge: margin amount divided by the TAIEX close (rough proxy for market size).
+    ratio_logs = [math.log(row["mrg_amt"] / row["close"]) for row in clean]
+    streak = 0
     for i, row in enumerate(clean):
         h = logs[max(0, i - 155):i + 1]
         k = logs[max(0, i - 51):i + 1]
         pct = 100 * sum(x < h[-1] for x in h[:-1]) / len(h[:-1]) if len(h) >= 104 else None
         mdd = 100 * (math.exp(k[-1] - max(k)) - 1) if len(k) >= 26 else None
+        r = ratio_logs[max(0, i - 155):i + 1]
+        ratio_pct = 100 * sum(x < r[-1] for x in r[:-1]) / len(r[:-1]) if len(r) >= 104 else None
         row["pct"] = pct
         row["mdd"] = mdd
         row["hot"] = pct is not None and pct >= 90
         row["cold"] = mdd is not None and mdd <= -30
+        row["ratioPct"] = ratio_pct
+        row["relHot"] = ratio_pct is not None and ratio_pct >= 90
+        streak = streak + 1 if row["hot"] else 0
+        row["hotWeeks"] = streak
     return clean
+
+
+def hot_episodes(rows: list[dict]) -> int:
+    """Number of separate runs of consecutive hot weeks (the current run counts once)."""
+    return sum(1 for i, row in enumerate(rows) if row["hot"] and (i == 0 or not rows[i - 1]["hot"]))
 
 
 def to_report(rows: list[dict], today: date | None = None) -> dict:
@@ -93,12 +107,14 @@ def to_report(rows: list[dict], today: date | None = None) -> dict:
     today = today or datetime.now(TPE).date()
     provisional = last_date.isocalendar()[:2] == today.isocalendar()[:2] and last_date.weekday() < 4
     def public(row: dict) -> dict:
-        return {key: row[key] for key in ("date", "close", "pct", "mdd", "hot", "cold")}
+        return {key: row[key] for key in ("date", "close", "pct", "mdd", "hot", "cold", "ratioPct", "relHot", "hotWeeks")}
     return {
         "version": 1,
         "asOf": last["date"],
         "provisional": provisional,
         "scope": "TWSE listed only; amount in thousand NTD, not market value",
+        "firstDate": rows[0]["date"],
+        "hotEpisodes": hot_episodes(rows),
         "latest": public(last),
         "rows": [public(row) for row in rows],
     }

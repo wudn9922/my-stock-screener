@@ -8,6 +8,10 @@
 .mt-label.mt-hot { color: #f5be81; border-color: #956328; background: #df923b1b; }
 .mt-label.mt-cold { color: #a4ccfd; border-color: #286cb8; background: #398fe41b; }
 .mt-label.mt-neutral { color: var(--text-2); border-color: var(--border-strong); }
+.mt-persist { color: #f5be81; font-weight: 600; }
+.mt-relative { margin: 12px 0 0; font-size: 12px; color: var(--text-2); }
+.mt-relative b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.mt-relative[data-state="hot"] b { color: #f5be81; }
 .mt-provisional { color: #dfb550; }
 .mt-gauge-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .mt-gauge { min-width: 0; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
