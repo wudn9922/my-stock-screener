@@ -153,3 +153,61 @@
 .wb-row:has(.wb-extended) .wb-quote b { line-height: 19px; }
 .wb-row:has(.wb-extended) .wb-change { line-height: 14px; font-size: 11px; }
 .wb-row:has(.wb-extended) .wb-spark { width: 48px; }
+
+/* Phone-only watchlist reference: underline tabs, 88px quote rows, bottom action sheet. */
+@media (max-width: 767px) {
+  .watchlist-page .watchlist-board { gap: 0; margin: 0; }
+  .watchlist-page .wb-toolbar { margin: 0 -16px; padding: 0 16px; border-bottom: 1px solid var(--border-strong); gap: 0; align-items: stretch; }
+  .watchlist-page .wb-tabs, .watchlist-page .wb-toolbar .console-tabs { display: contents; }
+  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { flex: 1 1 auto; min-width: 0; height: 44px; min-height: 44px; padding: 0 3px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-2); font-size: 12px; font-weight: 400; white-space: nowrap; }
+  .watchlist-page .wb-tabs button.active, .watchlist-page .wb-view-switch button.active { border-bottom-color: var(--accent); color: var(--text); background: none; font-weight: 700; }
+  .watchlist-page .wb-list-toolbar { padding: 8px 0; min-height: 44px; gap: 8px; flex-wrap: wrap; }
+  .watchlist-page .wb-list-picker { flex: 0 1 135px; }
+  .watchlist-page .wb-list-picker select { min-height: 44px; font-size: 12px; }
+  .watchlist-page .wb-chart-toggle { min-height: 44px; margin-left: auto; }
+  .watchlist-page .wb-live-time { order: -1; margin-left: 0; font-size: 11px; }
+  .watchlist-page .wb-caption { display: none; }
+  .watchlist-page .wb-rows { border-top: 0; }
+  .watchlist-page .wb-row, .watchlist-page .wb-row:has(.wb-extended) { box-sizing: border-box; height: 88px; min-height: 88px; padding: 0; gap: 12px; }
+  .watchlist-page .wb-name { flex: 0 1 116px; min-width: 0; }
+  .watchlist-page .wb-name b { font-size: 17px; line-height: 24px; font-weight: 600; }
+  .watchlist-page .wb-name small { font-size: 12px; line-height: 17px; color: var(--text-2); }
+  .watchlist-page .wb-spark, .watchlist-page .wb-row:has(.wb-extended) .wb-spark { flex: 1 1 104px; width: 104px; max-width: 104px; min-width: 36px; height: 36px; }
+  .watchlist-page .wb-quote, .watchlist-page .wb-row:has(.wb-extended) .wb-quote { flex: 0 1 auto; width: auto; min-width: 82px; max-width: 130px; gap: 3px; }
+  .watchlist-page .wb-quote b, .watchlist-page .wb-row:has(.wb-extended) .wb-quote b { font-size: 17px; line-height: 21px; }
+  .watchlist-page .wb-change, .watchlist-page .wb-row:has(.wb-extended) .wb-change { font-size: 13px; line-height: 17px; padding: 1px 8px; }
+  .watchlist-page .wb-extended { font-size: 10px; line-height: 14px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-quote { max-width: 142px; }
+  .wb-action-backdrop { position: fixed; inset: 0; z-index: 110; background: rgba(0,0,0,.65); display: flex; align-items: flex-end; }
+  .wb-action-sheet { box-sizing: border-box; width: 100%; padding: 16px 16px calc(24px + var(--safe-bottom)); border-radius: 16px 16px 0 0; background: var(--surface); display: grid; gap: 8px; }
+  .wb-action-sheet-title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
+  .wb-action-sheet button { min-height: 44px; text-align: left; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); color: var(--text); }
+  .watchlist-page .wb-legacy-actions { display: none; }
+  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { box-sizing: border-box; flex-shrink: 0; height: 44px; min-height: 44px; align-self: flex-start; }
+  .watchlist-page .wb-list-toolbar { flex-wrap: nowrap; height: 40px; min-height: 40px; padding: 0; }
+  .watchlist-page .wb-chart-toggle { height: 32px; min-height: 32px; padding: 0 10px; font-size: 12px; border-radius: 8px; background: var(--surface-3); }
+  .watchlist-page .wb-live-time { order: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .watchlist-page .wb-list-picker { flex: 0 1 115px; min-width: 0; }
+  .watchlist-page .wb-list-picker select { height: 32px; min-height: 32px; padding: 0 4px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-quote { max-width: 132px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-spark { min-width: 50px; }
+  .watchlist-page .wb-extended { font-size: 10px; }
+}
+
+/* Desktop retains the original 清單｜持股 control order; phones show 持股 as the fourth source tab. */
+@media (min-width: 768px) {
+  .watchlist-board .wb-toolbar .wb-view-switch { order: -1; }
+}
+@media (max-width: 767px) {
+  .watchlist-page:has(.watchlist-board) .wb-view-switch button:first-child { display: none; }
+  .watchlist-page > .page-footer-note { display: none; }
+}
+
+.wb-extended .up { color: var(--up-text); }
+.wb-extended .down { color: var(--down-text); }
+
+@media (max-width: 767px) {
+  .watchlist-page .wb-toolbar { min-height: 44px; height: 44px; }
+  .watchlist-page .wb-list-toolbar { box-sizing: border-box; }
+  .watchlist-page .wb-action-sheet { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+}

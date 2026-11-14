@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
@@ -192,10 +193,13 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(page.locator('.page-title')).toHaveText('自選');
   await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
   await expect(page.getByRole('button', { name: '重新檢查舊版資料', exact: true })).toBeVisible();
+  await openListActions(page);
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '匯入備份', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '匯出清單備份', exact: true })).toBeEnabled();
+  if (await page.getByRole('dialog', { name: '清單操作' }).isVisible()) await page.getByRole('button', { name: '關閉清單操作' }).click();
   for (const [name, symbol] of [['導覽 NVDA', 'NVDA'], ['導覽 AAPL', 'AAPL']]) {
+    await openListActions(page);
     await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
     await page.getByRole('textbox', { name: '手動清單名稱' }).fill(name!);
     await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');

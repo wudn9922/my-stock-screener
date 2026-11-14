@@ -26,7 +26,7 @@ test('A1 receive time stays above the list without adding toolbar height and adv
   await expect(page.locator('.wb-row').first()).toBeVisible();
   // clientHeight compares actual CSS pixels, without subtracting two fractional viewport positions.
   const before = await toolbar.evaluate(element => element.clientHeight);
-  expect(before).toBe(45);
+  expect(before).toBe(40); // status and list/chart controls share the fixed 40px row
   release();
   const time = toolbar.getByTestId('board-live-time');
   await expect(time).toHaveText(/^延遲報價 · 更新於 12:20:\d{2}$/);

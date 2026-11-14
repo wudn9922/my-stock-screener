@@ -33,6 +33,7 @@ import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 import { HoldingsPanel } from '../holdings/HoldingsPanel';
 import { getStorageContextKey } from '../auth/storage';
+import { useDialogFocus } from '../ui/useDialogFocus';
 import { useStockParameters } from '../cloud/useStockParameters';
 import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters';
 import { loadPeRiverFile } from '../fundamentals/peRiverRank';
@@ -60,6 +61,20 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [cloudMessage, setCloudMessage] = useState('');
   const [cloudLists, setCloudLists] = useState<CloudList[]>([]);
   const [creating, setCreating] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  useDialogFocus(actionsOpen, 'watchlist-actions');
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setActionsOpen(false); } };
+    globalThis.document.addEventListener('keydown', close);
+    return () => globalThis.document.removeEventListener('keydown', close);
+  }, [actionsOpen]);
+  useEffect(() => {
+    if (section !== 'lists') return;
+    const openActions = () => setActionsOpen(true);
+    window.addEventListener('atlas:watchlist-actions', openActions);
+    return () => window.removeEventListener('atlas:watchlist-actions', openActions);
+  }, [section]);
   const [name, setName] = useState('');
   const [manual, setManual] = useState('');
   const [market, setMarket] = useState<'TW' | 'US'>('TW');
@@ -303,9 +318,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         </div>
       </div>
       <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
-      {section === 'lists' && listsView === 'holdings' && viewSwitch}
-      {section === 'lists' && listsView === 'lists' && (
-        <WatchlistBoard viewSwitch={viewSwitch} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
+      {section === 'lists' && actionsOpen && <div className="wb-action-backdrop" onClick={() => setActionsOpen(false)}>
+        <section className="wb-action-sheet" role="dialog" aria-modal="true" aria-label="清單操作" data-dialog-focus="watchlist-actions" onClick={event => event.stopPropagation()}>
+          <div className="wb-action-sheet-title"><b>清單操作</b><button type="button" aria-label="關閉清單操作" onClick={() => setActionsOpen(false)}>關閉</button></div>
+          <button type="button" onClick={() => { setActionsOpen(false); navigate({ page: 'screener', group: 'universe-tw' }); }}>以篩選條件建立清單</button>
+          <button type="button" onClick={() => { setActionsOpen(false); setListsView('lists'); setCreating(true); }}>建立手動清單</button>
+          <button type="button" disabled={!canPersist()} onClick={() => { setActionsOpen(false); download(); }}>匯出清單備份</button>
+          <button type="button" onClick={() => { setActionsOpen(false); imported.current?.click(); }}>匯入備份</button>
+        </section>
+      </div>}
+      {section === 'lists' && (
+        <WatchlistBoard viewSwitch={viewSwitch} holdingsActive={listsView === 'holdings'} onShowLists={() => setListsView('lists')} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
@@ -333,7 +356,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           資料狀態
         </button>
       </div>}
-      {tab === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
+      {section === 'lists' && listsView === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
         <section className="console-card" aria-label="顯示與App"><DisplaySettings
           reportDate={report.status === 'ok' ? report.report.reportDate : null}
           generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>
@@ -351,7 +374,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           {selected?.market === 'US' && (
             <SecRadar key={selected.id} symbols={activeVisit?.members.map((m) => m.symbol) ?? selected.symbols} />
           )}
-          <div className="console-actions">
+          <div className="console-actions wb-legacy-actions">
             <button type="button" className="primary-button" onClick={() => navigate({ page: 'screener', group: 'universe-tw' })}>
               以篩選條件建立清單
             </button>
@@ -418,7 +441,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               </button>
             </form>
           )}
-          {!selected ? (
+          {!selected && section === 'lists' && listsView === 'lists' ? null : !selected ? (
             <div className="page-state empty">
               <b>還沒有條件清單</b>
               <p>到選股頁套用技術或財務條件後，按「存成自選清單」；可以保存多組不同策略。</p>

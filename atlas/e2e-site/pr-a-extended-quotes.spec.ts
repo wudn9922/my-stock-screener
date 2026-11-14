@@ -25,7 +25,7 @@ async function separate(elements: Locator[]) {
     expect(Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))).toBe(0);
   }
 }
-for (const inline of [false, true]) test(`A3 direct extended price, in-flow details and <=56px rows (newer batch=${inline})`, async ({ page }, info) => {
+for (const inline of [false, true]) test(`A3 direct extended price, in-flow details and 88px phone rows (newer batch=${inline})`, async ({ page }, info) => {
   await setup(page, inline);
   let staticRequests = 0;
   await page.route('**/report/extended-quotes/AAPL.json', route => { staticRequests++; return route.fulfill({ json: snapshot }); });
@@ -55,7 +55,13 @@ for (const inline of [false, true]) test(`A3 direct extended price, in-flow deta
   const row = page.locator('.wb-row');
   await expect(row.getByTestId('board-extended-quote')).toContainText(inline ? '盤後 105.00 +5.00%' : '盤後 102.00 +2.00%');
   await expect(row.locator('.wb-quote b')).toHaveText('100.00');
-  expect((await row.boundingBox())!.height).toBeLessThanOrEqual(56);
+  const rowHeight = (await row.boundingBox())!.height;
+  if (await page.locator('.site-tabbar').isVisible()) {
+    expect(rowHeight).toBeGreaterThanOrEqual(87);
+    expect(rowHeight).toBeLessThanOrEqual(89);
+  } else {
+    expect(rowHeight).toBeLessThanOrEqual(56);
+  }
   await separate([row.locator('.wb-name'), row.locator('.wb-spark'), row.locator('.wb-quote')]);
   const quote = (await row.locator('.wb-quote').boundingBox())!, extended = (await row.getByTestId('board-extended-quote').boundingBox())!;
   expect(extended.x).toBeGreaterThanOrEqual(quote.x);

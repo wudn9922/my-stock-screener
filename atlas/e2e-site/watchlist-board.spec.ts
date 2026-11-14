@@ -1,3 +1,4 @@
+import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
@@ -43,7 +44,8 @@ test('without lists the board opens on LINE 熱門 with quotes, and explains the
   await expect(page.locator('.site')).toHaveAttribute('data-page', 'screener');
   await page.goBack();
   await expect(source(page, '最近搜尋')).toHaveCount(0);
-  // List management below the board is unchanged.
+  // On phones the list actions live in the header sheet; desktop keeps inline controls.
+  await openListActions(page);
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
 });
@@ -61,6 +63,7 @@ test('a saved list shows its rows read-only; a row opens 個股 and a failed quo
   await trending(page, ['NVDA']);
   await cloudOwner(page);
   await page.goto('./?page=watchlist');
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill('看板測試');
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');
@@ -90,7 +93,7 @@ test('board rows keep 44px targets and no horizontal overflow at 320px', async (
   await expect(rows(page)).toHaveCount(3);
   for (const box of await rows(page).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height)))
     expect(box).toBeGreaterThanOrEqual(44);
-  for (const name of ['我的清單', 'LINE 熱門', '突破／跌破'])
+  for (const name of ['我的清單', 'LINE 熱門', '突破訊號'])
     expect((await source(page, name).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.querySelector('#main')!.scrollWidth - document.querySelector('#main')!.clientWidth)).toBeLessThanOrEqual(0);
 });
