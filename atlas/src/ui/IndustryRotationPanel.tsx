@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   fetchIndustryRotation,
+  headlineReturn,
+  industryMethodNote,
   sortIndustryRotation,
   type IndustryRotation,
 } from "../report/industryRotation";
@@ -92,6 +94,11 @@ function IndustryComparison({ market }: { market: "TW" | "US" }) {
             {source?.scope === "full" ? "全市場" : "流動性名單"} ·{" "}
             {market === "TW" ? "官方產業別" : "Sector"}
           </p>
+          {source?.method && (
+            <p className="analysis-caption" data-testid="industry-method-note">
+              {industryMethodNote(source.method, market)}
+            </p>
+          )}
           <ul
             className="analysis-comparison-list"
             aria-label="產業輪動比較結果"
@@ -100,7 +107,10 @@ function IndustryComparison({ market }: { market: "TW" | "US" }) {
               <li className="analysis-comparison-row" key={row.name}>
                 <b>{market === "US" ? sectorLabel(row.name) : row.name}</b>
                 <div className="analysis-metrics">
-                  <span>報酬 {formatPercent(row.returnPct)}</span>
+                  <span>
+                    {row.medianReturnPct === undefined ? "報酬" : "中位數"}{" "}
+                    {formatPercent(headlineReturn(row))}
+                  </span>
                   <span>
                     上漲{" "}
                     {row.upShare === null ? "—" : `${row.upShare.toFixed(1)}%`}
@@ -119,13 +129,20 @@ function IndustryComparison({ market }: { market: "TW" | "US" }) {
                   · 報酬 {row.validCount}/{row.count} 檔 · 量能{" "}
                   {row.volumeCount}/{row.count} 檔
                 </p>
+                {row.medianReturnPct !== undefined && (
+                  <p className="analysis-secondary">
+                    {row.medianReturnPct === null
+                      ? `流動性合格且有報酬 ${row.validCount} 檔，樣本不足不排名`
+                      : `平均 ${formatPercent(row.returnPct)} · 市值加權 ${formatPercent(row.capWeightedReturnPct)}`}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
         </>
       )}
       <HelpDisclosure label="產業比較計算說明">
-        報酬為目前產業成員的等權平均，上漲比例只計有有效報酬者。成交量比＝本期總股數÷前一期等長區間總股數，只計兩期皆有完整成交量的相同股票，不代表資金淨流入。動能變化只比較兩期完整行情的共同樣本；成員採目前分類，具有存續偏差。缺少快取或成交量時顯示「—」，不把未知值當零。
+        有方法說明時，報酬以中位數為主、平均與市值加權為輔，且只計入流動性合格的成員；舊版檔案則為目前產業成員的等權平均。上漲比例只計有有效報酬者。成交量比＝本期總股數÷前一期等長區間總股數，只計兩期皆有完整成交量的相同股票，不代表資金淨流入。動能變化只比較兩期完整行情的共同樣本；成員採目前分類，具有存續偏差。缺少快取或成交量時顯示「—」，不把未知值當零。
       </HelpDisclosure>
     </div>
   );
