@@ -12,7 +12,7 @@ export interface ColoredVolumeValue {
 
 export const VOLUME_SMA_PERIOD = 20;
 
-const volumePalette = { up: '#39baa0b3', down: '#ef6b7bb3' };
+const volumePalette = { up: '#FF5A5Fb3', down: '#2BC8A8b3' };
 
 /** Up/down volume colors (`#rrggbb`), shared by the chart's legacy volume and Volume indicator. */
 export function setVolumeColors(up: string, down: string) {

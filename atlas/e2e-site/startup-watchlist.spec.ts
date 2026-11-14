@@ -25,7 +25,7 @@ test("welcome is visible before the app bundle and the normal launch opens watch
       await page
         .locator("#atlas-welcome")
         .evaluate((element) => getComputedStyle(element).backgroundColor),
-    ).toBe("rgb(11, 14, 19)");
+    ).toBe("rgb(14, 16, 20)");
   } finally {
     release();
   }

@@ -1557,3 +1557,16 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 完整回歸發現 world-btc.spec.ts 在 BTC 保存來源切換時捲動卡片，會遇到 DOM 替換而偶發 element detached。原文字、OHLC、日曆、畫布、週K與零錯誤斷言全部保留；先等待原有來源日期／保存標示，再於 10 秒內重試對同一 locator 的捲動，進入畫面後才等待延遲載入圖表的 OHLC。WorldPage 與行情程式未改。修正後三平台 BTC 回歸另行重跑，精確結果記在 PR。
 
 使用者要求繼續增加本益比選項。本次沿用原估值與篩選架構，新增可留白的上下限及快捷倍數；舊條件、導覽與網址全部保留。具體規則、資料缺漏處理及測試見 docs/SCREENER_PE_FILTER.md。市場檔只載入一次且涵蓋畫面外股票，來源失敗不會回傳未篩選結果；自選策略保留失敗前的比較基準。離線收集器只適配既有估值 JSON，未變更任何後端 API、SQL、權限、workflow 或市場資料檔。採主要工程師自我審查，沒有獨立簽核；實際測試數字記錄在 PR body。
+
+
+## Atlas phone redesign — step 1 (tokens / shell)
+Independent Claude visual sign-off and actual 390px compiled screenshots are pending; no independent approval is claimed.
+No layout assertions were changed. Lint, build and responsive/browser checks remain to be confirmed by CI/reviewer before merge.
+
+### Claude review 6857550965 — requested changes
+Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px without weakening the navigation test; synchronized five reference files and handoff; added numeric-role font rules for watchlist/market/stock/account; removed residual blue focus, brand gradient, old swatches and login splash colors. Price axis reverted to its proportional system face to protect chart plot width. Still requires independent main-vs-branch axis pixel measurement, 390px US-convention screenshot and WebKit verification.
+
+### Claude CI review 6867292969
+- Fixed actual mobile viewport regression: 52px phone top bar, 64px bottom bar, 44px header actions. Preserves compact futures fifth-card viewport; `mexc.spec.ts:661` stays unchanged.
+- Spec-driven E2E updates: candle pixel RGB detection now matches `#FF5A5F` / `#2BC8A8`; phone watchlist heading expectation now matches the visible `自選` title. Handoff step 1 synchronized.
+- Claude locally verified targeted compact and nav cases; this push has not independently rerun CI or WebKit. `workspace-refinements.spec.ts:6` reported as a pre-existing main failure by reviewer, not altered.

@@ -299,7 +299,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     <div className={`page console-page ${section === 'lists' ? 'watchlist-page' : ''}`}>
       <div className={`page-head ${section === 'lists' ? 'watchlist-heading' : ''}`}>
         <div>
-          <h2 className="page-title">{section === 'lists' ? '自選清單' : '我的'}</h2>
+          <h2 className="page-title">{section === 'lists' ? '自選' : '我的'}</h2>
         </div>
       </div>
       <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
