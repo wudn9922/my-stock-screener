@@ -43,6 +43,23 @@ class DataStatusTests(unittest.TestCase):
             row = evaluate(self.tw, {"asOf": day, "generatedAt": "2026-10-28T09:00:00Z"}, now("2026-10-28T10:00:00Z"))
             self.assertEqual((row["status"], row["lagTradingDays"]), (status, lag))
 
+    def test_breakouts_are_weekly_without_diluting_daily_sources(self):
+        sources = {source.id: source for source in SOURCES}
+        tw = sources['breakouts-tw']
+        us = sources['breakouts-us']
+        self.assertEqual((tw.kind, tw.normal_delay, tw.stale_after), ('weekly', 6, 7))
+        self.assertEqual((us.kind, us.normal_delay, us.stale_after), ('weekly', 6, 7))
+        at = now('2026-11-21T20:00:00Z')
+        def report(day):
+            return {'markets': {'tw': {'asOf': day}, 'us': {'asOf': day}}, 'generatedAt': at.isoformat()}
+        self.assertEqual(evaluate(tw, report('2026-11-13'), at)['status'], 'ok')
+        self.assertEqual(evaluate(us, report('2026-11-13'), at)['status'], 'ok')
+        self.assertEqual(evaluate(tw, report('2026-11-11'), at)['status'], 'stale')
+        self.assertIn('每週更新一次（週六）', evaluate(tw, report('2026-11-13'), at)['reason'])
+        daily = sources['universe-tw']
+        self.assertEqual(evaluate(daily, {'markets': {'TW': {'asOf': '2026-11-13', 'counts': {'stale': 0, 'missing': 0}}},
+                                          'generatedAt': at.isoformat()}, at)['status'], 'stale')
+
     def test_daily_pipeline_timing_is_not_late(self):
         sources = {source.id: source for source in SOURCES}
         tw, us = sources["universe-tw"], sources["universe-us"]

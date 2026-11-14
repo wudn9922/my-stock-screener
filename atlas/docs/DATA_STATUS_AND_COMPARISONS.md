@@ -13,8 +13,8 @@
 | 每日報告 | latest.json → reportDate；generatedAt 另列 | daily | 0／3 | XTAI／720 分鐘 |
 | 全市場台股 | universe.json → markets.TW.asOf；含 counts.stale/missing | daily | 0／3 | XTAI／720 分鐘 |
 | 全市場美股 | universe.json → markets.US.asOf；含 counts.stale/missing | daily | 0／3 | XNYS／1320 分鐘 |
-| 台股突破 | breakouts.json → markets.tw.asOf；舊格式才用 asOf | daily | 0／3 | XTAI／720 分鐘 |
-| 美股突破 | breakouts.json → markets.us.asOf；舊格式才用 asOf | daily | 0／3 | XNYS／1320 分鐘 |
+| 台股突破 | breakouts.json → markets.tw.asOf；舊格式才用 asOf | weekly（週六） | 6／7 | XTAI／720 分鐘 |
+| 美股突破 | breakouts.json → markets.us.asOf；舊格式才用 asOf | weekly（週六） | 6／7 | XNYS／1320 分鐘 |
 | 台股市場寬度 | breadth.json → markets.tw.asOf；舊格式才用 generatedAt | daily | 0／3 | XTAI／720 分鐘 |
 | 美股市場寬度 | breadth.json → markets.us.asOf；舊格式才用 generatedAt | daily | 0／3 | XNYS／1320 分鐘 |
 | 美股題材 | themes.json → asOf | daily | 0／3 | XNYS／1320 分鐘 |
@@ -28,6 +28,8 @@
 | 熱門股 | trending-stocks.json → fetchedAt | daily | 0／3 | XNYS／360 分鐘 |
 | 台股 K 線封存 | kline-archive:manifest.json → markets.tw.lastDate | daily | 0／3 | XTAI／720 分鐘 |
 | 美股 K 線封存 | kline-archive:manifest.json → markets.us.lastDate | daily | 0／3 | XNYS／1320 分鐘 |
+
+進場成功率每週六（台北時間，美股週五收盤後）重算一次；任一市場 asOf 已滿 7 個日曆天、資料缺失或讀不到時自動補跑，手動可選 auto／force／skip。狀態檢查用每市場最多 6 個已收盤交易日作正常週期、7 日以上標示過期；全市場清單、寬度、風險警示仍依原本頻率更新。
 
 使用與 `breakout_alert/market_clock.py` 相同的 `exchange_calendars` 交易所日曆，指定 XTAI／XNYS，不用週一至週五近似；早收盤、休市、夏令時間均依日曆。應更新日＝已收盤且已過發布寬限的最近交易日；落後數＝資料日之後至應更新日之間的交易日數。寬限依實際產出排程訂定：每日報告與全市場流程約在台灣時間 23:20～23:40 發布，因此每日流程的台股來源用 720 分鐘（台灣時間次日 01:30 前），美股用 1320 分鐘（夏令台灣時間隔天 02:00、冬令 03:00 前，即前一個美股交易日的資料要在台灣隔天晚上報告後才到）；其他美股來源維持 360 分鐘、台股 120 分鐘。正常的產出時間不會被標為延遲；這不宣稱來源有即時服務保證。
 

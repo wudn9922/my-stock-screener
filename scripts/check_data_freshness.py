@@ -106,6 +106,11 @@ def evaluate(calendar, sources, now):
                 continue
             if observed > expected:
                 issues[key] = f'{LABELS[source]} {market}：資料日晚於最近已收盤交易日 {expected}'
+            elif source == 'breakouts':
+                # Weekly Saturday producer: tolerate six completed sessions;
+                # seven or more means the weekly result missed its catch-up window.
+                if lag > 6:
+                    issues[key] = f'{LABELS[source]} {market}：資料日 {observed}，應至 {expected}，至少落後 {lag} 個交易日（每週更新一次）'
             elif lag > 1:
                 issues[key] = f'{LABELS[source]} {market}：資料日 {observed}，應至 {expected}，至少落後 {lag} 個交易日'
     return issues, checked

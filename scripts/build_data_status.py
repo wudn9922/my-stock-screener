@@ -48,8 +48,8 @@ SOURCES = (
     Source("report", "每日報告", "無", "latest.json", "reportDate", publish_minutes=TW_PIPELINE_MINUTES),
     Source("universe-tw", "全市場台股", "TW", "universe.json", "markets.TW.asOf", publish_minutes=TW_PIPELINE_MINUTES, counts_field="markets.TW.counts"),
     Source("universe-us", "全市場美股", "US", "universe.json", "markets.US.asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES, counts_field="markets.US.counts"),
-    Source("breakouts-tw", "台股突破", "TW", "breakouts.json", "markets.tw.asOf|asOf", publish_minutes=TW_PIPELINE_MINUTES),
-    Source("breakouts-us", "美股突破", "US", "breakouts.json", "markets.us.asOf|asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
+    Source("breakouts-tw", "台股突破", "TW", "breakouts.json", "markets.tw.asOf|asOf", 6, 7, "weekly", publish_minutes=TW_PIPELINE_MINUTES),
+    Source("breakouts-us", "美股突破", "US", "breakouts.json", "markets.us.asOf|asOf", 6, 7, "weekly", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
     Source("breadth-tw", "台股市場寬度", "TW", "breadth.json", "markets.tw.asOf|generatedAt", publish_minutes=TW_PIPELINE_MINUTES),
     Source("breadth-us", "美股市場寬度", "US", "breadth.json", "markets.us.asOf|generatedAt", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
     Source("themes-us", "美股題材", "US", "themes.json", "asOf", calendar="XNYS", publish_minutes=US_PIPELINE_MINUTES),
@@ -158,6 +158,8 @@ def evaluate(source, document, now, *, archive_generated=None, error=None):
         result["lagTradingDays"] = lag
         result["status"] = "ok" if lag <= source.normal_delay else "stale" if lag >= source.stale_after else "late"
         result["reason"] = ("已達正常更新範圍" if result["status"] == "ok" else f"落後 {lag} 個交易日") + f"；正常容許 {source.normal_delay} 個交易日。"
+        if source.id in ("breakouts-tw", "breakouts-us"):
+            result["reason"] += "每週更新一次（週六），平日沿用上次有效報表。"
         if source.kind == "quarterly":
             result["reason"] += "此日期為涵蓋範圍內最早擷取日，不代表財報季度。"
         elif source.date_field in ("generatedAt", "fetchedAt"):
