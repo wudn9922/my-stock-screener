@@ -16,8 +16,8 @@ async function paintedSeries(chart: Locator) {
         if (near(r, 142) && near(g, 153) && near(b, 243) && alpha > 240) counts.secondMa++;
         // Histograms use translucent up/down fills; candle bodies are opaque.
         if (alpha >= 145 && alpha <= 160 && (
-          (near(r, 242) && near(g, 54) && near(b, 69)) ||
-          (near(r, 34) && near(g, 171) && near(b, 148))
+          (near(r, 255) && near(g, 90) && near(b, 95)) ||
+          (near(r, 43) && near(g, 200) && near(b, 168))
         )) counts.volume++;
       }
     }
