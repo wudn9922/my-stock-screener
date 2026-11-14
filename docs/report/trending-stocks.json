@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "source": "Yahoo Finance US trending · LINE 財經報告",
+  "fetchedAt": "2026-11-13T09:34:05.413250+00:00",
+  "sentAt": "2026-11-13T09:34:25.374080+00:00",
+  "symbols": [
+    "MSFT",
+    "CBRS",
+    "CSCO",
+    "AMAT",
+    "SLS"
+  ]
+}

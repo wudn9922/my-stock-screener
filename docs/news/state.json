@@ -1,0 +1,20 @@
+{
+  "sources": {
+    "Barron's": {
+      "failStreak": 0,
+      "file": "docs/news/barrons-20261113-365cb365f357.jpg",
+      "lastFailure": "2026-11-11T09:34:09.857458+00:00",
+      "sentAt": "2026-11-13T09:33:10.594152+00:00",
+      "sha256": "365cb365f3571e3925122d50ae83f2ef598970d44054ddaca01696d1e3f104b0",
+      "snapshot": "2026-11-12T15:31:15+00:00"
+    },
+    "WSJ": {
+      "failStreak": 0,
+      "file": "docs/news/wsj-20261113-5c981bc149f2.jpg",
+      "sentAt": "2026-11-13T09:33:10.594152+00:00",
+      "sha256": "5c981bc149f28564c404b4f0bbba130fab3d7c6f2f814d4f5503d8ebb792d460",
+      "snapshot": "2026-11-12T18:29:03+00:00"
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,3427 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-13T16:48:21.973665+00:00",
+  "threshold": 0.95,
+  "method": "calendar-session-guard-v3",
+  "markets": {
+    "tw": {
+      "primary": {
+        "symbol": "^TWII",
+        "source": "kline-archive",
+        "firstDate": "2021-01-04",
+        "lastDate": "2026-11-13"
+      },
+      "closedSessions": [
+        {
+          "date": "2021-02-08",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1758.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1758.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1757.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-11",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1755.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-12",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1314.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-15",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-16",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-03-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1761.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1760.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-30",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1764.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-06-14",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1767.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1773.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-21",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1773.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-10-11",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1776.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-12-31",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1790.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-31",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1794.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1793.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1344.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-04",
+          "reasons": [
+            "official-no-quotes",
+            "published-closure"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20220204&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=111%2F02%2F04&id=&response=json",
+              "bytes": 1630,
+              "sha256": "3043d74dc00e516a8326fe120f5ff489a8f19cb9dd5890f2b57320623dc323b0",
+              "stat": "ok",
+              "responseDate": "20220204",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1348.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-05-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1806.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-06-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1809.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-09-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1820.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-10-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1823.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1831.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-18",
+          "reasons": [
+            "official-no-quotes",
+            "published-closure"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20230118&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=112%2F01%2F18&id=&response=json",
+              "bytes": 1630,
+              "sha256": "1e733b3ac94c2cf5180ed4c50b2cc5a8d75db4c887f590034b7f3bddd3350bc9",
+              "stat": "ok",
+              "responseDate": "20230118",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1833.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1833.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-23",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1374.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-26",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1839.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1839.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1842.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1842.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1841.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-05-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1847.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-22",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1854.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-23",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1853.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-08-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1859.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-09-29",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1860.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-10-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1860.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-10-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1859.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1871.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-06",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1891.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-07",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1890.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-08",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1890.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1889.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-12",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1416.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-13",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-14",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-04-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1900.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-04-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1900.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-05-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1899.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-06-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1904.5,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1913.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1912.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-09-17",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1914.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1918.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1917.25,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1914.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-10-31",
+          "reasons": [
+            "official-no-quotes",
+            "published-closure"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20241031&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=113%2F10%2F31&id=&response=json",
+              "bytes": 1630,
+              "sha256": "ea53127c7c0cc77cbbf443ac716f5cc1185264ad2f21974e519b2fbc1fdf8d33",
+              "stat": "ok",
+              "responseDate": "20241031",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1937.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-23",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1940.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1940.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1939.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1454.25,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-29",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1454.25,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-30",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-31",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-02-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1953.75,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1956.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1956.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1960.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-30",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1963.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-09-29",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1970.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-10-06",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1970.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-10-10",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1971.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-10-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1971.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-12-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1978.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1978.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-12",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1979.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-13",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1979.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-16",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1979.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-17",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1979.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-18",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1484.25,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 0.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-04-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1980.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-04-06",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1980.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-05-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1981.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-06-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1982.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-07-10",
+          "reasons": [
+            "official-no-quotes",
+            "published-closure"
+          ],
+          "officialEvidence": [
+            {
+              "exchange": "twse",
+              "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20260710&type=ALLBUT0999",
+              "bytes": 71,
+              "sha256": "a5691b2512d7068ab2f69df75c3ef8fbc38dc565086422b1602656895c92c652",
+              "stat": "很抱歉，沒有符合條件的資料!",
+              "responseDate": null,
+              "quoteRows": 0
+            },
+            {
+              "exchange": "tpex",
+              "url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=115%2F07%2F10&id=&response=json",
+              "bytes": 1630,
+              "sha256": "dbe663baef40aedfd8a73857f8b71e8ef7b86cd46138d8637dfbe87345e87b5b",
+              "stat": "ok",
+              "responseDate": "20260710",
+              "quoteRows": 0
+            }
+          ],
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "flatZeroShare": null,
+          "coverageReference": 0,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-09-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1986.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-09-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1986.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-10-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1987.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-10-23",
+          "reasons": [
+            "primary-index-missing",
+            "flat-zero-cohort",
+            "published-closure"
+          ],
+          "observedSymbols": 1981,
+          "flatZeroSymbols": 1981,
+          "eligibleSymbols": 1981,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": 0.0,
+          "flatZeroShare": 1.0,
+          "coverageReference": 1987.0,
+          "calendar": "XTAI",
+          "calendarSession": true,
+          "affectedRows": 2214,
+          "sampleSymbols": [
+            "00400A.TW",
+            "00401A.TW",
+            "00402A.TW",
+            "00403A.TW",
+            "00404A.TW"
+          ]
+        },
+        {
+          "date": "2026-10-26",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 1987.0,
+          "calendar": "XTAI",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        }
+      ],
+      "indexGapsWithTrading": [],
+      "missingSessions": [],
+      "dataGaps": {
+        "status": "ok",
+        "startDate": "2021-01-01",
+        "through": "2026-11-13",
+        "calendar": "XTAI",
+        "missingStockThreshold": 0.5,
+        "comparison": "strictly-greater",
+        "eligibility": "ordinary-stock archive firstDate <= session; no assumed pre-firstDate history",
+        "primaryFirstDate": "2021-01-04",
+        "primaryLastDate": "2026-11-13",
+        "reason": null,
+        "sessions": []
+      }
+    },
+    "us": {
+      "primary": {
+        "symbol": "^GSPC",
+        "source": "kline-archive",
+        "firstDate": "2021-01-04",
+        "lastDate": "2026-11-12"
+      },
+      "closedSessions": [
+        {
+          "date": "2021-01-18",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3764.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-02-15",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3804.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-04-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3865.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-05-31",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3955.25,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-07-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 3989.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-09-06",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4096.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-11-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4187.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2021-12-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4218.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-01-17",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4242.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-02-21",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4263.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-04-15",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4295.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-05-30",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4322.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-06-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4328.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-07-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4330.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-09-05",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4352.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-11-24",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4380.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2022-12-26",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4389.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4390.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-01-16",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4393.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-02-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4407.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-04-07",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4423.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-05-29",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4452.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-06-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4454.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-07-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4457.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-09-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4493.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-11-23",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4534.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2023-12-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4544.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4544.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-01-15",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4548.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-02-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4568.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-03-29",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4587.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-05-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4627.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-06-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4636.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-07-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4645.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-09-02",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4678.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-11-28",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4770.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2024-12-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4786.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4791.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-09",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4795.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-01-20",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4800.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-02-17",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4822.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-04-18",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4875.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-05-26",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4905.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-06-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4919.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-07-04",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 4932.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-09-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5001.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-11-27",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5086.25,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2025-12-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5105.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-01-01",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5107.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-01-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5114.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-02-16",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5125.5,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-04-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5173.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-05-25",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5214.0,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-06-19",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5245.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-07-03",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5260.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        },
+        {
+          "date": "2026-09-07",
+          "reasons": [
+            "exchange-calendar-closed",
+            "primary-index-missing",
+            "published-closure"
+          ],
+          "observedSymbols": 0,
+          "flatZeroSymbols": 0,
+          "eligibleSymbols": 0,
+          "unknownVolumeSymbols": 0,
+          "positiveVolumeSymbols": 0,
+          "positiveVolumeShare": null,
+          "flatZeroShare": null,
+          "coverageReference": 5324.75,
+          "calendar": "XNYS",
+          "calendarSession": false,
+          "affectedRows": 0,
+          "sampleSymbols": []
+        }
+      ],
+      "indexGapsWithTrading": [],
+      "missingSessions": [],
+      "dataGaps": {
+        "status": "ok",
+        "startDate": "2021-01-01",
+        "through": "2026-11-12",
+        "calendar": "XNYS",
+        "missingStockThreshold": 0.5,
+        "comparison": "strictly-greater",
+        "eligibility": "ordinary-stock archive firstDate <= session; no assumed pre-firstDate history",
+        "primaryFirstDate": "2021-01-04",
+        "primaryLastDate": "2026-11-12",
+        "reason": null,
+        "sessions": []
+      }
+    }
+  },
+  "scan": {
+    "archiveCommit": "9f6c7f71bc7c0e5b424b19a8d4dfa25db7c4fd8c",
+    "symbols": 7694,
+    "rows": 9820264,
+    "yearFiles": 41515,
+    "invalidRows": 0,
+    "errors": [],
+    "suspectedDatesWithRows": 0,
+    "suspectedRows": 0,
+    "seconds": 47.912
+  }
+}
