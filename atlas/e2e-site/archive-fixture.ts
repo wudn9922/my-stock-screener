@@ -61,6 +61,11 @@ export async function live(page:Page) {
 
 /** Opens the phone-only list actions sheet; desktop actions remain in the page. */
 export async function openListActions(page: Page) {
+  const sheet = page.getByRole('dialog', { name: '清單操作' });
+  if (await sheet.isVisible()) return;
   const add = page.getByRole('button', { name: '新增清單', exact: true });
+  const inline = page.getByRole('button', { name: '建立手動清單', exact: true });
+  // isVisible() alone does not wait for the phone shell to finish rendering.
+  await add.or(inline).first().waitFor({ state: 'visible' });
   if (await add.isVisible()) await add.click();
 }

@@ -219,6 +219,7 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(page.getByRole('dialog', { name: 'NVDA 個股均線（所有清單共用）' })).toBeVisible();
   await page.getByRole('button', { name: '取消編輯', exact: true }).click();
   await expect(page.getByText('SEC 8-K 重大事件雷達', { exact: false }).first()).toBeVisible();
+  await openListActions(page);
   const exported = page.waitForEvent('download');
   await page.getByRole('button', { name: '匯出清單備份', exact: true }).click();
   const download = await exported;

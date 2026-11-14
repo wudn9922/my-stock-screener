@@ -189,7 +189,7 @@
   .watchlist-page .wb-live-time { order: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .watchlist-page .wb-list-picker { flex: 0 1 115px; min-width: 0; }
   .watchlist-page .wb-list-picker select { height: 32px; min-height: 32px; padding: 0 4px; }
-  .watchlist-page .wb-row:has(.wb-extended) .wb-quote { max-width: 132px; }
+  .watchlist-page .wb-row:has(.wb-extended) .wb-quote { width: max-content; flex-shrink: 0; max-width: 132px; }
   .watchlist-page .wb-row:has(.wb-extended) .wb-spark { min-width: 50px; }
   .watchlist-page .wb-extended { font-size: 10px; }
 }
