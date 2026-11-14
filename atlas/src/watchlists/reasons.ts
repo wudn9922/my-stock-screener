@@ -24,6 +24,7 @@ function actualValue(chip: FilterChip, item: GroupItem, state: FilterState, cont
   if (chip.id.startsWith('tr:')) {
     const flag = chip.id.slice(3);
     if (flag === 'stack') return [20, 50, 200].map(period => `MA${period} 乖離 ${formatPercent(maDeviation(item, period as 20 | 50 | 200))}`).join('、');
+    if (flag === 'near20') return `MA20 乖離 ${formatPercent(maDeviation(item, 20))}（需介於 −2%～+1%）`;
     if (flag === 'slope') return `MA20 斜率 ${number(metrics?.ma20Slope5, '%')}`;
     if (flag === 'nobear') return `趨勢：${metrics?.trend === 'down' ? '空頭' : metrics?.trend === 'up' ? '多頭' : metrics?.trend ? '盤整' : '未提供；此條件僅排除已知空頭'}`;
     const period = flag === 'a20' ? 20 : flag === 'a50' ? 50 : 200;
@@ -35,6 +36,8 @@ function actualValue(chip: FilterChip, item: GroupItem, state: FilterState, cont
   if (chip.id === 'rs1') return `1 月相對大盤 ${number(metrics?.rs21, '%')}`;
   if (chip.id === 'vr') return `較前一交易日成交量 ${number(metrics?.volVsPrev, ' 倍')}`;
   if (chip.id === 'vol') return `20 日平均成交量 ${formatMarketVolume(metrics?.volumeAvg20, context.market)}`;
+  if (chip.id === 'atr') return `ATR% ${number(metrics?.atrPct, '%')}`;
+  if (chip.id === 'rng') return `20 日區間寬度 ${number(metrics?.range20, '%')}`;
   if (chip.id === 'pe') {
     const figures = context.pe?.[item.symbol];
     return figures?.peTtmLoss ? '近四季虧損，本益比不適用' : `本益比 ${number(screenerPeValue(figures), ' 倍')}`;

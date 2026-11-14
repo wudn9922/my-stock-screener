@@ -44,6 +44,12 @@ export const UNIVERSE_FIELDS = [
  * without them (the daily scan list written by main.py) parse exactly as before.
  */
 export const UNIVERSE_PROFILE_FIELDS = ['sector', 'industry', 'marketCap'] as const;
+/**
+ * Optional metric columns appended by newer builds: `rsScore` (weighted 3／6／9／12-month relative return that
+ * `rsRank` ranks), `atrPct` (Wilder ATR14 ÷ close × 100) and `range20` (20-bar high–low range ÷ low × 100, %).
+ * Files without them parse exactly as before (null).
+ */
+export const UNIVERSE_EXTRA_METRIC_FIELDS = ['rsScore', 'atrPct', 'range20'] as const;
 
 /** Route group keys of the two full-market lists (report group keys use underscores, never this form). */
 export const UNIVERSE_GROUP_KEYS: Record<UniverseMarketKey, string> = { TW: 'universe-tw', US: 'universe-us' };
@@ -119,6 +125,9 @@ export function universeRowToItem(
     rs63: get('rs63'),
     rsBench: context.benchmark,
     rsRank: get('rsRank'),
+    rsScore: get('rsScore'),
+    atrPct: get('atrPct'),
+    range20: get('range20'),
     volVsPrev: get('volVsPrev'),
     turnover20: get('turnover20'),
     volumeAvg20: get('volumeAvg20'),

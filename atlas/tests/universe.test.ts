@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { parseMetrics } from '../src/report/schema';
 import {
+  UNIVERSE_EXTRA_METRIC_FIELDS,
   UNIVERSE_FIELDS,
   UNIVERSE_GROUP_KEYS,
   fetchUniverse,
@@ -70,6 +72,46 @@ describe('universe.json', () => {
     const old = parseUniverse(fixture);
     if (old.status !== 'ok') throw new Error('old fixture must parse');
     expect(old.universe.markets.TW!.items[0]!.metrics!.volumeAvg20).toBeNull();
+  });
+
+  it('reads the optional rsScore / atrPct / range20 columns and leaves them null in old files', () => {
+    expect(UNIVERSE_EXTRA_METRIC_FIELDS).toEqual(['rsScore', 'atrPct', 'range20']);
+    const fields = [...UNIVERSE_FIELDS, ...UNIVERSE_EXTRA_METRIC_FIELDS];
+    const base = UNIVERSE_FIELDS.map((field) => {
+      const at = fixture.fields.indexOf(field);
+      return at < 0 ? null : fixture.markets.US!.rows[0]![at];
+    });
+    const result = parseUniverse({
+      fields,
+      markets: {
+        US: {
+          benchmark: 'SPY',
+          rows: [
+            [...base, 12.34, 2.5, 18.75],
+            ['MSFT', ...base.slice(1), '7.5', 'x', null],
+            ['NVDA', ...base.slice(1), Infinity, -1, 0],
+          ],
+        },
+      },
+    });
+    if (result.status !== 'ok') throw new Error('extended columns must parse');
+    const [first, second, third] = result.universe.markets.US!.items;
+    expect(first!.metrics).toMatchObject({ rsScore: 12.34, atrPct: 2.5, range20: 18.75 });
+    // Numeric strings are read, junk and nulls become null, and rsRank keeps its own column.
+    expect(second!.metrics).toMatchObject({ rsScore: 7.5, atrPct: null, range20: null, rsRank: first!.metrics!.rsRank });
+    expect(third!.metrics).toMatchObject({ rsScore: null, atrPct: -1, range20: 0 });
+    // The published file is still in the old format: every row parses, with the new fields null.
+    const old = parseUniverse(fixture);
+    if (old.status !== 'ok') throw new Error('old fixture must parse');
+    for (const market of Object.values(old.universe.markets))
+      for (const item of market!.items) expect(item.metrics).toMatchObject({ rsScore: null, atrPct: null, range20: null });
+    expect(old.universe.markets.TW!.items[0]!.metrics).toMatchObject({ rsRank: fixture.markets.TW!.rows[0]![fixture.fields.indexOf('rsRank')] });
+  });
+
+  it('parseMetrics accepts the new fields and defaults them to null', () => {
+    expect(parseMetrics({ rsScore: 3.2, atrPct: '1.5', range20: 9 })).toMatchObject({ rsScore: 3.2, atrPct: 1.5, range20: 9 });
+    expect(parseMetrics({ rsScore: 'abc', atrPct: undefined, range20: NaN })).toMatchObject({ rsScore: null, atrPct: null, range20: null });
+    expect(parseMetrics({ rsRank: 80, rs63: 4 })).toMatchObject({ rsRank: 80, rs63: 4, rsScore: null, atrPct: null, range20: null });
   });
 
   it('reads the optional profile columns and the full-market scope', () => {

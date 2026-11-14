@@ -1,14 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  AMBUSH_MIN_VOLUME_TW,
   EMPTY_FILTERS,
   FILTER_PARAM_MAX,
+  TREND_FLAGS,
+  TREND_LABELS,
   FILTER_STORAGE_KEY,
   NO_METRICS_REASON,
   NO_GROWTH_REASON,
   NO_GROWTH_ROWS_REASON,
   VOLUME_PRESETS,
   activeChips,
+  ambushPreset,
   applyFilters,
   countFilters,
   filterAvailability,
@@ -34,6 +38,8 @@ const universe = parseUniverse(JSON.parse(readFileSync('tests/fixtures/screener/
 if (universe.status !== 'ok') throw new Error('universe fixture');
 const TW = universe.universe.markets.TW!.items;
 const US = universe.universe.markets.US!.items;
+// The published file is still in the old format: none of the rows carries rsScore / atrPct / range20.
+const OLD_FORMAT_ROWS = TW.every((row) => row.metrics!.atrPct === null && row.metrics!.range20 === null && row.metrics!.rsScore === null);
 const growth = parseGrowthFile(JSON.parse(readFileSync('tests/fixtures/screener/us-growth.json', 'utf8')))!;
 
 const state = (f: string | null) => parseFilters(f);
@@ -439,5 +445,189 @@ describe('stored conditions', () => {
     expect(readStoredFilters('US', memoryStorage({ [FILTER_STORAGE_KEY]: '{"US":"<b>"}' }))).toBeNull();
     expect(readStoredFilters('TW', null)).toBeNull();
     expect(() => writeStoredFilters('TW', 'x', null)).not.toThrow();
+  });
+});
+
+describe('volatility conditions: ATR% and 20-day range width', () => {
+  const tw = { market: 'TW' as const };
+  const rows = [
+    item('LOW', { atrPct: 2, range20: 8 }),
+    item('EDGE', { atrPct: 3, range20: 15 }),
+    item('OVER', { atrPct: 3.01, range20: 15.01 }),
+    item('NONE', { atrPct: null, range20: null }),
+    item('ATRONLY', { atrPct: 1 }),
+  ];
+  const symbols = (f: string, list = rows) => applyFilters(list, state(f), tw).map((row) => row.symbol);
+
+  it('encodes atr:N and rng:N, drops unusable values and keeps old links untouched', () => {
+    const parsed = state('atr:3;rng:15');
+    expect(parsed).toMatchObject({ atr: 3, rng: 15 });
+    expect(serializeFilters(parsed)).toBe('atr:3;rng:15');
+    // Canonical order: after the volume threshold, before the fundamentals.
+    expect(serializeFilters(state('eps:2:20;rng:12.5;atr:2.5;vol:250000;rs:80'))).toBe('rs:80;vol:250000;atr:2.5;rng:12.5;eps:2:20');
+    expect(serializeFilters(state(serializeFilters(state('atr:2.5;rng:12.5'))))).toBe('atr:2.5;rng:12.5');
+    for (const bad of ['atr:0', 'atr:-1', 'atr:x', 'atr:', 'atr:1:2', 'rng:0', 'rng:-3', 'rng:Infinity', 'rng:~']) {
+      const parsed = state(bad);
+      expect(parsed.atr ?? null).toBeNull();
+      expect(parsed.rng ?? null).toBeNull();
+      expect(serializeFilters(parsed)).toBe('');
+    }
+    // An old link has neither key, and still equals the empty state.
+    expect(state('ema20:-5:5;tr:a20;hi:10;rs:80;vr:1.2;vol:100000')).not.toHaveProperty('atr');
+    expect(state('hi:10')).toEqual({ ...EMPTY_FILTERS, hi: 10 });
+    expect(serializeFilters({ ...EMPTY_FILTERS, atr: 3, rng: null })).toBe('atr:3');
+    const url = serializeRoute({ page: 'screener', group: 'universe-tw', f: 'atr:3;rng:15' });
+    expect(parseRoute(url).route).toEqual({ page: 'screener', group: 'universe-tw', f: 'atr:3;rng:15' });
+  });
+
+  it('keeps stocks at or below the bound (inclusive) and excludes missing values', () => {
+    expect(symbols('atr:3')).toEqual(['LOW', 'EDGE', 'ATRONLY']);
+    expect(symbols('rng:15')).toEqual(['LOW', 'EDGE']);
+    expect(symbols('atr:3;rng:15')).toEqual(['LOW', 'EDGE']);
+    expect(symbols('atr:1')).toEqual(['ATRONLY']);
+    expect(symbols('atr:0.5')).toEqual([]);
+    // Combined with another condition by AND.
+    expect(symbols('atr:3;rs:80', [item('A', { atrPct: 2, rsRank: 90 }), item('B', { atrPct: 2, rsRank: 10 })])).toEqual(['A']);
+  });
+
+  it('is unavailable (skipped and flagged) when the loaded file lacks the column', () => {
+    const old = [item('OLD1', { rsRank: 50 }), item('OLD2', { rsRank: 60 })];
+    const availability = filterAvailability(old, tw);
+    expect(availability.atr).toBe(NO_METRICS_REASON);
+    expect(availability.rng).toBe(NO_METRICS_REASON);
+    expect(applyFilters(old, state('atr:3;rng:10'), tw)).toEqual(old);
+    expect(activeChips(state('atr:3;rng:10'), availability).map((chip) => [chip.id, chip.unavailable])).toEqual([
+      ['atr', NO_METRICS_REASON],
+      ['rng', NO_METRICS_REASON],
+    ]);
+    // One row with a value switches the condition on for the whole group.
+    const mixed = [...old, item('NEW', { atrPct: 2, range20: 5 })];
+    expect(filterAvailability(mixed, tw)).toMatchObject({ atr: null, rng: null });
+    expect(applyFilters(mixed, state('atr:3'), tw).map((row) => row.symbol)).toEqual(['NEW']);
+    // The published (old-format) universe file behaves the same way.
+    expect(OLD_FORMAT_ROWS).toBe(true);
+    expect(filterAvailability(TW, tw).atr).toBe(NO_METRICS_REASON);
+    expect(filterAvailability(TW, tw).rng).toBe(NO_METRICS_REASON);
+    expect(applyFilters(TW, state('atr:3;rng:10'), tw)).toEqual(TW);
+  });
+
+  it('labels, counts and clears each condition on its own', () => {
+    const s = state('hi:10;atr:2.5;rng:15');
+    expect(activeChips(s).map((chip) => [chip.id, chip.label])).toEqual([
+      ['hi', '距52週高 ≤10%'],
+      ['atr', 'ATR% ≤2.5'],
+      ['rng', '20 日區間寬度 ≤15%'],
+    ]);
+    expect(countFilters(s)).toBe(3);
+    expect(serializeFilters(removeFilter(s, 'atr'))).toBe('hi:10;rng:15');
+    expect(serializeFilters(removeFilter(s, 'rng'))).toBe('hi:10;atr:2.5');
+    expect(s).toMatchObject({ atr: 2.5, rng: 15 }); // not mutated
+    let next: FilterState = s;
+    for (const chip of activeChips(s)) next = removeFilter(next, chip.id);
+    expect(serializeFilters(next)).toBe('');
+    expect(countFilters(next)).toBe(0);
+  });
+});
+
+describe('trend flag near20', () => {
+  const tw = { market: 'TW' as const };
+  const row = (symbol: string, d20: number | null) => item(symbol, { ma: { 20: d20, 50: null, 200: null } });
+  const symbols = (rows: GroupItem[], f = 'tr:near20') => applyFilters(rows, state(f), tw).map((r) => r.symbol);
+
+  it('is exactly one new flag, labelled and serialized in canonical order', () => {
+    expect(TREND_FLAGS).toHaveLength(7);
+    expect(TREND_FLAGS.filter((flag) => flag === 'near20')).toHaveLength(1);
+    expect(TREND_LABELS.near20).toBe('貼近MA20（−2%～+1%）');
+    expect(serializeFilters(state('tr:near20,slope,a20'))).toBe('tr:a20,slope,near20');
+    expect(state('tr:near20,slope').tr).toEqual(['slope', 'near20']);
+    expect(activeChips(state('tr:near20')).map((chip) => [chip.id, chip.key, chip.label])).toEqual([['tr:near20', 'tr', '貼近MA20（−2%～+1%）']]);
+    expect(serializeFilters(removeFilter(state('tr:near20,slope'), 'tr:near20'))).toBe('tr:slope');
+    // The retired MA distance ranges stay retired.
+    expect(state('ma20:-2:1')).toEqual(EMPTY_FILTERS);
+  });
+
+  it('includes −2 and +1, excludes just outside, and excludes a missing MA20', () => {
+    const rows = [
+      row('M2', -2), row('P1', 1), row('IN', -0.5), row('ZERO', 0),
+      row('LOW', -2.01), row('HIGH', 1.01), row('FAR', 8), row('NULL', null),
+    ];
+    expect(symbols(rows)).toEqual(['M2', 'P1', 'IN', 'ZERO']);
+    expect(filterAvailability(rows, tw).ma20).toBeNull();
+    // Combined with the rising-MA20 flag by AND.
+    const mixed = [
+      item('A', { ma: { 20: 0.5 }, ma20Slope5: 0.4 }),
+      item('B', { ma: { 20: 0.5 }, ma20Slope5: -0.1 }),
+      item('C', { ma: { 20: 5 }, ma20Slope5: 0.4 }),
+    ];
+    expect(symbols(mixed, 'tr:near20,slope')).toEqual(['A']);
+  });
+
+  it('falls back to the group MA values like a20 does, and is unavailable like a20 when no row has an MA20', () => {
+    const near = item('NEAR', null, { close: 100, maValues: { 20: 101 } }); // −0.99 %
+    const far = item('FAR', null, { close: 100, maValues: { 20: 95 } }); // +5.26 %
+    expect(symbols([near, far])).toEqual(['NEAR']);
+    const none = item('NONE', null, { maList: [], maValues: {} });
+    const availability = filterAvailability([none], tw);
+    expect(availability.ma20).toBe(NO_METRICS_REASON);
+    expect(applyFilters([none], state('tr:near20'), tw)).toEqual([none]); // skipped, as tr:a20 is
+    expect(applyFilters([none], state('tr:a20'), tw)).toEqual([none]);
+    expect(activeChips(state('tr:near20'), availability)[0]!.unavailable).toBe(NO_METRICS_REASON);
+    // With some data the missing row is excluded, exactly as for a20.
+    expect(symbols([near, none])).toEqual(['NEAR']);
+    expect(symbols([near, none], 'tr:a20')).toEqual([]);
+  });
+
+  it('matches the fixture rows by the same distance as the a20 flag', () => {
+    const result = applyFilters(TW, state('tr:near20'), tw);
+    expect(result).toEqual(TW.filter((row) => {
+      const d = row.metrics!.ma['20'];
+      return d !== null && d >= -2 && d <= 1;
+    }));
+  });
+});
+
+describe('「潛伏」 preset', () => {
+  const rows = [
+    item('R50', { ma: { 20: 0.5 }, ma20Slope5: 0.3, rsRank: 50, volumeAvg20: 2_000_000 }),
+    item('R90', { ma: { 20: -1.5 }, ma20Slope5: 0.1, rsRank: 90, volumeAvg20: 1_000_000 }),
+    item('R70', { ma: { 20: 1 }, ma20Slope5: 0.2, rsRank: 70, volumeAvg20: 5_000_000 }),
+    item('THIN', { ma: { 20: 0 }, ma20Slope5: 0.2, rsRank: 99, volumeAvg20: 999_999 }),
+    item('FALL', { ma: { 20: 0 }, ma20Slope5: -0.2, rsRank: 95, volumeAvg20: 9_000_000 }),
+    item('FAR', { ma: { 20: 6 }, ma20Slope5: 0.2, rsRank: 80, volumeAvg20: 9_000_000 }),
+  ];
+
+  it('Taiwan: near20 + slope, volume 1,000,000 shares, sorted by RS descending', () => {
+    const preset = ambushPreset('TW');
+    expect(preset.sort).toBe('rs');
+    expect(AMBUSH_MIN_VOLUME_TW).toBe(1_000_000);
+    expect(preset.filters).toEqual({ ...EMPTY_FILTERS, tr: ['slope', 'near20'], vol: 1_000_000 });
+    expect(serializeFilters(preset.filters)).toBe('tr:slope,near20;vol:1000000');
+    expect(activeChips(preset.filters, undefined, 'TW').map((chip) => chip.label)).toEqual(['MA20上彎', '貼近MA20（−2%～+1%）', '20 日均量 ≥1,000 張']);
+    const shown = applyFilters(rows, preset.filters, { market: 'TW' });
+    expect(filterAndSortItems(shown, '', preset.sort).map((row) => row.symbol)).toEqual(['R90', 'R70', 'R50']);
+  });
+
+  it('US: the volume condition is left unset', () => {
+    const preset = ambushPreset('US');
+    expect(preset.sort).toBe('rs');
+    expect(preset.filters.vol).toBeNull();
+    expect(serializeFilters(preset.filters)).toBe('tr:slope,near20');
+    const shown = applyFilters(rows, preset.filters, { market: 'US' });
+    expect(filterAndSortItems(shown, '', preset.sort).map((row) => row.symbol)).toEqual(['THIN', 'R90', 'R70', 'R50']);
+  });
+
+  it('is ordinary filter state: shares through the link and each condition removes individually', () => {
+    const preset = ambushPreset('TW');
+    const text = serializeFilters(preset.filters);
+    expect(parseFilters(text)).toEqual(preset.filters);
+    expect(parseRoute(serializeRoute({ page: 'screener', group: 'universe-tw', f: text })).route).toEqual({ page: 'screener', group: 'universe-tw', f: text });
+    const ids = activeChips(preset.filters, undefined, 'TW').map((chip) => chip.id);
+    expect(ids).toEqual(['tr:slope', 'tr:near20', 'vol']);
+    expect(serializeFilters(removeFilter(preset.filters, 'tr:near20'))).toBe('tr:slope;vol:1000000');
+    expect(serializeFilters(removeFilter(preset.filters, 'tr:slope'))).toBe('tr:near20;vol:1000000');
+    expect(serializeFilters(removeFilter(preset.filters, 'vol'))).toBe('tr:slope,near20');
+    // The preset object is not shared state: removing a condition never changes the next preset.
+    expect(ambushPreset('TW').filters.tr).toEqual(['slope', 'near20']);
+    expect(preset.filters.tr).toEqual(['slope', 'near20']);
   });
 });

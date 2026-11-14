@@ -5,6 +5,8 @@ import { useDialogFocus } from './useDialogFocus';
 import { formatDateTime, formatMarketVolume, marketVolumeUnit, marketVolumeValue } from './format';
 import type { GrowthFile } from '../fundamentals/GrowthProvider';
 import {
+  AMBUSH_MIN_VOLUME_TW,
+  AMBUSH_PRESET_LABEL,
   EMPTY_FILTERS,
   GROWTH_PRESETS,
   QUARTER_PRESETS,
@@ -16,6 +18,7 @@ import {
   SHARE_VOLUME_PRESETS,
   YEAR_PRESETS,
   activeChips,
+  ambushPreset,
   enoughPeriods,
   formatRange,
   peRangeOf,
@@ -64,6 +67,8 @@ export interface FilterSheetProps {
   /** Shortest 52-week window among the rows when it is not a full year yet. */
   shortHighWindow: number | null;
   onApply: (state: FilterState) => void;
+  /** One-tap 「潛伏」 preset: the page applies the conditions, sorts by RS 百分位 and closes the sheet. */
+  onPreset: (preset: ReturnType<typeof ambushPreset>) => void;
   onClose: () => void;
 }
 
@@ -222,6 +227,13 @@ function periodChoices(unit: '季' | '年', current: number, covered: ((count: n
     ),
   );
 }
+/** Quick choices of the volatility-contraction conditions (a link or the typed field may carry any positive number). */
+const ATR_PRESETS: readonly number[] = [2, 3, 5];
+const RANGE_PRESETS: readonly number[] = [10, 15, 20];
+const upperBoundOptions = (presets: readonly number[]): ChoiceOption<number>[] => [
+  { value: null, label: '不限' },
+  ...presets.map((preset) => ({ value: preset, label: `≤${preset}%` })),
+];
 const GROWTH_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: '不限' },
   ...GROWTH_PRESETS.map((preset) => ({ value: preset, label: `≥${preset}%` })),
@@ -673,6 +685,8 @@ export function FilterSheet(props: FilterSheetProps) {
       </div>
     );
   };
+  // The preset needs the MA20 distance and slope; a group without them cannot show its result.
+  const presetBlocked = trendFlagUnavailable('near20', availability) ?? trendFlagUnavailable('slope', availability);
   const draftChips = activeChips(draft, availability, market, props.hasFixedMAs);
   const revenueChips = draftChips.filter((chip) => chip.key === 'rev' || chip.key === 'revY');
   const revenueCount = revenueChips.length;
@@ -732,6 +746,16 @@ export function FilterSheet(props: FilterSheetProps) {
         </div>}
         <div className="fs-body">
           <div hidden={category === 'fundamental'}>
+          <Section title="快速組合" unavailable={presetBlocked}>
+            <div className="fs-chips" role="group" aria-label="快速組合">
+              <button type="button" className="fs-chip" onClick={() => props.onPreset(ambushPreset(market))}>
+                {AMBUSH_PRESET_LABEL}
+              </button>
+            </div>
+            <p className="fs-hint">
+              貼近MA20＋MA20上彎{market === 'TW' ? `＋20 日均量 ≥${formatMarketVolume(AMBUSH_MIN_VOLUME_TW, market)}` : ''}，依 RS 百分位由強到弱；會取代目前條件，各項之後可個別移除。
+            </p>
+          </Section>
           <Section title={`20 日平均成交量（${volumeUnit}）`} unavailable={availability.vol} hint="以含資料日在內、最近完整 20 個交易日的平均成交量篩選。台股以張顯示（1 張＝1,000 股），美股以股顯示；未滿 20 日不提供均量。留白或輸入 0 可取消門檻。">
             <Choice
               label="平均成交量門檻"
@@ -764,6 +788,36 @@ export function FilterSheet(props: FilterSheetProps) {
             {volumeInvalid && <p id="fs-volume-error" className="fs-unavailable" role="alert">請輸入有效的非負{volumeUnit}數{market === 'TW' ? '（最小 0.001 張）' : '（整數）'}。</p>}
           </Section>
           <Section
+            title="波動收斂"
+            unavailable={availability.atr && availability.rng ? availability.atr : null}
+            hint="ATR%＝Wilder ATR(14)÷收盤價×100，數字越小代表每日波動越小。20 日區間寬度＝近 20 根 K 線（最高價−最低價）÷最低價×100。兩者皆為上限（≤，含邊界）；缺少數值的股票會被排除。"
+          >
+            {([
+              ['atr', 'ATR%', 'ATR% 上限', ATR_PRESETS],
+              ['rng', '20 日區間寬度', '20 日區間寬度上限', RANGE_PRESETS],
+            ] as const).map(([key, title, label, presets]) => availability[key] ? (
+              <div key={key} className="fs-block" role="group" aria-label={title}>
+                <div className="fs-sub">{title}</div>
+                <p className="fs-unavailable">{availability[key]}</p>
+              </div>
+            ) : (
+              <div key={key} className="fs-term" role="group" aria-label={title}>
+                <span className="fs-term-name">{title} ≤</span>
+                <Choice label={label} value={draft[key] ?? null} onChange={(next) => update({ [key]: next === draft[key] ? null : next })} options={upperBoundOptions(presets)} compact />
+                <TermInput
+                  label={`${title} 上限（%）`}
+                  value={draft[key] ?? null}
+                  unit="%"
+                  min={0.01}
+                  max={1000}
+                  allowEmpty
+                  hint="請輸入大於 0 的數字，留空即不限"
+                  onCommit={(next) => update({ [key]: next })}
+                />
+              </div>
+            ))}
+          </Section>
+          <Section
             title="均線乖離"
             hint="收盤價相對均線的百分比，高於為正、低於為負。預設 EMA20；有個股固定均線參數時，改用其中最小期數的 MA。各股票獨立判斷；滑到兩端代表不限。"
             unavailable={availability.ema20}
@@ -774,7 +828,7 @@ export function FilterSheet(props: FilterSheetProps) {
           <Section
             title="趨勢（可複選）"
             unavailable={TREND_FLAGS.every((flag) => trendFlagUnavailable(flag, availability)) ? availability.tr : null}
-            hint="多頭排列：股價 > MA20 > MA50 > MA200。排除空頭：股價 < MA20 < MA50 且 MA20 下彎。"
+            hint="多頭排列：股價 > MA20 > MA50 > MA200。排除空頭：排除報告趨勢標記為「空頭」的股票（股價 < MA20 < MA50 且 MA20 下彎；有 MA200 資料時，股價還須低於 MA200）。貼近MA20：收盤價在 MA20 的 −2%～+1% 以內（含邊界）。"
           >
             <div className="fs-chips" role="group" aria-label="趨勢條件">
               {TREND_FLAGS.map((flag) => {
@@ -818,7 +872,7 @@ export function FilterSheet(props: FilterSheetProps) {
           <Section
             title="相對強弱（對大盤指數）"
             unavailable={availability.rs && availability.rs3 && availability.rs1 ? availability.rs : null}
-            hint={`大盤基準：${benchmark}。相對報酬＝(1＋個股報酬)÷(1＋大盤報酬)−1，大於 0 代表跑贏大盤。RS 百分位＝個股 3 個月相對報酬，在${marketName}「全市場篩選」名單中的排名（99 最強、1 最弱；名單範圍見全市場篩選頁的說明）。`}
+            hint={`大盤基準：${benchmark}。相對報酬＝(1＋個股報酬)÷(1＋大盤報酬)−1，大於 0 代表跑贏大盤。RS 百分位＝個股 3／6／9／12 個月相對報酬加權（權重 40/20/20/20）後，在${marketName}「全市場篩選」名單中的市場排名（99 最強、1 最弱；名單範圍見全市場篩選頁的說明）。尚未改版的資料檔仍以 3 個月相對報酬排名。`}
           >
             {(!availability.rs1 || !availability.rs3) && (
               <div className="fs-chips" role="group" aria-label="相對大盤報酬">

@@ -2,6 +2,11 @@
 Atlas 選股篩選器指標（F2）：由 data/*.csv 日 K 計算報酬、均線乖離（SMA 與 EMA20）、52 週高點、相對強弱與量比（今日 ÷ 前一交易日），
 供 docs/report/latest.json（groups[].items[].metrics）與 docs/report/universe.json 使用。
 
+- RS 百分位（rsRank）＝ rsScore 在同市場名單中的百分位；rsScore 為 3／6／9／12 個月（63／126／189／252 根）
+  相對報酬的加權平均（40／20／20／20%），較長期間缺資料時以可用期間重新分配權重（至少要有 63 根）。
+  讀到沒有 rsScore 欄的舊 universe.json 時，改用 rs63 分布（同時以 rs63 排名，兩者不混用）。
+- 波動收斂：atrPct ＝ Wilder ATR(14) ÷ 收盤 × 100；range20 ＝ 近 20 根（最高價 − 最低價）÷ 最低價 × 100。
+
 - 不 import main；yfinance 只在下載基準指數時才延遲 import。
 - 資料不足的欄位一律為 None（JSON null），絕不輸出 NaN / inf。
 - 百分比單位為 %，四捨五入到小數 2 位。
@@ -14,6 +19,7 @@ import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
 from kline_integrity import usable_frame, read_csv as read_kline_csv
 from scripts.market_sessions import analysis_prices, market_prices
@@ -46,6 +52,10 @@ UNIVERSE_FIELDS = [
     "turnover20",
     "asOf",
     "volumeAvg20",
+    # 以下為後加欄位（前端依 fields 名稱對應；舊檔沒有這些欄時為 null）
+    "rsScore",
+    "atrPct",
+    "range20",
 ]
 
 MARKET_BENCHMARKS = {
@@ -53,10 +63,10 @@ MARKET_BENCHMARKS = {
     "US": "SPY"
 }
 
-# 行情收集與選股資料名單不限成交股數；LINE tw_all 報告另外篩選最新日 K 至少 100 萬股。
+# 行情收集與選股資料名單不限成交股數；LINE tw_all 報告另外篩選最新日 K 至少 100 萬股且 MA20 上彎（依 RS 百分位排序）。
 # 保留舊 scope=liquid 的相容格式。
 UNIVERSE_LABELS = {
-    "TW": "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單當日成交≥100萬股）",
+    "TW": "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單另需當日成交≥100萬股、MA20上彎）",
     "US": "S&P 500 成分股"
 }
 
@@ -72,16 +82,28 @@ SLOPE_BARS = 5
 HI52_BARS = 252
 TURNOVER_BARS = 20
 VOLUME_AVERAGE_BARS = 20
+ATR_BARS = 14
+RANGE_BARS = 20
+
+# RS 綜合分數：各期間（交易日）相對報酬的權重；至少要有第一個期間（63 根）
+RS_SCORE_WEIGHTS = ((63, 0.4), (126, 0.2), (189, 0.2), (252, 0.2))
+RS_SCORE_FIELD = "rsScore"
+# 舊 universe.json 沒有 rsScore 欄時，RS 百分位改用 rs63
+RS_LEGACY_FIELD = "rs63"
 
 # 基準指數最後一根 K 比個股最後一根早超過此天數，相對強弱給 None
 BENCH_STALE_DAYS = 7
-# 基準指數快取少於此根數時改為下載
+# 全市場建置寫入基準快取的最少根數（scripts/build_universe_full.py）
 BENCH_MIN_BARS = 64
+# 每日掃描的基準快取（例如 INDEX_HISTORY_CACHE 的 ^TWII，4 年）少於此根數時改為下載：
+# RS 綜合分數最長期間 252 根，加上休市與資料日差異的餘裕
+BENCH_RS_BARS = max(period for period, _ in RS_SCORE_WEIGHTS) + 10
+# 2 年約 500 根，涵蓋 BENCH_RS_BARS
 BENCH_DOWNLOAD_PERIOD = "2y"
 
 # universe 內最後一根 K 早於市場 asOf 超過此天數視為過期，不列入
 UNIVERSE_STALE_DAYS = 7
-# 有 rs63 的股票少於此數時不計算 RS 百分位
+# 有 RS 分數（rsScore，舊檔為 rs63）的股票少於此數時不計算 RS 百分位
 RS_RANK_MIN_COUNT = 10
 
 PRICE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
@@ -240,6 +262,64 @@ def _relative_strength(stock_return, bench_return):
     return ((1 + stock_return / 100) / denominator - 1) * 100
 
 
+def rs_score_from_relatives(relatives):
+    """
+    relatives：{期間: 相對報酬 % 或 None}。依 RS_SCORE_WEIGHTS 加權平均；
+    第一個期間（63 根）缺值時回傳 None，其餘缺值的期間不計，權重依可用期間重新分配。
+    """
+    first_period = RS_SCORE_WEIGHTS[0][0]
+
+    if finite_or_none(relatives.get(first_period)) is None:
+        return None
+
+    total = 0.0
+    weight_sum = 0.0
+
+    for period, weight in RS_SCORE_WEIGHTS:
+        value = finite_or_none(relatives.get(period))
+
+        if value is None:
+            continue
+
+        total += value * weight
+        weight_sum += weight
+
+    return total / weight_sum if weight_sum > 0 else None
+
+
+def ma20_slope5(close):
+    """MA20 對 5 根前 MA20 的變化 %（metrics 的 ma20Slope5；LINE tw_all 的「MA20 上彎」也用這個定義）。"""
+    close = np.asarray(close, dtype=float)
+
+    if len(close) < 20 + SLOPE_BARS:
+        return None
+
+    current = float(close[-20:].mean())
+    previous = float(close[-20 - SLOPE_BARS:-SLOPE_BARS].mean())
+    return pct_change(current, previous)
+
+
+def wilder_atr(high, low, close, bars=ATR_BARS):
+    """Wilder ATR：前 bars 個真實區間取平均，之後 ATR = (前 ATR × (bars − 1) + TR) ÷ bars；需要 bars + 1 根。"""
+    if len(close) < bars + 1:
+        return None
+
+    true_ranges = [
+        max(
+            high[i] - low[i],
+            abs(high[i] - close[i - 1]),
+            abs(low[i] - close[i - 1])
+        )
+        for i in range(1, len(close))
+    ]
+    atr = sum(true_ranges[:bars]) / bars
+
+    for true_range in true_ranges[bars:]:
+        atr = (atr * (bars - 1) + true_range) / bars
+
+    return finite_or_none(atr)
+
+
 def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
     """
     df：OHLCV 日 K（DatetimeIndex）；bench_close：基準收盤 Series 或 None。
@@ -255,6 +335,7 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
 
     close = df["Close"].to_numpy(dtype=float)
     high = df["High"].to_numpy(dtype=float)
+    low = df["Low"].to_numpy(dtype=float)
     volume = df["Volume"].to_numpy(dtype=float)
     dates = df.index
     bars = len(close)
@@ -291,18 +372,18 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         ema20 = pct_change(last, ema_last)
 
     # MA20 對 5 根前的變化
-    slope = None
+    slope = ma20_slope5(close)
 
-    if bars >= 20 + SLOPE_BARS:
-        previous_ma20 = float(close[-20 - SLOPE_BARS:-SLOPE_BARS].mean())
-        slope = pct_change(sma[20], previous_ma20)
-
+    # 多頭：收盤 > MA20 > MA50、MA20 上彎，有 MA200 時另需收盤 > MA200（空頭對稱）；MA200 不足 200 根時不看
     trend = None
 
     if sma[50] is not None and slope is not None:
-        if last > sma[20] > sma[50] and slope > 0:
+        above_200 = sma[200] is None or last > sma[200]
+        below_200 = sma[200] is None or last < sma[200]
+
+        if last > sma[20] > sma[50] and slope > 0 and above_200:
             trend = "up"
-        elif last < sma[20] < sma[50] and slope < 0:
+        elif last < sma[20] < sma[50] and slope < 0 and below_200:
             trend = "down"
         else:
             trend = "mixed"
@@ -316,17 +397,34 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
 
     relative = {}
 
-    for period in (21, 63):
+    for period in sorted({21} | {period for period, _ in RS_SCORE_WEIGHTS}):
         bench_return = None
+        stock_return = None
 
         if bars > period:
+            stock_return = pct_change(last, close[-1 - period])
             bench_return = _bench_return(
                 bench_close,
                 dates[-1 - period],
                 dates[-1]
             )
 
-        relative[period] = _relative_strength(returns[period], bench_return)
+        relative[period] = _relative_strength(stock_return, bench_return)
+
+    rs_score = rs_score_from_relatives(relative)
+
+    # 波動收斂：ATR(14) 佔收盤 %、近 20 根高低區間寬度 %（最低價 ≤ 0 的壞資料給 None）
+    atr = wilder_atr(high, low, close)
+    atr_pct = atr / last * 100 if atr is not None and last > 0 else None
+
+    range20 = None
+
+    if bars >= RANGE_BARS:
+        lowest = float(low[-RANGE_BARS:].min())
+        highest = float(high[-RANGE_BARS:].max())
+
+        if lowest > 0:
+            range20 = (highest - lowest) / lowest * 100
 
     # 量比：今日成交量 ÷ 前一個交易日成交量（前一日為 0 或缺值時為 None）
     vol_vs_prev = None
@@ -375,11 +473,14 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         "hiBars": int(hi_bars),
         "rs21": round_or_none(relative[21]),
         "rs63": round_or_none(relative[63]),
+        "rsScore": round_or_none(rs_score),
         "rsBench": bench_symbol,
         "rsRank": None,
         "volVsPrev": round_or_none(vol_vs_prev),
         "turnover20": turnover,
         "volumeAvg20": volume_average,
+        "atrPct": round_or_none(atr_pct),
+        "range20": round_or_none(range20),
     }
 
 
@@ -387,7 +488,7 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
 # RS 百分位
 # =========================================================================
 def rs_rank_from_distribution(value, distribution):
-    """value 在已排序的 rs63 分布中的百分位（1–99）；分布太小回傳 None。"""
+    """value 在已排序的 RS 分數分布（rsScore；舊檔為 rs63）中的百分位（1–99）；分布太小回傳 None。"""
     value = finite_or_none(value)
 
     if value is None or len(distribution) < RS_RANK_MIN_COUNT:
@@ -400,19 +501,32 @@ def rs_rank_from_distribution(value, distribution):
     return int(min(99, max(1, round(percentile))))
 
 
-def assign_rs_rank(rows):
+def rs_rank_field(rows):
     """
-    rows：含 rs63 的 dict（metrics）。就地填入 rsRank，回傳排序後的 rs63 分布，
-    供不在 universe 內的自選股以二分搜尋對照。
+    排名依據：每一筆有 rs63 的資料都有 rsScore 時用 rsScore（目前的指標），否則整批改用 rs63
+    （例如來自沒有 rsScore 欄的舊檔），兩種分數不混在同一個分布裡。
     """
+    for row in rows:
+        if finite_or_none(row.get(RS_LEGACY_FIELD)) is not None and finite_or_none(row.get(RS_SCORE_FIELD)) is None:
+            return RS_LEGACY_FIELD
+
+    return RS_SCORE_FIELD
+
+
+def assign_rs_rank(rows, field=None):
+    """
+    rows：含 rsScore（或舊資料的 rs63）的 dict（metrics）。就地填入 rsRank，回傳排序後的分數分布，
+    供不在 universe 內的自選股以二分搜尋對照。field 省略時由 rs_rank_field 決定。
+    """
+    field = field or rs_rank_field(rows)
     distribution = sorted(
         value
-        for value in (finite_or_none(row.get("rs63")) for row in rows)
+        for value in (finite_or_none(row.get(field)) for row in rows)
         if value is not None
     )
 
     for row in rows:
-        row["rsRank"] = rs_rank_from_distribution(row.get("rs63"), distribution)
+        row["rsRank"] = rs_rank_from_distribution(row.get(field), distribution)
 
     return distribution
 
@@ -471,12 +585,12 @@ def download_benchmark(symbol):
 
 def load_benchmark(symbol, cache_df=None, downloader=None):
     """
-    回傳基準收盤 Series；cache_df（例如 INDEX_HISTORY_CACHE 的 ^TWII）夠長時直接使用，
-    否則下載 2 年日 K。失敗回傳 None（相對強弱與 RS 百分位會是 null）。
+    回傳基準收盤 Series；cache_df（例如 INDEX_HISTORY_CACHE 的 ^TWII）涵蓋 RS 綜合分數最長期間
+    （BENCH_RS_BARS 根）時直接使用，否則下載 2 年日 K。失敗回傳 None（相對強弱與 RS 百分位會是 null）。
     """
     cached = _extract_close(cache_df, symbol)
 
-    if cached is not None and len(cached) >= BENCH_MIN_BARS:
+    if cached is not None and len(cached) >= BENCH_RS_BARS:
         return cached
 
     try:
@@ -533,7 +647,7 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
     """
     tickers 的 CSV 全部計算指標；過期（最後一根 K 早於市場眾數日期 7 天以上）與讀不到的略過。
     bench：{"symbol": "^TWII", "close": Series 或 None}。
-    回傳 {"market","benchmark","asOf","universe","records","rsDistribution"}。
+    回傳 {"market","benchmark","asOf","universe","records","rsDistribution","rsField"}。
     """
     market = str(market).upper()
     bench_symbol, _ = _bench_parts(bench, market)
@@ -585,7 +699,7 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
     by_date = {}
     for record in records:
         by_date.setdefault(record["asOf"], []).append(record["metrics"])
-    distributions = {day: assign_rs_rank(metrics) for day, metrics in by_date.items()}
+    distributions = {day: assign_rs_rank(metrics, RS_SCORE_FIELD) for day, metrics in by_date.items()}
     distribution = distributions.get(as_of, [])
 
     print(
@@ -600,6 +714,7 @@ def build_universe(tickers, market, data_dir, bench, name_fn=None):
         "universe": UNIVERSE_LABELS.get(market, market),
         "records": records,
         "rsDistribution": distribution,
+        "rsField": RS_SCORE_FIELD,
         "nonTradingDates": sorted(excluded_dates),
     }
 
@@ -608,7 +723,7 @@ def make_lookup(universe, data_dir, bench_map):
     """
     回傳 lookup(symbol) → metrics 或 None。
     universe 內的股票直接取用；不在 universe 的自選股即時讀 CSV 計算，
-    rsRank 以二分搜尋對照同市場 universe 的 rs63 分布。
+    rsRank 以二分搜尋對照同市場 universe 的 RS 分數分布（rsField：rsScore，改用舊全市場檔時為 rs63）。
     """
     universe = universe or {}
     bench_map = bench_map or {}
@@ -642,8 +757,10 @@ def make_lookup(universe, data_dir, bench_map):
             metrics = compute_stock_metrics(df, bench_close, bench_symbol)
 
             if metrics is not None:
-                distribution = (universe.get(market) or {}).get("rsDistribution") or []
-                metrics["rsRank"] = rs_rank_from_distribution(metrics["rs63"], distribution)
+                market_universe = universe.get(market) or {}
+                distribution = market_universe.get("rsDistribution") or []
+                field = market_universe.get("rsField") or RS_SCORE_FIELD
+                metrics["rsRank"] = rs_rank_from_distribution(metrics.get(field), distribution)
 
         except Exception as exc:
             print(f"⚠️ {symbol} 指標計算失敗：{type(exc).__name__}: {exc}")
@@ -906,19 +1023,47 @@ def keep_fresh_full_markets(payload, existing, today=None):
     return combined, kept
 
 
+def full_rs_field(document, market):
+    """
+    全市場檔該市場的 RS 百分位依據：欄位有 rsScore 且該市場每一列有 rs63 的都有 rsScore 時用 rsScore，
+    否則用 rs63（沒有 rsScore 欄的舊檔，或單獨重建另一個市場後 rsScore 欄為補進的 null 的舊列）；
+    兩個欄位都沒有時回傳 None。依市場判斷，兩種分數不混在同一個分布裡。
+    """
+    fields = fields_of(document)
+    entry = ((document or {}).get("markets") or {}).get(market) if isinstance(document, dict) else None
+    rows = [row for row in (entry or {}).get("rows") or [] if isinstance(row, list)]
+
+    def column(field):
+        return fields.index(field) if field in fields else None
+
+    def value(row, index):
+        return finite_or_none(row[index]) if index is not None and len(row) > index else None
+
+    score, legacy = column(RS_SCORE_FIELD), column(RS_LEGACY_FIELD)
+
+    if score is None:
+        return RS_LEGACY_FIELD if legacy is not None else None
+
+    if legacy is not None and any(value(row, legacy) is not None and value(row, score) is None for row in rows):
+        return RS_LEGACY_FIELD
+
+    return RS_SCORE_FIELD
+
+
 def full_rs_distribution(document, market, reference_as_of=None, today=None):
-    """夠新的 scope=full 市場的 rs63 排序分布；沒有時回傳 None。"""
+    """夠新的 scope=full 市場的 RS 分數排序分布（依 full_rs_field：rsScore，舊檔 rs63）；沒有時回傳 None。"""
     entry = fresh_full_market(document, market, reference_as_of, today=today)
 
     if entry is None:
         return None
 
     fields = fields_of(document)
+    field = full_rs_field(document, market)
 
-    if "rs63" not in fields:
+    if field is None:
         return None
 
-    column = fields.index("rs63")
+    column = fields.index(field)
     values = sorted(
         value
         for value in (
@@ -933,8 +1078,9 @@ def full_rs_distribution(document, market, reference_as_of=None, today=None):
 
 def adopt_full_rs_distribution(universes, existing, today=None):
     """
-    main.py 的每日掃描名單算完後呼叫：該市場若有夠新的全市場檔，RS 百分位改用全市場的 rs63 分布
-    （報告群組與自選股的 RS 百分位與選股頁全市場一致）。就地修改，回傳改用的市場清單。
+    main.py 的每日掃描名單算完後呼叫：該市場若有夠新的全市場檔，RS 百分位改用全市場的 RS 分數分布
+    （報告群組與自選股的 RS 百分位與選股頁全市場一致）。全市場檔是沒有 rsScore 欄的舊檔時，
+    該市場的分布與個股分數都改用 rs63（universe["rsField"] 記錄依據，make_lookup 沿用）。就地修改，回傳改用的市場清單。
     """
     adopted = []
 
@@ -947,11 +1093,14 @@ def adopt_full_rs_distribution(universes, existing, today=None):
         if distribution is None:
             continue
 
+        field = full_rs_field(existing, market)
+
         for record in universe.get("records") or []:
             metrics = record.get("metrics") or {}
-            metrics["rsRank"] = rs_rank_from_distribution(metrics.get("rs63"), distribution)
+            metrics["rsRank"] = rs_rank_from_distribution(metrics.get(field), distribution)
 
         universe["rsDistribution"] = distribution
+        universe["rsField"] = field
         adopted.append(market)
 
     return adopted

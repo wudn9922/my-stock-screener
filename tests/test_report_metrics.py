@@ -23,19 +23,21 @@ UNIVERSE_FIELDS = [
     "symbol", "name", "close", "changePct", "volume", "r5", "r21", "r63",
     "ma20", "ma50", "ma200", "ema20", "ma20Slope5", "trend", "hi52", "fromHi52", "hiBars",
     "rs21", "rs63", "rsRank", "volVsPrev", "turnover20", "asOf", "volumeAvg20",
+    "rsScore", "atrPct", "range20",
 ]
 
 
-def make_prices(closes, volumes=None, highs=None, end="2026-10-09"):
+def make_prices(closes, volumes=None, highs=None, end="2026-10-09", lows=None):
     closes = [float(value) for value in closes]
     index = pd.bdate_range(end=end, periods=len(closes))
     volumes = volumes if volumes is not None else [1000.0] * len(closes)
     highs = highs if highs is not None else closes
+    lows = lows if lows is not None else closes
     return pd.DataFrame(
         {
             "Open": closes,
             "High": [float(value) for value in highs],
-            "Low": closes,
+            "Low": [float(value) for value in lows],
             "Close": closes,
             "Volume": [float(value) for value in volumes],
         },
@@ -263,7 +265,8 @@ class ComputeStockMetricsTest(unittest.TestCase):
         metrics = report_metrics.compute_stock_metrics(make_prices([10]), None, "SPY")
         self.assertEqual(metrics["bars"], 1)
         self.assertEqual(metrics["hiBars"], 1)
-        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "ema20", "volVsPrev", "turnover20", "volumeAvg20"):
+        for key in ("r5", "r21", "r63", "ma20Slope5", "trend", "ema20", "volVsPrev", "turnover20", "volumeAvg20",
+                    "rsScore", "atrPct", "range20"):
             self.assertIsNone(metrics[key], key)
         self.assertEqual(metrics["ma"], {"20": None, "50": None, "200": None})
         strict_json(metrics)
@@ -315,6 +318,149 @@ class ComputeStockMetricsTest(unittest.TestCase):
         self.assertIsNone(metrics["rs63"])
 
 
+class RsScoreTest(unittest.TestCase):
+    """rsScore：63／126／189／252 根相對報酬 40／20／20／20% 加權，缺的期間依可用期間重新分配權重。"""
+
+    @staticmethod
+    def steps(count, moves):
+        # moves：{距最後一根的根數: 從該根起的收盤}，其餘維持前值；回傳由舊到新的收盤
+        closes = []
+        value = 100.0
+        for offset in range(count - 1, -1, -1):
+            value = moves.get(offset, value)
+            closes.append(value)
+        return closes
+
+    def test_weighted_blend_of_four_horizons(self):
+        # 個股在 252／189／126／63 根前之後各漲一次，基準不動：各期間相對報酬可手算
+        closes = self.steps(300, {251: 110.0, 188: 121.0, 125: 133.1, 62: 146.41})
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), bench_series([50.0] * 300), "SPY")
+        relative = {63: 10.0, 126: 21.0, 189: 33.1, 252: 46.41}
+        expected = 0.4 * relative[63] + 0.2 * (relative[126] + relative[189] + relative[252])
+        self.assertAlmostEqual(metrics["rsScore"], round(expected, 2))
+        self.assertAlmostEqual(metrics["rs63"], 10.0)
+
+    def test_benchmark_moves_are_removed_per_horizon(self):
+        closes = self.steps(300, {62: 120.0})
+        # 基準 100 → 252 根前之後 90 → 63 根前之後 99：63／126／189 根基準 +10%，252 根基準 −1%
+        bench = self.steps(300, {251: 90.0, 62: 99.0})
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), bench_series(bench), "SPY")
+        rel_mid = (1.20 / 1.10 - 1) * 100
+        rel252 = (1.20 / 0.99 - 1) * 100
+        self.assertAlmostEqual(metrics["rs63"], round(rel_mid, 2))
+        self.assertAlmostEqual(metrics["rsScore"], round(0.8 * rel_mid + 0.2 * rel252, 2))
+
+    def test_short_history_renormalises_weights(self):
+        # 150 根：只有 63 與 126 根可用 → 權重 0.4 : 0.2 重新分配為 2/3 : 1/3
+        closes = self.steps(150, {125: 110.0, 62: 132.0})
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), bench_series([50.0] * 300), "SPY")
+        expected = (0.4 * 20.0 + 0.2 * 32.0) / 0.6
+        self.assertAlmostEqual(metrics["rsScore"], round(expected, 2))
+
+    def test_only_63_bar_horizon_equals_rs63(self):
+        closes = self.steps(100, {62: 115.0})
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), bench_series([50.0] * 300), "SPY")
+        self.assertAlmostEqual(metrics["rsScore"], metrics["rs63"])
+        self.assertAlmostEqual(metrics["rsScore"], 15.0)
+
+    def test_benchmark_without_long_history_renormalises(self):
+        # 個股有 300 根，基準只有 100 根：126 根以上的期間基準不足 → 只用 63 根
+        closes = self.steps(300, {251: 50.0, 62: 115.0})
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), bench_series([50.0] * 100), "SPY")
+        self.assertAlmostEqual(metrics["rsScore"], metrics["rs63"])
+
+    def test_needs_the_63_bar_horizon(self):
+        metrics = report_metrics.compute_stock_metrics(
+            make_prices([100.0] * 60), bench_series([50.0] * 300), "SPY"
+        )
+        self.assertIsNone(metrics["rs63"])
+        self.assertIsNone(metrics["rsScore"])
+        no_bench = report_metrics.compute_stock_metrics(make_prices([100.0] * 300), None, "SPY")
+        self.assertIsNone(no_bench["rsScore"])
+        self.assertIsNone(report_metrics.rs_score_from_relatives({63: None, 126: 5.0}))
+        self.assertAlmostEqual(report_metrics.rs_score_from_relatives({63: 3.0, 252: 9.0}), (0.4 * 3 + 0.2 * 9) / 0.6)
+
+
+class TrendAndVolatilityTest(unittest.TestCase):
+    def test_uptrend_requires_close_above_ma200_when_available(self):
+        # 長期下跌後近期反彈：收盤 > MA20 > MA50 且 MA20 上彎，但仍低於 MA200 → mixed
+        closes = geometric(300, 0.995, 220) + geometric(300 * 0.995 ** 219, 1.004, 60)
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), None, "SPY")
+        self.assertGreater(metrics["ma"]["20"], 0)
+        self.assertGreater(metrics["ma"]["50"], metrics["ma"]["20"])
+        self.assertGreater(metrics["ma20Slope5"], 0)
+        self.assertLess(metrics["ma"]["200"], 0)
+        self.assertEqual(metrics["trend"], "mixed")
+        # 同一段反彈但歷史不足 200 根（沒有 MA200）：維持原規則 → up
+        short = report_metrics.compute_stock_metrics(make_prices(closes[-150:]), None, "SPY")
+        self.assertIsNone(short["ma"]["200"])
+        self.assertEqual(short["trend"], "up")
+
+    def test_downtrend_requires_close_below_ma200_when_available(self):
+        closes = geometric(100, 1.005, 220) + geometric(100 * 1.005 ** 219, 0.996, 60)
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), None, "SPY")
+        self.assertLess(metrics["ma20Slope5"], 0)
+        self.assertLess(metrics["ma"]["50"], metrics["ma"]["20"])
+        self.assertLess(metrics["ma"]["20"], 0)
+        self.assertGreater(metrics["ma"]["200"], 0)
+        self.assertEqual(metrics["trend"], "mixed")
+        short = report_metrics.compute_stock_metrics(make_prices(closes[-150:]), None, "SPY")
+        self.assertIsNone(short["ma"]["200"])
+        self.assertEqual(short["trend"], "down")
+
+    def test_steady_trends_keep_their_labels(self):
+        rising = report_metrics.compute_stock_metrics(make_prices(geometric(100, 1.01, 260)), None, "SPY")
+        falling = report_metrics.compute_stock_metrics(make_prices(geometric(200, 0.99, 260)), None, "SPY")
+        self.assertEqual((rising["trend"], falling["trend"]), ("up", "down"))
+
+    def test_atr_pct_wilder_hand_calculated(self):
+        # 16 根：前 14 個真實區間平均為初始 ATR，第 15 個以 Wilder 平滑
+        closes = [10.0 + 0.1 * i for i in range(16)]
+        highs = [value + 0.5 for value in closes]
+        lows = [value - 0.5 for value in closes]
+        highs[-1] = closes[-1] + 2.0  # 最後一根真實區間 = 高 − 低 = 2.5
+        true_ranges = [max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1]))
+                       for i in range(1, 16)]
+        atr = sum(true_ranges[:14]) / 14
+        atr = (atr * 13 + true_ranges[14]) / 14
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes, highs=highs, lows=lows), None, "SPY")
+        self.assertAlmostEqual(metrics["atrPct"], round(atr / closes[-1] * 100, 2))
+        self.assertAlmostEqual(report_metrics.wilder_atr(highs, lows, closes), atr)
+
+    def test_atr_uses_gaps_from_previous_close(self):
+        # 高 = 低 = 收：只有最後一根的跳空形成真實區間
+        metrics = report_metrics.compute_stock_metrics(make_prices([10.0] * 14 + [12.0]), None, "SPY")
+        self.assertAlmostEqual(metrics["atrPct"], round(2.0 / 14 / 12.0 * 100, 2))
+
+    def test_atr_needs_fifteen_bars(self):
+        metrics = report_metrics.compute_stock_metrics(
+            make_prices([10.0] * 14, highs=[11.0] * 14, lows=[9.0] * 14), None, "SPY"
+        )
+        self.assertIsNone(metrics["atrPct"])
+        self.assertIsNone(report_metrics.wilder_atr([1.0] * 14, [1.0] * 14, [1.0] * 14))
+
+    def test_range20_uses_last_twenty_highs_and_lows(self):
+        closes = [10.0] * 30
+        highs = [10.5] * 30
+        lows = [9.5] * 30
+        highs[5] = 50.0  # 近 20 根以外，不算
+        lows[5] = 1.0
+        highs[-3] = 12.0
+        lows[-10] = 8.0
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes, highs=highs, lows=lows), None, "SPY")
+        self.assertAlmostEqual(metrics["range20"], round((12.0 - 8.0) / 8.0 * 100, 2))
+
+    def test_range20_needs_twenty_bars(self):
+        self.assertIsNone(report_metrics.compute_stock_metrics(make_prices([10.0] * 19), None, "SPY")["range20"])
+        self.assertEqual(report_metrics.compute_stock_metrics(make_prices([10.0] * 20), None, "SPY")["range20"], 0)
+
+    def test_ma20_slope5_helper_matches_metric(self):
+        closes = geometric(100, 1.003, 40)
+        metrics = report_metrics.compute_stock_metrics(make_prices(closes), None, "SPY")
+        self.assertAlmostEqual(round(report_metrics.ma20_slope5(closes), 2), metrics["ma20Slope5"])
+        self.assertIsNone(report_metrics.ma20_slope5(closes[:24]))
+
+
 class RsRankTest(unittest.TestCase):
     def test_percentile_ranks(self):
         rows = [{"rs63": float(value)} for value in range(11)] + [{"rs63": None}]
@@ -340,6 +486,22 @@ class RsRankTest(unittest.TestCase):
         report_metrics.assign_rs_rank(rows)
         self.assertEqual([row["rsRank"] for row in rows], [None, None])
 
+    def test_ranks_by_rs_score_when_present(self):
+        # rsScore 與 rs63 排序相反：目前的指標以 rsScore 排名
+        rows = [{"rsScore": float(value), "rs63": float(-value)} for value in range(11)]
+        distribution = report_metrics.assign_rs_rank(rows)
+        self.assertEqual(distribution, [float(value) for value in range(11)])
+        self.assertEqual(rows[10]["rsRank"], 95)
+        self.assertEqual(report_metrics.rs_rank_field(rows), "rsScore")
+
+    def test_rows_without_rs_score_rank_by_rs63(self):
+        # 舊資料（沒有 rsScore）整批改用 rs63，不混用
+        rows = [{"rsScore": float(value), "rs63": float(-value)} for value in range(10)] + [{"rs63": 50.0}]
+        self.assertEqual(report_metrics.rs_rank_field(rows), "rs63")
+        report_metrics.assign_rs_rank(rows)
+        self.assertEqual(rows[-1]["rsRank"], 95)
+        self.assertEqual(rows[0]["rsRank"], 86)
+
     def test_rank_from_distribution(self):
         distribution = [float(value) for value in range(20)]
         self.assertEqual(report_metrics.rs_rank_from_distribution(100.0, distribution), 99)
@@ -351,13 +513,13 @@ class RsRankTest(unittest.TestCase):
 
 class LoadBenchmarkTest(unittest.TestCase):
     def test_uses_cache_when_long_enough(self):
-        cache = make_prices(geometric(100, 1.001, 300))
+        cache = make_prices(geometric(100, 1.001, report_metrics.BENCH_RS_BARS))
 
         def downloader(symbol):
             raise AssertionError("should not download")
 
         close = report_metrics.load_benchmark("^TWII", cache_df=cache, downloader=downloader)
-        self.assertEqual(len(close), 300)
+        self.assertEqual(len(close), report_metrics.BENCH_RS_BARS)
         self.assertAlmostEqual(close.iloc[-1], cache["Close"].iloc[-1])
 
     def test_downloads_when_cache_missing_or_short(self):
@@ -373,6 +535,13 @@ class LoadBenchmarkTest(unittest.TestCase):
             "SPY", cache_df=make_prices([1] * 10), downloader=downloader
         )
         self.assertEqual(calls, ["SPY"])
+        # 快取不足 252 根＋餘裕（RS 綜合分數最長期間）也改為下載；下載期間 2 年涵蓋
+        report_metrics.load_benchmark(
+            "SPY", cache_df=make_prices([1] * (report_metrics.BENCH_RS_BARS - 1)), downloader=downloader
+        )
+        self.assertEqual(calls, ["SPY", "SPY"])
+        self.assertGreater(report_metrics.BENCH_RS_BARS, 252)
+        self.assertEqual(report_metrics.BENCH_DOWNLOAD_PERIOD, "2y")
         self.assertEqual(len(close), 200)
         self.assertIsInstance(close, pd.Series)
 
@@ -400,7 +569,8 @@ class UniverseTest(unittest.TestCase):
             )
         write_csv(self.dir, "9999.TW", make_prices([10] * 100, end="2026-08-01"))
         write_csv(self.dir, "AAPL", make_prices(geometric(200, 1.002, 260)))
-        write_csv(self.dir, "CUSTOM.TWO", make_prices(geometric(30, 1.02, 120)))
+        # 120 根只有 63 根期間：63 根相對報酬要遠高於名單內最強股票的綜合分數
+        write_csv(self.dir, "CUSTOM.TWO", make_prices(geometric(30, 1.05, 120)))
         self.tw_bench = {"symbol": "^TWII", "close": bench_series([100.0] * 300)}
         self.us_bench = {"symbol": "SPY", "close": None}
         self.tw_tickers = [f"{1101 + i}.TW" for i in range(12)] + ["9999.TW", "0000.TW"]
@@ -449,7 +619,7 @@ class UniverseTest(unittest.TestCase):
         self.assertEqual(set(payload["markets"]), {"TW", "US"})
         tw = payload["markets"]["TW"]
         self.assertEqual(tw["benchmark"], "^TWII")
-        self.assertEqual(tw["universe"], "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單當日成交≥100萬股）")
+        self.assertEqual(tw["universe"], "台股上市／上櫃資料名單（收集不限股數；LINE 全市場潛伏清單另需當日成交≥100萬股、MA20上彎）")
         self.assertEqual(payload["markets"]["US"]["universe"], "S&P 500 成分股")
         self.assertEqual(tw["scope"], "liquid")
         self.assertEqual(payload["markets"]["US"]["benchmark"], "SPY")
