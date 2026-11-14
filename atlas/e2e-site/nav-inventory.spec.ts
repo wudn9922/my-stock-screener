@@ -189,7 +189,7 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   const cloud = await owner(page);
   await page.goto('./');
   await primary(page).getByRole('button', { name: '自選', exact: true }).click();
-  await expect(page.locator('.page-title')).toHaveText('自選清單');
+  await expect(page.locator('.page-title')).toHaveText('自選');
   await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
   await expect(page.getByRole('button', { name: '重新檢查舊版資料', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
@@ -254,6 +254,6 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await gear.getByRole('button', { name: '關閉', exact: true }).click();
   await page.screenshot({ path: info.outputPath(info.project.name === 'desktop-chromium' ? 'my-display-desktop.png' : 'my-display-mobile-390.png') });
   await page.getByRole('link', { name: '自選清單 →', exact: true }).click();
-  await expect(page.locator('.page-title')).toHaveText('自選清單');
+  await expect(page.locator('.page-title')).toHaveText('自選');
   await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
 });
