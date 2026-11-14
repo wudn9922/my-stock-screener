@@ -83,6 +83,7 @@ job, not a design job.
    Everything in today's header menus (更新 K 線, 建議均線, 波動率, data notes, share) stays reachable.
 6. **我的** (`me.html`). Account card, then grouped setting rows. 個股均線參數 and 自訂分組 open as
    sub-views that hold today's forms unchanged; 資料狀態 and 備份與還原 likewise.
+7. **沒有設計稿的畫面統一字體。** 財務頁與市場頁次要卡片（市場寬度、突破、警示）的價格、百分比、數字改用 `--font-num`。
 
 ## How review works
 

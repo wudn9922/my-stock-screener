@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ChartCandlestick, LayoutDashboard, ListFilter, Search, Settings, Star, UserRound, X } from 'lucide-react';
+import { ChartCandlestick, LayoutDashboard, ListFilter, Plus, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -329,6 +329,9 @@ export function Site() {
           </div>
         )}
         <div className="site-topbar-end">
+          {mobile && route.page === 'watchlist' && <button type="button" className="icon-button site-watchlist-add" aria-label="新增清單" title="新增清單" onClick={() => window.dispatchEvent(new Event('atlas:watchlist-actions'))}>
+            <Plus size={21} aria-hidden="true" />
+          </button>}
           {mobile && <button type="button" className="icon-button site-mobile-search" aria-label="搜尋股票" title="搜尋股票" onClick={() => setSearchOpen(true)}>
             <Search size={21} aria-hidden="true" />
           </button>}

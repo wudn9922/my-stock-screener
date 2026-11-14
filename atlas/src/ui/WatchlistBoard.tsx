@@ -262,14 +262,14 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
 
   return (
     <section className="watchlist-board" aria-label="自選行情">
-      <div className="wb-toolbar">{viewSwitch}<div className="wb-tabs" role="group" aria-label="行情來源">
-        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破']] as const).map(([key, label]) => (
+      <div className="wb-toolbar"><div className="wb-tabs" role="group" aria-label="行情來源">
+        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破訊號']] as const).map(([key, label]) => (
           <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
             setTab(key);
             if (key === 'list' && lists[0] && list?.id !== lists[0].id) onSelectList(lists[0].id);
           }}>{label}</button>
         ))}
-      </div>
+      </div>{viewSwitch}
       </div>
       {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
       <div className="wb-list-toolbar">

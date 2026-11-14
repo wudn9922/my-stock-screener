@@ -60,6 +60,13 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [cloudMessage, setCloudMessage] = useState('');
   const [cloudLists, setCloudLists] = useState<CloudList[]>([]);
   const [creating, setCreating] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  useEffect(() => {
+    if (section !== 'lists') return;
+    const openActions = () => setActionsOpen(true);
+    window.addEventListener('atlas:watchlist-actions', openActions);
+    return () => window.removeEventListener('atlas:watchlist-actions', openActions);
+  }, [section]);
   const [name, setName] = useState('');
   const [manual, setManual] = useState('');
   const [market, setMarket] = useState<'TW' | 'US'>('TW');
@@ -303,6 +310,15 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         </div>
       </div>
       <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
+      {section === 'lists' && actionsOpen && <div className="wb-action-backdrop" onClick={() => setActionsOpen(false)}>
+        <section className="wb-action-sheet" role="dialog" aria-modal="true" aria-label="清單操作" onClick={event => event.stopPropagation()}>
+          <div className="wb-action-sheet-title"><b>清單操作</b><button type="button" onClick={() => setActionsOpen(false)}>關閉</button></div>
+          <button type="button" onClick={() => { setActionsOpen(false); navigate({ page: 'screener', group: 'universe-tw' }); }}>以篩選條件建立清單</button>
+          <button type="button" onClick={() => { setActionsOpen(false); setListsView('lists'); setCreating(true); }}>建立手動清單</button>
+          <button type="button" disabled={!canPersist()} onClick={() => { setActionsOpen(false); download(); }}>匯出清單備份</button>
+          <button type="button" onClick={() => { setActionsOpen(false); imported.current?.click(); }}>匯入備份</button>
+        </section>
+      </div>}
       {section === 'lists' && listsView === 'holdings' && viewSwitch}
       {section === 'lists' && listsView === 'lists' && (
         <WatchlistBoard viewSwitch={viewSwitch} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
