@@ -130,6 +130,8 @@ test('a delayed US valuation never leaks into Taiwan results after switching mar
     await page.goto(`./?page=screener&group=${us.group.key}&f=pe::20`);
     await expect(page.getByText('載入本益比資料…', { exact: true })).toBeVisible();
     await expect(page.locator('.screener-row')).toHaveCount(0);
+    // Phone and tablet show one market's chips at a time; the 台股｜美股 switch brings up the Taiwan row.
+    if (page.viewportSize()!.width < 1100) await page.getByRole('group', { name: '市場', exact: true }).getByRole('button', { name: '台股', exact: true }).click();
     await page.locator('.chip-row').first().getByRole('button', { name: /^全市場潛伏/ }).click();
     await expect(page.locator('.screener-row')).toHaveCount(6);
     await page.getByRole('button', { name: /篩選條件/ }).click();
