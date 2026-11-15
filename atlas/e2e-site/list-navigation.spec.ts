@@ -2,6 +2,7 @@ import { copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mockDeviceAccount } from './account-fixture';
+import { openListActions } from './archive-fixture';
 import { buildReport, mockSite } from './mocks';
 
 // Set SCREENSHOT_DIR to also copy the phone picture of the list bar there (docs/screenshots/list-nav).
@@ -225,6 +226,7 @@ test('an open watchlist survives a stock chart and returns through 自選; a rep
   await mockSite(page, { fundamentals: true });
   await page.goto('./?page=watchlist');
   for (const [name, symbols] of [['導覽甲', 'NVDA, AAPL'], ['導覽乙', 'MSFT, NVDA, AAPL']] as const) {
+    await openListActions(page);
     await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
     await page.getByRole('textbox', { name: '手動清單名稱' }).fill(name);
     await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');
@@ -283,6 +285,7 @@ test('hidden pages issue no data requests or live polls while another page is op
     if (action === 'access.get') requests.pop();
   });
   await page.goto('./?page=watchlist');
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill('盤中');
   await page.getByRole('textbox', { name: '手動清單股票' }).fill('2330.TW, 2317.TW');

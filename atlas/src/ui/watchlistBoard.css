@@ -155,7 +155,7 @@
 .wb-row:has(.wb-extended) .wb-spark { width: 48px; }
 
 /* Phone-only watchlist reference: underline tabs, 88px quote rows, bottom action sheet. */
-@media (max-width: 767px) {
+@media (max-width: 1099px) {
   .watchlist-page .watchlist-board { gap: 0; margin: 0; }
   .watchlist-page .wb-toolbar { margin: 0 -16px; padding: 0 16px; border-bottom: 1px solid var(--border-strong); gap: 0; align-items: stretch; }
   .watchlist-page .wb-tabs, .watchlist-page .wb-toolbar .console-tabs { display: contents; }
@@ -195,10 +195,10 @@
 }
 
 /* Desktop retains the original 清單｜持股 control order; phones show 持股 as the fourth source tab. */
-@media (min-width: 768px) {
+@media (min-width: 1100px) {
   .watchlist-board .wb-toolbar .wb-view-switch { order: -1; }
 }
-@media (max-width: 767px) {
+@media (max-width: 1099px) {
   .watchlist-page:has(.watchlist-board) .wb-view-switch button:first-child { display: none; }
   .watchlist-page > .page-footer-note { display: none; }
 }
@@ -206,7 +206,7 @@
 .wb-extended .up { color: var(--up-text); }
 .wb-extended .down { color: var(--down-text); }
 
-@media (max-width: 767px) {
+@media (max-width: 1099px) {
   .watchlist-page .wb-toolbar { min-height: 44px; height: 44px; }
   .watchlist-page .wb-list-toolbar { box-sizing: border-box; height: 52px; min-height: 52px; padding: 4px 0; }
   .watchlist-page .wb-action-sheet { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }

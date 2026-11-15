@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openListActions } from './archive-fixture';
 import { buildReport, mockSite } from './mocks';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
 import { accessEnvelope, DEVICE_USER_ID, installLineAccount, OWNER_USER_ID, SECOND_USER_ID, type TestStorageMode } from './account-fixture';
@@ -154,6 +155,7 @@ for (const mode of ['none', 'device'] as const) {
     const policy = mode === 'device' ? await installPolicy(page) : null;
     await mockSite(page, { report: buildReport(20), fundamentals: true });
     await page.goto('./?page=watchlist');
+    await openListActions(page);
     await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
     await page.getByRole('textbox', { name: '手動清單名稱' }).fill('我的研究');
     await page.getByRole('textbox', { name: '手動清單股票' }).fill('2330.TW');
