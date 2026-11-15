@@ -2237,6 +2237,8 @@
     border-bottom: 0;
     background: var(--bg);
   }
+  /* The short-landscape account rule pads the desktop-style header; the title row carries its own 6px. */
+  .site.on-chart .ws-header.ws-header-compact { padding: 0; }
   .ws-header-compact .ws-title-row {
     display: flex;
     align-items: center;
@@ -2336,7 +2338,7 @@
     font: 600 30px/1 var(--font-num);
     letter-spacing: 0;
   }
-  .ws-header-compact .ws-quote span { font: 400 15px/1.2 var(--font-num); }
+  .ws-header-compact .ws-quote span { font: 400 15px/1 var(--font-num); }
   .ws-header-compact .ws-quote small.ws-quote-unit:not(.sr-only) {
     display: inline;
     color: var(--text-3);
@@ -2351,6 +2353,7 @@
     font-size: 12px;
     line-height: 17px;
   }
+  .ws-header-compact .ws-price-meta :is(span, small, dt, dd) { line-height: 17px; }
   .ws-header-compact .ws-meta-item {
     display: inline-flex;
     align-items: center;
@@ -2395,13 +2398,14 @@
     font: 400 12px/17px var(--font-num);
   }
   .ws-header-compact .ws-valuation dd.pe-loss { color: var(--text-3); }
+  .ws-header-compact .ws-stock-statistics > .ws-stats-menu { display: flex; }
   /* A 20px icon with a 44px hit area. */
   .ws-header-compact .ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle {
     position: relative;
     width: 20px;
-    height: 20px;
-    min-height: 20px;
-    margin-left: 4px;
+    height: 17px;
+    min-height: 17px;
+    margin-left: 2px;
     color: var(--text-3);
   }
   .ws-header-compact .ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle::before {

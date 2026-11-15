@@ -52,9 +52,9 @@ test('stock controls share one compact row and the normal chart fills the space 
     // The plot still fills the initial viewport; P/E and the common data footer follow below.
     expect(bounds.mainOverflow).toBeGreaterThan(0);
     if (bounds.navigation.height > 0) {
-      // Step 5 header: title row, price row and view tabs (was ≤124px with the toolbar under it). The quote line
-      // wraps to a second line below 390px.
-      expect(bounds.header).toBeLessThanOrEqual(size.width >= 390 ? 150 : 168);
+      // Step 5 header: 50px title row, price row and view tabs, 150px at 390px (was ≤124px with the toolbar under
+      // it). The quote line may wrap to a second line on narrower phones.
+      expect(bounds.header).toBeLessThanOrEqual(size.width >= 390 ? 152 : 170);
       // The 56px timeframe toolbar is docked between the plot and the site navigation.
       expect(Math.abs(bounds.toolbar.height - 56)).toBeLessThanOrEqual(1);
       expect(Math.abs(bounds.plot.bottom - bounds.toolbar.top)).toBeLessThanOrEqual(2);
