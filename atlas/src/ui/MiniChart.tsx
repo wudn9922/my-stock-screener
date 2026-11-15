@@ -15,6 +15,7 @@ import { getDailyBarResult, getLegacyDailyResult, getWatchlistDailyResult } from
 import { LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, sameBars, type LiveDaily } from '../market-data/LiveQuotes';
 import { mergeArchiveDaily } from '../market-data/KlineArchive';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
+import { AXIS_FONT_FAMILY } from '../chart/AxisAppearance';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { sma } from '../indicators/MovingAverage';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
@@ -178,7 +179,7 @@ export function MiniChart({
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#8A94A3',
         fontSize: 10,
-        fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+        fontFamily: AXIS_FONT_FAMILY,
         attributionLogo: interactive,
       },
       grid: { vertLines: { visible: false }, horzLines: { color: '#1E232B' } },
@@ -277,7 +278,7 @@ export function MiniChart({
     scale.setVisibleLogicalRange({ from, to: from + count - 1 });
   };
   return (
-    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status} title={sourceNote}>
+    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height: `var(--mini-chart-height, ${height}px)` }} data-status={status} title={sourceNote}>
       {interactive && <div className="mini-chart-controls" role="group" aria-label={`${symbol} 圖表縮放`}>
         <span>日 K{showVolume ? ' · 成交量' : ''}</span>
         <button type="button" aria-label="縮小圖表" title="縮小（顯示更多 K 線）" disabled={status !== 'ready'} onClick={() => zoom(1.5)}>−</button>

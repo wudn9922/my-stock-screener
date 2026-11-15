@@ -5,6 +5,14 @@ import { mockSite } from './mocks';
 
 const panel = (page: Page) => page.getByRole('region', { name: '多頭末期警示', exact: true });
 const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, '../tests/fixtures/market-warnings.sample.json'), 'utf8'));
+/** Phone and tablet show the card as a one-line summary; tapping it opens the detail. Desktop is always open. */
+async function openWarnings(page: Page) {
+  const card = panel(page);
+  await expect(card.locator('.mw-score, .mw-summary')).not.toHaveCount(0);
+  const summary = card.locator('.mw-summary');
+  if (await summary.isVisible() && (await summary.getAttribute('aria-expanded')) === 'false') await summary.click();
+  await expect(card.locator('.mw-score')).toBeVisible();
+}
 async function fixtures(page: Page, raw: unknown = sample, status = 200) {
   await mockSite(page);
   await page.route('**/report/market-warnings.json', route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(raw) }));
@@ -29,6 +37,7 @@ test('three warning charts replace short-window volume ratios, default to 60 day
   await fixtures(page);
   await page.goto('./?page=markets&market=tw');
   const card = panel(page);
+  await openWarnings(page);
   await expect(card.getByLabel('警示價量窗口')).toHaveValue('60');
   await expect(card.getByLabel('警示指數')).toHaveValue('^TWII');
   await expect(card.locator('.mw-plot')).toHaveCount(3);
@@ -77,6 +86,7 @@ test('three warning charts replace short-window volume ratios, default to 60 day
 test('US volume warning is grey and SOX uses labelled SOXX volume while other index values stay separate', async ({ page }) => {
   await fixtures(page); await page.goto('./?page=markets&market=us');
   const card = panel(page);
+  await openWarnings(page);
   await expect(card.locator('.mw-lights li').first()).toHaveAttribute('data-state','na');
   await expect(card).toContainText('不適用（無歷史驗證）');
   await card.getByLabel('警示指數').selectOption('^SOX');
@@ -96,6 +106,7 @@ test('invalid or missing warnings never retain old numbers and explicit retry re
   await expect(card.getByRole('status')).toContainText('HTTP 503');
   await page.route('**/report/market-warnings.json', route => route.fulfill({ json:sample }));
   await card.getByRole('button', { name:'重試警示資料' }).click();
+  await openWarnings(page);
   await expect(card.locator('.mw-score')).toContainText('2 項亮燈');
 });
 test('a retained US market labels the old calculation and archive source while TW stays current', async ({ page }, info) => {
@@ -111,6 +122,7 @@ test('a retained US market labels the old calculation and archive source while T
   const card = panel(page);
   await expect(card.getByRole('status')).toContainText('本市場未更新');
   await expect(card.getByRole('status')).toContainText('^IXIC');
+  await openWarnings(page);
   await card.getByLabel('警示指數').selectOption('^IXIC');
   await expect(card.locator('.mw-chart-block > p.source-note')).toContainText('GitHub 永久封存');
   await expect(card.locator('.mw-score time')).toHaveText(raw.markets.us.asOf);
@@ -120,6 +132,7 @@ test('a retained US market labels the old calculation and archive source while T
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   await captureState(page, info.outputPath('market-warning-retained.png'));
   await page.goto('./?page=markets&market=tw');
+  await openWarnings(page);
   await expect(panel(page).locator('.mw-plot')).toHaveCount(3);
   await expect(panel(page).locator('.mw-update-note')).toHaveCount(0);
 });
@@ -134,5 +147,6 @@ test('a first-run US failure has no invented lights or charts and does not hide 
   await expect(card.getByRole('button', { name: '重試警示資料' })).toBeVisible();
   await captureState(page, info.outputPath('market-warning-unavailable.png'));
   await page.goto('./?page=markets&market=tw');
+  await openWarnings(page);
   await expect(panel(page).locator('.mw-plot')).toHaveCount(3);
 });
