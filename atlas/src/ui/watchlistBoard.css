@@ -159,7 +159,7 @@
   .watchlist-page .watchlist-board { gap: 0; margin: 0; }
   .watchlist-page .wb-toolbar { margin: 0 -16px; padding: 0 16px; border-bottom: 1px solid var(--border-strong); gap: 0; align-items: stretch; }
   .watchlist-page .wb-tabs, .watchlist-page .wb-toolbar .console-tabs { display: contents; }
-  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { flex: 1 1 auto; min-width: 0; height: 44px; min-height: 44px; padding: 0 3px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-2); font-size: 12px; font-weight: 400; white-space: nowrap; }
+  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { flex: 1 1 auto; min-width: 0; height: 45px; min-height: 45px; padding: 0 3px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-2); font-size: 12px; font-weight: 400; white-space: nowrap; }
   .watchlist-page .wb-tabs button.active, .watchlist-page .wb-view-switch button.active { border-bottom-color: var(--accent); color: var(--text); background: none; font-weight: 700; }
   .watchlist-page .wb-list-toolbar { padding: 8px 0; min-height: 44px; gap: 8px; flex-wrap: wrap; }
   .watchlist-page .wb-list-picker { flex: 0 1 135px; }
@@ -183,7 +183,7 @@
   .wb-action-sheet-title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
   .wb-action-sheet button { min-height: 44px; text-align: left; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); color: var(--text); }
   .watchlist-page .wb-legacy-actions { display: none; }
-  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { box-sizing: border-box; flex-shrink: 0; height: 44px; min-height: 44px; align-self: flex-start; }
+  .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { box-sizing: border-box; flex-shrink: 0; height: 45px; min-height: 45px; align-self: flex-start; }
   .watchlist-page .wb-list-toolbar { flex-wrap: nowrap; height: 40px; min-height: 40px; padding: 0; }
   .watchlist-page .wb-chart-toggle { height: 44px; min-height: 44px; padding: 0 10px; font-size: 12px; border-radius: 8px; background: var(--surface-3); }
   .watchlist-page .wb-live-time { order: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
