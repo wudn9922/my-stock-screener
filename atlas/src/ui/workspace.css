@@ -2432,45 +2432,6 @@
     padding: 0 16px;
     border-bottom: 1px solid var(--border-strong);
   }
-  .ws-header-compact .stock-page-controls > .stock-tabs {
-    display: flex;
-    gap: 22px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: none;
-  }
-  .ws-header-compact .stock-page-controls .stock-tabs > button {
-    position: relative;
-    box-sizing: border-box;
-    min-width: 0;
-    height: 40px;
-    min-height: 40px;
-    padding: 0;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-    color: var(--text-2);
-    font-size: 15px;
-    font-weight: 400;
-  }
-  .ws-header-compact .stock-page-controls .stock-tabs > button::before {
-    content: '';
-    position: absolute;
-    inset: -2px -11px 0;
-  }
-  .ws-header-compact .stock-page-controls .stock-tabs > button:hover { background: none; color: var(--text); }
-  .ws-header-compact .stock-page-controls .stock-tabs > button.active {
-    border-bottom-color: var(--accent);
-    background: none;
-    box-shadow: none;
-    color: var(--text);
-    font-weight: 700;
-  }
-
   /* 更多 (⋯) menu: 44px rows; 建議均線, 波動率 and 資料說明 open in place. */
   .ws-more-menu > .ws-stats-panel {
     padding: 6px;
