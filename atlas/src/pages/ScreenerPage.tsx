@@ -169,9 +169,20 @@ function GroupChips({
   );
 }
 
-/** Distance to the row's first MA as a centred bar: right (up) for above, left (down) for below, full at ±20%. */
-function MaBar({ distance }: { distance: number | null }) {
-  const width = distance === null ? 0 : (Math.min(Math.abs(distance), 20) / 20) * 50;
+/** Full-scale distance for the bars: the largest first-MA distance in the list, never below ±5%. */
+function maBarScale(items: readonly GroupItem[]) {
+  let scale = 5;
+  for (const item of items) {
+    const period = item.maList[0];
+    const distance = period === undefined ? null : maDistance(item.close, maValue(item.maValues, period));
+    if (distance !== null && Number.isFinite(distance)) scale = Math.max(scale, Math.abs(distance));
+  }
+  return scale;
+}
+
+/** Distance to the row's first MA as a centred bar: right (up) for above, left (down) for below, full at ±scale%. */
+function MaBar({ distance, scale = 20 }: { distance: number | null; scale?: number }) {
+  const width = distance === null ? 0 : (Math.min(Math.abs(distance), scale) / scale) * 50;
   return (
     <span className={`row-ma-bar ${toneClass(distance)}`} aria-hidden="true">
       <span className="ma-bar-track">
@@ -193,6 +204,7 @@ function Row({
   onOpen,
   marketDate,
   compact = false,
+  barScale,
 }: {
   item: GroupItem;
   pe: PeFigures | undefined;
@@ -206,6 +218,7 @@ function Row({
   marketDate?: string | null;
   /** Phone and tablet grid: distance bar, P/E column, ▲/▼ change; the MA list and the note move into the title. */
   compact?: boolean;
+  barScale?: number;
 }) {
   const tone = toneClass(item.changePct);
   const status = itemStatusOf(item);
@@ -266,7 +279,7 @@ function Row({
             {pill.text}
           </span>
         ))}
-        {compact && !shownPills.length && <MaBar distance={distances[0]?.distance ?? null} />}
+        {compact && !shownPills.length && <MaBar distance={distances[0]?.distance ?? null} scale={barScale} />}
         {distances.map(({ period, distance }) => (
           <span key={period} className={`ma-pill ${toneClass(distance)}`} title={`收盤相對 MA${period} 的乖離`}>
             MA{period} {distance === null ? '—' : formatPercent(distance, 1)}
@@ -493,6 +506,7 @@ function ScreenerView({
     () => filterAndSortItems(filtered, query, activeSort, { growth, asOf: observationDate, fixedMAs }),
     [filtered, query, activeSort, growth, observationDate, fixedMAs],
   );
+  const barScale = useMemo(() => maBarScale(items), [items]);
   const countFor = useCallback(
     (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
     [viewItems, context, query],
@@ -619,7 +633,9 @@ function ScreenerView({
     } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
   }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>;
   const changes = !isTrending && <ScreenerChanges market={market} group={group.key} filters={filters} query={query} view={activeView} openChart={openChart} />;
-  const firstMa = group.maList[0];
+  // The header names one MA only when every shown row measures against that same period.
+  const groupFirstMa = group.maList[0];
+  const firstMa = groupFirstMa !== undefined && items.every(item => !item.maList.length || item.maList[0] === groupFirstMa) ? groupFirstMa : undefined;
   // Rows below the list's visible area (phone and tablet show the count under the list, like the reference).
   const remaining = items.length - Math.min(items.length, Math.floor((scroll.top + scroll.height) / ROW_HEIGHT));
 
@@ -826,6 +842,7 @@ function ScreenerView({
                     fixedMAs={fixedMAs}
                     top={(start + offset) * ROW_HEIGHT}
                     compact={compact}
+                    barScale={barScale}
                     onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList, list: chartListContext })}
                   />
                 </div>

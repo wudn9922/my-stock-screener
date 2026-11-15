@@ -2649,7 +2649,7 @@ h3 {
   }
   .screener-page .row-mas {
     display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-columns: 120px minmax(0, 1fr);
     grid-auto-flow: row dense;
     align-content: center;
     justify-items: start;
@@ -2676,6 +2676,9 @@ h3 {
   }
   .screener-page .row-ma-bar .ma-bar-value {
     display: none;
+  }
+  .screener-page .row-ma-bar .ma-bar-track {
+    width: 120px;
   }
   .screener-page .row-mas > .ma-pill.up { color: var(--up); }
   .screener-page .row-mas > .ma-pill.down { color: var(--down); }
