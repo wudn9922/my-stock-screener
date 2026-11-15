@@ -257,7 +257,7 @@ export function WatchlistBoard({ viewSwitch, holdingsActive = false, onShowLists
     empty = tab === 'list'
       ? hasLists
         ? <p>這份清單還沒有入選股票；下方「清單追蹤結果」載入後會自動更新。</p>
-        : <><p>還沒有自選清單。可以在選股頁用篩選條件建立，或在下方建立手動清單。</p>
+        : <><p>還沒有自選清單。可以到選股頁用篩選條件建立，或建立手動清單。</p>
           <button type="button" className="ghost-button" onClick={() => navigate({ page: 'screener' })}>到選股建立清單</button></>
       : trending?.status === 'error'
           ? <><p>{trending.message}</p><button type="button" className="ghost-button" onClick={retry}>重試</button></>
