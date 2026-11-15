@@ -87,6 +87,10 @@ for (const [name, type, settings] of [
       ) });
       if (market === "tw") {
         const volume = page.getByRole("region", { name: "多頭末期警示", exact: true });
+        // Phone/tablet widths show a collapsed summary first; open it before reading the detail.
+        await volume.locator(".mw-score, .mw-summary").first().waitFor();
+        const summary = volume.locator(".mw-summary");
+        if (await summary.isVisible() && (await summary.getAttribute("aria-expanded")) === "false") await summary.click();
         await volume.getByLabel("警示價量窗口").waitFor();
         if (await volume.getByLabel("警示價量窗口").inputValue() !== "60")
           throw new Error("Market warnings must default to the researched 60-session window");
