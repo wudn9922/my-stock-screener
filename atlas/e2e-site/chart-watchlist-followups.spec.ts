@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { mockSite, buildReport, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { searchSymbol } from '../e2e/site-helpers';
 import { mockDeviceAccount } from './account-fixture';
+import { openListActions } from './archive-fixture';
 
 async function candlePixels(page: Page) {
   return page.getByTestId('chart').evaluate(host => {
@@ -48,6 +49,7 @@ test('switching from a manually scaled low-price stock to a high-price stock sho
 
 const board = (page: Page) => page.getByRole('region', { name: '自選行情' });
 async function createManual(page: Page, name: string, symbol: string) {
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill(name);
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openListActions } from './archive-fixture';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount } from './account-fixture';
 import type { ParameterStock } from '../src/cloud/settingsApi';
@@ -165,6 +166,7 @@ test('a failed save leaves both rows intact and a load error prevents saving gue
 test('continuous charts use saved stock MAs before group MAs and reset to six months; index strip is removed', async ({ page }, testInfo) => {
   await cloudParameters(page, [stock('AAPL', 'ungrouped', 4, [13, 34]), stock('NVDA', 'us_g1', 5, [29, 73])]);
   await page.goto('./?page=watchlist');
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill('六個月持續看圖');
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');

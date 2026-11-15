@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ChartCandlestick, LayoutDashboard, ListFilter, Search, Settings, Star, UserRound, X } from 'lucide-react';
+import { ChartCandlestick, LayoutDashboard, ListFilter, Plus, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -28,6 +28,7 @@ import {
 } from './routeMemory';
 import { chartListFor, listPosition, listState, rememberChartList, type ChartListContext, type ChartListItem } from './listContext';
 import { ListNavBar } from '../ui/ListNavBar';
+import { requestWatchlistActions, watchlistActionsRequest } from './watchlistActionsRequest';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -131,6 +132,9 @@ export function Site() {
   const localSymbols = useMemo(() => [...reportSymbols(report), ...WORLD_ASSETS.map(asset => ({ symbol: asset.symbol, name: `${asset.ticker} ${asset.name}` }))], [report]);
 
   useEffect(() => applyColorConvention(preferences.colors), [preferences.colors]);
+  useEffect(() => {
+    if (route.page !== 'watchlist') watchlistActionsRequest.consume();
+  }, [route.page]);
   // A navigation that names a symbol becomes one chart request (URL syncs never repeat it).
   useEffect(() => {
     if (route.page !== 'chart' || !route.symbol) return;
@@ -329,6 +333,9 @@ export function Site() {
           </div>
         )}
         <div className="site-topbar-end">
+          {mobile && route.page === 'watchlist' && <button type="button" className="icon-button site-watchlist-add" aria-label="新增清單" title="新增清單" onClick={requestWatchlistActions}>
+            <Plus size={21} aria-hidden="true" />
+          </button>}
           {mobile && <button type="button" className="icon-button site-mobile-search" aria-label="搜尋股票" title="搜尋股票" onClick={() => setSearchOpen(true)}>
             <Search size={21} aria-hidden="true" />
           </button>}

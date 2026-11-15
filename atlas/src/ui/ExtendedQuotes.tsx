@@ -36,7 +36,7 @@ export function ExtendedQuoteLine({ symbol, quote, active = true, compact = fals
   const value = selectExtendedQuote(symbol, quote, state?.data);
   if (!value) return null;
   const text = extendedLineText(value, compact);
-  if (compact) return <span className="wb-extended" data-testid="board-extended-quote" title={`${text} · ${value.source}`}>{text}</span>;
+  if (compact) return <span className="wb-extended" data-testid="board-extended-quote" title={`${text} · ${value.source}`}>{value.mode === 'pre' ? '盤前' : '盤後'} <span>{formatPrice(value.price)}</span>{value.changePercent !== undefined && <span className={value.changePercent > 0 ? 'up' : value.changePercent < 0 ? 'down' : 'flat'}> {formatPercent(value.changePercent)}</span>}</span>;
   return <button type="button" className="ws-extended-line" data-testid="extended-quotes-toggle" aria-label={`盤前盤後報價：${text}`} aria-expanded={expanded} aria-controls="extended-quote-details" onClick={onToggle}>{text}</button>;
 }
 export function ExtendedQuotes({
