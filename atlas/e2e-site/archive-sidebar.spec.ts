@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { clock, archives, live } from './archive-fixture';
 import { mockSite } from './mocks';
+import { openStockMenu } from '../e2e/site-helpers';
 
 test('C4 visible sidebar TW/US rows share one batch and update once a minute',async({page},info)=>{
   await page.clock.install({time:clock});await mockSite(page);
@@ -11,7 +12,7 @@ test('C4 visible sidebar TW/US rows share one batch and update once a minute',as
   await expect.poll(()=>batches.length).toBe(1);
   const before=batches.length;
   if(info.project.name==='desktop-chromium')await page.getByRole('button',{name:'圖表收藏',exact:true}).click();
-  else {await page.getByRole('button',{name:'更多面板',exact:true}).click();await page.getByRole('tab',{name:'圖表收藏',exact:true}).click();}
+  else {await openStockMenu(page);await page.getByRole('button',{name:'更多面板',exact:true}).click();await page.getByRole('tab',{name:'圖表收藏',exact:true}).click();}
   await expect.poll(()=>batches.length).toBe(before+1);
   expect(batches.at(-1)!.some(s=>s.endsWith('.TW'))).toBe(true);
   await page.locator('[data-watch-symbol="AAPL"]').scrollIntoViewIfNeeded();

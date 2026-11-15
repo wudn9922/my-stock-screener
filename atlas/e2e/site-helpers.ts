@@ -33,9 +33,30 @@ export async function openPanel(page: Page, panel: WorkspacePanel): Promise<void
     await expect(dock).toHaveAttribute('aria-pressed', 'true');
     return;
   }
-  await page.getByRole('button', { name: '更多面板', exact: true }).click();
+  const more = page.getByRole('button', { name: '更多面板', exact: true });
+  if (!(await more.isVisible())) await openStockMenu(page);
+  await more.click();
   await sheet.getByRole('tab', { name, exact: true }).click();
   await expect(sheet.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true');
+}
+
+/**
+ * Phone/tablet chart header: 更新 K 線, 建議均線, 波動率, 資料說明, 全螢幕 and 更多面板 live in the 更多 (⋯) menu.
+ * Opens it when the page shows one (desktop has no menu and is left as it is).
+ */
+export async function openStockMenu(page: Page): Promise<void> {
+  // Either header has mounted once the symbol shows (the chart workspace loads lazily).
+  await expect(page.getByTestId('active-symbol')).toBeVisible();
+  const toggle = page.getByTestId('stock-more-toggle');
+  if (!(await toggle.isVisible())) return;
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+/** Closes the 更多 (⋯) menu if it is open, so it no longer covers the page. */
+export async function closeStockMenu(page: Page): Promise<void> {
+  const toggle = page.getByTestId('stock-more-toggle');
+  if ((await toggle.isVisible()) && (await toggle.getAttribute('aria-expanded')) === 'true') await toggle.click();
 }
 
 export async function closePanel(page: Page): Promise<void> {

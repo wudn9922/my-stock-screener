@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accountDatabase, mockDeviceAccount } from './account-fixture';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
-import { searchSymbol } from '../e2e/site-helpers';
+import { searchSymbol, closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 import type { SymbolState } from '../src/storage/schema';
 
 async function saved(page: Page, symbol = 'AAPL'): Promise<SymbolState | undefined> {
@@ -32,12 +32,14 @@ test('hourly, weekly and monthly MAs and drawings fix independently and survive 
     await page.getByRole('button', { name: `週期 ${timeframe}`, exact: true }).click();
     await loaded(page);
     await expect(page.locator('.indicator-chip')).toHaveCount(0);
+    await openStockMenu(page);
     await page.getByTestId('ma-recommendation-toggle').click();
     const editor = page.locator('.timeframe-ma-editor');
     await expect(editor.getByRole('region', { name: `${timeframe} 週期專屬設定` })).toContainText('變更自動保存');
     await editor.getByRole('spinbutton', { name: 'SMA 週期', exact: true }).fill(String(period));
     await editor.getByRole('button', { name: '新增 SMA', exact: true }).click();
     await page.getByTestId('ma-recommendation-toggle').click();
+    await closeStockMenu(page);
     const chart = page.getByTestId('chart'); await chart.scrollIntoViewIfNeeded();
     await chooseDrawingTool(page, '水平線');
     const box = (await chart.boundingBox())!;
@@ -47,12 +49,14 @@ test('hourly, weekly and monthly MAs and drawings fix independently and survive 
     await page.mouse.up();
     await expect(page.getByRole('toolbar', { name: '所選畫線操作' })).toBeVisible();
     await page.getByRole('button', { name: '取消選取', exact: true }).click();
+    await openStockMenu(page);
     await page.getByTestId('ma-recommendation-toggle').click();
     await expect(editor).toContainText('均線 1 條／畫線 1 條');
     await editor.getByRole('button', { name: '固定此週期設定', exact: true }).click();
     await expect(editor.getByRole('button', { name: '解除固定此週期', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(editor.getByRole('button', { name: `設定 SMA ${period}`, exact: true })).toBeDisabled();
     await page.getByTestId('ma-recommendation-toggle').click();
+    await closeStockMenu(page);
   }
   await expect.poll(async () => (await saved(page))?.drawings.filter(line => line.locked).length).toBe(3);
   const before = (await saved(page))!;
@@ -65,6 +69,7 @@ test('hourly, weekly and monthly MAs and drawings fix independently and survive 
   await expect(page.locator('.indicator-chip')).toHaveCount(0);
   await searchSymbol(page, 'AAPL'); await loaded(page);
   await page.getByRole('button', { name: '週期 1W', exact: true }).click(); await loaded(page);
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   const editor = page.locator('.timeframe-ma-editor');
   await expect(editor.getByRole('button', { name: '解除固定此週期', exact: true })).toBeVisible();
@@ -78,6 +83,7 @@ test('hourly, weekly and monthly MAs and drawings fix independently and survive 
 test('visitors see a RAM-only warning and reload does not persist timeframe studies', async ({ page }) => {
   await mockSite(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1W'); await loaded(page);
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   const editor = page.locator('.timeframe-ma-editor');
   await expect(editor).toContainText('僅本次瀏覽，重新開啟即消失');

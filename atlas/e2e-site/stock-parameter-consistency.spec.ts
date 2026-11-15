@@ -4,6 +4,7 @@ import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount } from './account-fixture';
 import type { ParameterStock } from '../src/cloud/settingsApi';
 import type { SavedWatchlist } from '../src/watchlists/model';
+import { openStockMenu } from '../e2e/site-helpers';
 
 const stock = (ticker: string, group_id: string, id: number, periods: number[]): ParameterStock => ({ id, ticker, group_id,
   ma1: periods[0] ?? 0, ma2: periods[1] ?? 0, ma3: periods[2] ?? 0, ma4: periods[3] ?? 0 });
@@ -54,6 +55,7 @@ async function movingAveragePixels(host: ReturnType<Page['locator']>) {
 }
 
 async function openFixed(page: Page, symbol = '2330.TW') {
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
   return page.getByRole('dialog', { name: `${symbol} 個股均線（所有清單共用）` });

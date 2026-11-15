@@ -254,6 +254,13 @@ export function Site() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [position, stepList]);
+  // Phone/tablet chart header 返回: the previous in-app page when this chart was opened inside Atlas (a history
+  // entry Atlas pushed); a deep link or reload has no such entry, so it opens 自選 instead of leaving the site.
+  const initialHistoryLength = useRef(window.history.length);
+  const chartBack = useCallback(() => {
+    if (navSource === 'app' && window.history.length > initialHistoryLength.current) window.history.back();
+    else navigate(navDestination(routeMemory.current, 'watchlist'));
+  }, [navSource, navigate]);
   const listNav = position && chartList ? <ListNavBar name={chartList.name} position={position} onStep={stepList} /> : null;
 
   /**
@@ -403,6 +410,7 @@ export function Site() {
                 onOpenFinancials={openFinancials}
                 view={stockView}
                 onViewChange={setStockView}
+                onBack={chartBack}
                 reportSymbols={localSymbols}
               />
               </Suspense>

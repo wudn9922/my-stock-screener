@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mockDeviceAccount } from './account-fixture';
 import { mockSite } from './mocks';
-import { closePanel, openPanel, searchSymbol } from '../e2e/site-helpers';
+import { closePanel, openPanel, openStockMenu, searchSymbol } from '../e2e/site-helpers';
 
 test('stock controls share one compact row and the normal chart fills the space above navigation', async ({ page }, testInfo) => {
   test.setTimeout(120000);
@@ -23,7 +23,9 @@ test('stock controls share one compact row and the normal chart fills the space 
       Math.abs(host.getBoundingClientRect().bottom - host.querySelector('.tv-lightweight-charts')!.getBoundingClientRect().bottom),
     )).toBeLessThanOrEqual(1);
     const controls = page.locator('.ws-stock-controls');
-    await expect(controls.getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '建議均線', '波動率']);
+    // Phone/tablet: 建議均線 and 波動率 moved from the tab row into the header's 更多 (⋯) menu.
+    const compact = await page.getByTestId('stock-more-toggle').isVisible();
+    await expect(controls.getByRole('button')).toHaveText(compact ? ['K線', '財務', '價量', '研究'] : ['K線', '財務', '價量', '研究', '建議均線', '波動率']);
     await expect(page.locator('.app-shell')).not.toHaveClass(/chart-focus/);
     const bounds = await page.evaluate(() => {
       const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
@@ -37,7 +39,7 @@ test('stock controls share one compact row and the normal chart fills the space 
         controlsInsideViewport: buttons.every(button => button.left >= 0 && button.right <= innerWidth),
         helpRightOfValues: help.left >= valuation.right - 1,
         helpAligned: Math.abs((help.top + help.bottom) / 2 - (valuation.top + valuation.bottom) / 2),
-        plot: box('.chart-host'), stage: box('.chart-stage'), navigation: box('.site-tabbar'),
+        plot: box('.chart-host'), stage: box('.chart-stage'), navigation: box('.site-tabbar'), toolbar: box('.chart-toolbar'),
         mainOverflow: main.scrollHeight - main.clientHeight,
         horizontalOverflow: document.scrollingElement!.scrollWidth - innerWidth,
       };
@@ -50,15 +52,23 @@ test('stock controls share one compact row and the normal chart fills the space 
     // The plot still fills the initial viewport; P/E and the common data footer follow below.
     expect(bounds.mainOverflow).toBeGreaterThan(0);
     if (bounds.navigation.height > 0) {
-      expect(bounds.header).toBeLessThanOrEqual(124);
-      expect(Math.abs(bounds.plot.bottom - bounds.navigation.top)).toBeLessThanOrEqual(2);
+      // Step 5 header: 50px title row, price row and view tabs, 150px at 390px (was ≤124px with the toolbar under
+      // it). The quote line may wrap to a second line on narrower phones.
+      expect(bounds.header).toBeLessThanOrEqual(size.width >= 390 ? 152 : 170);
+      // The 56px timeframe toolbar is docked between the plot and the site navigation.
+      expect(Math.abs(bounds.toolbar.height - 56)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.plot.bottom - bounds.toolbar.top)).toBeLessThanOrEqual(2);
+      expect(Math.abs(bounds.toolbar.bottom - bounds.navigation.top)).toBeLessThanOrEqual(2);
       expect(bounds.plot.height).toBeGreaterThan(size.height > size.width ? bounds.availableHeight * 0.5 : 40);
+      // The chart is the page: legend and plot take at least 60% of a 390×844 viewport.
+      if (size.width === 390 && size.height === 844) expect(bounds.stage.height).toBeGreaterThanOrEqual(844 * 0.6);
     }
     const plotHeight = bounds.plot.height;
     await page.getByTestId('valuation-help-toggle').click();
     await expect(page.getByRole('region', { name: '本益比說明', exact: true })).toBeVisible();
     await expect.poll(async () => (await page.locator('.chart-host').boundingBox())!.height).toBe(plotHeight);
     await page.keyboard.press('Escape');
+    await openStockMenu(page);
     await page.getByTestId('source-info-toggle').click();
     const source = page.getByRole('region', { name: '行情資料說明', exact: true });
     await expect(source).toBeVisible();
@@ -69,6 +79,41 @@ test('stock controls share one compact row and the normal chart fills the space 
       await page.screenshot({ path: testInfo.outputPath('compact-normal-chart.png') });
   }
   await testInfo.attach('chart-layout-measurements', { body: JSON.stringify(measurements), contentType: 'application/json' });
+});
+
+test('iPad landscape: the desktop stock header keeps the symbol, price and controls apart', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Desktop header layout (1100px and wider)');
+  await mockDeviceAccount(page);
+  await mockSite(page);
+  // 1180×820 is iPad Air landscape, where 2330.TW used to sit under the price; 1133 and 1100 are the tighter widths.
+  for (const width of [1180, 1133, 1100]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+    await expect(page.getByTestId('active-symbol')).toHaveText('2330.TW');
+    await expect(page.getByTestId('header-quote').locator('b')).not.toHaveText('—');
+    await expect(page.getByTestId('valuation')).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const box = (element: Element) => {
+        const { left, right, top, bottom } = element.getBoundingClientRect();
+        return { left, right, top, bottom };
+      };
+      const header = document.querySelector('.ws-header')!;
+      return {
+        symbol: box(document.querySelector('[data-testid="active-symbol"]')!),
+        price: box(document.querySelector('[data-testid="header-quote"]')!),
+        parts: [...header.children].map(box),
+        overflow: header.scrollWidth - header.clientWidth,
+      };
+    });
+    type Box = typeof layout.symbol;
+    const overlap = (a: Box, b: Box) =>
+      Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    expect(overlap(layout.symbol, layout.price), `symbol and price at ${width}px`).toBe(0);
+    for (let i = 0; i < layout.parts.length; i++)
+      for (let j = i + 1; j < layout.parts.length; j++)
+        expect(overlap(layout.parts[i]!, layout.parts[j]!), `header parts ${i} and ${j} at ${width}px`).toBe(0);
+    expect(layout.overflow).toBeLessThanOrEqual(0);
+  }
 });
 
 test('report navigation starts without MAs and preserves manually selected per-stock indicators', async ({ page }) => {
