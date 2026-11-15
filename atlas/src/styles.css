@@ -1084,8 +1084,16 @@ h3 {
   border-radius: 2px;
 }
 .ma-chip em {
+  font-family: var(--font-num);
   font-style: normal;
   font-weight: 600;
+}
+.ma-chip-prefix,
+.index-card-sign {
+  font-style: normal;
+}
+.ma-chip-prefix {
+  display: none;
 }
 .card-chevron {
   color: var(--text-3);
@@ -1943,4 +1951,280 @@ h3 {
   .console-page .saved-member-list time) {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
+}
+
+/* -- Markets (phone and tablet, 1099px and below): full index cards, then the secondary cards in one column.
+   The markets-main / markets-side wrappers add no box here so the existing cards can be ordered in one flow. */
+@media (max-width: 1099px) {
+  .markets-page {
+    max-width: 1040px;
+    padding-top: 0;
+  }
+  .markets-page > .page-head {
+    display: none;
+  }
+  .markets-page .market-tabs {
+    flex: none;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+  .markets-page .market-tabs button {
+    position: relative;
+    flex: none;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 14px;
+    gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 18px;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .markets-page .market-tabs button.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .markets-page .market-tabs button .flag {
+    display: none;
+  }
+  /* The pill is 36px tall; the pseudo-element keeps a 44px touch target. */
+  .markets-page .market-tabs button::before {
+    content: '';
+    position: absolute;
+    inset: -4px -2px;
+  }
+  .markets-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .markets-layout > .markets-main,
+  .markets-layout > .markets-side {
+    display: contents;
+  }
+  /* Order: index cards, 多頭末期警示, 融資餘額溫度, 突破, 市場寬度, LINE 摘要, 資料來源. */
+  .markets-main > .section-bar {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .markets-main > .index-grid,
+  .markets-main > .muted-text { order: 1; }
+  .markets-layout .market-warning-card { order: 2; }
+  .markets-layout .margin-temperature-card { order: 3; }
+  .markets-layout .breakout-card { order: 4; }
+  .markets-layout .breadth-card { order: 5; }
+  .markets-layout .line-card { order: 6; }
+  .markets-layout .help-disclosure { order: 7; }
+  .markets-layout .card {
+    margin: 0;
+    border-radius: 16px;
+  }
+  .markets-page .index-grid {
+    gap: 10px;
+  }
+  .markets-page .index-card {
+    gap: 10px;
+    padding: 16px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--surface);
+  }
+  .markets-page .index-card:hover {
+    background: var(--surface);
+  }
+  /* Row 1: name and symbol, trend tag. Row 2: value and change (the head wrapper adds no box). */
+  .markets-page .index-card .index-card-link:not(.index-card-foot) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .markets-page .index-card-head {
+    display: contents;
+  }
+  .markets-page .index-card-name {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 6px;
+  }
+  .markets-page .index-card-name b {
+    min-width: 0;
+    overflow: visible;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: normal;
+  }
+  .markets-page .index-card-name small {
+    font-family: var(--font-num);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-3);
+  }
+  .markets-page .index-card .index-card-link:not(.index-card-foot) > .trend-badge {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+    padding: 2px 10px;
+    border: 0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  /* Any trend other than bull / bear (neutral, unknown) uses the accent tag. */
+  .markets-page .index-card .trend-badge.trend-neutral,
+  .markets-page .index-card .trend-badge.trend-unknown {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .markets-page .index-card .trend-badge.trend-bull {
+    background: var(--up-soft);
+    color: var(--up);
+  }
+  .markets-page .index-card .trend-badge.trend-bear {
+    background: var(--down-soft);
+    color: var(--down);
+  }
+  .markets-page .index-card-quote {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+  .markets-page .index-card-quote b {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  .markets-page .index-card-quote .index-card-change {
+    justify-self: end;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .markets-page .index-card-quote.up .index-card-change::before { content: '▲ '; }
+  .markets-page .index-card-quote.down .index-card-change::before { content: '▼ '; }
+  .markets-page .index-card-quote .index-card-sign {
+    display: none;
+  }
+  .markets-page .index-card-quote small.index-card-live {
+    grid-column: 2;
+    justify-self: end;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  /* Candles get about 150px above a 26px time axis; the zoom row hangs directly under it (44px reserved). */
+  .markets-page .index-card .mini-chart {
+    --mini-chart-height: 176px;
+    margin-bottom: 44px;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .markets-page .index-card .mini-chart-interactive .mini-chart-canvas {
+    top: 0;
+  }
+  /* The page footer carries the TradingView attribution (ChartAttribution); the logo would cover candles here. */
+  .markets-page .index-card #tv-attr-logo {
+    display: none;
+  }
+  .markets-page .index-card .mini-chart-controls {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 44px;
+    gap: 4px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .markets-page .index-card .mini-chart-controls button {
+    min-width: 44px;
+    height: 44px;
+    padding: 0 8px;
+    border: 6px solid transparent;
+    border-radius: 16px;
+    background: var(--surface-2);
+    background-clip: padding-box;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+  .markets-page .index-card .mini-chart-controls output {
+    min-width: 0;
+    color: var(--text-2);
+    font-family: var(--font-num);
+  }
+  /* MA distances: three equal cells; the score line sits under them. */
+  .markets-page .index-card > .index-card-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
+  }
+  .markets-page .ma-legend {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .markets-page .ma-legend > .muted-text {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .markets-page .ma-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .markets-page .ma-chip:nth-child(n + 4),
+  .markets-page .ma-chip i {
+    display: none;
+  }
+  .markets-page .ma-chip-prefix {
+    display: inline;
+  }
+  .markets-page .ma-chip-label {
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .markets-page .ma-chip em {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .markets-page .index-score {
+    justify-content: flex-end;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .markets-layout {
+    gap: 12px;
+  }
+  .markets-page .index-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 }

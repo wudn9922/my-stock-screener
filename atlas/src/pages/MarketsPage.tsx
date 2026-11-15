@@ -32,6 +32,10 @@ function IndexCard({ index: reported, onOpen }: { index: IndexStatus; onOpen: ()
   const live = useLiveQuote(reported.symbol);
   const index = live?.quote ? { ...reported, close: live.quote.price, changePct: live.quote.changePercent } : reported;
   const tone = toneClass(index.changePct);
+  // Phone and tablet draw ▲/▼ plus the unsigned value; the signed text stays for the desktop card.
+  const change = formatPercent(index.changePct);
+  const changeSign = /^[+-]/.test(change) ? change[0] : '';
+  const changeValue = changeSign ? change.slice(1) : change;
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
@@ -48,7 +52,7 @@ function IndexCard({ index: reported, onOpen }: { index: IndexStatus; onOpen: ()
         </div>
         <div className={`index-card-quote ${tone}`}>
           <b>{formatPrice(index.close)}</b>
-          <span>{formatPercent(index.changePct)}</span>
+          <span className="index-card-change"><i className="index-card-sign">{changeSign}</i>{changeValue}</span>
           {live && <small className="index-card-live" data-testid="index-live-time">更新於 {formatLiveTime(live.retrievedAt * 1000)}</small>}
         </div>
       </div>
@@ -63,7 +67,7 @@ function IndexCard({ index: reported, onOpen }: { index: IndexStatus; onOpen: ()
               return (
                 <span key={period} className="ma-chip">
                   <i style={{ background: indicatorColors[i % indicatorColors.length] }} aria-hidden="true" />
-                  MA{period}
+                  <span className="ma-chip-label"><span className="ma-chip-prefix">距 </span>MA{period}</span>
                   {distance !== null && <em className={toneClass(distance)}>{formatPercent(distance, 1)}</em>}
                 </span>
               );

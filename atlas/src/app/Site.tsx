@@ -367,7 +367,10 @@ export function Site() {
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
         <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}</div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
-          <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />}
+          <div className="market-head">
+            {reportDate && <span className="market-head-date">資料日 {formatDateTime(reportDate, false)}</span>}
+            <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />
+          </div>}
         {KEPT_PAGES.filter((page) => visited.current.has(page)).map((page) => {
           const shown = routeMemory.current.pages[page];
           return shown && (
