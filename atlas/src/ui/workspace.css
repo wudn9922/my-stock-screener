@@ -2213,13 +2213,17 @@
 @media (min-width: 1100px) and (max-width: 1439px) {
   .ws-header > .ws-symbol,
   .ws-header > .ws-stock-statistics { flex-shrink: 0; }
-  .ws-header > .ws-symbol .ws-symbol-text small { max-width: 140px; }
-  .ws-header > .ws-price-block { min-width: 250px; }
+  .ws-header > .ws-symbol .ws-symbol-text small { max-width: 120px; }
+  .ws-header > .ws-price-block { min-width: 240px; }
   .ws-header > .ws-price-block > .ws-quote { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; }
+}
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .ws-header { gap: 8px; }
+  .ws-header > .ws-symbol .ws-symbol-text small { max-width: 90px; }
 }
 /* Below 1180px the refresh button keeps only its icon (its name stays in aria-label and title). */
 @media (min-width: 1100px) and (max-width: 1179px) {
-  .ws-header { gap: 8px; }
+  .ws-header > .ws-price-block { min-width: 228px; }
   .ws-header-actions .ws-refresh-button { width: 40px; gap: 0; padding: 0; justify-content: center; font-size: 0; }
 }
 
