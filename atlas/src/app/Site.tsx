@@ -28,6 +28,7 @@ import {
 } from './routeMemory';
 import { chartListFor, listPosition, listState, rememberChartList, type ChartListContext, type ChartListItem } from './listContext';
 import { ListNavBar } from '../ui/ListNavBar';
+import { requestWatchlistActions } from './watchlistActionsRequest';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -329,7 +330,7 @@ export function Site() {
           </div>
         )}
         <div className="site-topbar-end">
-          {mobile && route.page === 'watchlist' && <button type="button" className="icon-button site-watchlist-add" aria-label="新增清單" title="新增清單" onClick={() => window.dispatchEvent(new Event('atlas:watchlist-actions'))}>
+          {mobile && route.page === 'watchlist' && <button type="button" className="icon-button site-watchlist-add" aria-label="新增清單" title="新增清單" onClick={requestWatchlistActions}>
             <Plus size={21} aria-hidden="true" />
           </button>}
           {mobile && <button type="button" className="icon-button site-mobile-search" aria-label="搜尋股票" title="搜尋股票" onClick={() => setSearchOpen(true)}>

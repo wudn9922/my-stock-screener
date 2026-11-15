@@ -39,6 +39,7 @@ import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters'
 import { loadPeRiverFile } from '../fundamentals/peRiverRank';
 import { useWhileActive } from '../app/pageActivity';
 import { chartList } from '../app/listContext';
+import { watchlistActionsRequest } from '../app/watchlistActionsRequest';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
@@ -62,6 +63,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [cloudLists, setCloudLists] = useState<CloudList[]>([]);
   const [creating, setCreating] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const pendingActions = useSyncExternalStore(watchlistActionsRequest.subscribe, watchlistActionsRequest.getSnapshot);
   useDialogFocus(actionsOpen, 'watchlist-actions');
   useEffect(() => {
     if (!actionsOpen) return;
@@ -70,11 +72,10 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     return () => globalThis.document.removeEventListener('keydown', close);
   }, [actionsOpen]);
   useEffect(() => {
-    if (section !== 'lists') return;
-    const openActions = () => setActionsOpen(true);
-    window.addEventListener('atlas:watchlist-actions', openActions);
-    return () => window.removeEventListener('atlas:watchlist-actions', openActions);
-  }, [section]);
+    if (section !== 'lists' || !pendingActions) return;
+    setActionsOpen(true);
+    watchlistActionsRequest.consume();
+  }, [section, pendingActions]);
   const [name, setName] = useState('');
   const [manual, setManual] = useState('');
   const [market, setMarket] = useState<'TW' | 'US'>('TW');
