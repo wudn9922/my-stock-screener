@@ -13,7 +13,8 @@ test('screener chart review follows filters and search, returns to the same rows
   const expected = await page.locator('.screener-row .row-id > small').allTextContents();
   const charts = page.getByRole('region', { name: '連續股票圖表' });
   const toggle = page.locator('.screener-chart-toggle');
-  await expect(toggle).toHaveText('連續看全部股票圖表（3 檔）');
+  // Phone and tablet dock the toggle above the tab bar with the shorter label.
+  await expect(toggle).toHaveText(page.viewportSize()!.width < 1100 ? '連續看圖 · 3 檔' : '連續看全部股票圖表（3 檔）');
   await toggle.click();
   await expect(charts.locator('.stock-chart-name h3')).toHaveText(expected);
   const first = charts.locator('.stock-chart-card').first();

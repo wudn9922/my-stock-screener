@@ -1,18 +1,11 @@
-import { useEffect, useId, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { MarketWarnings } from '../report/schema';
 import { loadMarketWarnings, weeklySample, type WarningsResult } from '../report/marketWarnings';
 import { TimeChart, type ChartLine } from './rates/TimeChart';
 import type { TimeBand } from './rates/TimeBands';
 import { ResearchNote } from './research/Common';
+import { useCompactLayout } from './useCompactLayout';
 import './marketWarnings.css';
-
-// Phone and tablet show the card as a one-line summary; the full detail opens on tap.
-const compactQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1099px)') : null;
-const subscribeCompact = (callback: () => void) => {
-  compactQuery?.addEventListener('change', callback);
-  return () => compactQuery?.removeEventListener('change', callback);
-};
-const useCompactLayout = () => useSyncExternalStore(subscribeCompact, () => compactQuery?.matches ?? false, () => false);
 
 const ratio = (value: number | null | undefined) => value == null ? '資料不足' : `${(value * 100).toFixed(1)}%`;
 const percent = (value: number) => `${(value * 100).toFixed(0)}%`;
@@ -27,6 +20,7 @@ function WarningBody({ data, market, report }: { data: MarketWarnings; market: '
   const params = data.params, cfg = params.markets[market];
   const [selected, setSelected] = useState(cfg.indices[0]!);
   const [window, setWindow] = useState<5 | 10 | 20 | 60>(params.defaultWindow);
+  // Phone and tablet show the card as a one-line summary; the full detail opens on tap.
   const compact = useCompactLayout();
   const [open, setOpen] = useState(false);
   const detailId = useId();

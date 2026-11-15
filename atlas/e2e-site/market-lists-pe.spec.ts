@@ -98,7 +98,13 @@ test('permission display is immediately before data health at the foot of every 
   await page.goto('./?page=screener&group=tw_all');
   const list = page.locator('.screener-list');
   await expect(list).toBeVisible();
-  expect((await list.boundingBox())!.height).toBeGreaterThan(page.viewportSize()!.height * .75);
+  const box = (await list.boundingBox())!;
+  if (page.viewportSize()!.width < 1100) {
+    // Phone and tablet: the list fills the screen from the column header down to the actions docked above the tab bar.
+    const dock = (await page.locator('.screener-dock').boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(dock.y + 1);
+    expect(box.y + box.height).toBeGreaterThan(dock.y - 32);
+  } else expect(box.height).toBeGreaterThan(page.viewportSize()!.height * .75);
 });
 
 test('Chinese heatmap preserves original identities and makes narrow cell names readable', async ({ page }) => {

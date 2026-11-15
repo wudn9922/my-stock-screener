@@ -12,6 +12,8 @@ test('LINE stocks open a chart and repeated updates request only that stock; fai
   await mockSite(page, { fundamentals: true });
   await page.route('**/report/trending-stocks.json', route => route.fulfill({ json: trending }));
   await page.goto('./?page=screener');
+  // Phone and tablet show one market's chips at a time; the 台股｜美股 switch brings up the US row.
+  if (page.viewportSize()!.width < 1100) await page.getByRole('group', { name: '市場', exact: true }).getByRole('button', { name: '美股', exact: true }).click();
   await page.getByRole('button', { name: /^LINE 熱門/ }).click();
   const list = page.getByRole('list', { name: 'LINE 熱門股票清單', exact: true });
   await expect(list.locator('.row-id b')).toHaveText(trending.symbols);
@@ -64,6 +66,8 @@ test('LINE group is US-only, next to full market, and retains LINE order, univer
   await page.goto('./?page=screener');
   const rows = page.locator('.group-chips .chip-row');
   await expect(rows.nth(0).getByRole('button', { name: /LINE 熱門/ })).toHaveCount(0);
+  // Phone and tablet show one market's chips at a time; the 台股｜美股 switch brings up the US row.
+  if (page.viewportSize()!.width < 1100) await page.getByRole('group', { name: '市場', exact: true }).getByRole('button', { name: '美股', exact: true }).click();
   await expect(rows.nth(1).getByRole('button').nth(0)).toHaveAttribute('aria-label', '美股全市場篩選');
   await expect(rows.nth(1).getByRole('button').nth(1)).toHaveText('LINE 熱門');
   await rows.nth(1).getByRole('button', { name: /LINE 熱門/ }).click();

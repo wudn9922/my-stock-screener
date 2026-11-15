@@ -1089,7 +1089,8 @@ h3 {
   font-weight: 600;
 }
 .ma-chip-prefix,
-.index-card-sign {
+.index-card-sign,
+.change-sign {
   font-style: normal;
 }
 .ma-chip-prefix {
@@ -1864,49 +1865,6 @@ h3 {
   .data-table tbody tr:hover th {
     background: var(--surface-2);
   }
-  .screener-page {
-    padding-bottom: 10px;
-  }
-  .screener-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'id quote'
-      'mas quote';
-    grid-template-rows: 34px 22px;
-    row-gap: 0;
-    padding: 4px 12px;
-    align-content: center;
-  }
-  .row-id {
-    grid-area: id;
-    flex-direction: row;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .row-mas {
-    grid-area: mas;
-  }
-  .ma-pill {
-    font-size: 11px;
-    padding: 1px 5px;
-  }
-  .row-pe,
-  .row-chevron {
-    display: none;
-  }
-  .row-quote {
-    grid-area: quote;
-  }
-  .screener-tools .result-count,
-  .screener-head {
-    display: none;
-  }
-  .sort-field select {
-    max-width: 128px;
-  }
-  .chip-row-label {
-    width: 28px;
-  }
   .page-foot {
     flex-direction: column;
   }
@@ -1935,6 +1893,7 @@ h3 {
 
 /* Quote, percentage, ticker and date typography; no CJK web-font download. */
 .num, .report-date, .row-id b, .row-quote, .row-pe, .change-pill,
+.ma-pill, .chip-count, .chip-unmatched,
 .index-score b, .index-value, .index-change, .tile-value,
 .asset-list-row b, .asset-list-row strong, time {
   font-family: var(--font-num);
@@ -2227,4 +2186,497 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
+}
+
+/* -- Screener (phone and tablet, 1099px and below): 資料日 and the 台股｜美股 switch, one market's chips,
+   search / 篩選 / 排序, a four-column list that fills the screen, and the list actions docked above the tab bar. */
+@media (max-width: 1099px) {
+  .site[data-page='screener'] {
+    /* Dock: 12px padding, 48px buttons, 12px padding and its 1px top border. */
+    --screener-dock: 73px;
+  }
+  .screener-page {
+    padding-top: 14px;
+    padding-bottom: 16px;
+    /* A transform would make the page the dock's containing block while it animates in; fade only. */
+    animation-name: fade-in;
+  }
+  .site[data-page='screener'] .site-data-footer {
+    margin-bottom: calc(16px + var(--screener-dock));
+  }
+  .screener-page > .page-head {
+    display: none;
+  }
+  /* The head, chips, toolbar and list fill the screen down to the dock, so the virtual list ends right above it;
+     選股結果變化 and the page footer follow below. */
+  .screener-body {
+    flex: none;
+    gap: 8px;
+    min-height: calc(100dvh - var(--safe-top) - var(--topbar) - var(--tabbar) - var(--safe-bottom) - var(--screener-dock) - 14px);
+  }
+  .screener-page > .screener-changes {
+    margin-top: 16px;
+  }
+  .screener-market-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+  }
+  .screener-page .screener-market-switch {
+    display: flex;
+  }
+  .screener-page .screener-market-switch > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+  }
+
+  /* Group chips: the selected market's row scrolls sideways edge to edge. */
+  .screener-page .group-chips {
+    margin: 0 calc(-1 * var(--screener-gutter, 16px));
+  }
+  .screener-page .chip-row {
+    gap: 8px;
+    padding: 2px var(--screener-gutter, 16px) 0;
+    scroll-padding-inline: var(--screener-gutter, 16px);
+  }
+  .screener-page .chip-row.is-other-market,
+  .screener-page .chip-row-label,
+  .screener-page .chip .lucide,
+  .screener-page .chip-kind {
+    display: none;
+  }
+  .screener-page .chip {
+    position: relative;
+    gap: 4px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: none;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  /* 40px chip, 44px touch target. */
+  .screener-page .chip::before {
+    content: '';
+    position: absolute;
+    inset: -2px 0;
+  }
+  .screener-page .chip.active {
+    border-color: var(--accent);
+    background: none;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .screener-page .chip .chip-count {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-3);
+  }
+  .screener-page .chip.active .chip-count {
+    color: inherit;
+  }
+
+  /* Search, 篩選 and 排序: 44px, radius 12, on --surface. */
+  .screener-page .screener-tools {
+    gap: 8px;
+  }
+  .screener-page .filter-field,
+  .screener-page .filter-open-button,
+  .screener-page .sort-field {
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .screener-page .filter-field {
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--text-3);
+  }
+  .screener-page .filter-field:focus-within {
+    border-color: var(--accent);
+  }
+  .screener-page .filter-field input {
+    min-height: 40px;
+    color: var(--text);
+    font-size: 16px;
+  }
+  .screener-page .filter-open-button,
+  .screener-page .sort-field {
+    gap: 6px;
+    padding: 0 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 400;
+  }
+  .screener-page .filter-open-button.active,
+  .screener-page .sort-field.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .screener-page .filter-badge {
+    color: #14110A;
+  }
+  .screener-page .sort-field {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .screener-page .sort-face {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .screener-page .sort-field select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-width: none;
+    opacity: 0;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .screener-page .sort-field:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .screener-tools .result-count,
+  .screener-meta.is-in-head {
+    display: none;
+  }
+
+  /* Column header and rows share one grid. */
+  .screener-page .screener-head,
+  .screener-page .screener-row {
+    grid-template-columns: minmax(0, 1fr) 84px 52px 84px;
+    gap: 10px;
+  }
+  .screener-page .screener-head {
+    align-items: end;
+    height: 32px;
+    margin: 0 0 -8px;
+    padding: 0 0 6px;
+    border-bottom: 1px solid var(--border-strong);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .screener-page .screener-head .head-ma {
+    text-align: center;
+  }
+  .screener-page .screener-list {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 240px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .screener-page .screener-row {
+    height: 64px;
+    padding: 0;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .screener-more {
+    margin: -4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-3);
+    text-align: center;
+  }
+  .screener-page .screener-charts {
+    margin: 0 calc(-1 * var(--screener-gutter, 16px));
+    padding: 0 var(--screener-gutter, 16px);
+  }
+
+  /* Column 1: ticker (+ status / earnings badges), name, an observation-date note when it differs. */
+  .screener-page .row-id {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 2px;
+  }
+  .screener-page .row-id > b,
+  .screener-page .row-id > .row-sym,
+  .screener-page .row-id > .earn-badge {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .screener-page .row-id > .earn-badge {
+    justify-self: start;
+    max-width: 100%;
+  }
+  .screener-page .row-id b {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .screener-page .row-id > small {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--text-2);
+  }
+  .screener-page .row-id > small.row-observation-date {
+    font-size: 10px;
+    line-height: 1.1;
+    color: var(--text-3);
+  }
+
+  /* Column 2: distance to the first MA as a centred bar, or up to two metric pills when a filter adds them. */
+  .screener-page .row-mas {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    overflow: hidden;
+  }
+  .screener-page .row-mas.has-metrics {
+    flex-wrap: nowrap;
+    align-content: normal;
+    max-height: none;
+  }
+  .screener-page .row-mas > .metric-pill {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 1px 5px;
+  }
+  .row-ma-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+  .ma-bar-track {
+    position: relative;
+    width: 84px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-2);
+  }
+  .ma-bar-track::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: var(--text-3);
+  }
+  .ma-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+  .row-ma-bar.up .ma-bar-fill {
+    left: 50%;
+    border-radius: 0 3px 3px 0;
+    background: var(--up);
+  }
+  .row-ma-bar.down .ma-bar-fill {
+    right: 50%;
+    border-radius: 3px 0 0 3px;
+    background: var(--down);
+  }
+  .ma-bar-value {
+    font: 400 12px/1.2 var(--font-num);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-2);
+  }
+  .row-ma-bar.up .ma-bar-value { color: var(--up); }
+  .row-ma-bar.down .ma-bar-value { color: var(--down); }
+  /* The note goes into the row's title; search reads it from the data. */
+  .screener-page .row-mas > .row-note {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  /* Column 3: P/E. Column 4: close, then ▲/▼ and the unsigned change. */
+  .screener-page .row-pe {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .screener-page .row-pe small {
+    display: none;
+  }
+  .screener-page .row-pe .pe-loss {
+    color: inherit;
+    font: 400 12px/1.4 var(--font-ui);
+  }
+  .screener-page .row-quote b {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .screener-page .row-quote .change-pill {
+    min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .screener-page .row-quote.up .change-pill::before { content: '▲ '; }
+  .screener-page .row-quote.down .change-pill::before { content: '▼ '; }
+  .screener-page .change-sign {
+    display: none;
+  }
+
+  /* Dock above the tab bar: 連續看圖, 存成清單, CSV (and the list name form while saving). */
+  .screener-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tabbar) + var(--safe-bottom));
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px calc(16px + var(--safe-right)) 12px calc(16px + var(--safe-left));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .screener-dock-actions,
+  .screener-dock > .save-watchlist,
+  .screener-dock > [role='alert'] {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .screener-dock-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .screener-dock-actions > button {
+    flex: none;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: none;
+    color: var(--text);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .screener-dock .screener-dock-charts {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 0;
+    background: var(--accent);
+    color: #14110A;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .screener-dock .screener-dock-csv {
+    font-family: var(--font-num);
+    font-size: 13px;
+  }
+  .screener-dock > .save-watchlist {
+    flex-wrap: nowrap;
+    padding: 0;
+  }
+  .screener-dock > .save-watchlist input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .screener-dock > .save-watchlist .primary-button {
+    flex: none;
+    min-height: 44px;
+  }
+  .screener-dock > [role='alert'] {
+    font-size: 12px;
+    color: var(--down);
+  }
+}
+/* Phone: the MA list goes into the row's title and accessible label (still read by assistive technology). */
+@media (max-width: 767px) {
+  .screener-page .row-mas > .ma-pill {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+/* Tablet: wider columns; the bar keeps the left of column 2 and the three MA values stack beside it. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .screener-page {
+    --screener-gutter: 24px;
+  }
+  .screener-page .screener-head,
+  .screener-page .screener-row {
+    grid-template-columns: minmax(0, 1fr) 240px 72px 110px;
+  }
+  .screener-page .screener-head .head-ma {
+    text-align: left;
+  }
+  .screener-page .row-mas {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-auto-flow: row dense;
+    align-content: center;
+    justify-items: start;
+    column-gap: 12px;
+    row-gap: 1px;
+  }
+  .screener-page .row-mas > .row-ma-bar {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: center;
+  }
+  .screener-page .row-mas > .metric-pill {
+    grid-column: 1;
+  }
+  .screener-page .row-mas > .ma-pill {
+    grid-column: 2;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .screener-page .row-ma-bar .ma-bar-value {
+    display: none;
+  }
+  .screener-page .row-mas > .ma-pill.up { color: var(--up); }
+  .screener-page .row-mas > .ma-pill.down { color: var(--down); }
 }

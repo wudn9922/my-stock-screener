@@ -125,7 +125,9 @@
     padding: 14px 16px 10px;
     background: var(--bg);
   }
-  .market-head-date {
+  /* Shared with the 選股 head (資料日 on the left, 台股｜美股 on the right). */
+  .market-head-date,
+  .screener-head-date {
     display: block;
     min-width: 0;
     overflow: hidden;
@@ -135,7 +137,8 @@
     font: 400 12px/1.4 var(--font-num);
     font-variant-numeric: tabular-nums;
   }
-  .market-head .market-section-nav {
+  .market-head .market-section-nav,
+  .screener-market-switch {
     position: static;
     flex: none;
     margin: 0 0 0 auto;
@@ -144,7 +147,8 @@
     background: var(--surface);
     box-shadow: none;
   }
-  .market-head .market-section-nav > a {
+  .market-head .market-section-nav > a,
+  .screener-market-switch > button {
     position: relative;
     flex: none;
     min-width: 0;
@@ -156,8 +160,10 @@
     font-weight: 400;
   }
   /* The item is 40px tall inside the 2px container padding; this keeps the full 44px hit area. */
-  .market-head .market-section-nav > a::before { content: ''; position: absolute; inset: -2px 0; }
-  .market-head .market-section-nav > a.active { background: var(--surface-3); color: var(--text); font-weight: 700; box-shadow: none; }
+  .market-head .market-section-nav > a::before,
+  .screener-market-switch > button::before { content: ''; position: absolute; inset: -2px 0; }
+  .market-head .market-section-nav > a.active,
+  .screener-market-switch > button.active { background: var(--surface-3); color: var(--text); font-weight: 700; box-shadow: none; }
 }
 @media (min-width: 768px) and (max-width: 1099px) {
   .market-head { padding-left: 24px; padding-right: 24px; }
