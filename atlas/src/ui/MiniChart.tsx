@@ -191,7 +191,10 @@ export function MiniChart({
       localization: { locale: 'zh-TW' },
     });
     chartRef.current = chart;
+    // Index levels in the thousands read better without cents on the axis; the card shows the exact value.
+    const lastClose = (barsRef.current ?? bars).at(-1)?.close ?? 0;
     const candles = chart.addSeries(CandlestickSeries, {
+      ...(lastClose >= 1000 ? { priceFormat: { type: 'price' as const, precision: 0, minMove: 1 } } : {}),
       upColor: up,
       downColor: down,
       borderVisible: false,

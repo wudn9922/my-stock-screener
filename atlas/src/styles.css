@@ -2130,15 +2130,19 @@ h3 {
     font-size: 11px;
     color: var(--text-3);
   }
-  /* Candlestick plot is exactly 150px; the zoom row hangs directly under it (44px reserved). */
+  /* Candles get about 150px above a 26px time axis; the zoom row hangs directly under it (44px reserved). */
   .markets-page .index-card .mini-chart {
-    --mini-chart-height: 150px;
+    --mini-chart-height: 176px;
     margin-bottom: 44px;
     border-radius: 0;
     overflow: visible;
   }
   .markets-page .index-card .mini-chart-interactive .mini-chart-canvas {
     top: 0;
+  }
+  /* The page footer carries the TradingView attribution (ChartAttribution); the logo would cover candles here. */
+  .markets-page .index-card #tv-attr-logo {
+    display: none;
   }
   .markets-page .index-card .mini-chart-controls {
     position: absolute;
