@@ -4,13 +4,15 @@ import { ChevronDown } from 'lucide-react';
 /**
  * Header controls open their details in a floating panel
  * over the chart instead of adding rows that shrink it. Children stay mounted while closed so their data loads once.
+ * `inline` (rows of the phone 更多 menu) opens the details in flow under the trigger instead of floating.
  */
-export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyle = false, testId = 'stock-stats-toggle' }: { label: string; children: ReactNode | ((open: boolean) => ReactNode); trigger?: ReactNode; triggerLabel?: string; tabStyle?: boolean; testId?: string }) {
+export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyle = false, inline = false, className, testId = 'stock-stats-toggle' }: { label: string; children: ReactNode | ((open: boolean, close: () => void) => ReactNode); trigger?: ReactNode; triggerLabel?: string; tabStyle?: boolean; inline?: boolean; className?: string; testId?: string }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<CSSProperties>();
   const placePanel = useCallback(() => {
+    if (inline) return;
     const bounds = root.current?.getBoundingClientRect();
     if (!bounds) return;
     const width = Math.min(380, window.innerWidth - 24);
@@ -18,7 +20,7 @@ export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyl
     const bottom = navigation && navigation.height > 0 && !root.current?.closest('.chart-focus') ? navigation.top : window.innerHeight;
     const top = Math.max(8, Math.min(bounds.bottom + 6, bottom - 100));
     setPosition({ position: 'fixed', top, left: Math.max(12, Math.min(bounds.left, window.innerWidth - width - 12)), right: 'auto', width, maxHeight: Math.max(0, bottom - top - 12) });
-  }, []);
+  }, [inline]);
   useEffect(() => {
     if (!open) return;
     const outside = (event: Event) => {
@@ -41,7 +43,7 @@ export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyl
     };
   }, [open, placePanel]);
   return (
-    <div className="ws-stats-menu" ref={root}>
+    <div className={`ws-stats-menu${inline ? ' ws-stats-menu-inline' : ''}${className ? ` ${className}` : ''}`} ref={root}>
       <button
         type="button"
         className={`ws-stats-toggle${tabStyle ? ' stock-tab-trigger' : ''}`}
@@ -55,7 +57,7 @@ export function StockStatsMenu({ label, children, trigger, triggerLabel, tabStyl
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       <div id={panelId} className="ws-stats-panel" style={position} role="region" aria-label={label} hidden={!open}>
-        {typeof children === 'function' ? children(open) : children}
+        {typeof children === 'function' ? children(open, () => setOpen(false)) : children}
       </div>
     </div>
   );
