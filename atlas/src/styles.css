@@ -2234,6 +2234,11 @@ h3 {
     padding: 0 18px;
   }
 
+  /* Edge-to-edge chip and chart rows use negative margins; WebKit measured 3px of page overflow at 320px
+     that Chromium does not. Clip (not hide) so sticky heads and the fixed dock keep working. */
+  .screener-page {
+    overflow-x: clip;
+  }
   /* Group chips: the selected market's row scrolls sideways edge to edge. */
   .screener-page .group-chips {
     margin: 0 calc(-1 * var(--screener-gutter, 16px));
