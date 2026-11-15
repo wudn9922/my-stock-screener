@@ -119,6 +119,7 @@ test("compact home reserves at least 80% of main viewport for quotes; tickers le
   expect(geometry.overflow).toBe(0);
   for (const button of await board
     .locator(".wb-toolbar button, .wb-list-toolbar button, select")
+    .filter({ visible: true })
     .all())
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: testInfo.outputPath("compact-watchlist.png") });
