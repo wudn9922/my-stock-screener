@@ -185,10 +185,10 @@
   .watchlist-page .wb-legacy-actions { display: none; }
   .watchlist-page .wb-tabs button, .watchlist-page .wb-view-switch button { box-sizing: border-box; flex-shrink: 0; height: 44px; min-height: 44px; align-self: flex-start; }
   .watchlist-page .wb-list-toolbar { flex-wrap: nowrap; height: 40px; min-height: 40px; padding: 0; }
-  .watchlist-page .wb-chart-toggle { height: 32px; min-height: 32px; padding: 0 10px; font-size: 12px; border-radius: 8px; background: var(--surface-3); }
+  .watchlist-page .wb-chart-toggle { height: 44px; min-height: 44px; padding: 0 10px; font-size: 12px; border-radius: 8px; background: var(--surface-3); }
   .watchlist-page .wb-live-time { order: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .watchlist-page .wb-list-picker { flex: 0 1 115px; min-width: 0; }
-  .watchlist-page .wb-list-picker select { height: 32px; min-height: 32px; padding: 0 4px; }
+  .watchlist-page .wb-list-picker select { height: 44px; min-height: 44px; padding: 0 4px; }
   .watchlist-page .wb-row:has(.wb-extended) .wb-quote { width: max-content; flex-shrink: 0; max-width: 132px; }
   .watchlist-page .wb-row:has(.wb-extended) .wb-spark { min-width: 50px; }
   .watchlist-page .wb-extended { font-size: 10px; }
@@ -208,6 +208,6 @@
 
 @media (max-width: 767px) {
   .watchlist-page .wb-toolbar { min-height: 44px; height: 44px; }
-  .watchlist-page .wb-list-toolbar { box-sizing: border-box; }
+  .watchlist-page .wb-list-toolbar { box-sizing: border-box; height: auto; }
   .watchlist-page .wb-action-sheet { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 }

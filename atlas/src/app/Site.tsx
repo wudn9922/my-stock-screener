@@ -28,7 +28,7 @@ import {
 } from './routeMemory';
 import { chartListFor, listPosition, listState, rememberChartList, type ChartListContext, type ChartListItem } from './listContext';
 import { ListNavBar } from '../ui/ListNavBar';
-import { requestWatchlistActions } from './watchlistActionsRequest';
+import { requestWatchlistActions, watchlistActionsRequest } from './watchlistActionsRequest';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -132,6 +132,9 @@ export function Site() {
   const localSymbols = useMemo(() => [...reportSymbols(report), ...WORLD_ASSETS.map(asset => ({ symbol: asset.symbol, name: `${asset.ticker} ${asset.name}` }))], [report]);
 
   useEffect(() => applyColorConvention(preferences.colors), [preferences.colors]);
+  useEffect(() => {
+    if (route.page !== 'watchlist') watchlistActionsRequest.consume();
+  }, [route.page]);
   // A navigation that names a symbol becomes one chart request (URL syncs never repeat it).
   useEffect(() => {
     if (route.page !== 'chart' || !route.symbol) return;
