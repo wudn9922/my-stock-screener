@@ -9,13 +9,17 @@ import { peRiverPercentile, type PeRiverFile } from '../fundamentals/peRiverRank
  * Screener filter conditions: state, the compact `f` URL encoding and the pure filter itself.
  *
  * Encoding (`;`-separated, canonical order, open range ends left empty, `~` also accepted):
- * `ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;eps:8:15:75;epsy:2:15;epss:3;rev:4:10;revy:3:0;acc:1;tn:0;nd:keep`
+ * `ema20:-5:5;tr:a20,a50,stack;hi:10;rs:80;rs3:0;rs1:0;vr:1.2;atr:3;rng:15;eps:8:15:75;epsy:2:15;epss:3;rev:4:10;revy:3:0;acc:1;tn:0;nd:keep`
  * - ema20: inclusive distance range in % (smallest fixed SMA when configured, otherwise EMA20)
- * - tr: trend flags (above MA20/50/200, MA20 rising, bullish stack 0 < d20 < d50 < d200, no downtrend)
+ * - tr: trend flags (above MA20/50/200, MA20 rising, bullish stack 0 < d20 < d50 < d200, no downtrend, `near20` =
+ *   close within −2%…+1% of the 20-day SMA, bounds included; the MA distance ranges stay retired)
  * - hi: within N% of the 52-week high; rs: RS percentile ≥ N (rank within the market's universe);
  *   rs3 / rs1: 3-month / 1-month relative return vs the market's benchmark index > N%
  * - vr: volume vs the previous session ≥ N (today ÷ yesterday)
  * - vol: 20-session average volume ≥ N (canonical integer shares; Taiwan input/display uses lots)
+ * - atr:N: ATR% ≤ N (Wilder ATR14 ÷ close × 100, inclusive); rng:N: 20-day range width ≤ N% ((20-bar highest high −
+ *   lowest low) ÷ lowest low × 100, inclusive). N is a positive number; stocks without the value are excluded, and a
+ *   file without the column leaves the condition unapplied (「未套用」).
  * - pe: inclusive nonnegative P/E bounds, `pe:10:20`, `pe::20` or `pe:10:`. TTM first, annual fallback,
  *   matching the displayed figure; losses and missing figures are always excluded.
  * - per: inclusive percentile bounds (0–100) of the current P/E on the stock's own P/E river, `per::30` (cheapest
@@ -83,7 +87,7 @@ export const SHARE_PRESETS: readonly number[] = [50, 75, 100];
 /** Periods with data a gate needs before it judges a stock: ceil(N ÷ 2). Fewer is 「資料不足」 (see keepMissing). */
 export const enoughPeriods = (periods: number): number => Math.ceil(periods / 2);
 
-export const TREND_FLAGS = ['a20', 'a50', 'a200', 'slope', 'stack', 'nobear'] as const;
+export const TREND_FLAGS = ['a20', 'a50', 'a200', 'slope', 'stack', 'nobear', 'near20'] as const;
 export type TrendFlag = (typeof TREND_FLAGS)[number];
 export const TREND_LABELS: Record<TrendFlag, string> = {
   a20: '站上MA20',
@@ -92,7 +96,10 @@ export const TREND_LABELS: Record<TrendFlag, string> = {
   slope: 'MA20上彎',
   stack: '多頭排列',
   nobear: '排除空頭',
+  near20: '貼近MA20（−2%～+1%）',
 };
+/** `near20`: the close's distance from the 20-day SMA, in %, inclusive on both ends. */
+export const NEAR20_RANGE = Object.freeze({ min: -2, max: 1 });
 
 export interface FilterState {
   /** Retired condition; ignored when parsing, serializing and filtering. */
@@ -107,6 +114,10 @@ export interface FilterState {
   vr: number | null;
   /** Minimum 20-session average volume in shares; null means no volume threshold. */
   vol: number | null;
+  /** ATR% ≤ N (metrics.atrPct); optional for saved conditions, null/absent means unrestricted. */
+  atr?: number | null;
+  /** 20-day range width ≤ N% (metrics.range20); optional for saved conditions, null/absent means unrestricted. */
+  rng?: number | null;
   /** Optional for compatibility with existing saved conditions; null/absent means unrestricted. */
   pe?: FilterRange | null;
   /** P/E river percentile bounds (0–100); optional for saved conditions, null/absent means unrestricted. */
@@ -168,6 +179,21 @@ export const formatShares = (shares: number): string =>
 export const toggleVolume = (current: number | null, next: number | null): number | null => (next === current ? null : next);
 /** An applied threshold that is not one of the presets (an old link): shown as 「目前條件」, no preset lit. */
 export const isCustomVolume = (value: number | null): value is number => value !== null && !VOLUME_PRESETS.includes(value);
+
+/**
+ * One-tap preset 「潛伏」: the conditions of the daily LINE 「台股-全市場潛伏」 list — close within −2%…+1% of the
+ * MA20 (`near20`), MA20 rising (`slope`), minimum daily volume 1,000,000 shares (Taiwan only; the US list has no
+ * volume floor) — sorted by RS 百分位 from strong to weak. Only ordinary filter / sort state: each condition can be
+ * removed on its own afterwards, and the result is shared through the usual `f` link.
+ */
+export const AMBUSH_PRESET_LABEL = '潛伏';
+export const AMBUSH_MIN_VOLUME_TW = 1_000_000;
+export function ambushPreset(market: 'TW' | 'US'): { filters: FilterState; sort: 'rs' } {
+  return {
+    filters: { ...EMPTY_FILTERS, tr: TREND_FLAGS.filter((flag) => flag === 'near20' || flag === 'slope'), vol: market === 'TW' ? AMBUSH_MIN_VOLUME_TW : null },
+    sort: 'rs',
+  };
+}
 
 export const FILTER_PARAM_MAX = 2000;
 export const FILTER_PARAM_PATTERN = /^[A-Za-z0-9:.,;_~-]{1,2000}$/;
@@ -271,6 +297,9 @@ export function parseFilters(value: string | null | undefined): FilterState {
     } else if (key === 'vol') {
       const vol = parts.length === 1 ? number(parts[0]) : null;
       state.vol = vol !== null && Number.isSafeInteger(vol) && vol > 0 ? vol : null;
+    } else if (key === 'atr' || key === 'rng') {
+      const bound = parts.length === 1 ? number(parts[0]) : null;
+      if (bound !== null && bound > 0) state[key] = bound;
     } else if (key === 'pe' && parts.length === 2) {
       const range = peRangeOf(parts[0]!, parts[1]!);
       if (range) state.pe = range;
@@ -312,6 +341,8 @@ export function serializeFilters(state: FilterState): string {
   if (state.rs1 !== null) tokens.push(`rs1:${formatNumber(state.rs1)}`);
   if (state.vr !== null) tokens.push(`vr:${formatNumber(state.vr)}`);
   if (state.vol !== null) tokens.push(`vol:${state.vol}`);
+  if (state.atr != null) tokens.push(`atr:${formatNumber(state.atr)}`);
+  if (state.rng != null) tokens.push(`rng:${formatNumber(state.rng)}`);
   if (state.pe) tokens.push(`pe:${formatRangeParam(state.pe)}`);
   if (state.per) tokens.push(`per:${formatRangeParam(state.per)}`);
   if (state.eps) tokens.push(gateParam('eps', state.eps.quarters, state.eps.min, state.eps.share));
@@ -504,8 +535,8 @@ export function accelCoverage(items: readonly GroupItem[], growth: GrowthFile | 
 
 // ---------------------------------------------------------- availability
 
-export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'vol' | 'pe' | 'per' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
-export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'vol', 'pe', 'per', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
+export type FilterKey = 'chg' | 'ema20' | 'tr' | 'hi' | 'rs' | 'rs3' | 'rs1' | 'vr' | 'vol' | 'atr' | 'rng' | 'pe' | 'per' | 'eps' | 'rev' | 'epsY' | 'revY' | 'epss' | 'accel' | 'accelY';
+export const FILTER_KEYS: readonly FilterKey[] = ['chg', 'ema20', 'tr', 'hi', 'rs', 'rs3', 'rs1', 'vr', 'vol', 'atr', 'rng', 'pe', 'per', 'eps', 'rev', 'epsY', 'revY', 'epss', 'accel', 'accelY'];
 /** SMA distances are no longer a filter, but the trend flags still need them; their availability is tracked too. */
 export type TrendMaKey = 'ma20' | 'ma50' | 'ma200';
 
@@ -565,6 +596,8 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
     rs1: reason(any((item) => item.metrics?.rs21)),
     vr: reason(any((item) => item.metrics?.volVsPrev)),
     vol: any((item) => item.metrics?.volumeAvg20) ? null : '此群組沒有近 20 日平均成交量資料（需完整 20 個交易日）',
+    atr: reason(any((item) => item.metrics?.atrPct)),
+    rng: reason(any((item) => item.metrics?.range20)),
     pe: context.pe === undefined ? '本益比資料載入中…' : context.pe === null ? '本益比資料尚未產生或暫時無法取得' : null,
     per: context.peRiver === undefined
       ? '本益比河流資料載入中…'
@@ -585,7 +618,7 @@ export function filterAvailability(items: readonly GroupItem[], context: FilterC
 
 /** Trend flags reuse the MA distances, so most work on report rows without metrics too. */
 export function trendFlagUnavailable(flag: TrendFlag, availability: FilterAvailability): string | null {
-  if (flag === 'a20') return availability.ma20;
+  if (flag === 'a20' || flag === 'near20') return availability.ma20;
   if (flag === 'a50') return availability.ma50;
   if (flag === 'a200') return availability.ma200;
   if (flag === 'stack') return availability.ma20 ?? availability.ma50 ?? availability.ma200;
@@ -601,6 +634,11 @@ const TREND_TESTS: Record<TrendFlag, (item: GroupItem) => boolean> = {
   a20: (item) => (maDeviation(item, 20) ?? 0) > 0,
   a50: (item) => (maDeviation(item, 50) ?? 0) > 0,
   a200: (item) => (maDeviation(item, 200) ?? 0) > 0,
+  near20: (item) => {
+    const distance = maDeviation(item, 20);
+    // The epsilon only absorbs float noise of distances derived from the group's MA values.
+    return distance !== null && distance >= NEAR20_RANGE.min - 1e-9 && distance <= NEAR20_RANGE.max + 1e-9;
+  },
   slope: (item) => (item.metrics?.ma20Slope5 ?? 0) > 0,
   stack: (item) => {
     const d20 = maDeviation(item, 20),
@@ -632,6 +670,9 @@ export function applyFilters(items: readonly GroupItem[], state: FilterState, co
   if (rs1 !== null && !available.rs1) tests.push((item) => (item.metrics?.rs21 ?? -Infinity) > rs1);
   if (vr !== null && !available.vr) tests.push((item) => (item.metrics?.volVsPrev ?? -Infinity) >= vr);
   if (vol !== null && !available.vol) tests.push((item) => (item.metrics?.volumeAvg20 ?? -Infinity) >= vol);
+  const { atr, rng } = state;
+  if (atr != null && !available.atr) tests.push((item) => (item.metrics?.atrPct ?? Infinity) <= atr);
+  if (rng != null && !available.rng) tests.push((item) => (item.metrics?.range20 ?? Infinity) <= rng);
   // An unavailable P/E source must never turn an applied numeric condition into an unfiltered list.
   if (state.pe) tests.push(item => item.status !== 'failed' && inRange(screenerPeValue(context.pe?.[item.symbol]), state.pe!));
   // Same rule as P/E: a missing river file or a stock without a current river position is excluded, never kept.
@@ -746,6 +787,8 @@ export function activeChips(state: FilterState, availability?: FilterAvailabilit
     chips.push({ id: 'rs1', key: 'rs1', label: state.rs1 === 0 ? '1月強於大盤' : `1月相對強弱 >${signed(state.rs1)}%` });
   if (state.vr !== null) chips.push({ id: 'vr', key: 'vr', label: `量比 ≥${formatNumber(state.vr)}` });
   if (state.vol !== null) chips.push({ id: 'vol', key: 'vol', label: `20 日均量 ≥${formatMarketVolume(state.vol, market)}` });
+  if (state.atr != null) chips.push({ id: 'atr', key: 'atr', label: `ATR% ≤${formatNumber(state.atr)}` });
+  if (state.rng != null) chips.push({ id: 'rng', key: 'rng', label: `20 日區間寬度 ≤${formatNumber(state.rng)}%` });
   if (state.pe) chips.push({ id: 'pe', key: 'pe', label: `本益比 ${formatPeRange(state.pe)}` });
   if (state.per) chips.push({ id: 'per', key: 'per', label: `河流分位 ${formatPeRiverRange(state.per)}` });
   if (state.eps) chips.push({ id: 'eps', key: 'eps', label: gateLabel('EPS', state.eps) });
@@ -786,7 +829,7 @@ export function removeFilter(state: FilterState, id: ChipId): FilterState {
       next.extraGates = next.extraGates!.filter((_, i) => i !== index);
     } else next[id] = null;
   } else if (id === 'chg' || id === 'ema20' || id === 'epss' || id === 'pe' || id === 'per') next[id] = null;
-  else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr' || id === 'vol') next[id] = null;
+  else if (id === 'hi' || id === 'rs' || id === 'rs3' || id === 'rs1' || id === 'vr' || id === 'vol' || id === 'atr' || id === 'rng') next[id] = null;
   else if (id === 'accel') next.accel = false;
   else if (id === 'accelY') next.accelY = false;
   else if (id === 'turn') next.turn = true;

@@ -37,16 +37,31 @@ const optional = <T extends z.ZodType>(schema: T) => z.unknown().optional().tran
   const parsed = schema.safeParse(value);
   return parsed.success ? (parsed.data as z.output<T>) : null;
 });
-const rangeSchema = z.object({
-  key: z.enum(MA_RANGE_KEYS),
-  min: period,
-  max: period,
-  windowYears: z.unknown().optional().transform(finiteOrNull),
-  final: period,
-  candidates: z.array(candidateSchema).catch([]),
-  /** Stock-level ranking: this stock's range best beats `pct`% of the reference stocks' range bests. */
-  rank: optional(rankSchema.extend({ best: z.number() })),
-});
+const periodOrNull = (value: unknown): number | null => {
+  const parsed = period.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+const rangeSchema = z
+  .object({
+    key: z.enum(MA_RANGE_KEYS),
+    min: period,
+    max: period,
+    windowYears: z.unknown().optional().transform(finiteOrNull),
+    final: period,
+    candidates: z.array(candidateSchema).catch([]),
+    /** Stock-level ranking: this stock's range best beats `pct`% of the reference stocks' range bests. */
+    rank: optional(rankSchema.extend({ best: z.number() })),
+    /** VERSION 3: even the best candidate's stop-and-reverse return in this range is <= 0 (absent/invalid: false). */
+    unsuitable: z.unknown().optional().transform((value) => value === true),
+    /** VERSION 3: `final` was kept from the previous run because the new best was not clearly better (absent/invalid: false). */
+    held: z.unknown().optional().transform((value) => value === true),
+    /** VERSION 3: the previous run's final for this range (absent/invalid: null). */
+    previousFinal: z.unknown().optional().transform(periodOrNull),
+    /** VERSION 3: the pick without hysteresis; absent/invalid defaults to `final` below. */
+    computedFinal: z.unknown().optional().transform(periodOrNull),
+  })
+  .transform((range) => ({ ...range, computedFinal: range.computedFinal ?? range.final }));
+const marketOrNull = (value: unknown): 'TW' | 'US' | null => (value === 'TW' || value === 'US' ? value : null);
 const v2CandidateSchema = z.object({
   period,
   score2y: z.unknown().optional().transform(finiteOrNull),
@@ -82,6 +97,19 @@ export const maRecommendationSchema = z.object({
   bars: z.unknown().optional().transform(finiteOrNull),
   limited: z.unknown().optional().transform((value) => value === true),
   referenceAsof: z.unknown().optional().transform((value) => (typeof value === 'string' ? value : null)),
+  /** VERSION 3: market whose settings were used (absent/invalid: null). */
+  market: z.unknown().optional().transform(marketOrNull),
+  /** VERSION 3: round-trip trading cost in percent used by the stop-and-reverse backtest (absent/invalid/negative: null). */
+  costPct: z.unknown().optional().transform((value) => {
+    const cost = finiteOrNull(value);
+    return cost !== null && cost >= 0 ? cost : null;
+  }),
+  /** VERSION 3: reference pool the scores were ranked against (absent/invalid: null). */
+  referencePool: z.unknown().optional().transform(marketOrNull),
+  /** VERSION 3: prices were dividend-adjusted (absent/invalid: false). */
+  adjusted: z.unknown().optional().transform((value) => value === true),
+  /** VERSION 3: scoring mode identifier; accepted, never displayed (absent/invalid: null). */
+  scoring: z.unknown().optional().transform((value) => (typeof value === 'string' ? value : null)),
   suitability: z
     .unknown()
     .optional()
@@ -110,6 +138,17 @@ export function maRecommendationUrl(
   origin: string = typeof location === 'undefined' ? 'http://localhost' : location.origin,
 ): string {
   return new URL(`ma-selector/${encodeURIComponent(symbol)}.json`, reportUrl(base, override, origin)).href;
+}
+
+const POOL_LABELS = { TW: '台股', US: '美股' } as const;
+
+/** Short meta parts built only from VERSION 3 fields that are present (empty for a VERSION 1/2 file). */
+export function maMetaParts(data: Pick<MaRecommendation, 'costPct' | 'referencePool' | 'adjusted'>): string[] {
+  const parts: string[] = [];
+  if (data.costPct !== null) parts.push(`回測成本 來回 ${Number(data.costPct.toFixed(3))}%`);
+  if (data.referencePool !== null) parts.push(`基準池：${POOL_LABELS[data.referencePool]}`);
+  if (data.adjusted) parts.push('已還原股利');
+  return parts;
 }
 
 const MISSING = '這檔股票還沒有建議均線（每月更新；只涵蓋報告的台股與 S&P 500）。';

@@ -18,10 +18,19 @@ function field(value: string | number | null | undefined): string {
 
 const round = (value: number | null, digits: number) => (value === null ? null : Number(value.toFixed(digits)));
 
+const CSV_METRIC_COLUMNS: readonly { title: string; digits: number; value: (item: GroupItem) => number | null }[] = [
+  { title: 'RS分數%（3/6/9/12月相對報酬加權40/20/20/20）', digits: 2, value: (item) => item.metrics?.rsScore ?? null },
+  { title: 'ATR%', digits: 2, value: (item) => item.metrics?.atrPct ?? null },
+  { title: '20日區間寬度%', digits: 2, value: (item) => item.metrics?.range20 ?? null },
+];
+
 /** The screener list as shown (same rows, same order) for a spreadsheet. Missing values stay empty. */
 export function screenerCsv(items: readonly GroupItem[]): string {
   const periods = [...new Set(items.flatMap((item) => item.maList))].sort((a, b) => a - b).slice(0, MAX_MA_COLUMNS);
-  const header = ['代號', '名稱', '收盤', '漲跌幅%', '成交量', ...periods.flatMap((period) => [`MA${period}`, `距MA${period}%`]), '資料日', '備註'];
+  // Metric columns the screener list can filter on; written only when some row has the value, so a file built
+  // before the column existed exports exactly as before.
+  const metricColumns = CSV_METRIC_COLUMNS.filter(({ value }) => items.some((item) => value(item) !== null));
+  const header = ['代號', '名稱', '收盤', '漲跌幅%', '成交量', ...periods.flatMap((period) => [`MA${period}`, `距MA${period}%`]), '資料日', '備註', ...metricColumns.map(({ title }) => title)];
   const rows = items.map((item) => [
     displayTicker(item.symbol),
     item.name,
@@ -34,6 +43,7 @@ export function screenerCsv(items: readonly GroupItem[]): string {
     }),
     item.asOf,
     item.note,
+    ...metricColumns.map(({ value, digits }) => round(value(item), digits)),
   ]);
   return BOM + [header, ...rows].map((row) => row.map(field).join(',')).join('\r\n') + '\r\n';
 }

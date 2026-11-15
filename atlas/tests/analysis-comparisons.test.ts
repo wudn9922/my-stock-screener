@@ -10,6 +10,8 @@ import {
   parseScreenerSnapshot,
 } from "../src/report/screenerHistory";
 import {
+  headlineReturn,
+  industryMethodNote,
   parseIndustryRotation,
   sortIndustryRotation,
 } from "../src/report/industryRotation";
@@ -190,5 +192,92 @@ describe("industry comparison", () => {
       sortIndustryRotation(rows, "returnPct").map((row) => row.name),
     ).toEqual(["b", "c", "a"]);
     expect(rows[0].name).toBe("a");
+  });
+});
+describe("industry comparison method fields", () => {
+  const oldRow = {
+    name: "a",
+    count: 4,
+    validCount: 4,
+    returnPct: 17.7,
+    upShare: 60,
+    volumeRatio: null,
+    volumeCount: 0,
+    pairedCount: 0,
+    previousReturnPct: null,
+    momentumChange: null,
+    rank: 1,
+  };
+  const file = (rowValue: object, extra: object = {}) => {
+    const period = {
+      startDate: "2026-10-01",
+      endDate: "2026-11-12",
+      volumePreviousStart: "2026-09-01",
+      rows: [rowValue],
+    };
+    return {
+      version: 1,
+      generatedAt: "2026-11-13T00:00:00Z",
+      markets: {
+        US: {
+          asOf: "2026-11-12",
+          scope: "full",
+          ...extra,
+          periods: { d1: period, w1: period, m1: period, m3: period },
+        },
+      },
+    };
+  };
+  const method = { rankBy: "median" as const, minAmount: 5_000_000, minPrice: 5, minMembers: 3 };
+
+  it("parses a file published before the method fields existed and falls back to the mean", () => {
+    const parsed = parseIndustryRotation(file(oldRow));
+    const parsedRow = parsed?.markets.US?.periods.m1.rows[0];
+    expect(parsedRow).toBeDefined();
+    expect(parsed?.markets.US?.method).toBeUndefined();
+    expect(headlineReturn(parsedRow!)).toBe(17.7);
+  });
+
+  it("parses the new fields and uses the median as headline, including null for unranked groups", () => {
+    const ranked = {
+      ...oldRow,
+      liquidCount: 4,
+      medianReturnPct: 3.5,
+      capWeightedReturnPct: null,
+    };
+    const parsed = parseIndustryRotation(file(ranked, { method }));
+    const parsedRow = parsed?.markets.US?.periods.m1.rows[0];
+    expect(parsed?.markets.US?.method).toEqual(method);
+    expect(parsedRow?.capWeightedReturnPct).toBeNull();
+    expect(headlineReturn(parsedRow!)).toBe(3.5);
+    const unranked = { ...ranked, returnPct: null, medianReturnPct: null, rank: null };
+    const unrankedRow = parseIndustryRotation(file(unranked, { method }))?.markets.US?.periods.m1.rows[0];
+    expect(headlineReturn(unrankedRow!)).toBeNull();
+  });
+
+  it("rejects a malformed method block", () => {
+    expect(parseIndustryRotation(file(oldRow, { method: { ...method, rankBy: "mean" } }))).toBeNull();
+  });
+
+  it("sorts by the median headline when present, otherwise by the mean", () => {
+    const make = (name: string, returnPct: number | null, median?: number | null) => ({
+      ...oldRow,
+      name,
+      returnPct,
+      ...(median === undefined ? {} : { medianReturnPct: median }),
+    });
+    const withMedian = [make("spiky", 50, 1), make("steady", 5, 4), make("thin", null, null)];
+    expect(sortIndustryRotation(withMedian, "returnPct").map((r) => r.name)).toEqual(["steady", "spiky", "thin"]);
+    const legacy = [make("spiky", 50), make("steady", 5)];
+    expect(sortIndustryRotation(legacy, "returnPct").map((r) => r.name)).toEqual(["spiky", "steady"]);
+  });
+
+  it("builds the visible method note from the method block", () => {
+    expect(industryMethodNote(method, "US")).toBe(
+      "排名依中位數；僅計入 20 日均成交值 ≥ US$500萬、股價 ≥ US$5 的股票；少於 3 檔不排名。",
+    );
+    expect(industryMethodNote({ ...method, minAmount: 20_000_000, minPrice: 10 }, "TW")).toBe(
+      "排名依中位數；僅計入 20 日均成交值 ≥ NT$2,000萬、股價 ≥ NT$10 的股票；少於 3 檔不排名。",
+    );
   });
 });

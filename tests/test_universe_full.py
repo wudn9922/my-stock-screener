@@ -649,6 +649,16 @@ class EndToEndTest(unittest.TestCase):
         self.assertIsNone(row["sector"])
         self.assertEqual(row["marketCap"], round(1_000_000 * row["close"]))
         self.assertIsNotNone(row["rs63"])
+        # 新欄位在 universe 欄位契約裡（接在 volumeAvg20 之後、公司資料欄之前），全市場檔也有數值
+        self.assertEqual(document["fields"][-6:-3], ["rsScore", "atrPct", "range20"])
+        self.assertEqual(document["fields"][document["fields"].index("volumeAvg20") + 1:][:3], ["rsScore", "atrPct", "range20"])
+        for key in ("rsScore", "atrPct", "range20"):
+            self.assertIsNotNone(row[key], key)
+        # 基準與個股快取都涵蓋 252 根相對報酬所需的歷史（RS 綜合分數最長期間）
+        self.assertEqual(bu.FULL_RANGE, report_metrics.BENCH_DOWNLOAD_PERIOD)
+        self.assertGreater(uc.KEEP_BARS, 252)
+        for benchmark in ("^TWII", "SPY"):
+            self.assertGreaterEqual(len(uc.read_bars(uc.bars_path(self.cache, benchmark))), report_metrics.BENCH_RS_BARS)
         self.assertEqual(tw["rows"][-1][document["fields"].index("industry")], "電子零組件業")
         self.assertIsNone(tw["rows"][-1][document["fields"].index("marketCap")])  # 上櫃沒有股數
         # 美股：HALT 停牌被排除並計數；ETF、測試代號不在名單
@@ -929,12 +939,24 @@ class EndToEndTest(unittest.TestCase):
 # =========================================================================
 # main.py 與全市場檔共存
 # =========================================================================
-def full_market(as_of, rows=12):
+def full_market(as_of, rows=12, fields=None):
+    # 依欄位名稱排列（新檔有 rsScore；舊檔的 fields 沒有 rsScore／atrPct／range20）
+    fields = fields or bu.FULL_FIELDS
+
+    def row(i):
+        values = {"symbol": f"S{i}", "name": f"S{i}", "rs63": float(i), "rsScore": float(i), "asOf": as_of,
+                  "sector": "Tech", "industry": "Software", "marketCap": 1000 * i}
+        return [values.get(field) for field in fields]
+
     return {
         "benchmark": "SPY", "asOf": as_of, "universe": "美股…", "scope": "full",
-        "rows": [[f"S{i}", f"S{i}"] + [None] * 16 + [float(i), None, None, None, as_of, None, "Tech", "Software", 1000 * i]
-                 for i in range(rows)],
+        "rows": [row(i) for i in range(rows)],
     }
+
+
+LEGACY_FULL_FIELDS = [
+    field for field in bu.FULL_FIELDS if field not in ("rsScore", "atrPct", "range20")
+]
 
 
 class CoexistenceTest(unittest.TestCase):
@@ -987,17 +1009,71 @@ class CoexistenceTest(unittest.TestCase):
 
     def test_rs_rank_uses_full_distribution(self):
         universes = {
-            "US": {"asOf": "2026-10-14", "records": [{"metrics": {"rs63": 5.5}}, {"metrics": {"rs63": None}}]},
-            "TW": {"asOf": "2026-10-14", "records": [{"metrics": {"rs63": 1.0, "rsRank": 50}}]},
+            # rs63 故意與 rsScore 不同：新檔以 rsScore 排名
+            "US": {"asOf": "2026-10-14", "records": [{"metrics": {"rsScore": 5.5, "rs63": -100.0}},
+                                                     {"metrics": {"rsScore": None, "rs63": None}}]},
+            "TW": {"asOf": "2026-10-14", "records": [{"metrics": {"rsScore": 1.0, "rs63": 1.0, "rsRank": 50}}]},
         }
         adopted = report_metrics.adopt_full_rs_distribution(universes, self.existing())
         self.assertEqual(adopted, ["US"])
-        # 全市場 rs63 = 0..11；5.5 在中間
+        # 全市場 rsScore = 0..11；5.5 在中間
         self.assertEqual(universes["US"]["records"][0]["metrics"]["rsRank"], 50)
         self.assertIsNone(universes["US"]["records"][1]["metrics"]["rsRank"])
         self.assertEqual(universes["US"]["rsDistribution"], [float(i) for i in range(12)])
+        self.assertEqual(universes["US"]["rsField"], "rsScore")
         self.assertEqual(universes["TW"]["records"][0]["metrics"]["rsRank"], 50)
         self.assertEqual(report_metrics.adopt_full_rs_distribution(universes, self.existing("2026-09-01")), [])
+
+    def test_rs_rank_falls_back_to_rs63_for_old_full_file(self):
+        # 已發布的舊全市場檔沒有 rsScore 欄：分布與個股分數都改用 rs63，不把 rsScore 拿去比 rs63 分布
+        existing = self.existing()
+        existing["fields"] = LEGACY_FULL_FIELDS
+        existing["markets"]["US"] = full_market("2026-10-13", fields=LEGACY_FULL_FIELDS)
+        self.assertEqual(report_metrics.full_rs_field(existing, "US"), "rs63")
+        self.assertEqual(report_metrics.full_rs_field(self.existing(), "US"), "rsScore")
+        self.assertEqual(report_metrics.full_rs_distribution(existing, "US", "2026-10-14"), [float(i) for i in range(12)])
+        universes = {"US": {"asOf": "2026-10-14", "records": [{"symbol": "AAA", "metrics": {"rsScore": 100.0, "rs63": 5.5}}]}}
+        self.assertEqual(report_metrics.adopt_full_rs_distribution(universes, existing), ["US"])
+        self.assertEqual(universes["US"]["records"][0]["metrics"]["rsRank"], 50)
+        self.assertEqual(universes["US"]["rsField"], "rs63")
+        # 自選股（不在名單內）也沿用同一依據
+        with tempfile.TemporaryDirectory() as data_dir:
+            closes = [10.0] * 99 + [10.55]
+            frame = pd.DataFrame({"Open": closes, "High": closes, "Low": closes, "Close": closes, "Volume": 1000.0},
+                                 index=pd.bdate_range(end="2026-10-14", periods=100))
+            frame.index.name = "Date"
+            frame.to_csv(os.path.join(data_dir, "XYZ.csv"))
+            bench = pd.Series(100.0, index=pd.bdate_range(end="2026-10-14", periods=400))
+            lookup = report_metrics.make_lookup(universes, data_dir, {"US": {"symbol": "SPY", "close": bench}})
+            metrics = lookup("XYZ")
+        self.assertEqual(metrics["rs63"], 5.5)
+        self.assertEqual(metrics["rsRank"], 50)
+
+    def test_rs_rank_of_old_file_without_any_rs_column(self):
+        existing = self.existing()
+        existing["fields"] = [field for field in LEGACY_FULL_FIELDS if field != "rs63"]
+        self.assertIsNone(report_metrics.full_rs_field(existing, "US"))
+        self.assertIsNone(report_metrics.full_rs_distribution(existing, "US", "2026-10-14"))
+
+    def test_rs_field_is_decided_per_market_in_a_mixed_file(self):
+        # 只重建一個市場後：文件欄位有 rsScore，另一個市場的舊列在 rsScore 欄是補進的 null → 該市場仍用 rs63
+        legacy_rows = [[None if field in ("rsScore", "atrPct", "range20") else value
+                        for field, value in zip(bu.FULL_FIELDS, row)]
+                       for row in full_market("2026-10-13")["rows"]]
+        existing = self.existing()
+        existing["markets"]["US"] = dict(full_market("2026-10-13"), rows=legacy_rows)
+        existing["markets"]["TW"] = full_market("2026-10-13")
+        self.assertEqual(report_metrics.full_rs_field(existing, "US"), "rs63")
+        self.assertEqual(report_metrics.full_rs_field(existing, "TW"), "rsScore")
+        self.assertEqual(report_metrics.full_rs_distribution(existing, "US", "2026-10-14"), [float(i) for i in range(12)])
+        universes = {
+            "US": {"asOf": "2026-10-14", "records": [{"metrics": {"rsScore": 100.0, "rs63": 5.5}}]},
+            "TW": {"asOf": "2026-10-14", "records": [{"metrics": {"rsScore": 5.5, "rs63": -100.0}}]},
+        }
+        self.assertEqual(sorted(report_metrics.adopt_full_rs_distribution(universes, existing)), ["TW", "US"])
+        self.assertEqual((universes["US"]["rsField"], universes["TW"]["rsField"]), ("rs63", "rsScore"))
+        self.assertEqual(universes["US"]["records"][0]["metrics"]["rsRank"], 50)
+        self.assertEqual(universes["TW"]["records"][0]["metrics"]["rsRank"], 50)
 
     def test_main_write_report_universe_keeps_full(self):
         from test_report_metrics import import_main

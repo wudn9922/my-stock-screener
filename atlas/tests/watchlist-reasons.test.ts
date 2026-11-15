@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { groupItemSchema } from '../src/report/schema';
 import { createWatchlist, evaluateWatchlist, visitWatchlist } from '../src/watchlists/model';
 import { explainWatchlistChanges } from '../src/watchlists/reasons';
-import { parseFilters, serializeFilters } from '../src/pages/screenerFilters';
+import { ambushPreset, parseFilters, serializeFilters } from '../src/pages/screenerFilters';
 import { parseGrowthFile } from '../src/fundamentals/GrowthProvider';
 import { readFileSync } from 'node:fs';
 
@@ -78,5 +78,22 @@ describe('watchlist transition evidence', () => {
     const reason = explainWatchlistChanges(visit(list, [], ['AAPL']), list, items, context).entered.AAPL;
     expect(reason.conditions[0].passed).toBe(true);
     expect(reason.conditions[0].value).toContain('資料不足，依設定保留');
+  });
+  it('saves the 「潛伏」 conditions as a strategy and explains near20, ATR% and range width with actual values', () => {
+    const saved = listOf(serializeFilters(ambushPreset('TW').filters), 'TW');
+    expect(saved.filters).toBe('tr:slope,near20;vol:1000000');
+    const list = listOf('tr:near20;atr:3;rng:15', 'TW');
+    expect(list.filters).toBe('tr:near20;atr:3;rng:15');
+    const items = [
+      row('2330.TW', { ma: { 20: 0.5 }, atrPct: 2, range20: 10 }),
+      row('2317.TW', { ma: { 20: 4 }, atrPct: 5, range20: 20 }),
+    ];
+    const reasons = explainWatchlistChanges(visit(list, ['2317.TW'], ['2330.TW']), list, items, { market: 'TW' });
+    expect(reasons.entered['2330.TW'].conditions.map(check => [check.passed, check.value])).toEqual([
+      [true, expect.stringContaining('MA20 乖離')],
+      [true, 'ATR% 2%'],
+      [true, '20 日區間寬度 10%'],
+    ]);
+    expect(reasons.exited['2317.TW'].conditions.map(check => check.passed)).toEqual([false, false, false]);
   });
 });

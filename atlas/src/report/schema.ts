@@ -110,7 +110,8 @@ export type MetricTrend = 'up' | 'down' | 'mixed';
 /**
  * Screener metrics per stock (`groups[].items[].metrics`, `report/universe.json`). Percentages are in %;
  * `ma` holds the close's distance from each SMA, `fromHi52` is ≤ 0, `rsRank` is a 1–99 percentile
- * within the market's universe. Any field can be null when the history is too short.
+ * within the market's universe (of `rsScore`, the weighted 3／6／9／12-month relative return, in files that carry it).
+ * Any field can be null when the history is too short.
  */
 export interface StockMetrics {
   bars: number;
@@ -130,6 +131,12 @@ export interface StockMetrics {
   rs63: number | null;
   rsBench: 'SPY' | '^TWII' | null;
   rsRank: number | null;
+  /** Weighted blend of the 63／126／189／252-day relative returns vs the benchmark (weights 40／20／20／20); null on older reports. */
+  rsScore: number | null;
+  /** Wilder ATR(14) ÷ close × 100; null on older reports or short history. */
+  atrPct: number | null;
+  /** (highest high − lowest low of the latest 20 bars) ÷ lowest low × 100; null on older reports or short history. */
+  range20: number | null;
   /** Today's volume ÷ the previous session's volume (null on older reports, whose `volRatio` meant something else). */
   volVsPrev: number | null;
   turnover20: number | null;
@@ -168,6 +175,9 @@ export function parseMetrics(value: unknown): StockMetrics | null {
     rs63: toFinite(raw.rs63),
     rsBench: bench === 'SPY' || bench === '^TWII' ? bench : null,
     rsRank: rank === null ? null : Math.min(99, Math.max(1, Math.round(rank))),
+    rsScore: toFinite(raw.rsScore),
+    atrPct: toFinite(raw.atrPct),
+    range20: toFinite(raw.range20),
     volVsPrev: toFinite(raw.volVsPrev),
     turnover20: toFinite(raw.turnover20),
     volumeAvg20: toFinite(raw.volumeAvg20),

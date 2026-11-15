@@ -7,9 +7,11 @@ import {
   MA_RANGE_KEYS,
   MA_RANGE_LABELS,
   fetchMaRecommendation,
+  maMetaParts,
   maSelectorLink,
   recommendedPeriods,
   v2Periods,
+  type MaRecommendation as MaRecommendationData,
   type MaRecommendationLoadResult,
   type MaRecommendationRange,
   type MaRecommendationV2,
@@ -86,6 +88,22 @@ const scoreText = (score: number | null) => (score === null ? '' : `（${Math.ro
 const scoreOf = (range: MaRecommendationRange) => range.candidates.find((c) => c.period === range.final)?.score ?? null;
 const percent = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(1)}%`);
 const beats = (rank: { pct: number } | null | undefined) => (rank ? `贏過 ${Math.round(rank.pct)}%` : '');
+
+/** VERSION 3 range notes: a caution when no MA in the range worked as a boundary, and why a held pick differs from the new best. */
+export function MaRangeNotes({ range }: { range: MaRecommendationRange }) {
+  const heldNote = range.held && range.computedFinal !== range.final;
+  if (!range.unsuitable && !heldNote) return null;
+  return <>
+    {range.unsuitable && <p className="ws-ma-reco-note ws-ma-reco-caution" role="note">反手回測為負，此區間均線僅供參考</p>}
+    {heldNote && <p className="ws-ma-reco-note ws-ma-reco-held">沿用上次（本次試算 MA{range.computedFinal}，差距未達換線門檻）</p>}
+  </>;
+}
+
+/** VERSION 3 backtest settings (cost, reference pool, adjusted prices); renders nothing when none is present. */
+export function MaMetaLine({ data }: { data: MaRecommendationData }) {
+  const parts = maMetaParts(data);
+  return parts.length ? <p className="ws-ma-reco-status ws-ma-reco-meta">{parts.join(' · ')}</p> : null;
+}
 
 /** One toggle button per candidate period (shared by the current and the experimental v2 tables). */
 function CandidateButton({ period, star, score, extra, applied, onToggle }: {
@@ -260,6 +278,7 @@ function DailyMaRecommendation({
             ? `日線至 ${result.data.asof}${result.data.limited ? ' · 資料不足 3.5 年，中長期僅供參考' : ''}`
             : result.message}
       </p>
+      {data && <MaMetaLine data={data} />}
       {savedStock && <p className="ws-ma-reco-status">個股均線（所有清單共用）：{parameterMAs(savedStock).join(' / ')}</p>}
       {parameterError && <p role="status">{parameterError}</p>}
       <button type="button" className="ghost-button" disabled={!applied.length && !savedStock}
@@ -304,6 +323,7 @@ function DailyMaRecommendation({
                             applied={applied} onToggle={toggle} />
                         ))}
                       </div>
+                      <MaRangeNotes range={range} />
                     </td>
                     <td>
                       {percent(final?.sarReturn ?? null)}

@@ -43,3 +43,19 @@
 .ws-ma-reco-table th[scope="row"] {
   white-space: nowrap;
 }
+/* VERSION 3 range notes: compact, wrap inside the candidates cell on a 390px phone. */
+.ws-ma-reco-note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.ws-ma-reco-caution {
+  padding: 2px 6px;
+  border-inline-start: 3px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  color: var(--warn);
+}
+.ws-ma-reco-held {
+  color: var(--text-3);
+}

@@ -6,6 +6,15 @@ type RangeKey = '3y' | '10y' | 'all';
 const percent = (value: number | null, digits = 1) => value === null ? '資料不足' : `${value.toFixed(digits)}%`;
 const number = (value: number) => value.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
 const labelFor = (row: TemperatureReading) => [row.hot ? '過熱提醒' : '', row.cold ? '過冷提醒' : ''].filter(Boolean).join('＋') || '中性';
+const persistence = (data: MarginTemperature): string => {
+  const { hotWeeks } = data.latest;
+  if (!data.latest.hot || !hotWeeks) return '';
+  const year = data.firstDate?.slice(0, 4);
+  const episode = year && data.hotEpisodes ? `（${year} 年以來第 ${data.hotEpisodes} 段）` : '';
+  return `已連續 ${hotWeeks} 週${episode}`;
+};
+const relativeText = (ratioPct: number | null): string => ratioPct === null ? '資料不足'
+  : `P${Math.floor(ratioPct)} · ${ratioPct >= 90 ? '融資增速高於大盤' : '融資增速未明顯高於大盤'}`;
 const LEFT = 48, RIGHT = 888, SPAN = RIGHT - LEFT;
 const xp = (index: number, length: number) => LEFT + index * SPAN / Math.max(length - 1, 1);
 const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
@@ -102,7 +111,7 @@ function Gauge({ title, value, range, threshold, cold }: {
   </div>;
 }
 
-function TemperatureBody({ data }: { data: MarginTemperature }) {
+export function TemperatureBody({ data }: { data: MarginTemperature }) {
   const [range, setRange] = useState<RangeKey>('all');
   const rows = useMemo(() => {
     if (range === 'all') return data.rows;
@@ -116,11 +125,13 @@ function TemperatureBody({ data }: { data: MarginTemperature }) {
       {current.hot && <span className="mt-label mt-hot">▲ 過熱提醒</span>}
       {current.cold && <span className="mt-label mt-cold">▼ 過冷提醒</span>}
       {!current.hot && !current.cold && <span className="mt-label mt-neutral">● 中性</span>}
-    </div><time dateTime={data.asOf}>資料日期 {data.asOf}</time>{data.provisional && <span className="mt-provisional">本週暫計</span>}</div>
+    </div>{persistence(data) && <span className="mt-persist">{persistence(data)}</span>}<time dateTime={data.asOf}>資料日期 {data.asOf}</time>{data.provisional && <span className="mt-provisional">本週暫計</span>}</div>
     <div className="mt-gauge-grid">
       <Gauge title="熱度 · 近 3 年分位" value={current.pct} range={[0, 100]} threshold={90} />
       <Gauge title="冷度 · 自 52 週高點降幅" value={current.mdd} range={[-100, 0]} threshold={-30} cold />
     </div>
+    {current.ratioPct !== undefined && <p className="mt-relative" data-state={current.ratioPct !== null && current.ratioPct >= 90 ? 'hot' : 'neutral'}>
+      <span>相對大盤分位</span> <b>{relativeText(current.ratioPct)}</b></p>}
     <p className="mt-fixed"><b>僅描述融資水位偏熱／偏冷，非買賣訊號。</b></p>
     <div className="mt-chart-tools"><h3>加權指數與融資溫度歷史圖</h3>
       <label>顯示區間<select aria-label="融資溫度歷史區間" value={range} onChange={event => setRange(event.target.value as RangeKey)}>
@@ -136,6 +147,8 @@ function TemperatureBody({ data }: { data: MarginTemperature }) {
       <p>歷史（2007–2026）：3 個大頭附近皆曾亮燈過熱、4 個大底附近皆曾亮燈過冷；但提醒常提早數週到數月，過熱亮燈後指數仍可能續漲（例如 2020-12 亮燈後約 55 週才見大頭、期間指數再漲約 29%）。</p>
       <p>資料僅含上市融資；融資金額為借款成本餘額，非市值。</p>
       <p>熱度：156 週視窗（至少 104 週），與視窗內前面週數相比較低者的占比；冷度：融資金額與 52 週最高額的差距（至少 26 週）。來源：證交所。歷史統計是回顧性描述，不代表未來表現。</p>
+      <p>融資餘額會隨大盤規模一起成長，所以金額分位在長期多頭中常會長時間維持高檔，「過熱」可能持續很多週。{current.ratioPct !== undefined &&
+        '相對大盤分位則把融資金額除以加權指數收盤價，當作市場規模的粗略代理（只是代理，不是市場總市值），用來看融資有沒有比指數成長得更快。'}</p>
     </div>
   </>;
 }

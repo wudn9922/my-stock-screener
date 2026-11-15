@@ -770,6 +770,11 @@ function ScreenerView({
           setFilters(next);
           closeSheet();
         }}
+        onPreset={(preset) => {
+          setFilters(preset.filters);
+          setSort(preset.sort);
+          closeSheet();
+        }}
         onClose={closeSheet}
       />
     </div>
