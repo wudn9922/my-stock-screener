@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockSite, yahooChart } from "./mocks";
+import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 const at = Date.parse("2026-11-03T16:02:00Z") / 1000;
 
 test("ANT and Claude find the IPO record, open details and never open a fictitious stock chart", async ({
@@ -128,6 +129,7 @@ test("missing extended coverage and missing intraday history explain the cause",
   await expect(page.getByTestId("active-symbol")).toHaveText("NVDA");
   await expect(page.getByTestId("ohlc-header")).toContainText("O ");
   await expect(page.locator(".chart-loading")).toHaveCount(0);
+  await openStockMenu(page);
   await page.getByTestId("source-info-toggle").click();
   await expect(
     page.getByRole("region", { name: "行情資料說明" }),
@@ -138,6 +140,7 @@ test("missing extended coverage and missing intraday history explain the cause",
       .getByRole("link", { name: "查看官方盤前頁面" }),
   ).toHaveAttribute("href", /nasdaq.com.*nvda\/pre-market/);
   await page.getByTestId("source-info-toggle").click();
+  await closeStockMenu(page);
   await page.getByRole("button", { name: "價量", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "前一交易日同時間量比" }),

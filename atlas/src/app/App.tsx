@@ -1233,8 +1233,11 @@ export function App({
   // Phone and tablet (≤1099px): one title row, the price row and the K線｜財務｜價量｜研究 tabs; everything the
   // desktop header shows beside them opens from the 更多 (⋯) menu.
   const compactLiveStatus = !asset && headerQuote ? quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined) : null;
-  // The data-state word leads the line, so the status repeats it only for assistive text (the full text stays).
-  const compactLivePrefix = compactLiveStatus ? /^(即時|延遲|模擬)報價 · /.exec(compactLiveStatus)?.[0] : undefined;
+  // The data-state word already leads the line, so it shows the short form (「更新於 12:20:31」, 「11/13 收盤」);
+  // the full status stays in the document for assistive tech.
+  const compactLiveShort = compactLiveStatus
+    ?.replace(/^(即時|延遲|模擬)報價 · /, '')
+    .replace(/^已收盤 · 最後成交 (\d{2}\/\d{2}) \d{2}:\d{2}$/, '$1 收盤');
   const compactHeader = (
     <header className="ws-header ws-header-compact" inert={modal} aria-hidden={modal}>
       <div className="ws-title-row">
@@ -1343,10 +1346,10 @@ export function App({
           <div className="ws-price-meta">
             <span className="ws-meta-item">{dataStateBadge}報價</span>
             {compactLiveStatus !== null && (
-              <small className="ws-meta-item ws-live-time" data-testid="live-time">
-                {compactLivePrefix && <span className="ws-live-prefix">{compactLivePrefix}</span>}
-                {compactLivePrefix ? compactLiveStatus.slice(compactLivePrefix.length) : compactLiveStatus}
-              </small>
+              <span className="ws-meta-item">
+                <small className="ws-live-time sr-only" data-testid="live-time">{compactLiveStatus}</small>
+                <span className="ws-live-short" aria-hidden="true">{compactLiveShort}</span>
+              </span>
             )}
             {!isIndex && providerId !== 'demo' && (
               <span className="ws-meta-item ws-stock-statistics">

@@ -3,6 +3,7 @@ import { mockSite, yahooChart } from './mocks';
 import { misOnlyChart, overlayMis, parseMisRow } from '../../supabase/functions/market-chart/twse-mis';
 import { MIS_NOW, MIS_TODAY, misRows, misYahoo } from '../tests/fixtures/twse-mis';
 import { archiveIndexFixture } from '../tests/fixtures/archive-index';
+import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 
 const LIVE_PRICE = 1234.5;
 
@@ -138,12 +139,14 @@ for (const symbol of ['2330.TW', '6488.TWO', '^TWII', '^TWOII']) {
     await expect(page.getByTestId('ohlc-header')).toContainText(price.toFixed(2));
     await expect(page.getByTestId('live-time')).toContainText('即時報價');
     await expect(page.getByTestId('chart-data-state')).toHaveText('即時');
+    await openStockMenu(page);
     await page.getByTestId('source-info-toggle').click();
     await expect(page.locator('.data-source')).toContainText('證交所即時（非官方 API）');
     if (symbol === '^TWII') await expect(page.locator('.data-source')).toContainText('GitHub 永久封存');
     if (symbol === '^TWOII') await expect(page.locator('.data-source')).toContainText('TPEx 歷史');
     await expect(page.locator('.data-source')).toContainText(new Date(MIS_TODAY * 1000).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }));
     await page.getByTestId('source-info-toggle').click();
+    await closeStockMenu(page);
     price += symbol.startsWith('^') ? 0.1 : 1;
     await page.clock.fastForward(61_000);
     await expect(page.getByTestId('header-quote')).toContainText(formatted(price));
@@ -171,6 +174,7 @@ test('MIS failure restores Yahoo labeling through the same minute feed', async (
   await page.clock.fastForward(61_000);
   await expect(page.getByTestId('live-time')).toContainText('延遲報價');
   await expect(page.getByTestId('chart-data-state')).toHaveText('延遲');
+  await openStockMenu(page);
   await page.getByTestId('source-info-toggle').click();
   await expect(page.locator('.data-source')).not.toContainText('證交所即時');
   await expect(page.locator('.data-source')).toContainText('Yahoo');

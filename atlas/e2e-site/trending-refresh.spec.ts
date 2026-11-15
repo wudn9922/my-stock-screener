@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { buildReport, mockSite, screenerFixtures, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { mockDeviceAccount } from './account-fixture';
+import { openStockMenu } from '../e2e/site-helpers';
 
 const trending = {
   version: 1, source: 'Yahoo Finance US trending · LINE 財經報告',
@@ -19,6 +20,8 @@ test('LINE stocks open a chart and repeated updates request only that stock; fai
   await expect(list.locator('.row-id b')).toHaveText(trending.symbols);
   await list.getByRole('link').filter({ hasText: 'NVDA' }).click();
   const update = page.getByRole('button', { name: '更新 NVDA K 線', exact: true });
+  // Phone/tablet: 更新 K 線 is in the chart header's 更多 (⋯) menu.
+  await openStockMenu(page);
   await expect(update).toBeEnabled();
   const header = page.getByTestId('header-quote');
   const originalPrice = (await header.textContent())!;
@@ -150,6 +153,8 @@ test('switching symbols while refreshing cancels the result for the old chart', 
   await mockSite(page);
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   const update = page.getByRole('button', { name: '更新 NVDA K 線', exact: true });
+  // Phone/tablet: 更新 K 線 is in the chart header's 更多 (⋯) menu.
+  await openStockMenu(page);
   await expect(update).toBeEnabled();
   let release!: () => void;
   let started = false;

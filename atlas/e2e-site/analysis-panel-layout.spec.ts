@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mockSite } from './mocks';
 import { researchFixtureBody } from './research-fixtures';
+import { openStockMenu } from '../e2e/site-helpers';
 
 test('volume ratios lead the centered anomaly controls and volatility values remain large', async ({ page }, info) => {
   await mockSite(page);
@@ -42,6 +43,7 @@ test('volume ratios lead the centered anomaly controls and volatility values rem
   await expect(ratios.locator('dd')).toHaveText(values);
   await panel.screenshot({ path: info.outputPath('volume-ratios-first.png') });
 
+  await openStockMenu(page);
   await page.getByTestId('volatility-toggle').click();
   const volatility = page.getByRole('region', { name: '波動率', exact: true });
   await expect(volatility.locator('[data-volatility-value]')).toHaveText([/\d+\.\d{2}%/, /\d+\.\d{2}%/]);

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope } from './account-fixture';
 import { readFileSync } from 'node:fs';
+import { closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 
 // Shape written by ma-selector scripts/build_recommendations.py (synthetic values).
 const recommendation = {
@@ -68,6 +69,9 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   const toggle = page.getByTestId('ma-recommendation-toggle');
   // Recommendations and volatility share the stock view control group.
   // Hidden also matches an element not yet mounted; wait for the lazy chart header before measuring it.
+  // Phone/tablet: recommendations and volatility are rows of the header's 更多 (⋯) menu.
+  await openStockMenu(page);
+  const compact = await page.getByTestId('stock-more-toggle').isVisible();
   await expect(toggle).toBeVisible();
   await expect(page.getByTestId('valuation')).toBeVisible();
   await expect(card).toBeHidden();
@@ -83,8 +87,13 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
       overflow: document.scrollingElement!.scrollWidth - innerWidth,
     };
   });
-  expect(Math.max(...row.tops) - Math.min(...row.tops)).toBeLessThanOrEqual(12);
-  expect(row.tabsOverlap).toBe(0);
+  if (compact) {
+    await expect(page.locator('.ws-more-list').getByTestId('ma-recommendation-toggle')).toBeVisible();
+    await expect(page.locator('.ws-more-list').getByTestId('volatility-toggle')).toBeVisible();
+  } else {
+    expect(Math.max(...row.tops) - Math.min(...row.tops)).toBeLessThanOrEqual(12);
+    expect(row.tabsOverlap).toBe(0);
+  }
   expect(row.overflow).toBeLessThanOrEqual(0);
 
   await toggle.click();
@@ -142,12 +151,15 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [20, 24, 38, 89] })]);
   await expect(page.getByText('2330.TW 個股均線 20 / 24 / 38 / 89已儲存到你的 Supabase 帳號。')).toBeVisible();
-  // The recommendation menu stays open across the dialog; a sibling control dismisses it.
+  // The recommendation menu stays open across the dialog; a sibling control dismisses it (on phones the 更多 menu
+  // that holds it covers the tabs, so it is closed first).
   await expect(card).toBeVisible();
+  await closeStockMenu(page);
   await page.getByTestId('stock-tab-chart').click();
   await expect(card).toBeHidden();
   await expect(page.getByTestId('chart')).toBeVisible();
   await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(4);
+  await openStockMenu(page);
   await toggle.click();
   await expect(card).toBeVisible();
 });
@@ -157,6 +169,7 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
   await page.route('**/my-stock-screener/report/ma-selector/**', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   const card = page.getByTestId('ma-recommendation');
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await expect(card.locator('dd')).toHaveText('—');
   await expect(card.locator('.ws-ma-reco-status')).toContainText('還沒有建議均線');
@@ -173,6 +186,7 @@ test('the panel shows ranking, 2-year scores and the experimental v2 picks, whic
     route.fulfill({ contentType: 'application/json', body: v2Fixture('with-second') }),
   );
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   const card = page.getByTestId('ma-recommendation');
   await expect(card.locator('dd')).toContainText('短 33');
@@ -208,6 +222,7 @@ test('v2 without a second short line says so and applies three lines', async ({ 
     route.fulfill({ contentType: 'application/json', body: v2Fixture('no-second') }),
   );
   await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   const v2 = page.getByTestId('ma-recommendation').getByTestId('ma-recommendation-v2');
   await expect(v2.locator('summary')).toHaveText(/^實驗選線 v2（尚未驗證）：短 35 · 中 \d+ · 長 96$/);

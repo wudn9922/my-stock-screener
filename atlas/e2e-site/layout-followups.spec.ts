@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { mockSite } from './mocks';
 import { researchFixtureBody } from './research-fixtures';
+import { openStockMenu } from '../e2e/site-helpers';
 
 test('世界 views stay on one row on narrow phones in every view', async ({ page }) => {
   await mockSite(page);
@@ -32,6 +33,7 @@ test('the 價量 view opens directly with analysis and recommendations open from
   const view = page.getByRole('region', { name: '價量', exact: true });
   await expect(view.locator('.stock-view-card > h2')).toHaveText(['價量分析']);
   await expect(view.getByTestId('ma-recommendation')).toHaveCount(0);
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.getByRole('region', { name: '建議均線', exact: true }).getByTestId('ma-recommendation')).toBeInViewport();
 });

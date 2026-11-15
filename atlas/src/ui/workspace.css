@@ -2373,11 +2373,10 @@
     letter-spacing: 0;
   }
   .ws-header-compact .ws-price-meta .demo-badge.demo { color: var(--warn); }
-  .ws-header-compact .ws-live-time {
+  .ws-header-compact .ws-live-short {
     color: var(--text-2);
     font: 400 12px/17px var(--font-num);
   }
-  .ws-header-compact .ws-live-prefix { display: none; }
   .ws-header-compact .ws-stock-statistics { gap: 0; }
   .ws-header-compact .ws-valuation { display: inline-flex; gap: 0; margin: 0; padding: 0; }
   .ws-header-compact .ws-valuation div {
@@ -2389,7 +2388,7 @@
     padding: 0;
     border: 0;
   }
-  .ws-header-compact .ws-valuation div:not(:last-child)::after { margin: 0 1px; }
+  .ws-header-compact .ws-valuation div:not(:last-child)::after { margin: 0 5px 0 1px; }
   .ws-header-compact .ws-valuation dt { color: var(--text-2); font-size: 12px; }
   .ws-header-compact .ws-valuation dd {
     color: var(--text);
