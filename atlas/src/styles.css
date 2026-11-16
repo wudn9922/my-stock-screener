@@ -1907,9 +1907,31 @@ h3 {
   .ws-symbol-text b, .ws-quote, .ws-extended-line, .ws-valuation dd,
   .ws-volatility-values dd, .ohlc-header, .stock-chart-quote, .stock-chart-date,
   .fin-quarter-change, .watchlist-counts, .status-counts,
-  .console-page .saved-member-list time) {
+  .console-page .saved-member-list time,
+  .fin-big, .fin-metric .fin-period, .fin-chart-window, .fin-key-value, .fin-key-period, .fin-inputs dd,
+  .fin-detail-head b, .fin-detail-value b, .fin-detail-value small, .fin-range button, .fin-quarter-period,
+  .fin-quarter-value, .fin-tile-value, .fin-table thead th b, .fin-table thead th small, .fin-cell-value, .fin-cell-yoy,
+  .fin-peers tbody th > button.text-button, .fin-peers tbody th small, .fin-peers tbody td:not(:last-child), .pe-river-legend span, .pe-river-legend b,
+  figure.chip-spark figcaption > span:first-child, figure.chip-spark figcaption > span:last-child,
+  .breadth-pct, .breadth-row-foot, .breadth-axis, .breadth-chart-axis, .breadth-trade-plan dd,
+  .bo-method-index, .bo-win, .bo-metrics dd, .bo-ratio, .bo-row-foot b, .bo-history-table tbody th,
+  .bo-history-table td, .mt-data-table td:nth-child(-n + 4), .mt-gauge-head b,
+  .mt-gauge-ticks span:first-child, .mt-gauge-ticks span:last-child, .mt-plot-foot span:first-child,
+  .mt-plot-foot span:last-child, .mt-history svg text:not(:first-of-type), .mw-score > b, .mw-values dd, .mw-latest,
+  .mw-tools select) {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
+}
+/* :has() rules stay outside the list above: an engine without :has() drops every selector in a list that contains one. */
+.site .bo-table-wrap td:has(> small),
+.site .fin-title:has(.fin-currency) > b {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+/* Chinese labels inside those number elements keep the UI font. */
+.site :is(.fin-key-period small, .bo-win small, .bo-ratio span, .breadth-row-foot > span, .mw-score > b > small,
+  .mw-latest small, .mw-summary-count small) {
+  font-family: var(--font-ui);
 }
 
 /* -- Markets (phone and tablet, 1099px and below): full index cards, then the secondary cards in one column.
