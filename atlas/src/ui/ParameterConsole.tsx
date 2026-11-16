@@ -20,7 +20,10 @@ import { stockParametersChanged } from '../cloud/useStockParameters';
 import { getStorageContextKey } from '../auth/storage';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
-export function ParameterConsole() {
+export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | 'groups' }) {
+  // 我的 on phones and tablets opens the stock parameters and the custom groups as two sub-views of the same forms.
+  const showStocks = part !== 'groups';
+  const showGroups = part !== 'stocks';
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const [groups, setGroups] = useState<ParameterGroup[]>([]);
   const [stocks, setStocks] = useState<ParameterStock[]>([]);
@@ -99,8 +102,8 @@ export function ParameterConsole() {
   );
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
-      <h2>個股均線（所有清單共用）與個人分組</h2>
-      <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>
+      {part === 'all' && <h2>個股均線（所有清單共用）與個人分組</h2>}
+      {showStocks && <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>}
       {message && (
         <p role="status" className="console-message">
           {message}
@@ -114,6 +117,7 @@ export function ParameterConsole() {
           在 LINE 開啟 Atlas
         </a>
       </div>
+      {showStocks && <>
       <form className="console-form" onSubmit={save}>
         <label>
           股票代號
@@ -352,7 +356,8 @@ export function ParameterConsole() {
           )}
         </ConsoleDialog>
       )}
-      <details className="research-disclosure">
+      </>}
+      {showGroups && <details className="research-disclosure" open={part === 'groups' ? true : undefined}>
         <summary>管理自訂分組</summary>
         <div className="research-disclosure-body">
           <form
@@ -399,8 +404,8 @@ export function ParameterConsole() {
             />
           ))}
         </div>
-      </details>
-      {access.isAdmin && access.storageMode === 'cloud' && (
+      </details>}
+      {showStocks && access.isAdmin && access.storageMode === 'cloud' && (
         <details className="research-disclosure">
           <summary>大盤指數均線參數（管理員）</summary>
           <div className="research-disclosure-body">

@@ -36,3 +36,56 @@ a.line-launch-link { margin: 6px 0; text-decoration: none; }
 @media (max-width: 767px) {
   .site-account-flow > .storage-policy-account { width: calc(100% - 32px); margin-top: 12px; padding: 10px 12px; }
 }
+
+/* 我的 on phones and tablets: the account card of the reference (avatar, status, full-width action, remember choice). */
+.account-avatar { display: none; }
+@media (max-width: 1099px) {
+  .site-account-flow > .storage-policy-account {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: min(640px, calc(100% - 32px));
+    margin: 8px auto 0;
+    padding: 16px;
+    border: 0;
+    border-radius: 16px;
+  }
+  .storage-policy-account > .account-avatar {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: var(--surface-3);
+    color: var(--text-2);
+  }
+  .storage-policy-account > p[data-storage-mode] { grid-column: 2; display: block; margin: 0; font-size: 12px; line-height: 1.4; color: var(--text-2); }
+  .storage-policy-account > p[data-storage-mode]::before { display: none; }
+  .storage-policy-account > :not(.account-avatar):not([data-storage-mode]) { grid-column: 1 / -1; }
+  .storage-policy-account .account-text { display: flex; flex-direction: column; gap: 2px; }
+  .storage-policy-account .account-status { font-size: 16px; font-weight: 700; color: var(--text); }
+  .storage-policy-account .account-sep { display: none; }
+  .storage-policy-account .account-desc { overflow-wrap: anywhere; }
+  .storage-policy-account .pwa-login-actions { display: grid; gap: 4px; }
+  .storage-policy-account .pwa-login-actions > button { margin-bottom: 8px; }
+  .storage-policy-account .pwa-login-actions > button {
+    width: 100%;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .storage-policy-account .pwa-login-actions > .account-primary { border-color: var(--accent); background: var(--accent); color: #14110A; }
+  .storage-policy-account .pwa-login-actions > .account-primary:hover:not(:disabled) { background: var(--accent); }
+  .storage-policy-account .pwa-login-actions > .account-secondary { border-color: var(--border-strong); background: none; color: var(--text); }
+  .storage-policy-account .pwa-login-actions > button:disabled { opacity: 0.6; }
+  .storage-policy-account .pwa-login-actions .help-disclosure > summary { min-height: 44px; }
+  .storage-policy-account .remember-device { min-height: 44px; gap: 10px; font-size: 13px; color: var(--text-2); }
+  .storage-policy-account .remember-device input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .storage-policy-account .pwa-login-actions .help-disclosure { flex: none; min-width: 0; margin: -8px 0; }
+}

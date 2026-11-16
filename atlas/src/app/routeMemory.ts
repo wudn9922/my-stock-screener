@@ -83,6 +83,7 @@ export function scrollSection(route: Route): string {
     case 'screener': return route.group ?? '';
     case 'world': return route.view ?? '';
     case 'themes': return route.market ?? '';
+    case 'console': return route.view ?? '';
     case 'chart': return route.symbol ?? '';
     default: return '';
   }

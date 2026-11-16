@@ -173,3 +173,25 @@
 @media (min-width: 768px) and (max-width: 1099px) {
   .market-head-date { display: none; }
 }
+
+/* A 我的 sub-view (phones and tablets) replaces the top bar with its own 52px header. */
+@media (max-width: 1099px) {
+  .site[data-console-view] {
+    grid-template-rows: 0 minmax(0, 1fr) calc(var(--tabbar) + var(--safe-bottom));
+  }
+  .site[data-console-view] .site-topbar {
+    visibility: hidden;
+    padding-top: 0;
+    border: 0;
+    overflow: hidden;
+  }
+  .site[data-console-view] .site-main {
+    padding-top: var(--safe-top);
+  }
+  /* Notes and the legacy-import prompt under the 我的 list follow its column. */
+  .site[data-page='console'] .site-data-footer {
+    max-width: 640px;
+    margin-inline: auto;
+    width: calc(100% - 32px);
+  }
+}

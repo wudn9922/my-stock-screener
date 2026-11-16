@@ -6,6 +6,7 @@ import { researchFixtureBody } from './research-fixtures';
 import { openPanel, closePanel } from '../e2e/site-helpers';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
 import { universeBody } from '../tests/fixtures/industry/universeGen';
+import { isCompactConsole } from './console-nav';
 
 async function setup(page: Page) {
   await mockSite(page);
@@ -89,10 +90,22 @@ test('permission display is immediately before data health at the foot of every 
   for (const route of ['markets', 'world&view=fx', 'themes', 'screener', 'watchlist', 'console', 'chart&symbol=AAPL']) {
     await page.goto(`./?page=${route}`);
     const footer = page.locator('.site-data-footer');
-    await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
-    expect(await footer.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
-    expect(await footer.evaluate(element => element.lastElementChild?.classList.contains('data-health'))).toBe(true);
+    if (isCompactConsole(page)) {
+      // Phones and tablets move the permission display and data health to 我的 › 資料狀態; no page ends with them.
+      await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(0);
+      await expect(page.locator('.data-health')).toHaveCount(0);
+    } else {
+      await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
+      expect(await footer.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
+      expect(await footer.evaluate(element => element.lastElementChild?.classList.contains('data-health'))).toBe(true);
+    }
     expect(await footer.evaluate(element => element === document.getElementById('main')!.lastElementChild)).toBe(true);
+    expect(await noOverflow(page)).toBeLessThanOrEqual(1);
+  }
+  if (isCompactConsole(page)) {
+    await page.goto('./?page=console&view=status');
+    await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
+    expect(await page.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
     expect(await noOverflow(page)).toBeLessThanOrEqual(1);
   }
   await page.goto('./?page=screener&group=tw_all');

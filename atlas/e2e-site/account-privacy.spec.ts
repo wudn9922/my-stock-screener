@@ -2,17 +2,22 @@ import { expect, test, type Page } from '@playwright/test';
 import { openListActions } from './archive-fixture';
 import { buildReport, mockSite } from './mocks';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
+import { consoleEntry, isCompactConsole, openConsoleSection } from './console-nav';
 import { accessEnvelope, DEVICE_USER_ID, installLineAccount, OWNER_USER_ID, SECOND_USER_ID, type TestStorageMode } from './account-fixture';
 
 async function openParameters(page: Page) {
-  await page.getByRole('button', { name: '均線參數', exact: true }).click();
+  await openConsoleSection(page, 'parameters');
   await expect(page.getByRole('region', { name: '原有均線參數控制台' })).toBeVisible();
 }
 async function createParameters(page: Page, name: string) {
+  // Phones and tablets open 自訂分組 and 個股均線參數 as two sub-views; its group manager starts open.
+  if (isCompactConsole(page)) await openConsoleSection(page, 'groups');
   const details = page.locator('.parameter-console details').filter({ hasText: '管理自訂分組' });
-  await details.locator('summary').click();
+  if (!await details.evaluate(node => (node as HTMLDetailsElement).open)) await details.locator('summary').click();
   await details.getByRole('textbox', { name: '新增個人分組名稱' }).fill(name);
   await details.getByRole('button', { name: '新增分組', exact: true }).click();
+  await expect(details.getByRole('textbox', { name: `分組 ${name} 名稱` })).toBeVisible();
+  if (isCompactConsole(page)) await openConsoleSection(page, 'parameters');
   await expect(page.getByRole('combobox', { name: '參數股票分組' })).toContainText(name);
   await page.getByRole('textbox', { name: '參數股票代號' }).fill('NVDA');
   await page.getByRole('combobox', { name: '參數股票分組' }).selectOption({ label: name });
@@ -60,6 +65,9 @@ async function installPolicy(page: Page, initial = DEVICE_USER_ID, admin = false
     return route.fulfill({ status: 403, json: { ok: false, error: 'No cloud persistence granted in this fixture' } });
   });
   const switchAccount = async (userId: string | null) => {
+    // The phone layout shows the account card on the 我的 list, not inside a sub-view.
+    const back = page.getByRole('button', { name: '返回我的', exact: true });
+    if (isCompactConsole(page) && await back.isVisible()) await back.click();
     await page.evaluate(id => {
       const state = globalThis as unknown as { __lineAccount: string | null; __lineToken: string };
       state.__lineAccount = id;
@@ -67,7 +75,12 @@ async function installPolicy(page: Page, initial = DEVICE_USER_ID, admin = false
       window.dispatchEvent(new Event('focus'));
     }, userId);
     await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', userId ? policies.get(userId)?.storageMode ?? 'none' : 'none');
-    if (userId) await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toContainText(userId);
+    if (userId && isCompactConsole(page)) {
+      // The storage notice lives under 資料狀態 on phones and tablets.
+      await openConsoleSection(page, 'status');
+      await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toContainText(userId);
+      await back.click();
+    } else if (userId) await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toContainText(userId);
   };
   return { policies, privateRequests, adminSaves, switchAccount };
 }
@@ -92,7 +105,7 @@ test('ordinary visitors can group, set MAs and draw, with zero application persi
   await mockSite(page, { report: buildReport(20) });
   await page.goto('./?page=console');
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
-  await expect(page.getByRole('button', { name: '管理員', exact: true })).toHaveCount(0);
+  await expect(consoleEntry(page, 'admin')).toHaveCount(0);
   await openParameters(page);
   await createParameters(page, '訪客測試分組');
   await page.getByRole('button', { name: '個股', exact: true }).click();
@@ -147,7 +160,7 @@ test('device grants isolate accounts, keep their own parameters after reload, an
   await createParameters(page, '撤權後只在記憶體');
   expect(await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)))).toEqual(before);
   expect(policy.privateRequests).toEqual([]);
-  await expect(page.getByRole('button', { name: '管理員', exact: true })).toHaveCount(0);
+  await expect(consoleEntry(page, 'admin')).toHaveCount(0);
 });
 
 for (const mode of ['none', 'device'] as const) {
@@ -177,7 +190,7 @@ test('only the verified owner can manage per-account storage modes even while th
   const policy = await installPolicy(page, OWNER_USER_ID, true);
   await mockSite(page);
   await page.goto('./?page=console');
-  await page.getByRole('button', { name: '管理員', exact: true }).click();
+  await openConsoleSection(page, 'admin');
   const panel = page.getByRole('region', { name: '管理員儲存權限' });
   await expect(panel).toBeVisible();
   await panel.getByRole('textbox', { name: '授權 LINE 帳號 ID' }).fill(DEVICE_USER_ID);
@@ -189,7 +202,7 @@ test('only the verified owner can manage per-account storage modes even while th
   await expect(panel).toContainText('朋友的裝置');
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await policy.switchAccount(SECOND_USER_ID);
-  await expect(page.getByRole('button', { name: '管理員', exact: true })).toHaveCount(0);
+  await expect(consoleEntry(page, 'admin')).toHaveCount(0);
   await expect(page.getByRole('region', { name: '管理員儲存權限' })).toHaveCount(0);
   expect(policy.privateRequests).toEqual([]);
 });

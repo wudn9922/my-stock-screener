@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openConsoleSection } from './console-nav';
 import { buildReport, mockSite } from './mocks';
 import { accessEnvelope } from './account-fixture';
 import type { SavedWatchlist } from '../src/watchlists/model';
@@ -176,7 +177,7 @@ test('each rule-list member can save permanent ungrouped parameters that survive
 test('existing parameter stocks support search, group filters, a five-row scroll area and modal edit/delete', async ({ page }) => {
   const cloud = await mockConsole(page);
   await page.goto('./?page=console');
-  await page.getByRole('button', { name: '均線參數', exact: true }).click();
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(9);
   const viewport = page.getByRole('region', { name: '已有參數股票清單' });
