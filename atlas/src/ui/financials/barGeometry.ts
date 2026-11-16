@@ -86,10 +86,12 @@ export function barPath(bar: BarBox, zeroY: number, radius = 4): string {
   return `M${f(left)},${f(zeroY)}V${f(end - r)}Q${f(left)},${f(end)} ${f(left + r)},${f(end)}H${f(right - r)}Q${f(right)},${f(end)} ${f(right)},${f(end - r)}V${f(zeroY)}Z`;
 }
 
-/** Approximate rendered width of a numeric label (tabular digits ≈ 0.6em, separators narrower). */
+/** Approximate rendered width of a numeric label in the chart's monospaced numeric font. */
 export function labelWidth(text: string, fontSize: number): number {
   let width = 0;
-  for (const char of text) width += /[0-9]/.test(char) ? 0.6 : /[,.]/.test(char) ? 0.3 : 0.62;
+  // The chart SVG uses the monospaced numeric font (IBM Plex Mono): every Latin character, commas and points
+  // included, advances 0.6em. CJK characters fall back to the UI font at about 1em.
+  for (const char of text) width += /[\u3000-\u9fff\uff00-\uffef]/.test(char) ? 1 : 0.6;
   return width * fontSize;
 }
 
@@ -161,6 +163,7 @@ export function labelPlan(
   let indices = mode === 'all' ? new Set(texts.flatMap((text, index) => (text ? [index] : []))) : extremes;
   if (mode === 'all' && widest > slotWidth - 2) {
     if (widest * 0.9 <= slotWidth - 2) fontSize = 9;
+    else if (widest * 0.8 <= slotWidth - 2) fontSize = 8;
     else indices = extremes;
   }
   if (selected !== null && texts[selected]) indices = new Set([...indices, selected]);
