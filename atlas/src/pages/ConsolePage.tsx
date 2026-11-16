@@ -1,4 +1,5 @@
 import { DataFacts, DisplaySettings } from '../ui/DisplaySettings';
+import { rememberConsoleListScroll } from '../app/consoleListScroll';
 import { InstallPanel } from '../pwa/InstallPanel';
 import { AppUpdate } from '../pwa/AppUpdate';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
@@ -344,7 +345,10 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     const reportDate = report.status === 'ok' ? report.report.reportDate : null;
     // A sub-view entry the list pushed marks itself, so Back can pop to the list; a deep link, reload of an older
     // entry or a return through the tab bar has no list before it and opens the list in place instead.
-    const go = (route: Route) => navigate(route, route.page === 'console' ? { state: { consoleFromList: true } } : undefined);
+    const go = (route: Route) => {
+      if (route.page === 'console') rememberConsoleListScroll();
+      navigate(route, route.page === 'console' ? { state: { consoleFromList: true } } : undefined);
+    };
     const back = () => {
       if ((window.history.state as { consoleFromList?: boolean } | null)?.consoleFromList === true) window.history.back();
       else navigate({ page: 'console' }, { replace: true });

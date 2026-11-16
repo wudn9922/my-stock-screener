@@ -45,7 +45,11 @@ test('我的 sub-views are routes: a 52px header, browser back and the list scro
   const main = page.locator('#main');
   await main.evaluate(element => element.scrollTo({ top: 90 }));
   await expect.poll(() => main.evaluate(element => element.scrollTop)).toBeGreaterThan(40);
+  // Playwright scrolls a target into view before clicking it (the fixed tab bar can cover a row at the bottom edge);
+  // centre the row first so the click does not move the list and `before` is the scroll the tap leaves.
+  await row.evaluate(element => element.scrollIntoView({ block: 'center' }));
   const before = await main.evaluate(element => element.scrollTop);
+  expect(before).toBeGreaterThan(40);
   await row.click();
   await expect(page).toHaveURL(/page=console&view=status/);
   const back = page.getByRole('button', { name: '返回我的', exact: true });

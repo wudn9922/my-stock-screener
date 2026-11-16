@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { takeConsoleListScroll } from './consoleListScroll';
 import { ChartCandlestick, LayoutDashboard, ListFilter, Plus, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
@@ -167,10 +168,19 @@ export function Site() {
     if (previous && previous.page === route.page && previous.section === section) return;
     const inConsole = previous?.page === 'console' && route.page === 'console';
     // Read the list's scroll from the last scroll event: the shorter sub-view may already have clamped scrollTop.
-    if (inConsole && previous.section === '') consoleListScroll.current = pageScrolls.current.get('console')?.top ?? 0;
+    if (inConsole && previous.section === '')
+      consoleListScroll.current = takeConsoleListScroll() ?? pageScrolls.current.get('console')?.top ?? 0;
     const saved = previous && previous.page !== route.page && isKeptPage(route.page) ? pageScrolls.current.get(route.page) : undefined;
-    const top = inConsole && section === '' ? consoleListScroll.current : saved?.identity === identity ? saved.top : 0;
-    document.getElementById('main')?.scrollTo?.({ top });
+    const restoreList = inConsole && section === '';
+    const top = restoreList ? consoleListScroll.current : saved?.identity === identity ? saved.top : 0;
+    const main = document.getElementById('main');
+    main?.scrollTo?.({ top });
+    if (!restoreList || !main) return;
+    // WebKit can move the list after this commit (late layout or its own history scroll handling); apply it again.
+    const frame = requestAnimationFrame(() => {
+      if (Math.abs(main.scrollTop - top) > 1) main.scrollTo?.({ top });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [route.page, section, identity]);
   useEffect(() => {
     const titles =
