@@ -1913,7 +1913,7 @@ h3 {
   .fin-quarter-value, .fin-tile-value, .fin-table thead th b, .fin-table thead th small, .fin-cell-value, .fin-cell-yoy,
   .fin-peers tbody th > button.text-button, .fin-peers tbody th small, .fin-peers tbody td:not(:last-child), .pe-river-legend span, .pe-river-legend b,
   figure.chip-spark figcaption > span:first-child, figure.chip-spark figcaption > span:last-child,
-  .breadth-pct, .breadth-row-foot, .breadth-axis, .breadth-chart-axis, .breadth-trade-plan dd,
+  .breadth-pct, .breadth-row-foot, .breadth-axis, .breadth-chart-axis, .breadth-trade-plan dd, .breadth-seg tbody td,
   .bo-method-index, .bo-win, .bo-metrics dd, .bo-ratio, .bo-row-foot b, .bo-history-table tbody th,
   .bo-history-table td, .mt-data-table td:nth-child(-n + 4), .mt-gauge-head b,
   .mt-gauge-ticks span:first-child, .mt-gauge-ticks span:last-child, .mt-plot-foot span:first-child,
