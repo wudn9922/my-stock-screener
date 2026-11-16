@@ -176,10 +176,15 @@ export function Site() {
     const main = document.getElementById('main');
     main?.scrollTo?.({ top });
     if (!restoreList || !main) return;
-    // WebKit can move the list after this commit (late layout or its own history scroll handling); apply it again.
-    const frame = requestAnimationFrame(() => {
+    // Content below the rows (the footer) can mount a few frames later, so the list may be briefly too short and the
+    // browser clamps the scroll; keep applying it for a few frames until it holds.
+    let frame = 0;
+    let tries = 0;
+    const settle = () => {
       if (Math.abs(main.scrollTop - top) > 1) main.scrollTo?.({ top });
-    });
+      if (Math.abs(main.scrollTop - top) > 1 && ++tries < 12) frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
     return () => cancelAnimationFrame(frame);
   }, [route.page, section, identity]);
   useEffect(() => {

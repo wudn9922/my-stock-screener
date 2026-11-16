@@ -45,18 +45,22 @@ test('我的 sub-views are routes: a 52px header, browser back and the list scro
   const main = page.locator('#main');
   await main.evaluate(element => element.scrollTo({ top: 90 }));
   await expect.poll(() => main.evaluate(element => element.scrollTop)).toBeGreaterThan(40);
-  // Playwright scrolls a target into view before clicking it (the fixed tab bar can cover a row at the bottom edge);
-  // centre the row first so the click does not move the list and `before` is the scroll the tap leaves.
+  // Playwright scrolls a target into view before clicking it, by an amount that differs between engines. Read the
+  // list scroll and tap the row in one step so `before` is exactly the scroll the tap leaves.
   await row.evaluate(element => element.scrollIntoView({ block: 'center' }));
-  const before = await main.evaluate(element => element.scrollTop);
+  const before = await row.evaluate(element => {
+    const top = document.getElementById('main')!.scrollTop;
+    (element as HTMLElement).click();
+    return top;
+  });
   expect(before).toBeGreaterThan(40);
-  await row.click();
   await expect(page).toHaveURL(/page=console&view=status/);
   const back = page.getByRole('button', { name: '返回我的', exact: true });
-  const box = (await back.boundingBox())!;
-  expect(box.width).toBeGreaterThanOrEqual(44);
-  expect(box.height).toBeGreaterThanOrEqual(44);
-  expect((await page.locator('.me-subhead').boundingBox())!.height).toBe(52);
+  // The tap is a DOM click, so measure once the sub-view has settled; round away sub-pixel float noise.
+  const size = async (locator: typeof back) => { const box = (await locator.boundingBox())!; return { w: Math.round(box.width), h: Math.round(box.height) }; };
+  await expect.poll(async () => (await size(page.locator('.me-subhead'))).h).toBe(52);
+  expect((await size(back)).w).toBeGreaterThanOrEqual(44);
+  expect((await size(back)).h).toBeGreaterThanOrEqual(44);
   await expect(page.locator('.me-subhead h2')).toHaveText('資料狀態');
   await expect(page.locator('.site-topbar')).toBeHidden();
   await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
