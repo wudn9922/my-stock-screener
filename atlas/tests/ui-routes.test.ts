@@ -22,6 +22,16 @@ describe('site routes', () => {
     expect(route('?page=nope')).toEqual({ page: 'markets', market: 'tw' });
   });
 
+  it('opens a 我的 sub-view from the view parameter and drops unknown ones', () => {
+    expect(route('?page=console')).toEqual({ page: 'console' });
+    expect(route('?page=console&view=status')).toEqual({ page: 'console', view: 'status' });
+    expect(route('?page=console&view=Backup')).toEqual({ page: 'console', view: 'backup' });
+    expect(route('?page=console&view=nope')).toEqual({ page: 'console' });
+    expect(serializeRoute({ page: 'console', view: 'groups' })).toBe('?page=console&view=groups');
+    expect(serializeRoute({ page: 'console' })).toBe('?page=console');
+    expect(sameRoute({ page: 'console' }, { page: 'console', view: 'app' })).toBe(false);
+  });
+
   it('keeps legacy report links (?symbol=&tf=) working as chart links', () => {
     expect(route('?symbol=2330.TW&tf=1D')).toEqual({ page: 'chart', symbol: '2330.TW', tf: '1D' });
     expect(route('?symbol=%5ETWII&timeframe=1W')).toEqual({ page: 'chart', symbol: '^TWII', tf: '1W' });

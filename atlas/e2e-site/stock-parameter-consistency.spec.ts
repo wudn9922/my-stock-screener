@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openConsoleSection } from './console-nav';
 import { openListActions } from './archive-fixture';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount } from './account-fixture';
@@ -90,6 +91,7 @@ test('cloud grouped MAs render on a fresh chart; confirm updates the original ro
 test('editing an original grouped stock remains effective even when legacy dormant duplicates exist', async ({ page }) => {
   const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 34, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
   await page.goto('./?page=console');
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.locator('tbody tr').first().getByRole('button', { name: '編輯', exact: true }).click();
@@ -108,6 +110,7 @@ test('editing an original grouped stock remains effective even when legacy dorma
 test('moving out of a group and then joining another group reuses the same id and MAs', async ({ page }) => {
   const cloud = await cloudParameters(page, [stock('AAPL', 'us_g1', 4, [17, 43])]);
   await page.goto('./?page=console');
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.getByRole('button', { name: '移出分組' }).click();

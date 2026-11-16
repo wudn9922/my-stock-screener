@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
+import { isCompactConsole, openConsoleSection } from './console-nav';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import type { SavedWatchlist } from '../src/watchlists/model';
@@ -191,8 +192,12 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await page.goto('./');
   await primary(page).getByRole('button', { name: '自選', exact: true }).click();
   await expect(page.locator('.page-title')).toHaveText('自選');
-  await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '重新檢查舊版資料', exact: true })).toBeVisible();
+  // Phones and tablets keep the permission display and its re-check button under 我的 › 資料狀態, not under 自選.
+  if (isCompactConsole(page)) await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(0);
+  else {
+    await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重新檢查舊版資料', exact: true })).toBeVisible();
+  }
   await openListActions(page);
   await expect(page.getByRole('button', { name: '以篩選條件建立清單', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '匯入備份', exact: true })).toBeVisible();
@@ -233,32 +238,56 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(page.getByRole('button', { name: '刪除雲端清單', exact: true })).toHaveCount(2);
   await primary(page).getByRole('button', { name: '我的', exact: true }).click();
   await expect(page.locator('.page-title')).toHaveText('我的');
-  await expect(page.getByRole('link', { name: '自選清單 →', exact: true })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
-  await page.getByRole('button', { name: '均線參數', exact: true }).click();
+  const compact = isCompactConsole(page);
+  // Phones and tablets: the 自選清單 row replaces the link, and the storage notice lives under 資料狀態.
+  const watchlistLink = compact ? page.getByRole('link', { name: /^自選清單/ }) : page.getByRole('link', { name: '自選清單 →', exact: true });
+  await expect(watchlistLink).toBeVisible();
+  if (compact) {
+    await openConsoleSection(page, 'status');
+    await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重新檢查舊版資料', exact: true })).toBeVisible();
+    await expect(page.getByText('盤中每分鐘更新', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: '返回我的', exact: true }).click();
+  } else await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toBeVisible();
+  await openConsoleSection(page, 'parameters');
   const parameters = page.getByRole('region', { name: '原有均線參數控制台' });
   await expect(parameters).toBeVisible();
   await expect(parameters.getByRole('textbox', { name: '參數股票代號' })).toBeVisible();
   await expect(parameters.locator('a[href*="liff.line.me"]').first()).toHaveAttribute('href', /page=console$/);
-  await page.getByRole('button', { name: '管理員', exact: true }).click();
+  // The custom groups are their own sub-view on phones and tablets, and part of the 均線參數 tab on the desktop.
+  if (compact) await openConsoleSection(page, 'groups');
+  await expect(page.getByRole('region', { name: '原有均線參數控制台' }).getByText('管理自訂分組', { exact: true })).toBeVisible();
+  await openConsoleSection(page, 'admin');
   await expect(page.getByRole('region', { name: '管理員儲存權限' })).toBeVisible();
-  await page.getByRole('button', { name: '顯示與App', exact: true }).click();
-  const display = page.getByRole('region', { name: '顯示與App', exact: true });
-  await expect(display.getByRole('region', { name: '安裝 Atlas', exact: true })).toBeVisible();
-  await expect(display.getByRole('region', { name: '版本更新', exact: true })).toBeVisible();
-  await display.getByText('綠漲紅跌', { exact: true }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-colors', 'us');
-  await page.reload();
-  await page.getByRole('button', { name: '顯示與App', exact: true }).click();
-  await expect(display.getByRole('radio', { name: '綠漲紅跌' })).toBeChecked();
+  await openConsoleSection(page, 'display');
+  if (compact) {
+    await expect(page.getByRole('region', { name: '安裝 Atlas', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: '版本更新', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '返回我的', exact: true }).click();
+    const colors = page.getByRole('group', { name: '漲跌顏色' });
+    await colors.getByRole('button', { name: /綠漲/ }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-colors', 'us');
+    await page.reload();
+    await expect(colors.getByRole('button', { name: /綠漲/ })).toHaveAttribute('aria-pressed', 'true');
+  } else {
+    const display = page.getByRole('region', { name: '顯示與App', exact: true });
+    await expect(display.getByRole('region', { name: '安裝 Atlas', exact: true })).toBeVisible();
+    await expect(display.getByRole('region', { name: '版本更新', exact: true })).toBeVisible();
+    await display.getByText('綠漲紅跌', { exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-colors', 'us');
+    await page.reload();
+    await openConsoleSection(page, 'display');
+    await expect(display.getByRole('radio', { name: '綠漲紅跌' })).toBeChecked();
+  }
   await page.getByRole('button', { name: '顯示設定', exact: true }).click();
   const gear = page.getByRole('dialog', { name: '顯示設定', exact: true });
   await expect(gear.getByRole('radio', { name: '綠漲紅跌' })).toBeChecked();
   await gear.getByText('紅漲綠跌', { exact: true }).click();
-  await expect(display.getByRole('radio', { name: '紅漲綠跌' })).toBeChecked();
+  if (compact) await expect(page.getByRole('group', { name: '漲跌顏色' }).getByRole('button', { name: /紅漲/ })).toHaveAttribute('aria-pressed', 'true');
+  else await expect(page.getByRole('region', { name: '顯示與App', exact: true }).getByRole('radio', { name: '紅漲綠跌' })).toBeChecked();
   await gear.getByRole('button', { name: '關閉', exact: true }).click();
   await page.screenshot({ path: info.outputPath(info.project.name === 'desktop-chromium' ? 'my-display-desktop.png' : 'my-display-mobile-390.png') });
-  await page.getByRole('link', { name: '自選清單 →', exact: true }).click();
+  await watchlistLink.click();
   await expect(page.locator('.page-title')).toHaveText('自選');
   await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
 });

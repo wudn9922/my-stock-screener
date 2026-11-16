@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { UserRound } from 'lucide-react';
+import { useCompactLayout } from '../ui/useCompactLayout';
 import { acceptLineHandoff, isLineInAppBrowser, lineLoginError, loginLineIdentity, logoutLineIdentity, refreshLineIdentity, type LineIdentity } from '../cloud/lineIdentity';
 import { DEVICE_SESSION_DAYS, deviceSessionVersion, forgetDevice, rememberAfterRedirect, rememberDevice, rememberedDevice, subscribeDeviceSession } from '../cloud/deviceSession';
 import { beginSeparateLineLogin, cancelIncomingLineHandoff, completeIncomingLineHandoff, incomingLineApproval, incomingLineConfirmationCode, lineHandoffMessage, linePairingCode, needsSeparateLineLogin, type LineCodeChallenge, type LoginCandidate } from '../cloud/lineLoginHandoff';
@@ -19,6 +21,7 @@ function applyRemember(identity: LineIdentity | null, remember: boolean) {
  */
 export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' | 'alerts' }) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
+  const compact = useCompactLayout();
   useSyncExternalStore(subscribeDeviceSession, deviceSessionVersion);
   const [remember, setRemember] = useState(true);
   const [rememberBusy, setRememberBusy] = useState(false);
@@ -61,6 +64,10 @@ export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' 
     : access.storageMode === 'device'
       ? '僅保存在此裝置，不會同步個人資料到 Supabase。'
       : '僅本次瀏覽暫存，重新整理即清除，不會保存個人操作。';
+  // The phone account card states the mode in one short line.
+  const description = compact && variant === 'full'
+    ? access.storageMode === 'cloud' ? '已獲雲端儲存授權' : access.storageMode === 'device' ? '僅保存在此裝置' : '操作只暫存到重新整理為止'
+    : label;
   const login = async () => {
     if (pending.current) return;
     setCandidate(null);
@@ -160,20 +167,25 @@ export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' 
     記住這台裝置（{DEVICE_SESSION_DAYS} 天內免登入）
   </label>;
   return <div className={`source-note storage-policy-note${variant === 'gate' ? ' storage-policy-gate' : ' storage-policy-account'}`} data-signed-in={access.userId ? 'true' : 'false'}>
+    {variant === 'full' && <span className="account-avatar" aria-hidden="true"><UserRound size={24} strokeWidth={1.8} /></span>}
     {variant === 'gate'
       ? message && <p role="alert">{message}</p>
       : <p role="status" data-storage-mode={access.storageMode}>
-        {access.userId ? '已登入 · ' : '訪客模式 · '}{label}{remembered && ' 此裝置已記住登入。'}{message && ` ${message}`}
+        <span className="account-text">
+          <span className="account-status">{access.userId ? '已登入' : '訪客模式'}</span>
+          <span className="account-sep"> · </span>
+          <span className="account-desc">{description}{remembered && ' 此裝置已記住登入。'}{message && ` ${message}`}</span>
+        </span>
       </p>}
     {flows}
     <div className="pwa-login-actions">{access.userId
       ? <>
-        <button type="button" className="ghost-button" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>
+        <button type="button" className="ghost-button account-secondary" disabled={busy} onClick={() => void logout()}>{isLineInAppBrowser() ? '登出 Atlas' : '登出 LINE'}</button>
         {!remembered && currentIdentity()?.kind !== 'device' && !isLineInAppBrowser() &&
-          <button type="button" className="ghost-button" disabled={busy || rememberBusy} onClick={() => void rememberNow()}>記住這台裝置</button>}
+          <button type="button" className="ghost-button account-primary" disabled={busy || rememberBusy} onClick={() => void rememberNow()}>記住這台裝置</button>}
       </>
       : <>
-        <button type="button" className={variant === 'gate' ? 'primary-button' : 'ghost-button'} disabled={busy} onClick={() => void login()}>{busy ? '正在開啟 LINE 登入…' : '使用 LINE 登入'}</button>
+        <button type="button" className={variant === 'gate' ? 'primary-button' : 'ghost-button account-primary'} disabled={busy} onClick={() => void login()}>{busy ? '正在開啟 LINE 登入…' : '使用 LINE 登入'}</button>
         {!isLineInAppBrowser() && rememberChoice}
         <HelpDisclosure label="登入說明">點選登入後會啟用 LINE 登入所需的瀏覽器儲存；個人操作的保存仍需帳號授權。勾選「記住這台裝置」時，這台裝置會保存一組登入憑證，{DEVICE_SESSION_DAYS} 天內未使用才需重新登入；按「登出」即刪除。</HelpDisclosure>
       </>}

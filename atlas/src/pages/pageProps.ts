@@ -5,6 +5,6 @@ import type { OpenChartOptions } from '../app/Site';
 export interface PageProps {
   report: ReportState;
   reload: () => void;
-  navigate: (route: Route, options?: { replace?: boolean }) => void;
+  navigate: (route: Route, options?: { replace?: boolean; state?: unknown }) => void;
   openChart: (options: OpenChartOptions) => void;
 }

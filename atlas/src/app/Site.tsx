@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { takeConsoleListScroll } from './consoleListScroll';
 import { ChartCandlestick, LayoutDashboard, ListFilter, Plus, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
@@ -159,12 +160,32 @@ export function Site() {
   }, []);
   const section = scrollSection(route);
   const identity = scrollIdentity(route);
+  // 我的 sub-views open at the top; going back to the 我的 list puts its scroll back.
+  const consoleListScroll = useRef(0);
   useLayoutEffect(() => {
     const previous = scrolled.current;
     scrolled.current = { page: route.page, section, identity };
     if (previous && previous.page === route.page && previous.section === section) return;
+    const inConsole = previous?.page === 'console' && route.page === 'console';
+    // Read the list's scroll from the last scroll event: the shorter sub-view may already have clamped scrollTop.
+    if (inConsole && previous.section === '')
+      consoleListScroll.current = takeConsoleListScroll() ?? pageScrolls.current.get('console')?.top ?? 0;
     const saved = previous && previous.page !== route.page && isKeptPage(route.page) ? pageScrolls.current.get(route.page) : undefined;
-    document.getElementById('main')?.scrollTo?.({ top: saved?.identity === identity ? saved.top : 0 });
+    const restoreList = inConsole && section === '';
+    const top = restoreList ? consoleListScroll.current : saved?.identity === identity ? saved.top : 0;
+    const main = document.getElementById('main');
+    main?.scrollTo?.({ top });
+    if (!restoreList || !main) return;
+    // Content below the rows (the footer) can mount a few frames later, so the list may be briefly too short and the
+    // browser clamps the scroll; keep applying it for a few frames until it holds.
+    let frame = 0;
+    let tries = 0;
+    const settle = () => {
+      if (Math.abs(main.scrollTop - top) > 1) main.scrollTo?.({ top });
+      if (Math.abs(main.scrollTop - top) > 1 && ++tries < 12) frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
   }, [route.page, section, identity]);
   useEffect(() => {
     const titles =
@@ -308,13 +329,18 @@ export function Site() {
       case 'themes': return <ThemesPage {...pageProps} theme={shown.theme} market={shown.market} view={shown.v} />;
       case 'screener': return <ScreenerPage {...pageProps} group={shown.group} f={shown.f} />;
       case 'watchlist': return <ConsolePage {...pageProps} section="lists" list={shown.list} />;
-      case 'console': return <ConsolePage {...pageProps} section="settings" />;
+      case 'console': {
+        const lastList = routeMemory.current.pages.watchlist;
+        return <ConsolePage {...pageProps} section="settings" view={shown.page === 'console' ? shown.view : undefined}
+          watchlistId={lastList?.page === 'watchlist' ? lastList.list : undefined} />;
+      }
       default: return null;
     }
   };
 
   return (
-    <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}>
+    <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}
+      data-console-view={mobile && route.page === 'console' ? route.view : undefined}>
       <header className="site-topbar">
         <a
           className="site-brand"
@@ -372,7 +398,7 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
-        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}</div>
+        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' && !(mobile && route.view) ? 'full' : 'alerts'} />}</div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
           <div className="market-head">
             {reportDate && <span className="market-head-date">資料日 {formatDateTime(reportDate, false)}</span>}
@@ -419,9 +445,10 @@ export function Site() {
         )}
         <div className="site-data-footer">
           <div id="site-page-notes" />
-          {route.page === 'console' && <LegacyImportCard />}
-          <StorageModeNotice />
-          <DataHealthPanel report={reportState} />
+          {route.page === 'console' && !(mobile && route.view) && <LegacyImportCard />}
+          {/* Phones and tablets keep the storage mode and data health under 我的 › 資料狀態, not under every page. */}
+          {!mobile && <StorageModeNotice />}
+          {!mobile && <DataHealthPanel report={reportState} />}
         </div>
       </main>
       <nav className="site-tabbar" aria-label="主要頁面">

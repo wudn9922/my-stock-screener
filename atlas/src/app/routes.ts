@@ -6,12 +6,16 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
  * Site routes live in the query string so the static GitHub Pages deployment needs no rewrites:
  * `?page=markets&market=tw`, `?page=world` (US Treasuries and rates, the default; aliases `?page=rates`, `?page=bonds`,
  * old `&view=rates`), `?page=world&view=indices` (world indices),
- * `?page=themes&theme=ai-chips` (`&market=tw` for the Taiwan themes; the US ones are the default; `&v=map` for the heatmap view), `?page=screener&group=tw_g1`, `?page=chart&symbol=2330.TW&tf=1D`,
+ * `?page=themes&theme=ai-chips` (`&market=tw` for the Taiwan themes; the US ones are the default; `&v=map` for the heatmap view), `?page=screener&group=tw_g1`, `?page=chart&symbol=2330.TW&tf=1D`, `?page=console&view=status` (a phone 我的 sub-view),
  * `?page=financials&symbol=AAPL&p=q` (not in the bottom bar; opened from the chart header). Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
  */
 export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financials', 'watchlist', 'console'] as const;
 export type Page = (typeof PAGES)[number];
+
+/** Phone/tablet 我的 sub-views (`?page=console&view=status`); the desktop page keeps its tabs and ignores this. */
+export const CONSOLE_VIEWS = ['parameters', 'groups', 'app', 'status', 'backup', 'admin'] as const;
+export type ConsoleView = (typeof CONSOLE_VIEWS)[number];
 
 export type Route =
   | { page: 'markets'; market: MarketKey }
@@ -20,7 +24,7 @@ export type Route =
   /** `market` is only present for Taiwan (`'tw'`); omitted means the US themes. `v: 'map'` shows the heatmap; omitted means the list. */
   | { page: 'themes'; theme?: string; market?: 'tw'; v?: 'map' }
   | { page: 'screener'; group?: string; f?: string }
-  | { page: 'console' }
+  | { page: 'console'; view?: ConsoleView }
   | { page: 'watchlist'; list?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe }
   /** q/a stores the period choice; US defaults to quarters, Taiwan to annual. tf returns to the chart. */
@@ -163,9 +167,10 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
   } else if (page === 'console' || page === 'watchlist') {
     const list = params.get('list');
     const validList = list && /^[0-9a-f-]{36}$/i.test(list) ? list : undefined;
+    const view = params.get('view')?.trim().toLowerCase();
     route = page === 'watchlist' || (page === 'console' && validList)
       ? { page: 'watchlist', ...(validList ? { list: validList } : {}) }
-      : { page: 'console' };
+      : { page: 'console', ...((CONSOLE_VIEWS as readonly string[]).includes(view ?? '') ? { view: view as ConsoleView } : {}) };
   } else if (page === 'chart') {
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };
@@ -198,6 +203,7 @@ export function serializeRoute(route: Route): string {
   if (route.page === 'screener' && route.group) params.set('group', route.group);
   if (route.page === 'screener' && route.f) params.set('f', route.f);
   if (route.page === 'watchlist' && route.list) params.set('list', route.list);
+  if (route.page === 'console' && route.view) params.set('view', route.view);
   if (route.page === 'chart') {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);

@@ -1,4 +1,12 @@
-import { DisplaySettings } from '../ui/DisplaySettings';
+import { DataFacts, DisplaySettings } from '../ui/DisplaySettings';
+import { rememberConsoleListScroll } from '../app/consoleListScroll';
+import { InstallPanel } from '../pwa/InstallPanel';
+import { AppUpdate } from '../pwa/AppUpdate';
+import { DataHealthPanel } from '../ui/DataHealthPanel';
+import { StorageModeNotice } from '../ui/StorageAdminPanel';
+import { MeColorRow, MeGroup, MeRow, MeSubview, CONSOLE_VIEW_TITLES } from '../ui/MeHome';
+import { useCompactLayout } from '../ui/useCompactLayout';
+import type { ConsoleView, Route } from '../app/routes';
 import { DataStatusPanel } from '../ui/DataStatusPanel';
 import { WatchlistBoard } from '../ui/WatchlistBoard';
 import { WatchlistChanges } from '../ui/WatchlistChanges';
@@ -43,7 +51,16 @@ import { watchlistActionsRequest } from '../app/watchlistActionsRequest';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
-export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings' }: PageProps & { list?: string; section?: 'lists' | 'settings' }) {
+export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings', view, watchlistId }: PageProps & {
+  list?: string;
+  section?: 'lists' | 'settings';
+  /** Phone/tablet 我的 sub-view (`?page=console&view=…`); the desktop page keeps its tabs. */
+  view?: ConsoleView;
+  /** The 自選 list that was open when 我的 was reached, for the 自選清單 row. */
+  watchlistId?: string;
+}) {
+  const compact = useCompactLayout();
+  const me = section === 'settings' && compact;
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const cloudAllowed = access.storageMode === 'cloud';
   const store = watchlistStore();
@@ -269,6 +286,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     anchor.click();
     URL.revokeObjectURL(url);
   };
+  const importFile = (file: File | undefined) => {
+    if (file)
+      void file.text().then((raw) =>
+        action(() => {
+          if (confirm('匯入會取代目前的條件清單，建議先匯出備份。是否繼續？')) {
+            store.importJson(raw);
+            setAttempt((value) => value + 1);
+          }
+        }),
+      );
+  };
   const create = (event: FormEvent) => {
     event.preventDefault();
     action(() => {
@@ -306,6 +334,95 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         ? (report.report.groups.find((group) => group.key === selected.group)?.name ?? '已儲存的選股群組')
         : '已儲存的選股群組'
     : '';
+
+  if (me) {
+    const currentList = document.lists.find((entry) => entry.id === watchlistId) ?? document.lists[0];
+    const currentCount = currentList
+      ? currentList.kind === 'manual'
+        ? currentList.symbols.length
+        : (currentList.lastViewed ?? currentList.history.at(-1))?.members.length
+      : undefined;
+    const reportDate = report.status === 'ok' ? report.report.reportDate : null;
+    // A sub-view entry the list pushed marks itself, so Back can pop to the list; a deep link, reload of an older
+    // entry or a return through the tab bar has no list before it and opens the list in place instead.
+    const go = (route: Route) => {
+      if (route.page === 'console') rememberConsoleListScroll();
+      navigate(route, route.page === 'console' ? { state: { consoleFromList: true } } : undefined);
+    };
+    const back = () => {
+      if ((window.history.state as { consoleFromList?: boolean } | null)?.consoleFromList === true) window.history.back();
+      else navigate({ page: 'console' }, { replace: true });
+    };
+    const content = (shown: ConsoleView) => {
+      switch (shown) {
+        case 'parameters':
+          return <ParameterConsole part="stocks" />;
+        case 'groups':
+          return <ParameterConsole part="groups" />;
+        case 'app':
+          return <div className="console-card me-app"><InstallPanel /><AppUpdate /></div>;
+        case 'status':
+          return (
+            <div className="me-stack">
+              <DataStatusPanel />
+              <section className="console-card me-facts" aria-label="報告與行情說明">
+                <DataFacts reportDate={reportDate} generatedAt={report.status === 'ok' ? report.report.generatedAt : null} />
+                <p className="muted me-live-note">盤中每分鐘更新（Yahoo 延遲報價）</p>
+              </section>
+              <StorageModeNotice />
+              <DataHealthPanel report={report} />
+            </div>
+          );
+        case 'backup':
+          return (
+            <section className="console-card me-backup" aria-label="清單備份">
+              {(error || storageError) && <p role="alert" className="console-message">{error || storageError}</p>}
+              <p className="muted">備份與還原你的自選與條件清單；匯入會取代目前的條件清單，建議先匯出備份。{!canPersist() && '目前僅暫存，未獲保存授權；登入後可匯出。'}</p>
+              <div className="console-actions">
+                <button type="button" className="ghost-button" disabled={!canPersist()} onClick={download}
+                  title={!canPersist() ? '目前僅暫存，未獲保存授權' : undefined}>匯出清單備份</button>
+                <button type="button" className="ghost-button" onClick={() => imported.current?.click()}>匯入備份</button>
+                <input type="file" ref={imported} accept="application/json,.json" hidden
+                  onChange={(event) => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
+              </div>
+            </section>
+          );
+        case 'admin':
+          return access.isAdmin ? <StorageAdminPanel /> : <p className="muted">此帳號沒有管理員權限。</p>;
+      }
+    };
+    return (
+      <div className={`page console-page console-me${view ? ' console-sub' : ''}`}>
+        {view ? (
+          <MeSubview title={CONSOLE_VIEW_TITLES[view]} onBack={back}>{content(view)}</MeSubview>
+        ) : (
+          <>
+            {/* The top bar already names the page; the heading stays in the document for assistive technology and tests. */}
+            <div className="page-head"><div><h2 className="page-title">我的</h2></div></div>
+            <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
+            <MeGroup label="個人化">
+              <MeRow label="自選清單" route={currentList ? { page: 'watchlist', list: currentList.id } : { page: 'watchlist' }} navigate={go}
+                value={currentList ? <>{currentList.name}{currentCount !== undefined && <> · <span className="num">{currentCount}</span> 檔</>}</> : 'LINE 熱門'} />
+              <MeRow label="個股均線參數" route={{ page: 'console', view: 'parameters' }} navigate={go}
+                value={<><span className="num">{Object.keys(fixedParameters).length}</span> 檔</>} />
+              <MeRow label="自訂分組" route={{ page: 'console', view: 'groups' }} navigate={go} />
+            </MeGroup>
+            <MeGroup label="顯示">
+              <MeColorRow />
+              <MeRow label="安裝到主畫面" route={{ page: 'console', view: 'app' }} navigate={go} />
+            </MeGroup>
+            <MeGroup label="資料">
+              <MeRow label="資料狀態" route={{ page: 'console', view: 'status' }} navigate={go}
+                value={reportDate ? <>報告日 <span className="num">{formatDateTime(reportDate, false)}</span></> : undefined} />
+              <MeRow label="備份與還原" route={{ page: 'console', view: 'backup' }} navigate={go}
+                value={canPersist() ? <><span className="num">{document.lists.length}</span> 份清單</> : '登入後可匯出'} />
+              {access.isAdmin && <MeRow label="管理員儲存權限" route={{ page: 'console', view: 'admin' }} navigate={go} />}
+            </MeGroup>
+          </>
+        )}
+      </div>
+    );
+  }
 
   const viewSwitch = <div className="segmented console-tabs wb-view-switch" role="group" aria-label="自選檢視">
     <button type="button" className={listsView === 'lists' ? 'active' : ''} aria-pressed={listsView === 'lists'} onClick={() => setListsView('lists')}>清單</button>
@@ -400,16 +517,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               accept="application/json,.json"
               hidden
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file)
-                  void file.text().then((raw) =>
-                    action(() => {
-                      if (confirm('匯入會取代目前的條件清單，建議先匯出備份。是否繼續？')) {
-                        store.importJson(raw);
-                        setAttempt((value) => value + 1);
-                      }
-                    }),
-                  );
+                importFile(event.target.files?.[0]);
                 event.target.value = '';
               }}
             />
