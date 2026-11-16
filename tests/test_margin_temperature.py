@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from margin_temperature import DATA, OUTPUT, TwseClient, build_rows, csv_rows, hot_episodes, make_report, parse_index, parse_margin, to_report
+from margin_temperature import DATA, OUTPUT, TwseClient, update, build_rows, csv_rows, hot_episodes, make_report, parse_index, parse_margin, to_report
 
 
 def weekly(closes, amounts):
@@ -144,6 +144,16 @@ class MarginTemperatureTests(unittest.TestCase):
         self.assertEqual(parse_index(day,date(2026,11,12)),{'open':44180.46,'high':44525.24,'low':42943.5,'close':43091.87})
         self.assertIsNone(parse_index(day,date(2026,11,13)))
         self.assertIsNone(parse_index({'stat':'No data'},date(2026,11,14)))
+
+    def test_update_uses_working_twse_routes(self):
+        # rwd/zh/indices/... is not a TWSE route; it redirects to HTML and failed every run.
+        routes = []
+        class Client:
+            def fetch(self, route, params):
+                routes.append(route)
+                return {'stat': '很抱歉，沒有符合條件的資料!'}
+        self.assertIn('休市', update(date(2026, 11, 14), client=Client()))
+        self.assertEqual(routes, ['marginTrading/MI_MARGN', 'TAIEX/MI_5MINS_HIST'])
 
     def test_retry_html_then_success(self):
         calls = []
