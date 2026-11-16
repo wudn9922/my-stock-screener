@@ -1,3 +1,4 @@
+import './app/zodCsp';
 import { createRoot } from 'react-dom/client';
 import { AccessBoundary } from './auth/AccessBoundary';
 import { applyColorConvention } from './app/sitePreferences';
