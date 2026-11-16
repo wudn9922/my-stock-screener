@@ -244,7 +244,7 @@ def update(target: date, client: TwseClient | None = None) -> str:
     client = client or TwseClient()
     stamp = target.strftime("%Y%m%d")
     margin = parse_margin(client.fetch("marginTrading/MI_MARGN", {"date": stamp, "selectType": "MS", "response": "json"}))
-    index = parse_index(client.fetch("indices/MI_5MINS_HIST", {"date": stamp, "response": "json"}), target)
+    index = parse_index(client.fetch("TAIEX/MI_5MINS_HIST", {"date": stamp, "response": "json"}), target)
     if margin is None and index is None:
         return f"{target}: 休市，未寫入資料"
     if margin is None or index is None:
