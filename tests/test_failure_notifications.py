@@ -175,8 +175,17 @@ class WorkflowCoverageTest(unittest.TestCase):
             for name, producer in doc['jobs'].items():
                 if name == 'notify-system-failure':
                     continue
-                partial = [s for s in producer.get('steps', []) if s.get('continue-on-error') == 'true'
-                           and s.get('id') != 'collect_notification_outcomes']
+                steps = producer.get('steps', [])
+
+                def retried(step):
+                    # A tolerated first attempt is fine only when a later, non-tolerated step
+                    # retries the same action on its failure, so a second failure still fails the job.
+                    return any(later.get('uses') == step.get('uses') and later.get('continue-on-error') != 'true'
+                               and f"steps.{step.get('id')}.outcome == 'failure'" in later.get('if', '')
+                               for later in steps[steps.index(step) + 1:])
+
+                partial = [s for s in steps if s.get('continue-on-error') == 'true'
+                           and s.get('id') != 'collect_notification_outcomes' and not retried(s)]
                 if partial:
                     self.assertTrue(all(s.get('id') for s in partial), path.name)
                     self.assertIn('notify_partial', producer['outputs'], path.name)
