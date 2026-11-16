@@ -75,7 +75,8 @@ import { closedBars } from '../market-data/MarketDataProvider';
 import { evaluateAlerts } from '../alerts/AlertEngine';
 import type { StrategyResult } from '../strategy';
 import { errorLog, reportError } from '../errors/UserErrors';
-import { SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
+import { PUBLIC_BASE, SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
+import { serializeRoute } from './routes';
 import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
 import { getMarketProfile } from '../market-data/MarketProfile';
@@ -1213,7 +1214,8 @@ export function App({
     </div>
   );
   const shareStock = async () => {
-    const url = window.location.href;
+    // Only the canonical stock route: no list context, account or session identifiers.
+    const url = `${window.location.origin}${PUBLIC_BASE}${serializeRoute({ page: 'chart', symbol, tf })}`;
     const title = `${ticker}${companyName ? ` ${companyName}` : ''} · Atlas`;
     if (typeof navigator.share === 'function') {
       try {
@@ -1506,6 +1508,9 @@ export function App({
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
               {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
+              <button type="button" className="ghost-button ws-share-link" onClick={() => void shareStock()}>
+                <Share size={16} strokeWidth={1.8} aria-hidden="true" />分享個股連結
+              </button>
             </div>}
           </StockStatsMenu>
         </div>

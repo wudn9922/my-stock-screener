@@ -2573,3 +2573,13 @@
   .ws-header-compact .ws-market-tag,
   .ws-header-compact .ws-symbol-icon { display: none; }
 }
+
+/* 分享個股連結 inside the desktop 行情資料說明 menu (phone/tablet share from the header icon). */
+.source-details .ws-share-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 12px;
+}
