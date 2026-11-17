@@ -15,7 +15,7 @@ import random
 import re
 import tempfile
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -238,6 +238,10 @@ def parse_index(payload: dict, target: date) -> dict[str, float] | None:
     return None
 
 
+class IncompleteDayError(RuntimeError):
+    """Only one of the two TWSE sources has the day: usually not yet published."""
+
+
 def update(target: date, client: TwseClient | None = None) -> str:
     if target > datetime.now(TPE).date():
         raise ValueError("不可抓取未來日期")
@@ -248,7 +252,7 @@ def update(target: date, client: TwseClient | None = None) -> str:
     if margin is None and index is None:
         return f"{target}: 休市，未寫入資料"
     if margin is None or index is None:
-        raise RuntimeError(f"{target}: 融資與加權指數資料不一致，保留舊資料")
+        raise IncompleteDayError(f"{target}: 融資與加權指數資料不一致，保留舊資料")
     idx = csv_rows(DATA / "taiex.csv")
     mg = csv_rows(DATA / "margin_daily.csv")
     if "mrg_lots" not in margin or "short_lots" not in margin:
@@ -275,17 +279,49 @@ def update(target: date, client: TwseClient | None = None) -> str:
     return f"{target}: 已更新，最新熱度 {report['latest']['pct']}, 冷度 {report['latest']['mdd']}"
 
 
+MAX_CATCH_UP_DAYS = 40
+
+
+def catch_up(client: TwseClient | None = None, today: date | None = None) -> list[str]:
+    """Fill every weekday after the last stored session through today.
+
+    GitHub's schedule often starts this job hours late, after midnight Taipei time, so
+    updating only "today" would treat the new day as a holiday and silently skip the
+    previous session. Holidays are skipped by update(); today's data is allowed to be
+    not yet published, any earlier day must be complete.
+    """
+    client = client or TwseClient()
+    today = today or datetime.now(TPE).date()
+    last = min(date.fromisoformat(csv_rows(DATA / name)[-1]["date"]) for name in ("taiex.csv", "margin_daily.csv"))
+    days = [last + timedelta(days=n) for n in range(1, (today - last).days + 1)]
+    days = [day for day in days if day.weekday() < 5]
+    if len(days) > MAX_CATCH_UP_DAYS:
+        raise RuntimeError(f"缺漏 {len(days)} 個平日，超過 {MAX_CATCH_UP_DAYS}；請用 --date 手動補")
+    messages = []
+    for day in days:
+        try:
+            messages.append(update(day, client))
+        except IncompleteDayError:
+            if day != today:
+                raise
+            messages.append(f"{day}: 今日資料尚未完整公布，下次執行再補")
+    return messages or [f"{last}: 已是最新"]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("build", "update"))
-    parser.add_argument("--date", type=date.fromisoformat, default=datetime.now(TPE).date())
+    parser.add_argument("--date", type=date.fromisoformat, default=None,
+                        help="update one day only; default catches up every missing weekday")
     args = parser.parse_args()
     if args.command == "build":
         report = make_report(csv_rows(DATA / "taiex.csv"), csv_rows(DATA / "margin_daily.csv"))
         atomic_write(OUTPUT, json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n")
         print(f"已生成 {OUTPUT.relative_to(ROOT)}，資料日 {report['asOf']}")
-    else:
+    elif args.date:
         print(update(args.date))
+    else:
+        print("\n".join(catch_up()))
 
 
 if __name__ == "__main__":
