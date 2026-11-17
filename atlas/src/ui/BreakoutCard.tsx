@@ -48,7 +48,7 @@ function StrategyRow({ method, stats, rule, params, index, points, months, asOf 
       <div className="bo-method-name"><span className="bo-method-index">0{index + 1}</span><div>
         <h3 className="bo-label">{method.label}</h3><details className="bo-inline-help"><summary>方法說明</summary><p>{method.hint}</p></details>
       </div></div>
-      <b className="bo-win" aria-label={`進場成功率 ${note ? '尚無完整結果' : rate(outcome?.winRate ?? null)}`}>
+      <b className="bo-win" aria-label={`突破條件達成率 ${note ? '尚無完整結果' : rate(outcome?.winRate ?? null)}`}>
         {note ? '—' : rate(outcome?.winRate ?? null)}<small>{asOf ? formatDateTime(asOf, false) : '資料日'} 測得</small>
       </b>
     </div>
@@ -70,7 +70,7 @@ function StrategyRow({ method, stats, rule, params, index, points, months, asOf 
         <div><dt>後續缺日</dt><dd>{count(comparison.missingN)}</dd></div>
       </dl>
       <div className="bo-row-foot"><span>{swing ? '收盤沒站上另列，不進成功率分母' : <>完整樣本中，突破日收盤即失敗 <b>{count(comparison.commonFailedN)}</b> 次</>}</span>
-        {rule === 'firstHit' && comparison.sameBarFailedN > 0 ? <span title="同根日K無法確認先後，保守判失敗">先後不明 {count(comparison.sameBarFailedN)} 次</span> : null}
+        {rule === 'firstHit' ? <span title="同根日K同時觸及成功與失敗條件，無法確認先後，保守判失敗；分母包含共通失敗的全部完整訊號樣本">同根先後不明、保守判失敗 {rate(comparison.completeN ? comparison.sameBarFailedN / comparison.completeN * 100 : null)}（{count(comparison.sameBarFailedN)}／{count(comparison.completeN)} 完整訊號樣本）</span> : null}
       </div>
     </> : null}
   </li>;
@@ -180,14 +180,14 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
   const result = activeDate === 'latest' ? latest : archived?.asOf === activeDate ? archived.result : null;
   const data = result?.status === 'ok' ? result.data.markets[market] : undefined;
   const params = result?.status === 'ok' ? result.data.params : DEFAULT_BREAKOUT_PARAMS;
-  return <section className="card breakout-card" aria-label={`${MARKET_NAMES[market]}全市場進場成功率`} aria-busy={result === null}>
-    <header className="card-head"><h2><Rocket size={16} aria-hidden="true" />全市場進場成功率<small>{MARKET_NAMES[market]}</small></h2>
+  return <section className="card breakout-card" aria-label={`${MARKET_NAMES[market]}全市場突破條件達成率`} aria-busy={result === null}>
+    <header className="card-head"><h2><Rocket size={16} aria-hidden="true" />全市場突破條件達成率<small>{MARKET_NAMES[market]}</small></h2>
       {data?.scope === 'full' && data.asOf ? <span className="bo-asof">資料日 {formatDateTime(data.asOf, false)}</span> : null}
     </header>
     <div className="bo-body">
       <p className="bo-note">每週更新一次（週六）；平日顯示上次完成的計算結果。</p>
       <div className="bo-history">
-        <label>測試紀錄<select aria-label="進場成功率測試日期" value={activeDate} onChange={event => setSelectedDate(event.target.value)}>
+        <label>測試紀錄<select aria-label="突破條件測試日期" value={activeDate} onChange={event => setSelectedDate(event.target.value)}>
           <option value="latest">今天／最新一次</option>
           {snapshots.map(entry => <option key={entry.asOf} value={entry.asOf}>{formatDateTime(entry.asOf, false)} 保存結果</option>)}
         </select></label>
@@ -196,7 +196,7 @@ export function BreakoutCard({ market }: { market: BreakoutMarketKey }) {
         {history && !snapshots.length ? <small>{history.status === 'ok' ? '尚無已保存的歷史結果。' : history.message}</small> : null}
       </div>
       {result === null ? <p className="muted-text" role="status">載入中…</p> : data?.scope === 'full' ? <BreakoutBody key={`${market}:${activeDate}`} data={data} params={params} /> :
-      data ? <p className="muted-text" role="status">舊口徑：全市場進場成功率尚未產生；舊的部分市場樣本不列入。</p> :
+      data ? <p className="muted-text" role="status">舊口徑：全市場突破條件達成率尚未產生；舊的部分市場樣本不列入。</p> :
         <p className="muted-text" role="status">{result.status === 'ok' ? `${MARKET_NAMES[market]}的突破勝率尚未產生。` : result.message}</p>}
     </div>
   </section>;

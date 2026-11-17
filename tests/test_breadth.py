@@ -248,6 +248,27 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(len(history["ma20Pct"]), len(history["dates"]))
         self.assertEqual(len(history["ma60Pct"]), len(history["dates"]))
 
+    def test_history_counts_align_and_preserve_ma_specific_eligibility(self):
+        frames = {
+            "LONG.TW": make_frame([100] * 59 + [110]),
+            "SHORT.TW": make_frame([100] * 19 + [110]),
+            "NO_VOLUME.TW": make_frame([100] * 59 + [110], volumes=[1000] * 59 + [0]),
+            "STALE.TW": make_frame([100] * 60, last="2026-10-08"),
+        }
+        market = bb.build_market(frames, "test")
+        history = market["history"]
+        for period in (20, 60):
+            above, total = history[f"ma{period}Above"], history[f"ma{period}Total"]
+            self.assertEqual(len(above), len(history["dates"]))
+            self.assertEqual(len(total), len(history["dates"]))
+            self.assertEqual(history[f"ma{period}Pct"], [round(a / t * 100, 1) if t else None for a, t in zip(above, total)])
+            self.assertEqual(above[-1], market["segments"]["all"][f"ma{period}"]["above"])
+            self.assertEqual(total[-1], market["segments"]["all"][f"ma{period}"]["total"])
+        self.assertEqual(history["ma20Total"][-1], 2)
+        self.assertEqual(history["ma60Total"][-1], 1)
+        self.assertEqual(history["ma60Total"][0], 0)
+        self.assertIsNone(history["ma60Pct"][0])
+
     def test_stale_csvs_do_not_shrink_the_coverage_denominator(self):
         # 12 檔裡 7 檔陸續停更（最後日期分散在 09-21～10-08）：asOf 當日只剩 5 檔，
         # 5/12 低於「總檔數一半」，但相對近期有資料檔數仍應保留。
@@ -345,7 +366,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(us["universe"], "S&P 500 成分股")
         self.assertEqual(us["segments"]["all"]["count"], 2)
         self.assertEqual(us["segments"]["all"]["ma20"], {"above": 1, "total": 2, "pct": 50.0})
-        self.assertEqual(set(tw["history"]), {"dates", "ma20Pct", "ma60Pct"})
+        self.assertEqual(set(tw["history"]), {"dates", "ma20Pct", "ma60Pct", "ma20Above", "ma20Total", "ma60Above", "ma60Total"})
 
     def test_us_uses_fallback_label_when_sp500_lookup_raises(self):
         def broken():

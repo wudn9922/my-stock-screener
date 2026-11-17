@@ -8,6 +8,8 @@ import {
   fetchMaRecommendation,
   maRecommendationUrl,
   maMetaParts,
+  hasComparableMaWindow,
+  maReferenceDescription,
   maSelectorLink,
   parseMaRecommendation,
   recommendedPeriods,
@@ -15,7 +17,7 @@ import {
 } from '../src/report/maRecommendation';
 import withSecond from './fixtures/ma-selector/2330.TW.with-second.json';
 import noSecond from './fixtures/ma-selector/2330.TW.no-second.json';
-import { MaMetaLine, MaRangeNotes, appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
+import { MaBacktestMetrics, MaPriceBasisNote, MaMetaLine, MaRangeNotes, appliedDailySmaPeriods, applyRecommended, missingRecommended, selectableCandidates, toggleRecommended } from '../src/ui/MaRecommendation';
 
 // Shape written by ma-selector scripts/build_recommendations.py (core/recommend.py).
 const file = (ticker = '2330.TW') => ({
@@ -305,5 +307,52 @@ describe('ma-selector VERSION 3 optional fields', () => {
 
   it('does not gate on the version number: later additive versions keep reading', () => {
     for (const version of [1, 2, 3, 4]) expect(parseMaRecommendation({ ...v3(), version }, '2330.TW').status).toBe('ok');
+  });
+});
+
+
+describe('corrected recommendation windows and price basis', () => {
+  const parse = (extra: Record<string, unknown> = {}) => {
+    const result = parseMaRecommendation({ ...file(), ...extra }, '2330.TW');
+    if (result.status !== 'ok') throw new Error('invalid fixture');
+    return result.data;
+  };
+  const metrics = (data: ReturnType<typeof parse>) => renderToStaticMarkup(createElement(MaBacktestMetrics, {
+    range: data.ranges[0]!, comparable: hasComparableMaWindow(data),
+  }));
+
+  it('keeps old files useful without presenting legacy drawdown or trade counts as corrected metrics', () => {
+    for (const extra of [{}, { windowMode: 'legacy_exit', scoring: 'period+range+legacy_exit' },
+      { windowMode: 'mark_to_market', scoring: 'structure-v3' },
+      { scoring: 'period+range+mark_to_market' }, { windowMode: 7 }]) {
+      const data = parse(extra);
+      expect(hasComparableMaWindow(data)).toBe(false);
+      expect(metrics(data)).toContain('+15.0%');
+      expect(metrics(data)).not.toContain('最大回撤');
+      expect(metrics(data)).not.toContain('交易');
+    }
+  });
+
+  it('shows corrected drawdown and trade counts only with both new accounting identifiers', () => {
+    const data = parse({ version: 4, windowMode: 'mark_to_market', scoring: 'period+range+mark_to_market' });
+    expect(data.windowMode).toBe('mark_to_market');
+    expect(metrics(data)).toContain('最大回撤 -5.0%');
+    expect(metrics(data)).toContain('交易 8 次');
+  });
+
+  it('uses the supplied reference pool size and a clear fallback for legacy files', () => {
+    expect(maReferenceDescription(parse())).toBe('基準股票（檔數未提供）');
+    const ranges = file().ranges.map(range => ({ ...range, rank: { n: 127, pct: 80, best: 65 } }));
+    expect(maReferenceDescription(parse({ ranges, referencePool: 'US' }))).toBe('127 檔美股基準股票');
+    expect(maReferenceDescription(parse({ ranges: ranges.map((range, index) => ({ ...range, rank: { ...range.rank, n: 127 + index } })) })))
+      .toBe('基準股票（檔數依各區間排名標示）');
+  });
+
+  it('explains that applying an SMA period does not align the selector and chart price bases', () => {
+    const adjusted = renderToStaticMarkup(createElement(MaPriceBasisNote, { adjusted: true }));
+    expect(adjusted).toContain('選線使用已還原股利價格');
+    expect(adjusted).toContain('拆股調整、未還原股利');
+    expect(adjusted).toContain('除息附近可能不同');
+    expect(renderToStaticMarkup(createElement(MaPriceBasisNote, { adjusted: false }))).toContain('選線資料未標示');
   });
 });

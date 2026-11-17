@@ -525,8 +525,9 @@ class TaiwanPayloadTest(unittest.TestCase):
         self.assertNotIn("2026-10-06", payload["dates"])
         by_symbol = {c["symbol"]: c for c in payload["themes"][0]["constituents"]}
         self.assertAlmostEqual(by_symbol["2330.TW"]["returns"]["d1"], 0.1, places=2)
-        # No bar on 10-08: forward-filled, so the last day's move is measured from the 10-07 close.
-        self.assertAlmostEqual(by_symbol["2317.TW"]["returns"]["d1"], (1.001**2 - 1) * 100, places=2)
+        # No bar on 10-08: the two-session move is not a one-session recovery-day return.
+        self.assertIsNone(by_symbol["2317.TW"]["returns"]["d1"])
+        self.assertAlmostEqual(payload["themes"][0]["returns"]["d1"], 0.1, places=2)
         self.assertAlmostEqual(by_symbol["2454.TW"]["returns"]["d1"], 0.1, places=2)
         self.assertLess(by_symbol["2454.TW"]["close"], 200)
 

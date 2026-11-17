@@ -40,7 +40,7 @@ describe('PeRiverPanel states', () => {
     const html = renderToStaticMarkup(createElement(PeRiverPanel, { history: us, load: ok(bars), onRetry: () => undefined }));
     expect(html).toContain('data-state="ok"');
     expect(html).toContain('本益比河流圖');
-    expect(html).toMatch(/目前本益比 [\d.]+x · 歷史第 \d+ 百分位/);
+    expect(html).toMatch(/目前本益比 [\d.]+x · 自身歷史第 \d+ 百分位/);
     expect(html).not.toContain('目前本益比</span>');
     expect(html).not.toContain('pe-river-legend');
   });
@@ -65,7 +65,7 @@ describe('PeRiverPanel states', () => {
     const html = render(us, ok(bars));
     expect(html).toContain('data-state="ok"');
     expect(html).toContain('目前本益比');
-    expect(html).toMatch(/歷史第 \d+ 百分位/);
+    expect(html).toMatch(/自身歷史第 \d+ 百分位/);
     expect(html).toMatch(/相對歷史中位數（[\d.]+x）(溢價|折價) [\d.]+%/);
     expect(html.match(/<li>/g)).toHaveLength(5);
     for (const p of [10, 30, 50, 70, 90]) expect(html).toContain(`P${p} · `);
@@ -75,6 +75,7 @@ describe('PeRiverPanel states', () => {
     expect(html).toContain('有效樣本');
     expect(html).toContain('涵蓋');
     expect(html).toContain('歷史本益比不代表未來，僅供研究參考');
+    expect(html).toContain('百分位表示目前本益比在自身歷史序列中的相對位置，不是回測或買賣訊號');
     expect(html).not.toContain('NaN');
     expect(html).not.toContain('undefined');
   });
@@ -132,6 +133,7 @@ describe('text helpers', () => {
     expect(excludedText({ ...base, excluded: { 'no-eps': 0, loss: 0, outlier: 0 } })).toBe('');
     expect(excludedText({ ...base, excluded: { 'no-eps': 3, loss: 2, outlier: 1 } })).toBe('不計入：EPS ≤ 0（虧損）2 週、本益比 > 200 倍 1 週、尚無已公布 EPS 3 週');
     expect(delayText('US')).toContain('45 天');
+    expect(delayText('US')).toContain('缺少申報日期時改用 90 天');
     expect(delayText('TW')).toContain('90 天');
     expect(shortWarning({ ...base, short: false })).toBeNull();
     expect(shortWarning({ ...base, short: true, coverageYears: 2.2, epsPeriodCount: 4 })).toContain('涵蓋僅 2.2 年');
@@ -139,11 +141,11 @@ describe('text helpers', () => {
   });
   it('words the percentile and the premium / discount', () => {
     const current = { pe: 30, percentile: 62.6, premiumPct: 12.34, median: 26.7, eps: 5, basis: 'ttm' as const, epsPeriodEnd: '2025-06-28', close: 150, time: 0 };
-    expect(percentileText(current)).toBe('歷史第 63 百分位');
+    expect(percentileText(current)).toBe('自身歷史第 63 百分位');
     expect(premiumText(current)).toBe('相對歷史中位數（26.7x）溢價 12.3%');
     expect(premiumText({ ...current, premiumPct: -8.04 })).toBe('相對歷史中位數（26.7x）折價 8.0%');
     expect(premiumText({ ...current, premiumPct: 0 })).toContain('相當');
-    expect(percentileText({ ...current, percentile: 100 })).toBe('歷史第 100 百分位');
+    expect(percentileText({ ...current, percentile: 100 })).toBe('自身歷史第 100 百分位');
     expect(unavailableDetail('foreign', {})).toBeNull();
     expect(unavailableDetail('insufficient', { validCount: 3, epsPeriodCount: 1, coverageYears: 0.5 })).toBe('有效本益比 3 週（至少需要 8 週） · 不同 EPS 1 組（至少需要 3 組） · 可用歷史 0.5 年');
   });

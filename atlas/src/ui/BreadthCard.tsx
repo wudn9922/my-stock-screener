@@ -286,6 +286,29 @@ function IndexSignal({ index }: { index: BreadthSignalIndex }) {
     </article>
   );
 }
+function BreadthHistorySamples({ history }: { history: BreadthHistory }) {
+  const [selectedDay, setSelectedDay] = useState('');
+  const day = history.dates.includes(selectedDay) ? selectedDay : history.dates.at(-1);
+  const dayIndex = history.dates.indexOf(day ?? '');
+  const hasCounts = !!(history.ma20Above && history.ma20Total) || !!(history.ma60Above && history.ma60Total);
+  return (
+hasCounts ? <div className="breadth-foot">
+        <label className="breadth-marker-select">全市場歷史樣本日期
+          <select aria-label="歷史寬度樣本日期" value={day} onChange={event => setSelectedDay(event.target.value)}>
+            {history.dates.map(date => <option key={date} value={date}>{date}</option>)}
+          </select>
+        </label>
+        <p aria-live="polite">{(['ma20', 'ma60'] as const).map((ma, index) => {
+          const above = history[`${ma}Above`]?.[dayIndex];
+          const total = history[`${ma}Total`]?.[dayIndex];
+          const pct = history[`${ma}Pct`][dayIndex] ?? null;
+          const known = above != null && total != null && above <= total;
+          return <span key={ma}>{index ? ' · ' : ''}{ma.toUpperCase()} <Pct value={pct} />{known ? `（${above.toLocaleString('zh-TW')}／${total.toLocaleString('zh-TW')} 檔）` : '（檔數未提供）'}</span>;
+        })}<br />站上均線檔數／當日有成交且具足夠日 K 的可計算檔數</p>
+      </div> : null
+  );
+}
+
 function LowSignals({ signals }: { signals: UsBreadthSignals }) {
   const indices = signals.lowSignal.indices;
   if (!indices.length) return null;
@@ -366,6 +389,7 @@ export function BreadthBody({
         }
         signals={signals}
       />
+      <BreadthHistorySamples history={data.history} />
       {twSignals ? (
         <HelpDisclosure label="超買超賣訊號不適用">
           {twSignals.reason}

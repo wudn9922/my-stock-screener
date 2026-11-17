@@ -158,3 +158,28 @@ test('US no-signal section folds to a single line and overbought wording stays c
     card.getByText('超買後先跌 40% vs 平常 41%', { exact: true }),
   ).toBeVisible();
 });
+
+
+test('historical breadth date selection exposes each moving average sample size', async ({ page }) => {
+  await setup(page);
+  const fixture = breadthFixture();
+  const history = fixture.markets.us.history;
+  const counts = {
+    ma20Above: history.dates.map((_, i) => 90 + i),
+    ma20Total: history.dates.map(() => 500),
+    ma60Above: history.dates.map((_, i) => 189 + i),
+    ma60Total: history.dates.map(() => 450),
+  };
+  Object.assign(history, counts);
+  await page.route('**/report/breadth.json', route => route.fulfill({ json: fixture }));
+  await page.goto('./?page=markets&market=us');
+  const card = page.getByRole('region', { name: '美股市場寬度', exact: true });
+  await card.scrollIntoViewIfNeeded();
+  const selector = card.getByLabel('歷史寬度樣本日期');
+  await expect(selector).toHaveValue(history.dates.at(-1)!);
+  await selector.selectOption(history.dates[0]!);
+  await expect(card.locator('[aria-live="polite"]')).toContainText('（90／500 檔）');
+  await expect(card.locator('[aria-live="polite"]')).toContainText('（189／450 檔）');
+  await expect(card.locator('[aria-live="polite"]')).toContainText('站上均線檔數／當日有成交且具足夠日 K 的可計算檔數');
+  expect(await card.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+});

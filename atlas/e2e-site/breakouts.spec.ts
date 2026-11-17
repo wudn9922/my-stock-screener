@@ -66,7 +66,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await mockBreakouts(page);
   await page.goto('./?page=markets&market=tw');
   const section = card(page);
-  await expect(section.getByRole('heading', { name: /全市場進場成功率/ })).toContainText('台股');
+  await expect(section.getByRole('heading', { name: /全市場突破條件達成率/ })).toContainText('台股');
   await expect(section).toContainText('每週更新一次（週六）');
   await expect(section.locator('.bo-asof')).toHaveText('資料日 2026/10/09');
   const order = await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.map(node => node.className));
@@ -89,7 +89,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
   await expect(table.locator('tbody td')).toHaveCount(12);
   await table.getByRole('button', { name: '先觸發', exact: true }).click();
   await expect(row(page).locator('.bo-win')).toContainText('55.0%');
-  await expect(row(page)).toContainText('先後不明 3 次');
+  await expect(row(page)).toContainText('同根先後不明、保守判失敗 1.4%（3／220 完整訊號樣本）');
   await section.getByText('比較全部四種勝率', { exact: true }).click();
 
   await expect(section.getByRole('button', { name: '近1週' })).toHaveCount(0);
@@ -117,7 +117,7 @@ test('three entry cards compare four outcomes with fixed cohorts on desktop and 
 test('United States has independent rates and unsupported markets omit the panel', async ({ page }) => {
   await mockBreakouts(page);
   await page.goto('./?page=markets&market=us');
-  await expect(card(page).getByRole('heading', { name: /全市場進場成功率/ })).toContainText('美股');
+  await expect(card(page).getByRole('heading', { name: /全市場突破條件達成率/ })).toContainText('美股');
   await expect(row(page).locator('.bo-win')).toContainText('44.5%');
   await picker(page).getByRole('button', { name: /先觸發判定/ }).click();
   await expect(row(page).locator('.bo-win')).toContainText('50.0%');
@@ -202,7 +202,7 @@ test('saved 20-day test dates show their own original results and return to the 
   }));
   await page.route('**/my-stock-screener/report/breakouts-archive/2026-08-30.json', route => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?page=markets&market=tw');
-  const dates = card(page).getByRole('combobox', { name: '進場成功率測試日期' });
+  const dates = card(page).getByRole('combobox', { name: '突破條件測試日期' });
   await expect(dates.locator('option')).toHaveCount(3);
   await expect(row(page).locator('.bo-win')).toContainText('50.0%');
   await dates.selectOption('2026-09-19');
@@ -272,5 +272,17 @@ test('new swing cohorts show exclusions, use hold5 and do not compare an old mon
   await expect(row(page).getByRole('img')).toHaveAttribute('aria-label', /2026-09-09 無完整結果/);
   await card(page).getByText('每月測試數值與涵蓋',{exact:true}).click();
   await expect(card(page).locator('.bo-history-table tbody tr').first()).toContainText('舊口徑／不比較');
+  await noOverflow(page);
+});
+
+
+test('first-hit ambiguity reports a conservative failure share of all complete signals', async ({ page }) => {
+  await mockBreakouts(page);
+  await page.goto('./?page=markets&market=tw');
+  await expect(card(page).getByRole('heading', { name: /全市場突破條件達成率/ })).toBeVisible();
+  await picker(page).getByRole('button', { name: /先觸發判定/ }).click();
+  await expect(row(page)).toContainText('同根先後不明、保守判失敗 1.4%（3／220 完整訊號樣本）');
+  await expect(row(page).locator('.bo-win')).toContainText('55.0%');
+  await expect(row(page).locator('.bo-ratio')).toContainText('121／220');
   await noOverflow(page);
 });
