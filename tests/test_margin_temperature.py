@@ -22,14 +22,23 @@ def weekly(closes, amounts):
 
 
 class MarginTemperatureTests(unittest.TestCase):
+    # The golden fixture and pinned values describe the data as of this date. The live
+    # files keep growing every trading day, so build the frozen rows from inputs up to
+    # this date; filtering the weekly output instead drops the current week once a later
+    # day in the same week is appended.
+    FIXTURE_END = '2026-11-12'
+
     @classmethod
     def setUpClass(cls):
-        cls.rows = build_rows(csv_rows(DATA / 'taiex.csv'), csv_rows(DATA / 'margin_daily.csv'))
+        idx, mg = csv_rows(DATA / 'taiex.csv'), csv_rows(DATA / 'margin_daily.csv')
+        cls.rows = build_rows(idx, mg)
+        cls.frozen = build_rows([r for r in idx if r['date'] <= cls.FIXTURE_END],
+                                [r for r in mg if r['date'] <= cls.FIXTURE_END])
 
     def test_golden_all_weeks(self):
         with (ROOT / 'tests/fixtures/margin_temperature/gauge_golden.csv').open(newline='') as fp:
             golden = list(csv.DictReader(fp))
-        historical = [row for row in self.rows if row['date'] <= golden[-1]['date']]
+        historical = [row for row in self.frozen if row['date'] <= golden[-1]['date']]
         self.assertEqual(len(historical), len(golden))
         differences = {'pct': [], 'mdd': []}
         for item, expected in zip(historical, golden):
@@ -47,7 +56,7 @@ class MarginTemperatureTests(unittest.TestCase):
             self.assertLess(maximum, .01)
 
     def test_latest_and_status(self):
-        historical = [row for row in self.rows if row['date'] <= '2026-11-12']
+        historical = self.frozen
         r = to_report(historical, date(2026, 11, 13))
         self.assertEqual(r['latest']['date'], '2026-11-12')
         self.assertTrue(r['provisional'])
