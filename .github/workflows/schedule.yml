@@ -32,6 +32,8 @@ jobs:
       notify_partial: ${{ steps.collect_notification_outcomes.outputs.has_partial }}
       notify_summary: ${{ steps.collect_notification_outcomes.outputs.summary }}
     runs-on: ubuntu-latest
+    # 平常 15–40 分鐘；卡住時不要空等預設的 6 小時
+    timeout-minutes: 75
     steps:
       - name: Skip if today's report already ran
         id: guard
