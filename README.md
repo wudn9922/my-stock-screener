@@ -125,9 +125,7 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 
 - 行情為 Yahoo 的**延遲資料**；每日更新與個股「更新 K 線」均不保證交易所即時報價。
 - 財報：美股來自 SEC EDGAR companyfacts 與 Yahoo Finance；台股財報（損益表、資產負債表、現金流量表）來自 FinMind 的官方期別，Yahoo 每日只補空值與較新期別，不覆蓋 FinMind 的值。
-- Atlas 的畫圖、設定等資料存在瀏覽器的 IndexedDB，**只保存在當下這個瀏覽器**：
-  LINE 內建瀏覽器、手機 Safari / Chrome、電腦之間不會同步，清除瀏覽器資料也會一併刪除。
-  （報告頁原本的水平線段仍照舊同步到 Supabase，不受影響。）
+- Atlas 個人資料依經授權的 LINE 帳號分為 none（僅記憶體）、device（帳號範圍的本機瀏覽器資料）及 cloud（既有 Supabase 同步）；訪客不會持久保存。已授權 device/cloud 帳號可在 Atlas 控制台明確匯入舊瀏覽器設定。清除瀏覽器資料會刪除本機資料；報告頁原有水平線段的 Supabase 同步不受影響。詳見 [帳號保存權限與匯入](docs/ACCOUNT_STORAGE_PERMISSIONS.md)。
 
 ### 永久 K 線目錄
 

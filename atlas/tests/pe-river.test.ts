@@ -24,6 +24,7 @@ interface Period {
   eps: number | null;
   fq?: number;
   basic?: number | null;
+  filed?: string;
 }
 interface Spec {
   market?: 'US' | 'TW';
@@ -45,6 +46,7 @@ function history(spec: Spec): FinancialHistory {
       epsDiluted: periods.map((p) => p.eps),
       epsBasic: periods.map((p) => (p.basic === undefined ? p.eps : p.basic)),
     },
+    epsQuality: periods.map((p) => p.filed ? { epsDiluted: 'A', epsDilutedFiled: p.filed, epsBasic: 'A', epsBasicFiled: p.filed } : null),
   });
   const market = spec.market ?? 'US';
   const result = parseFinancials({
@@ -140,17 +142,39 @@ describe('epsAt: TTM, fallback and the publish delay', () => {
     expect(epsAt(dateToSec('2024-08-14'), periods)).toMatchObject({ eps: 14, periodEnd: '2024-06-30' });
   });
 
-  it('waits 60 days for a US fiscal Q4 and 90 for a Taiwan one', () => {
+  it('uses 90 days for an unfiled US fiscal Q4 but preserves known filing dates and Taiwan timing', () => {
     const quarters = QUARTER_ENDS.slice(0, 4).map((end, i) => ({ end, fq: i + 1, eps: end === '2023-12-31' ? 9 : 1 }));
     const us = buildEpsPeriods(history({ quarters }));
-    // Q4'23 ends 12-31; +60 days = 2024-02-29 (leap year). Three quarters before that: no TTM.
+    // Missing Q4'23 filing date uses 90 days: 12-31 + 90 = 2024-03-30.
     expect(epsAt(dateToSec('2024-02-28'), us)).toBeNull();
-    expect(epsAt(dateToSec('2024-02-29'), us)).toMatchObject({ eps: 12, periodEnd: '2023-12-31' });
+    expect(epsAt(dateToSec('2024-03-29'), us)).toBeNull();
+    expect(epsAt(dateToSec('2024-03-30'), us)).toMatchObject({ eps: 12, periodEnd: '2023-12-31' });
+    const filedUs = buildEpsPeriods(history({
+      quarters: quarters.map((period) => period.end === '2023-12-31' ? { ...period, filed: '2024-03-15' } : period),
+    }));
+    // A known late filing remains usable on its actual date, without the 90-day fallback.
+    expect(epsAt(dateToSec('2024-03-14'), filedUs)).toBeNull();
+    expect(epsAt(dateToSec('2024-03-15'), filedUs)).toMatchObject({ eps: 12, periodEnd: '2023-12-31' });
+    const filedEarlyUs = buildEpsPeriods(history({
+      quarters: quarters.map((period) => period.end === '2023-12-31' ? { ...period, filed: '2024-02-10' } : period),
+    }));
+    expect(filedEarlyUs.quarters.at(-1)!.availSec).toBe(dateToSec('2024-02-29')); // Existing 60-day floor.
     const tw = buildEpsPeriods(history({ market: 'TW', quarters }));
     // Taiwan: Q2 +60 (08-29), Q4 +90 (2024-03-30).
     expect(epsAt(dateToSec('2024-03-29'), tw)).toBeNull();
     expect(epsAt(dateToSec('2024-03-30'), tw)).toMatchObject({ eps: 12 });
     expect(tw.quarters[1]!.availSec).toBe(dateToSec('2023-08-29'));
+  });
+
+  it('uses a 90-day fallback for US annual EPS without a filing date, retaining known-date behavior', () => {
+    const annuals = [{ end: '2022-12-31', eps: 3 }, { end: '2023-12-31', eps: 3.5 }];
+    const unfiled = buildEpsPeriods(history({ annuals }));
+    expect(epsAt(dateToSec('2024-03-29'), unfiled)).toMatchObject({ eps: 3, basis: 'annual' });
+    expect(epsAt(dateToSec('2024-03-30'), unfiled)).toMatchObject({ eps: 3.5, basis: 'annual' });
+
+    const filed = buildEpsPeriods(history({ annuals: [annuals[0]!, { ...annuals[1]!, filed: '2024-03-15' }] }));
+    expect(epsAt(dateToSec('2024-03-14'), filed)).toMatchObject({ eps: 3, basis: 'annual' });
+    expect(epsAt(dateToSec('2024-03-15'), filed)).toMatchObject({ eps: 3.5, basis: 'annual' });
   });
 
   it('returns null when nothing is published yet', () => {
@@ -167,16 +191,18 @@ describe('epsAt: TTM, fallback and the publish delay', () => {
         ],
       }),
     );
-    expect(epsAt(dateToSec('2023-02-28'), periods)).toBeNull(); // 2022 annual is published 03-01
+    expect(epsAt(dateToSec('2023-03-30'), periods)).toBeNull(); // 2022 annual has a 90-day fallback.
     expect(epsAt(dateToSec('2023-12-01'), periods)).toMatchObject({ eps: 3, basis: 'annual', periodEnd: '2022-12-31' });
-    // 2023 annual: 12-31 + 60 = 2024-02-29.
+    // 2023 annual: 12-31 + 90 = 2024-03-30.
     expect(epsAt(dateToSec('2024-02-28'), periods)).toMatchObject({ eps: 3 });
-    expect(epsAt(dateToSec('2024-02-29'), periods)).toMatchObject({ eps: 3.5, basis: 'annual' });
+    expect(epsAt(dateToSec('2024-03-29'), periods)).toMatchObject({ eps: 3 });
+    expect(epsAt(dateToSec('2024-03-30'), periods)).toMatchObject({ eps: 3.5, basis: 'annual' });
   });
 
   it('prefers the quarterly TTM over the annual figure once four quarters are published', () => {
-    const periods = buildEpsPeriods(history({ quarters: flatQuarters(), annuals: [{ end: '2023-12-31', eps: 3.5 }] }));
-    expect(epsAt(dateToSec('2024-03-20'), periods)).toMatchObject({ eps: 4, basis: 'ttm' });
+    const periods = buildEpsPeriods(history({ quarters: flatQuarters(), annuals: [{ end: '2023-12-31', eps: 3.5, filed: '2024-02-29' }] }));
+    expect(epsAt(dateToSec('2024-03-29'), periods)).toMatchObject({ basis: 'annual', eps: 3.5 });
+    expect(epsAt(dateToSec('2024-03-30'), periods)).toMatchObject({ eps: 4, basis: 'ttm' });
   });
 
   it('a missing quarter inside the window breaks the TTM and the annual figure takes over', () => {
@@ -265,41 +291,41 @@ describe('splits', () => {
 });
 
 describe('buildPeRiver', () => {
-  // Weekly bars from Monday 2023-01-02; with flat EPS 1 per quarter the first TTM is published 2024-02-29,
-  // so the first valid bar is Monday 2024-02-26 (judged on its Friday, 03-01) and the last is 2025-03-31.
+  // Weekly bars from Monday 2023-01-02; with flat EPS 1 per quarter the unfiled Q4 TTM is published 2024-03-30,
+  // so the first valid bar is Monday 2024-04-01 and the last is 2025-03-31.
   const ramp = (day: string) => Math.max(1, 4 * (10 + (dateToSec(day) - dateToSec('2024-02-26')) / (7 * DAY_SECONDS)));
   const model = () => okModel(buildPeRiver(history({ quarters: flatQuarters() }), weekly('2023-01-02', '2025-03-31', ramp), opts('2025-04-02')));
 
   it('counts valid points and ignores weeks before the first published TTM', () => {
     const m = model();
     expect(m.points).toHaveLength(118); // Mondays 2023-01-02 .. 2025-03-31
-    expect(m.validCount).toBe(58);
-    expect(m.excluded['no-eps']).toBe(60);
-    expect(m.points.filter((p) => p.pe === null).every((p) => p.time < dateToSec('2024-02-26'))).toBe(true);
-    expect(m.basisCounts).toEqual({ ttm: 58, annual: 0 });
+    expect(m.validCount).toBe(53);
+    expect(m.excluded['no-eps']).toBe(65);
+    expect(m.points.filter((p) => p.pe === null).every((p) => p.time < dateToSec('2024-04-01'))).toBe(true);
+    expect(m.basisCounts).toEqual({ ttm: 53, annual: 0 });
     expect(m.epsPeriodCount).toBe(5);
-    expect(m.coverageYears).toBeCloseTo(399 / 365.25, 6);
+    expect(m.coverageYears).toBeCloseTo(364 / 365.25, 6);
     expect(m.priceYears).toBeCloseTo((dateToSec('2025-03-31') - dateToSec('2023-01-02')) / (365.25 * DAY_SECONDS), 6);
   });
 
   it('sets the river lines at the percentiles of the valid P/E series', () => {
     const m = model();
-    // P/E runs 10, 11, …, 67 (58 points): linear percentiles.
+    // P/E runs 15, 16, …, 67 (53 points): linear percentiles.
     expect(m.levels.map((l) => l.p)).toEqual([10, 30, 50, 70, 90]);
-    expect(m.levels[0]!.multiple).toBeCloseTo(15.7, 9);
-    expect(m.levels[1]!.multiple).toBeCloseTo(27.1, 9);
-    expect(m.levels[2]!.multiple).toBeCloseTo(38.5, 9);
-    expect(m.levels[3]!.multiple).toBeCloseTo(49.9, 9);
-    expect(m.levels[4]!.multiple).toBeCloseTo(61.3, 9);
+    expect(m.levels[0]!.multiple).toBeCloseTo(20.2, 9);
+    expect(m.levels[1]!.multiple).toBeCloseTo(30.6, 9);
+    expect(m.levels[2]!.multiple).toBeCloseTo(41, 9);
+    expect(m.levels[3]!.multiple).toBeCloseTo(51.4, 9);
+    expect(m.levels[4]!.multiple).toBeCloseTo(61.8, 9);
   });
 
   it('reports the current P/E, its percent rank and the premium to the median', () => {
     const { current } = model();
     expect(current).not.toBeNull();
     expect(current!.pe).toBeCloseTo(67, 9);
-    expect(current!.percentile).toBeCloseTo((57.5 / 58) * 100, 9);
-    expect(current!.median).toBeCloseTo(38.5, 9);
-    expect(current!.premiumPct).toBeCloseTo((67 / 38.5 - 1) * 100, 9);
+    expect(current!.percentile).toBeCloseTo((52.5 / 53) * 100, 9);
+    expect(current!.median).toBeCloseTo(41, 9);
+    expect(current!.premiumPct).toBeCloseTo((67 / 41 - 1) * 100, 9);
     expect(current).toMatchObject({ eps: 4, basis: 'ttm', epsPeriodEnd: '2024-12-31', close: 268 });
   });
 
@@ -309,7 +335,7 @@ describe('buildPeRiver', () => {
     expect(line).toHaveLength(m.points.length);
     m.points.forEach((point, i) => {
       if (point.pe === null) expect(line[i]).toBeNull();
-      else expect(line[i]).toBeCloseTo(4 * 38.5, 9);
+      else expect(line[i]).toBeCloseTo(4 * 41, 9);
     });
   });
 
@@ -318,14 +344,14 @@ describe('buildPeRiver', () => {
   });
 
   it('judges the in-progress bar at the data date, not at its own Friday', () => {
-    // Q4'24 is published 2025-03-01. A bar starting Monday 02-24 would be judged on 02-28 (before it);
-    // a bar starting 03-03 judged on min(03-07, asOf).
+    // Q4'24 without a filing date is published 2025-03-31. A bar starting Monday 03-24 is judged before it;
+    // a bar starting 03-31 uses the data date when it is after the fallback date.
     const withAsOf = (last: string, asOfDay: string) =>
       okModel(buildPeRiver(history({ quarters: flatQuarters() }), weekly('2023-01-02', last, ramp), opts(asOfDay)));
-    expect(withAsOf('2025-02-24', '2025-02-28').current!.epsPeriodEnd).toBe('2024-09-30');
-    expect(withAsOf('2025-03-03', '2025-03-06').current!.epsPeriodEnd).toBe('2024-12-31');
-    // Same bar, but the data date is the Friday before the release: Q4'24 stays out.
-    expect(withAsOf('2025-03-03', '2025-02-28').current!.epsPeriodEnd).toBe('2024-09-30');
+    expect(withAsOf('2025-03-24', '2025-03-28').current!.epsPeriodEnd).toBe('2024-09-30');
+    expect(withAsOf('2025-03-31', '2025-04-01').current!.epsPeriodEnd).toBe('2024-12-31');
+    // Same bar, but the data date is before the fallback date: Q4'24 stays out.
+    expect(withAsOf('2025-03-31', '2025-03-28').current!.epsPeriodEnd).toBe('2024-09-30');
   });
 
   it('a later EPS release does not change earlier P/E (no look-ahead)', () => {
@@ -349,8 +375,8 @@ describe('buildPeRiver', () => {
   it('excludes loss periods from the statistics and breaks the river there', () => {
     const quarters = QUARTER_ENDS.map((end, i) => ({ end, fq: (i % 4) + 1, eps: end >= '2024-06-30' ? -1 : 1 }));
     const m = okModel(buildPeRiver(history({ quarters }), weekly('2023-01-02', '2025-03-31', () => 40), opts('2025-04-02')));
-    // TTM 4 (P/E 10) from 02-29, 2 (P/E 20) from Q2'24 on 08-14, then 0 / negative from 11-14.
-    expect(m.validCount).toBe(37);
+    // TTM 4 (P/E 10) from 03-30, 2 (P/E 20) from Q2'24 on 08-14, then 0 / negative from 11-14.
+    expect(m.validCount).toBe(32);
     expect(m.excluded.loss).toBe(21);
     expect(Math.min(...m.levels.map((l) => l.multiple))).toBeGreaterThanOrEqual(10);
     expect(Math.max(...m.levels.map((l) => l.multiple))).toBeLessThanOrEqual(20);
@@ -377,16 +403,16 @@ describe('buildPeRiver', () => {
   });
 
   it('shows the insufficient-history message below eight valid points', () => {
-    const seven = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-02-26', '2024-04-08', () => 40), opts('2024-04-10'));
+    const seven = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-04-01', '2024-05-13', () => 40), opts('2024-05-14'));
     expect(seven).toMatchObject({ status: 'unavailable', reason: 'insufficient', message: INSUFFICIENT_MESSAGE, validCount: 7 });
   });
 
   it('needs at least three distinct EPS figures, however many weeks there are', () => {
     // 8+ valid weeks but only the 2023-12-31 TTM behind them: the P/E history is just the price path.
-    const one = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-02-26', '2024-04-15', () => 40), opts('2024-04-17'));
+    const one = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-04-01', '2024-05-20', () => 40), opts('2024-05-14'));
     expect(one).toMatchObject({ status: 'unavailable', reason: 'insufficient', validCount: 8, epsPeriodCount: 1 });
     // Q1'24 (05-15) and Q2'24 (08-14) add two more.
-    const three = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-02-26', '2024-08-19', () => 40), opts('2024-08-21'));
+    const three = buildPeRiver(history({ quarters: flatQuarters() }), weekly('2024-04-01', '2024-08-19', () => 40), opts('2024-08-21'));
     expect(three.status).toBe('ok');
     expect(okModel(three).epsPeriodCount).toBe(3);
   });
@@ -406,7 +432,7 @@ describe('buildPeRiver', () => {
       ),
     );
     expect(m.basisCounts.annual).toBeGreaterThan(0);
-    expect(m.points[10]!.basis).toBe('annual');
+    expect(m.points[12]!.basis).toBe('annual');
     expect(m.points.at(-1)!.basis).toBe('ttm');
     expect(m.basisCounts.annual + m.basisCounts.ttm).toBe(m.validCount);
   });
@@ -457,7 +483,7 @@ describe('buildPeRiver', () => {
       { time: dateToSec('2025-04-07'), close: 0 },
       { time: dateToSec('2025-04-14'), close: -3 },
     ];
-    expect(okModel(buildPeRiver(history({ quarters: flatQuarters() }), bars, opts('2025-04-16'))).validCount).toBe(58);
+    expect(okModel(buildPeRiver(history({ quarters: flatQuarters() }), bars, opts('2025-04-16'))).validCount).toBe(53);
   });
 });
 

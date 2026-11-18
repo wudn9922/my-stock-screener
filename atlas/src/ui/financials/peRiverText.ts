@@ -38,7 +38,7 @@ export function excludedText(model: PeRiverModel): string {
 export function delayText(market: 'US' | 'TW'): string {
   if (market === 'TW')
     return `為避免前視偏誤，EPS 在期末後 ${PUBLISH_DELAY_DAYS.TW.quarter} 天（第二季 ${PUBLISH_DELAY_DAYS.TW.secondQuarter} 天、第四季與年度 ${PUBLISH_DELAY_DAYS.TW.yearEnd} 天，皆為法定公布期限）才納入。`;
-  return `為避免前視偏誤，EPS 在期末後 ${PUBLISH_DELAY_DAYS.US.quarter} 天（第四季與年度 ${PUBLISH_DELAY_DAYS.US.yearEnd} 天）才納入。`;
+  return `為避免前視偏誤，EPS 在期末後 ${PUBLISH_DELAY_DAYS.US.quarter} 天才納入；第四季與年度依申報日或期末後 ${PUBLISH_DELAY_DAYS.US.yearEnd} 天（取較晚者）納入，缺少申報日期時改用 90 天。`;
 }
 
 export function shortWarning(model: PeRiverModel): string | null {
@@ -58,7 +58,7 @@ export function premiumText(current: CurrentPe): string {
 
 export function percentileText(current: CurrentPe): string {
   const rank = Math.min(100, Math.max(0, Math.round(current.percentile)));
-  return `歷史第 ${rank} 百分位`;
+  return `自身歷史第 ${rank} 百分位`;
 }
 
 /** Why there is no river, in the voice of the card. */

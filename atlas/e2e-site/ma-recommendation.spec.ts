@@ -58,7 +58,7 @@ async function mockLine(page: Page) {
   return { saves, stocks };
 }
 
-test('chart shows the monthly recommendation, applies it on the daily chart and saves it as a fixed parameter', async ({ page }, testInfo) => {
+test('chart shows the recommendation, applies it on the daily chart and saves it as a fixed parameter', async ({ page }) => {
   await mockSite(page);
   const { saves, stocks } = await mockLine(page);
   await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
@@ -100,7 +100,7 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await page.locator('.ws-ma-timeframes > .help-disclosure > summary').click();
   await expect(card.locator('dd')).toHaveText('短 24（69） · 中 38（60） · 長 89（99）');
-  await expect(card.locator('.ws-ma-reco-status')).toHaveText('日線至 2026-10-17');
+  await expect(card.locator('.ws-ma-reco-status').filter({ hasText: /^日線至/ })).toHaveText('日線至 2026-10-17');
   await expect(card.getByRole('button', { name: '套用 SMA 20', exact: true })).toHaveText('20（70）');
   await expect(card.getByRole('button', { name: '套用 SMA 24', exact: true })).toHaveText('★24（69）');
   const explanation = card.locator('.help-disclosure');
@@ -110,7 +110,6 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(explanation).toContainText('★不一定是分數最高的那條');
   await expect(card.locator('table')).toContainText('+15.3%');
   await expect(card.getByRole('link', { name: /在 ma-selector 查看/ })).toHaveAttribute('href', /streamlit\.app\/\?ticker=2330\.TW$/);
-  await page.screenshot({ path: testInfo.outputPath('ma-recommendation-panel.png') });
 
   await expect(card.getByRole('button', { name: '固定為個股參數' })).toBeDisabled();
   // A non-star candidate can be applied alone; fixing starts from applied MAs, not the three recommendations.
@@ -146,7 +145,6 @@ test('chart shows the monthly recommendation, applies it on the daily chart and 
   await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 60');
   await dialog.getByRole('button', { name: /改用目前圖表的均線/ }).click();
   await expect(dialog.getByRole('textbox', { name: '個股均線（所有清單共用）' })).toHaveValue('20, 24, 38, 89');
-  await page.screenshot({ path: testInfo.outputPath('ma-recommendation-fix.png') });
   await dialog.getByRole('button', { name: '確認並儲存到雲端' }).click();
   await expect(dialog).toBeHidden();
   expect(saves).toEqual([expect.objectContaining({ action: 'stocks.save', ticker: '2330.TW', groupId: 'ungrouped', mas: [20, 24, 38, 89] })]);
@@ -180,7 +178,7 @@ test('a symbol without a recommendation links to the live ma-selector instead', 
 // Real ma-selector VERSION 2 output (synthetic prices): ranking, 2-year scores and the experimental selector v2.
 const v2Fixture = (name: string) => readFileSync(new URL(`../tests/fixtures/ma-selector/2330.TW.${name}.json`, import.meta.url), 'utf8');
 
-test('the panel shows ranking, 2-year scores and the experimental v2 picks, which apply alongside the current ones', async ({ page }, testInfo) => {
+test('the panel shows ranking, 2-year scores and the experimental v2 picks, which apply alongside the current ones', async ({ page }) => {
   await mockSite(page);
   await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: v2Fixture('with-second') }),
@@ -190,6 +188,9 @@ test('the panel shows ranking, 2-year scores and the experimental v2 picks, whic
   await page.getByTestId('ma-recommendation-toggle').click();
   const card = page.getByTestId('ma-recommendation');
   await expect(card.locator('dd')).toContainText('短 33');
+  await expect(card).toContainText('舊版回測視窗');
+  await expect(card).not.toContainText('最大回撤');
+  await expect(card).not.toContainText('交易 8 次');
   const rows = card.locator('.ws-ma-reco-table').first().locator('tbody tr');
   await expect(rows.nth(0).locator('th')).toContainText(/贏過 \d+%/);
   await expect(rows.nth(0).getByRole('button').first()).toContainText(/2年 \d+/);
@@ -203,7 +204,6 @@ test('the panel shows ranking, 2-year scores and the experimental v2 picks, whic
   await expect(v2.getByRole('button', { name: '套用 SMA 15', exact: true })).toContainText('★15');
   await expect(v2.locator('.ws-ma-v2-suitability li')).toHaveCount(3);
   await expect(v2.locator('.ws-ma-v2-suitability')).toContainText(/短期 2 年最高分 \d+（贏過 \d+%）/);
-  await page.screenshot({ path: testInfo.outputPath('ma-recommendation-v2.png') });
 
   await v2.getByRole('button', { name: '套用 v2 全部' }).click();
   const medium = Number((await v2.locator('summary').textContent())!.match(/中 (\d+)/)![1]);
@@ -230,4 +230,30 @@ test('v2 without a second short line says so and applies three lines', async ({ 
   await expect(v2.locator('tbody tr').first().locator('th')).toContainText('無第二條');
   await v2.getByRole('button', { name: '套用 v2 全部' }).click();
   await expect(page.locator('.indicator-chip .indicator-name')).toHaveCount(3);
+});
+
+test('corrected windows show comparable risk metrics and the selector/chart price basis', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSite(page);
+  await page.route('**/my-stock-screener/report/ma-selector/2330.TW.json', route => route.fulfill({ json: {
+    ...recommendation, version: 4, adjusted: true, referencePool: 'US',
+    windowMode: 'mark_to_market', scoring: 'period+range+mark_to_market',
+    ranges: recommendation.ranges.map(range => ({ ...range, rank: { n: 127, pct: 75, best: 80 } })),
+  } }));
+  await page.goto('./?page=chart&symbol=2330.TW&tf=1D');
+  await openStockMenu(page);
+  await page.getByTestId('ma-recommendation-toggle').click();
+  const card = page.getByTestId('ma-recommendation');
+  await expect(card).toContainText('選線使用已還原股利價格');
+  await expect(card).toContainText('除息附近可能不同');
+  await expect(card).toContainText('跨區間持倉以起點前一日收盤重新計價');
+  await expect(card).toContainText('逐日市值計算回撤');
+  const first = card.locator('.ws-ma-reco-table tbody tr').first();
+  await expect(first).toContainText('最大回撤 -5.0%');
+  await expect(first).toContainText('交易 8 次');
+  await card.getByText('建議均線與分數說明', { exact: true }).click();
+  await expect(card).toContainText('127 檔美股基準股票');
+  if (process.env.ATLAS_REVIEW_SCREENSHOT === '1') {
+    await page.screenshot({ path: testInfo.outputPath('ma-recommendation-corrected-390.png'), scale: 'css' });
+  }
 });

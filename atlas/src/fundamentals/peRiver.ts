@@ -23,15 +23,16 @@ export const DAY_SECONDS = 86_400;
 
 /**
  * Days after a period's end before its EPS may be used. Quarterly 45 days is the 10-Q / Taiwan Q1 & Q3
- * deadline. Annual figures and the derived fiscal Q4 come from the 10-K (60 days for large accelerated
- * filers; small caps may file later, up to 90) and from Taiwan's annual report (90 days); Taiwan's
- * semi-annual (Q2) report is due after 60 days. Longer than the usual publication date on purpose:
- * a too-early date would leak the future into the series.
+ * deadline. For US Q4/annual periods, 60 days remains the floor when a filing date is known; a missing
+ * filing date uses 90 days to cover smaller filers. Taiwan's annual report is due after 90 days and its
+ * semi-annual (Q2) report after 60 days. These delays are intentionally conservative to avoid look-ahead.
  */
 export const PUBLISH_DELAY_DAYS = {
   US: { quarter: 45, yearEnd: 60 },
   TW: { quarter: 45, secondQuarter: 60, yearEnd: 90 },
 } as const;
+/** US year-end reports without a recorded filing date may come from filers with a 90-day deadline. */
+const US_UNFILED_YEAR_END_FALLBACK_DAYS = 90;
 
 /** A weekly bar is judged at its Friday (bar start + 4 days); the in-progress bar at the data date. */
 export const BAR_OBSERVATION_OFFSET_DAYS = 4;
@@ -117,10 +118,14 @@ function periodsOf(series: FinancialSeries, kind: 'quarter' | 'annual', market: 
     const eps = diluted ?? basicValue;
     // a value cannot be known before it was filed (look-ahead guard)
     const filed = diluted !== null ? evidence?.epsDilutedFiled : evidence?.epsBasicFiled;
+    const isYearEnd = kind === 'annual' || series.fq[index] === 4 || annualEnds.has(end);
     const delay = publishDelayDays(market, kind, kind === 'quarter' ? (series.fq[index] ?? null) : null, annualEnds.has(end));
     const endSec = dateToSec(end);
     const filingSec = filed ? dateToSec(filed) : NaN;
-    const defaultAvailableSec = endSec + delay * DAY_SECONDS;
+    // Known US filing dates retain the existing 60-day floor and actual filed date. Only missing
+    // year-end filing dates use 90 days, covering small filers without shifting known filings.
+    const defaultDelay = market === 'US' && isYearEnd && !Number.isFinite(filingSec) ? US_UNFILED_YEAR_END_FALLBACK_DAYS : delay;
+    const defaultAvailableSec = endSec + defaultDelay * DAY_SECONDS;
     const availSec = Number.isFinite(filingSec) ? Math.max(defaultAvailableSec, filingSec) : defaultAvailableSec;
     out.push({ end, endSec, availSec, eps, basic: diluted === null && basicValue !== null });
   });
