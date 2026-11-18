@@ -133,7 +133,7 @@ function IndustryComparison({ market }: { market: "TW" | "US" }) {
                   <p className="analysis-secondary">
                     {row.medianReturnPct === null
                       ? `流動性合格且有報酬 ${row.validCount} 檔，樣本不足不排名`
-                      : `平均 ${formatPercent(row.returnPct)} · 市值加權 ${formatPercent(row.capWeightedReturnPct)}`}
+                      : `平均 ${formatPercent(row.returnPct)} · 按目前市值加權 ${formatPercent(row.capWeightedReturnPct)}`}
                   </p>
                 )}
               </li>
@@ -142,7 +142,7 @@ function IndustryComparison({ market }: { market: "TW" | "US" }) {
         </>
       )}
       <HelpDisclosure label="產業比較計算說明">
-        有方法說明時，報酬以中位數為主、平均與市值加權為輔，且只計入流動性合格的成員；舊版檔案則為目前產業成員的等權平均。上漲比例只計有有效報酬者。成交量比＝本期總股數÷前一期等長區間總股數，只計兩期皆有完整成交量的相同股票，不代表資金淨流入。動能變化只比較兩期完整行情的共同樣本；成員採目前分類，具有存續偏差。缺少快取或成交量時顯示「—」，不把未知值當零。
+        有方法說明時，報酬以中位數為主、平均與按目前市值加權為輔，且只計入流動性合格的成員；以目前市值加權，會放大期間漲多的股票。舊版檔案則為目前產業成員的等權平均。上漲比例只計有有效報酬者。成交量比＝本期總股數÷前一期等長區間總股數，只計兩期皆有完整成交量的相同股票，不代表資金淨流入。動能變化只比較兩期完整行情的共同樣本；成員採目前分類，具有存續偏差。缺少快取或成交量時顯示「—」，不把未知值當零。
       </HelpDisclosure>
     </div>
   );

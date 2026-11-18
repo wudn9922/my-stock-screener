@@ -80,8 +80,8 @@ MA_WINDOWS = (20, 50, 200)
 EMA_SPAN = 20
 SLOPE_BARS = 5
 HI52_BARS = 252
-TURNOVER_BARS = 20
 VOLUME_AVERAGE_BARS = 20
+TURNOVER_BARS = VOLUME_AVERAGE_BARS
 ATR_BARS = 14
 RANGE_BARS = 20
 
@@ -436,9 +436,15 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
         if previous_volume > 0 and volume[-1] > 0:
             vol_vs_prev = volume[-1] / previous_volume
 
+    # turnover20 與 volumeAvg20 共用最近 20 根的完整成交量窗口；真零仍有效。
+    unknown_volume_dates = set(df.attrs.get(UNKNOWN_VOLUME_DATES, ()))
+    complete_volume_window = bars >= VOLUME_AVERAGE_BARS and all(
+        day.isoformat() not in unknown_volume_dates
+        for day in dates[-VOLUME_AVERAGE_BARS:]
+    )
     turnover = None
 
-    if bars >= TURNOVER_BARS:
+    if complete_volume_window:
         turnover = finite_or_none(
             (close[-TURNOVER_BARS:] * volume[-TURNOVER_BARS:]).mean()
         )
@@ -448,11 +454,6 @@ def compute_stock_metrics(df, bench_close=None, bench_symbol="SPY"):
 
     # 最近 20 個交易日（含資料日）的平均成交量，維持股為資料單位。
     # 不足完整窗口或窗口中有未知量時，不以補零、單日量或成交金額推估。
-    unknown_volume_dates = set(df.attrs.get(UNKNOWN_VOLUME_DATES, ()))
-    complete_volume_window = bars >= VOLUME_AVERAGE_BARS and all(
-        day.isoformat() not in unknown_volume_dates
-        for day in dates[-VOLUME_AVERAGE_BARS:]
-    )
     volume_average = (
         round_or_none(volume[-VOLUME_AVERAGE_BARS:].mean())
         if complete_volume_window
