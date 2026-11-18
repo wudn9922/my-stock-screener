@@ -46,12 +46,16 @@ def summarize(rows, window, dates, min_amount=None, min_price=None, min_members=
 
     With min_amount/min_price set, members lacking turnover20/close or below either floor are excluded
     from every statistic (count still reports all members). Fewer than min_members liquid members with a
-    valid return -> every statistic is None and the group is unranked.
+    valid return -> every statistic is None and the group is unranked. volumeUnknownCount reports
+    members whose turnover20 cannot be assessed, separately from known amounts below the floor.
     """
-    members = rows if min_amount is None and min_price is None else [
+    filter_liquidity = min_amount is not None or min_price is not None
+    volume_unknown_count = sum(not finite(r.get("turnover20")) for r in rows) if filter_liquidity else 0
+    members = rows if not filter_liquidity else [
         r for r in rows if liquid(r, min_amount or 0, min_price or 0)]
     valid = [r for r in members if finite(r.get("return"))]
-    base = {"count": len(rows), "liquidCount": len(members), "validCount": len(valid)}
+    base = {"count": len(rows), "liquidCount": len(members), "validCount": len(valid),
+            "volumeUnknownCount": volume_unknown_count}
     if len(valid) < min_members:
         return {**base, "returnPct": None, "medianReturnPct": None, "capWeightedReturnPct": None, "upShare": None,
                 "volumeRatio": None, "volumeCount": 0, "pairedCount": 0, "previousReturnPct": None, "momentumChange": None}
