@@ -1,7 +1,7 @@
 import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { accessEnvelope, installLineAccount, mockDeviceAccount } from './account-fixture';
+import { accessEnvelope, installLineAccount, mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 
 const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: true });
@@ -59,6 +59,8 @@ test('guest paste previews errors, supports correction/skip, shows P&L and leaks
     logs: string[] = [];
   page.on('request', (request) => requests.push(request.url() + (request.postData() ?? '')));
   page.on('console', (message) => logs.push(message.text()));
+  // Quotes come from market-chart, which needs a LINE login; storage stays guest-only (no grant).
+  await mockMarketLogin(page);
   await open(page);
   await create(page);
   await expect(panel(page)).toContainText('重新開啟就會消失');
@@ -194,6 +196,7 @@ test('undeployed cloud holdings fail clearly and never fall back to device persi
 });
 
 test('a Taiwan broker 複委託 account holds US stocks in USD', async ({ page }) => {
+  await mockMarketLogin(page); // quotes come from market-chart, which needs a LINE login
   await open(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
   await expect(panel(page)).toContainText('永豐美股請用匯入 CSV');
@@ -289,7 +292,8 @@ test('six compact stock rows precede totals and operations, with full details on
 
 
 test('account creation offers CSV markets and only supported API connections', async ({ page }, info) => {
-  await mockDeviceAccount(page);
+  // SinoPac API sync is offered to the administrator only (sinopac.spec covers everyone else).
+  await mockDeviceAccount(page, true);
   await open(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
   await expect(panel(page).getByLabel('新增方式').getByRole('option')).toHaveText(['API 自動同步', '匯入 CSV']);

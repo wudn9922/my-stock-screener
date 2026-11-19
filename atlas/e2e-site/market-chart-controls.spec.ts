@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { buildReport, mockSite } from './mocks';
 
 async function paintedSeries(chart: Locator) {
@@ -24,6 +25,9 @@ async function paintedSeries(chart: Locator) {
     return counts;
   });
 }
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test('market chart paints configured long MAs and volume, zooms independently and opens the workspace explicitly', async ({ page }, info) => {
   const report = buildReport(3);

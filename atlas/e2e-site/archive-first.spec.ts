@@ -1,9 +1,11 @@
 import { archiveIndexFixture } from '../tests/fixtures/archive-index';
+import { mockMarketLogin } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { dailyBars, mockSite } from './mocks';
 
 const archiveRoot = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
 async function archived(page: Page, symbol = 'AAPL') {
+  await mockMarketLogin(page); // market-chart (live quotes, Yahoo fallback) needs a LINE login
   await mockSite(page);
   const bars = dailyBars(symbol, 150);
   const byYear = new Map<number, string[]>();

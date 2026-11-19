@@ -1,4 +1,4 @@
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
 
@@ -24,6 +24,7 @@ async function chartReady(page: Page) {
 }
 
 test('lands on 大盤 / 台灣 with report cards, LINE summary and mini charts', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockSite(page);
@@ -49,6 +50,7 @@ test('lands on 大盤 / 台灣 with report cards, LINE summary and mini charts',
 });
 
 test('index card opens the chart workspace without preset MAs', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   await mockSite(page);
   await page.goto('./?page=markets&market=tw');
   await page.locator('.index-card').first().getByRole('link', { name: '台灣加權指數，開啟完整圖表', exact: true }).click();
@@ -61,6 +63,7 @@ test('index card opens the chart workspace without preset MAs', async ({ page })
 });
 
 test('deep links, legacy links and LINE liff.state open the right page', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   await mockSite(page);
   await page.goto(`./?liff.state=${encodeURIComponent('/atlas/?page=world&view=indices')}`);
   await expect(page).toHaveURL(/\?page=world&view=indices$/);
@@ -75,6 +78,7 @@ test('deep links, legacy links and LINE liff.state open the right page', async (
 });
 
 test('global search finds Chinese names, bare digits and tickers, with keyboard and recent list', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   await mockSite(page);
   await page.goto('./?page=markets&market=tw');
   let input = await openSearch(page);
@@ -104,6 +108,7 @@ test('global search finds Chinese names, bare digits and tickers, with keyboard 
 });
 
 test('screener virtualizes a long list and opens rows without preset MAs', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   await mockSite(page, { report: buildReport(600) });
   await page.goto('./?page=screener&group=tw_all');
   await expect(page.locator('.screener-row').first()).toBeVisible();
@@ -121,6 +126,7 @@ test('screener virtualizes a long list and opens rows without preset MAs', async
 });
 
 test('world page compares indices and isolates per-row failures', async ({ page }) => {
+  await mockMarketLogin(page); // mini charts / quotes come from market-chart, which needs a LINE login
   await mockSite(page, { failingSymbols: ['^FTSE'] });
   await page.goto('./?page=world&view=indices');
   const ftse = page.locator('.data-table tbody tr').filter({ hasText: '英國富時100' });
