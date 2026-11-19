@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockSite, buildReport } from "./mocks";
-import { mockDeviceAccount, accountPreference } from "./account-fixture";
+import { mockDeviceAccount, accountPreference, mockMarketLogin } from "./account-fixture";
 import { createWatchlist, visitWatchlist } from "../src/watchlists/model";
 
 test("welcome is visible before the app bundle and the normal launch opens watchlists", async ({
@@ -139,6 +139,7 @@ test("compact home reserves at least 80% of main viewport for quotes; tickers le
 test("quote failures name a useful public cause without exposing the response body", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page, { failingSymbols: ["AAPL"] });
   await page.route("**/report/trending-stocks.json", (route) =>
     route.fulfill({

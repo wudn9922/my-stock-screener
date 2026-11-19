@@ -15,6 +15,7 @@ import { WorldAssetProvider } from './WorldAssetProvider';
 import { worldAssetFor } from './worldAssets';
 import { ArchiveFirstProvider } from './ArchiveFirstProvider';
 import { KlineArchive, klineArchive, type ArchiveOptions } from './KlineArchive';
+import type { MarketProxyAccess } from './marketProxyAccess';
 
 export interface ScreenerMarketProviderOptions {
   archive?: false | ArchiveOptions;
@@ -29,6 +30,8 @@ export interface ScreenerMarketProviderOptions {
   cache?: boolean | CachedMarketDataOptions;
   fetcher?: typeof fetch;
   now?: () => number;
+  /** market-chart login/quota gate (sends `X-Atlas-Token`); default the site-wide `marketProxyAccess`. */
+  access?: MarketProxyAccess;
 }
 
 /**
@@ -85,7 +88,7 @@ export class ScreenerMarketRouter implements MarketDataProvider {
 export function createScreenerMarketProvider(options: ScreenerMarketProviderOptions = {}): MarketDataProvider {
   const shared = { ...(options.fetcher ? { fetcher: options.fetcher } : {}), ...(options.now ? { now: options.now } : {}) };
   const router = new ScreenerMarketRouter(
-    new EdgeYahooProvider(options.proxyUrl ?? defaultMarketProxyUrl(), shared),
+    new EdgeYahooProvider(options.proxyUrl ?? defaultMarketProxyUrl(), { ...shared, ...(options.access ? { access: options.access } : {}) }),
     new StaticSeriesProvider(options.reportBase ?? defaultReportBase(), shared),
     new WorldAssetProvider(options.reportBase, options.fetcher),
   );

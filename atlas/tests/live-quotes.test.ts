@@ -19,6 +19,10 @@ import {
   slimChartPayload,
   validateQuotesRequest,
 } from '../../supabase/functions/market-chart/validate.ts';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 const DAY = 86400;
 // 2026-10-01 (Thursday) 13:30 UTC, the US daily row convention.

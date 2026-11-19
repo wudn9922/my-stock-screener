@@ -107,6 +107,8 @@ import { marketVolumeUnit } from '../ui/format';
 import { worldAssetFor } from '../market-data/worldAssets';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
+import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from '../ui/MarketLogin';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
@@ -242,6 +244,8 @@ export function App({
     [selected, setSelected] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [dataError, setDataError] = useState(''),
+    // Signed out (or the token was refused) and this chart has no static data: show the LINE login.
+    [loginRequired, setLoginRequired] = useState(false),
     [notice, setNotice] = useState(''),
     [result, setResult] = useState<BarResult | null>(null),
     // The data a backtest runs on: set by loads and manual refreshes, not by the live minute refresh
@@ -496,6 +500,7 @@ export function App({
     setResult(null);
     setLoadedResult(null);
     setDataError('');
+    setLoginRequired(false);
     setEventsStatus(
       STATIC_HOSTING && providerId === 'yahoo' ? '公司事件：需要後端' : '公司事件：載入中…',
     );
@@ -567,13 +572,14 @@ export function App({
             );
             if (events.status === 'available') chart.setCorporateEvents(events.events);
           })
-          .catch(() => {
-            if (live) setEventsStatus('公司事件：來源暫時無法使用');
+          .catch((error: unknown) => {
+            if (live) setEventsStatus(isMarketLoginRequired(error) ? '公司事件：登入 LINE 後可查看' : '公司事件：來源暫時無法使用');
           });
       })
       .catch((e) => {
         if (live) {
-          setDataError(reportError('market', e));
+          if (isMarketLoginRequired(e)) setLoginRequired(true);
+          else setDataError(reportError('market', e));
           setLoading(false);
         }
       });
@@ -1076,7 +1082,7 @@ export function App({
           if (live) evaluateCurrentAlerts(data);
         })
         .catch((error) => {
-          if (live && !abort.signal.aborted) reportError('market', error);
+          if (live && !abort.signal.aborted && !isMarketLoginRequired(error)) reportError('market', error);
         })
         .finally(() => {
           pending = false;
@@ -1720,6 +1726,15 @@ export function App({
                 <div className="chart-loading">
                   <span className="loading-ring" />
                   載入圖表…
+                </div>
+              )}
+              {loginRequired && !dataError && (
+                <div className="chart-loading error market-login-overlay">
+                  <MarketLoginPrompt />
+                  {!['1D', '1W', '1M'].includes(tf) && <button className="ghost-button" type="button"
+                    onClick={() => store.updateSymbol(symbol, s => ({ ...s, preferences: { ...s.preferences, timeframe: '1D' } }))}>
+                    改看日 K
+                  </button>}
                 </div>
               )}
               {dataError && (

@@ -15,6 +15,8 @@ import './watchlistBoard.css';
 import { MonitorSignals } from './MonitorSignals';
 import { PageFooterNote } from './PageFooterNote';
 import { loadFailureReason } from '../market-data/loadFailureReason';
+import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from './MarketLogin';
 import { StockChartList } from './StockChartList';
 import type { ParameterStock } from '../cloud/settingsApi';
 import { usePageActive } from '../app/pageActivity';
@@ -82,7 +84,7 @@ function useNear<T extends Element>() {
   return { ref, near, visible };
 }
 
-function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
+function QuoteRow({ row, onOpen, onLoginRequired }: { row: BoardRow; onOpen: (row: BoardRow) => void; onLoginRequired?: () => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | null>(null);
   const barsRef = useRef<readonly Bar[] | null>(null);
@@ -129,7 +131,10 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
         if (merged?.splitMismatch) replaceSplitHistory();
         setFailure(result.bars.length ? null : '來源沒有有效的日 K 資料');
       } },
-      (error: unknown) => { if (live) setFailure(loadFailureReason(error)); },
+      (error: unknown) => { if (live) {
+        setFailure(loadFailureReason(error));
+        if (isMarketLoginRequired(error)) onLoginRequired?.();
+      } },
     );
     return () => {
       live = false;
@@ -228,10 +233,12 @@ export function WatchlistBoard({ viewSwitch, holdingsActive = false, onShowLists
   const [tab, setTab] = useState<BoardTab>(hasLists ? 'list' : 'trending');
   const [expanded, setExpanded] = useState(false);
   const [charts, setCharts] = useState(false);
+  // A row without static data needs a LINE login; one prompt for the board (rows are links).
+  const [loginRequired, setLoginRequired] = useState(false);
   const chooseTab = (key: BoardTab) => { onShowLists?.(); setTab(key); };
   const { state: trending, retry } = useTrending(tab === 'trending');
   const liveAt = useLiveUpdatedAt();
-  useEffect(() => { setExpanded(false); setCharts(false); }, [tab, list?.id]);
+  useEffect(() => { setExpanded(false); setCharts(false); setLoginRequired(false); }, [tab, list?.id]);
   // The first saved list becomes the default source.
   useEffect(() => {
     if (hasLists) setTab('list');
@@ -291,10 +298,11 @@ export function WatchlistBoard({ viewSwitch, holdingsActive = false, onShowLists
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
       </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
+      {!charts && !empty && loginRequired && <div className="wb-login"><MarketLoginPrompt compact /></div>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
         parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openFromList} /> : (
         <ul className="wb-rows" aria-label="自選行情列表">
-          {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} />)}
+          {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} onLoginRequired={() => setLoginRequired(true)} />)}
         </ul>
       )}
       {!charts && rows.length > shown.length && (

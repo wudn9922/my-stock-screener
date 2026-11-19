@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite, yahooChart } from './mocks';
@@ -34,6 +35,9 @@ async function setup(page: Page, date: string, options: { symbol?: string; calen
   await expect.poll(() => batches.length).toBe(1);
   return { batches, reads: () => calendarReads };
 }
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 for (const [name, date, symbol] of [
   ['台股國慶補假', '2026-10-09T03:00:00Z', '2330.TW'],

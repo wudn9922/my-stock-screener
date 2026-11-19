@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite } from './mocks';
 import { researchFixtureBody } from './research-fixtures';
 import { openStockMenu } from '../e2e/site-helpers';
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test('volume ratios lead the centered anomaly controls and volatility values remain large', async ({ page }, info) => {
   await mockSite(page);

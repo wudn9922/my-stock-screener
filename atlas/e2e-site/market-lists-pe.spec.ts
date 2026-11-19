@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { mockDeviceAccount, accountDatabase } from './account-fixture';
+import { mockDeviceAccount, accountDatabase, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import { openPanel, closePanel } from '../e2e/site-helpers';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
@@ -132,6 +132,7 @@ test('Chinese heatmap preserves original identities and makes narrow cell names 
 });
 
 test('historical P/E follows the full-height K-line with an actual zoomable time series and a clear missing-data state', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await setup(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
@@ -154,6 +155,7 @@ test('historical P/E follows the full-height K-line with an actual zoomable time
 });
 
 test('a currently loss-making stock keeps historical P/E and explicitly says current P/E is inapplicable', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await setup(page);
   const history = JSON.parse(readFileSync(new URL('../../docs/report/financials/AAPL.json', import.meta.url), 'utf8'));
   for (const [key, count] of [['annual', 2], ['quarterly', 8]] as const) {

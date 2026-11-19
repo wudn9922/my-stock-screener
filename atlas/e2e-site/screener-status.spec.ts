@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite } from './mocks';
 
 /** Unmatched / failed stocks in fixed and custom groups (fixture: tw_g1 = 3 matched + 2 unmatched + 1 failed). */
@@ -47,6 +48,7 @@ test('sorting keeps failed rows last; the search box finds a row by its reason',
 });
 
 test('a failed row still opens its chart', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   const requested = await mockSite(page);
   await page.goto('./?page=screener&group=tw_g1');
   await page.getByRole('searchbox', { name: '在群組內篩選' }).fill('6505');
