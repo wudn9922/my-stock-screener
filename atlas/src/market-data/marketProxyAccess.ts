@@ -4,14 +4,20 @@
  * static GitHub data and anything else shows 「登入 LINE 後可查看」. Signed-in requests carry the
  * login token in `X-Atlas-Token` (re-read per request, so sign-in/sign-out applies without reload).
  * A 401 counts as signed out for that token; a 429 stops every request until `retryAfterSeconds`
- * passes, or for the rest of the session for the daily caps.
+ * passes, or for the rest of the session for the daily caps. A 503 AUTH_UNAVAILABLE /
+ * QUOTA_UNAVAILABLE is temporary: requests pause for `retryAfterSeconds`, then resume.
+ * The new 401/429/503 bodies are `{ ok:false, code, error, retryAfterSeconds }`; older market-chart
+ * errors keep `{ error: { code, message } }` and are left to the caller (e.g. 503 `rate_limited`).
  */
 import { accessState, currentIdentity, initializeAccess, refreshAccess } from '../auth/access';
 
 export const MARKET_TOKEN_HEADER = 'X-Atlas-Token';
 export const MARKET_LOGIN_MESSAGE = '登入 LINE 後可查看';
 const DEFAULT_QUOTA_MESSAGE = '查詢太頻繁，請稍後再試';
+const DEFAULT_PAUSE_MESSAGE = '行情服務暫時無法確認登入或額度，請稍後再試';
 const DAILY_CODES = new Set(['SITE_DAILY', 'USER_DAILY']);
+/** Temporary 503s from the function's login/quota checks (not signed out). */
+const PAUSE_CODES = new Set(['AUTH_UNAVAILABLE', 'QUOTA_UNAVAILABLE']);
 const DEFAULT_RETRY_SECONDS = 60;
 
 /** No request was (or will be) sent: the visitor must sign in with LINE first. */
@@ -22,7 +28,10 @@ export class MarketLoginRequiredError extends Error {
   }
 }
 
-/** The function refused for quota; `until` is epoch ms (Infinity: for the rest of this session). */
+/**
+ * The function refused for quota (429) or its checks are temporarily unavailable (503); no request is
+ * sent until `until` (epoch ms; Infinity: for the rest of this session).
+ */
 export class MarketQuotaError extends Error {
   constructor(message: string, readonly code: string, readonly until: number) {
     super(message);
@@ -123,8 +132,8 @@ export class MarketProxyAccess {
   getSnapshot = (): MarketAccessSnapshot => {
     const quota = this.activeQuota();
     const token = this.token();
-    const next: MarketAccessSnapshot = !token
-      ? { status: this.source.settled() ? 'signed-out' : 'pending' }
+    const next: MarketAccessSnapshot = !this.source.settled() ? { status: 'pending' } : !token
+      ? { status: 'signed-out' }
       : quota ? { status: 'quota', message: quota.message, code: quota.code, until: quota.until } : { status: 'ready' };
     const key = `${next.status}|${next.message ?? ''}|${next.code ?? ''}|${next.until ?? ''}`;
     if (key !== this.snapshotKey) {
@@ -156,6 +165,11 @@ export class MarketProxyAccess {
    */
   async authorize(): Promise<string> {
     if (!this.source.settled()) await this.source.ready().catch(() => undefined);
+    return this.authorizeNow();
+  }
+
+  /** `authorize` without waiting (the account check must already have finished). */
+  private authorizeNow(): string {
     const token = this.token();
     if (!token) throw new MarketLoginRequiredError();
     const quota = this.activeQuota();
@@ -173,7 +187,7 @@ export class MarketProxyAccess {
    * signed-out / quota state (thrown as MarketLoginRequiredError / MarketQuotaError).
    */
   async fetch(fetcher: typeof fetch, url: string, init: RequestInit = {}): Promise<Response> {
-    const token = await this.authorize();
+    const token = this.source.settled() ? this.authorizeNow() : await this.authorize();
     const headers = new Headers(init.headers);
     headers.set(MARKET_TOKEN_HEADER, token);
     const response = await fetcher(url, { ...init, headers });
@@ -183,14 +197,20 @@ export class MarketProxyAccess {
       this.source.unauthorized?.();
       throw new MarketLoginRequiredError();
     }
-    if (response.status === 429) throw this.blockForQuota(response, await readJson(response));
+    if (response.status === 429) throw this.blockForQuota(response, topLevelCode(await readJson(response)));
+    if (response.status === 503) {
+      // Only the new top-level-code shape pauses; an older `{ error: { code } }` 503 stays the caller's.
+      const body = topLevelCode(await readJson(response.clone()));
+      if (body && PAUSE_CODES.has(body.code)) throw this.blockForQuota(response, body);
+    }
     return response;
   }
 
-  private blockForQuota(response: Response, body: unknown): MarketQuotaError {
-    const payload = (body && typeof body === 'object' ? body : {}) as { code?: unknown; error?: unknown; retryAfterSeconds?: unknown };
-    const code = typeof payload.code === 'string' ? payload.code : 'RATE_LIMITED';
-    const message = typeof payload.error === 'string' && payload.error.trim() ? payload.error.trim() : DEFAULT_QUOTA_MESSAGE;
+  private blockForQuota(response: Response, body: NewErrorBody | null): MarketQuotaError {
+    const payload: Partial<NewErrorBody> = body ?? {};
+    const code = payload.code ?? 'RATE_LIMITED';
+    const message = typeof payload.error === 'string' && payload.error.trim() ? payload.error.trim()
+      : PAUSE_CODES.has(code) ? DEFAULT_PAUSE_MESSAGE : DEFAULT_QUOTA_MESSAGE;
     const header = Number(response.headers.get('Retry-After'));
     const seconds = typeof payload.retryAfterSeconds === 'number' && Number.isFinite(payload.retryAfterSeconds) && payload.retryAfterSeconds > 0
       ? payload.retryAfterSeconds : Number.isFinite(header) && header > 0 ? header : DEFAULT_RETRY_SECONDS;
@@ -210,8 +230,15 @@ export class MarketProxyAccess {
   }
 }
 
+interface NewErrorBody { code: string; error?: unknown; retryAfterSeconds?: unknown }
+
 async function readJson(response: Response): Promise<unknown> {
   try { return await response.json(); } catch { return null; }
+}
+
+/** `{ ok:false, code, error, retryAfterSeconds }` (the new shape), or null for anything else. */
+function topLevelCode(body: unknown): NewErrorBody | null {
+  return body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string' ? body as NewErrorBody : null;
 }
 
 /** The site-wide gate shared by every market-chart caller. */

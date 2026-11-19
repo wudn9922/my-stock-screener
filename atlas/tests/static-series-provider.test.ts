@@ -11,6 +11,10 @@ import { ScreenerMarketRouter, createScreenerMarketProvider } from '../src/marke
 import { EdgeYahooProvider } from '../src/market-data/EdgeYahooProvider';
 import { MarketDataUnavailableError } from '../src/market-data/ProviderErrors';
 import { getMarketProfile } from '../src/market-data/MarketProfile';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 const day = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 1000;
 const bar = (iso: string, open: number, high: number, low: number, close: number, volume = 100) => ({

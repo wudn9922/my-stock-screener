@@ -388,8 +388,10 @@ export class EdgeYahooProvider implements MarketDataProvider {
 
   private async download(symbol: string, timeframe: YahooTimeframe, signal: AbortSignal, includeEvents = false): Promise<RawEntry> {
     // Signed out / over quota fails here, before the timeout starts and without any request.
-    await this.access.authorize();
-    signal.throwIfAborted();
+    if (!this.access.canRequest()) {
+      await this.access.authorize();
+      signal.throwIfAborted();
+    }
     const controller = new AbortController();
     const forward = () => controller.abort(abortError(signal));
     signal.addEventListener('abort', forward, { once: true });

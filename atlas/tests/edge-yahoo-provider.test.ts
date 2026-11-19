@@ -8,6 +8,10 @@ import {
 } from '../src/market-data/EdgeYahooProvider';
 import { MarketDataUnavailableError } from '../src/market-data/ProviderErrors';
 import { normalizeYahooCalendarResponse, normalizeYahooResponse } from '../src/market-data/YahooNormalizer';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 const PROXY = 'https://proj.supabase.co/functions/v1/market-chart';
 const asOfMs = Date.parse('2026-10-07T20:05:00Z');

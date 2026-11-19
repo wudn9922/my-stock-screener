@@ -235,7 +235,7 @@ export class LiveQuoteFeed {
   /** Explicit retry uses the existing batched feed, without adding a polling loop. */
   async refresh(symbol: string): Promise<LiveDaily> {
     // Signed out or over quota: say so, without a request.
-    if (this.proxyUrl && isLiveSymbol(symbol)) await this.access.authorize();
+    if (this.proxyUrl && isLiveSymbol(symbol) && !this.access.canRequest()) await this.access.authorize();
     let latest: LiveDaily | undefined;
     const stop = this.subscribe(symbol, value => { latest = value; });
     const entry = this.entries.get(normalizeSymbol(symbol));
@@ -302,7 +302,7 @@ export class LiveQuoteFeed {
   private async run(periodic: boolean) {
     if (!this.visible()) return;
     // Signed out or over quota: nothing is due and nothing is marked as fetched.
-    try { await this.access.authorize(); } catch { return; }
+    if (!this.access.canRequest()) try { await this.access.authorize(); } catch { return; }
     if (this.loadCalendar) await this.calendar.ensure(this.now());
     if (!this.visible()) return;
     const now = this.now();

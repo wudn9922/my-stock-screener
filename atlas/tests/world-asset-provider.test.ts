@@ -8,6 +8,10 @@ import { isCanonicalSymbol } from '../src/market-data/MarketDataProvider';
 import { displayTicker, formatMarketVolume } from '../src/ui/format';
 import { cellLabelFit } from '../src/pages/treemap';
 import { industryName, US_INDUSTRY_ZH } from '../src/pages/industryNames';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 function fetcher(change?: (path: string, payload: Record<string, unknown>) => void) {
   return vi.fn<typeof fetch>(async input => {
