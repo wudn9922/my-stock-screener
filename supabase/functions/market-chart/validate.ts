@@ -86,7 +86,8 @@ export function buildYahooChartUrl(host: (typeof YAHOO_HOSTS)[number], request: 
 
 /** Browser cache lifetime: one minute for intraday bars, ten minutes for daily and longer. */
 export function cacheControlFor(interval: string): string {
-  return INTRADAY_INTERVALS.has(interval) ? 'public, max-age=60' : 'public, max-age=600';
+  // private: every response is now per signed-in user (X-Atlas-Token), so shared caches must not keep it.
+  return INTRADAY_INTERVALS.has(interval) ? 'private, max-age=60' : 'private, max-age=600';
 }
 
 export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = Object.freeze(['https://wudn9922.github.io']);
@@ -109,9 +110,9 @@ export function parseAllowedOrigins(value: string | undefined | null): readonly 
 
 export function corsHeaders(origin: string | null, allowed: readonly string[] = DEFAULT_ALLOWED_ORIGINS): Record<string, string> {
   const headers: Record<string, string> = {
-    Vary: 'Origin',
+    Vary: 'X-Atlas-Token, Origin',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-atlas-token',
     'Access-Control-Max-Age': '86400',
   };
   if (origin && isAllowedOrigin(origin, allowed)) headers['Access-Control-Allow-Origin'] = origin;
