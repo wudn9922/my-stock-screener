@@ -6,6 +6,8 @@ async function isPhone(page: Page) {
   return page.locator('.site-tabbar').isVisible();
 }
 async function openSearch(page: Page) {
+  // A signed-in launch renders the shell after LINE login; decide phone/desktop once it is there.
+  await page.locator('.site').waitFor();
   if (await isPhone(page)) {
     {
       const topSearch = page.locator('.site-topbar').getByRole('button', { name: '搜尋股票', exact: true });
