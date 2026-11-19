@@ -4,7 +4,7 @@ Atlas 手機通知（標準 Web Push）。
 Discord 提醒成功後，另外請 Supabase user-settings 函式（push.notify）把同一則提醒
 推播到該帳號訂閱的手機；點通知直接開啟該股票的 Atlas 圖表。
 
-- 未設定 WEB_PUSH_NOTIFY_URL 時完全略過，不影響原本的 Discord 提醒。
+- 預設送往 SUPABASE_URL 同專案的 user-settings；WEB_PUSH_NOTIFY_URL=off 可停用。推播失敗不影響原本的 Discord 提醒。
 - 驗證用 Cloud Run 已有的 SUPABASE_SERVICE_ROLE_KEY，不需要新的密鑰。
 - 推播失敗只記錄類型／HTTP 狀態，不記錄金鑰、網址參數或價格，也不會中斷提醒流程。
 """
@@ -103,8 +103,14 @@ class WebPushClient:
         environ = os.environ if environ is None else environ
         notify_url = environ.get("WEB_PUSH_NOTIFY_URL", "").strip()
         service_key = environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-        if not notify_url or not service_key:
+        if notify_url.lower() == "off" or not service_key:
             return None
+        if not notify_url:
+            # 預設用同一個 Supabase 專案的 user-settings，部署時不必另外設定 Cloud Run
+            base = urlparse(environ.get("SUPABASE_URL", "").strip())
+            if base.scheme != "https" or not base.hostname:
+                return None
+            notify_url = f"https://{base.hostname}/functions/v1/user-settings"
         parsed = urlparse(notify_url)
         supabase_host = urlparse(environ.get("SUPABASE_URL", "").strip()).hostname
         # 金鑰只送往同一個 Supabase 專案的 HTTPS 網址

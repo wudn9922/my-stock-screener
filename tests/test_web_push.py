@@ -86,7 +86,9 @@ class WebPushTests(unittest.TestCase):
     def test_skips_silently_without_configuration_or_with_unsafe_url(self):
         discord = FakeDiscord()
         self.assertIs(with_web_push(discord, USER, environ={}), discord)
-        self.assertIs(with_web_push(discord, USER, environ={**ENV, "WEB_PUSH_NOTIFY_URL": ""}), discord)
+        self.assertIs(with_web_push(discord, USER, environ={**ENV, "WEB_PUSH_NOTIFY_URL": "off"}), discord)
+        derived = WebPushClient.from_env(environ={**ENV, "WEB_PUSH_NOTIFY_URL": "", "SUPABASE_URL": "https://abc.supabase.co/rest/v1"})
+        self.assertEqual(derived.notify_url, "https://abc.supabase.co/functions/v1/user-settings")
         for url in ("http://abc.supabase.co/functions/v1/user-settings", "https://evil.example/functions/v1/user-settings",
                     "https://other.supabase.co/functions/v1/user-settings"):
             result, output = self.quiet(with_web_push, discord, USER, environ={**ENV, "WEB_PUSH_NOTIFY_URL": url})
