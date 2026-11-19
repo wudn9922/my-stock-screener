@@ -16,6 +16,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
+import { MarketQuotaNotice } from '../ui/MarketLogin';
 import { StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { RouteBoundary } from './RouteBoundary';
@@ -398,7 +399,7 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
-        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' && !(mobile && route.view) ? 'full' : 'alerts'} />}</div>
+        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' && !(mobile && route.view) ? 'full' : 'alerts'} />}<MarketQuotaNotice /></div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
           <div className="market-head">
             {reportDate && <span className="market-head-date">資料日 {formatDateTime(reportDate, false)}</span>}

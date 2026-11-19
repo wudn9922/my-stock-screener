@@ -1,5 +1,10 @@
+import { isMarketLoginRequired, isMarketQuotaError, MARKET_LOGIN_MESSAGE } from "./marketProxyAccess";
+
 /** Public market-data failures only. Never echo arbitrary response bodies, URLs or stacks. */
 export function loadFailureReason(error: unknown): string {
+  if (isMarketLoginRequired(error)) return MARKET_LOGIN_MESSAGE;
+  // The function's own quota text (e.g. 今日免費額度已用完，明天再試).
+  if (isMarketQuotaError(error)) return error.message;
   const text = error instanceof Error ? error.message : "";
   if (/timeout|timed out|逾時/i.test(text))
     return "行情來源回應逾時，請稍後重試";

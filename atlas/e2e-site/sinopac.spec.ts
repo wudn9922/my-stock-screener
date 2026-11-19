@@ -1,10 +1,11 @@
 import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { mockSite } from './mocks';
-import { accessEnvelope, installLineAccount, DEVICE_USER_ID } from './account-fixture';
+import { accessEnvelope, installLineAccount, mockDeviceAccount, DEVICE_USER_ID, OWNER_USER_ID } from './account-fixture';
 test('owner SinoPac status, manual sync, error and read-only imported portfolio', async ({ page }, info) => {
   await mockSite(page, { fundamentals: true });
-  await installLineAccount(page);
+  // SinoPac sync is shown only to the server-verified administrator.
+  await installLineAccount(page, OWNER_USER_ID);
   const id = '20000000-0000-4000-8000-000000000001';
   let synced = 0;
   const account = {
@@ -38,7 +39,7 @@ test('owner SinoPac status, manual sync, error and read-only imported portfolio'
   };
   await page.route('**/functions/v1/user-settings', (route) => {
     const b = route.request().postDataJSON();
-    if (b.action === 'access.get') return route.fulfill({ json: accessEnvelope(DEVICE_USER_ID, 'cloud') });
+    if (b.action === 'access.get') return route.fulfill({ json: accessEnvelope(OWNER_USER_ID, 'cloud', true) });
     if (b.action === 'holdings.sinopac.sync') {
       synced++;
       if (synced > 1)
@@ -108,7 +109,8 @@ test('legacy CSV SinoPac stays editable only after the selected account permissi
   page,
 }) => {
   await mockSite(page);
-  await installLineAccount(page);
+  // The administrator sees the SinoPac panel, so editing waits for its permission check.
+  await installLineAccount(page, OWNER_USER_ID);
   const id = '20000000-0000-4000-8000-000000000001';
   let release!: () => void;
   const ready = new Promise<void>((resolve) => {
@@ -116,7 +118,7 @@ test('legacy CSV SinoPac stays editable only after the selected account permissi
   });
   await page.route('**/functions/v1/user-settings', async (route) => {
     const b = route.request().postDataJSON();
-    if (b.action === 'access.get') return route.fulfill({ json: accessEnvelope(DEVICE_USER_ID, 'cloud') });
+    if (b.action === 'access.get') return route.fulfill({ json: accessEnvelope(OWNER_USER_ID, 'cloud', true) });
     if (b.action === 'holdings.sinopac.status') {
       await ready;
       return route.fulfill({ status: 403, json: { ok: false, error: '此帳號無永豐同步權限' } });
@@ -160,4 +162,44 @@ test('legacy CSV SinoPac stays editable only after the selected account permissi
   await expect(edit).toBeEnabled();
   await edit.click();
   await expect(page.getByRole('region', { name: '匯入持股', exact: true })).toBeVisible();
+});
+
+test('SinoPac is hidden from everyone but the administrator; a legacy CSV SinoPac account stays editable', async ({ page }) => {
+  await mockSite(page);
+  await installLineAccount(page);
+  const id = '20000000-0000-4000-8000-000000000001';
+  const actions: string[] = [];
+  await page.route('**/functions/v1/user-settings', (route) => {
+    const b = route.request().postDataJSON();
+    actions.push(b.action);
+    if (b.action === 'access.get') return route.fulfill({ json: accessEnvelope(DEVICE_USER_ID, 'cloud') });
+    return route.fulfill({
+      json: {
+        ok: true,
+        data: b.action === 'holdings.list'
+          ? { version: 1, accounts: [{ account: { id, name: '舊永豐 CSV', broker: 'sinopac', kind: 'tw-broker', currency: 'TWD' }, holdings: [], revision: 1 }] }
+          : [],
+      },
+    });
+  });
+  await page.goto('./?page=watchlist');
+  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  const holdings = page.getByRole('region', { name: '持股', exact: true });
+  await expect(holdings.getByRole('button', { name: '修正持股', exact: true })).toBeEnabled();
+  await expect(page.getByRole('region', { name: '永豐台股自動同步' })).toHaveCount(0);
+  await holdings.getByRole('button', { name: '新增帳戶', exact: true }).click();
+  await holdings.getByLabel('新增方式').selectOption('api');
+  await expect(holdings.getByLabel('API 服務').getByRole('option')).toHaveText(['MEXC（加密貨幣）']);
+  expect(actions.filter((action) => action.startsWith('holdings.sinopac'))).toEqual([]);
+});
+
+test('the administrator sees the SinoPac option', async ({ page }) => {
+  await mockSite(page);
+  await mockDeviceAccount(page, true);
+  await page.goto('./?page=watchlist');
+  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  const holdings = page.getByRole('region', { name: '持股', exact: true });
+  await holdings.getByRole('button', { name: '新增帳戶', exact: true }).click();
+  await holdings.getByLabel('新增方式').selectOption('api');
+  await expect(holdings.getByLabel('API 服務').getByRole('option')).toHaveText(['MEXC（加密貨幣）', '永豐證券（台股）']);
 });

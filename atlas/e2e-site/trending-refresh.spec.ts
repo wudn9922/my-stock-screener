@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { buildReport, mockSite, screenerFixtures, yahooChart, NO_LIVE_QUOTES } from './mocks';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { openStockMenu } from '../e2e/site-helpers';
 
 const trending = {
@@ -10,6 +10,7 @@ const trending = {
 };
 
 test('LINE stocks open a chart and repeated updates request only that stock; failure retains the chart', async ({ page }, testInfo) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page, { fundamentals: true });
   await page.route('**/report/trending-stocks.json', route => route.fulfill({ json: trending }));
   await page.goto('./?page=screener');
@@ -150,6 +151,7 @@ test('LINE group shares filters and saves only its symbols as a manual watchlist
 });
 
 test('switching symbols while refreshing cancels the result for the old chart', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.goto('./?page=chart&symbol=NVDA&tf=1D');
   const update = page.getByRole('button', { name: '更新 NVDA K 線', exact: true });

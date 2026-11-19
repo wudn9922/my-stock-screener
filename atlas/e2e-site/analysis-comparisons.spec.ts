@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { buildReport, mockSite } from "./mocks";
-import { accountPreference, mockDeviceAccount } from "./account-fixture";
+import { accountPreference, mockDeviceAccount, mockMarketLogin } from "./account-fixture";
 
 function snapshot(date: string, values: number[]) {
   return {
@@ -34,6 +34,7 @@ function snapshot(date: string, values: number[]) {
 test("relative strength compares shared dates, switches benchmark/period and preserves original chart", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.goto("./?page=chart&symbol=2330.TW&tf=1D");
   await expect(page.getByTestId("ohlc-header")).toContainText("O ");

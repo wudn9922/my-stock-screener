@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { dailyBars, mockSite, yahooChart } from './mocks';
 
 // Thursday 2026-10-08 10:32 in Taipei: the fixture's last daily bar is today's, the session is open.
@@ -44,6 +45,9 @@ async function chart(page: Page, symbol: string, sessions: Session[], todayDaily
   await expect(page.getByTestId('ohlc-header')).not.toBeEmpty();
   return intraday;
 }
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test('the volume legend shows today’s volume against the previous session at the same time', async ({ page }) => {
   const intraday = await chart(page, '2330.TW', [

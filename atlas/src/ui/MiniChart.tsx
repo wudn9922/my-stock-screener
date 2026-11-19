@@ -22,6 +22,8 @@ import { indicatorColors } from '../indicators/IndicatorRegistry';
 import './mini-chart-controls.css';
 import { miniChartStart } from './miniChartRange';
 import { usePageActive } from '../app/pageActivity';
+import { isMarketLoginRequired, isMarketQuotaError } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from './MarketLogin';
 
 const VISIBLE_BARS = 130;
 const NO_MAS: readonly number[] = [];
@@ -105,6 +107,8 @@ export function MiniChart({
   const paintRef = useRef<((next: Bar[]) => void) | null>(null);
   const drawnRef = useRef<Bar[] | null>(null);
   const [status, setStatus] = useState<MiniChartStatus>('idle');
+  // Why an error has no chart: signed out (login prompt) or the function's quota text.
+  const [blocked, setBlocked] = useState<{ login: true } | { message: string } | null>(null);
   const colors = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().colors);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
@@ -128,7 +132,7 @@ export function MiniChart({
     let live = true;
     recentRef.current = null; barsRef.current = null; archivedThrough.current = undefined;
     splitPending.current = false; setSourceNote('');
-    setBars(null);
+    setBars(null); setBlocked(null);
     setStatus('loading');
     statusRef.current?.('loading', null);
     // Long configured MAs need historical warm-up; the visible chart still starts at six months.
@@ -145,8 +149,9 @@ export function MiniChart({
         setStatus(next.length ? 'ready' : 'error');
         statusRef.current?.(next.length ? 'ready' : 'error', next);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!live) return;
+        setBlocked(isMarketLoginRequired(error) ? { login: true } : isMarketQuotaError(error) ? { message: error.message } : null);
         setStatus('error');
         statusRef.current?.('error', null);
       });
@@ -294,8 +299,10 @@ export function MiniChart({
       </div>}
       {status === 'ready' ? (
         <div ref={hostRef} className="mini-chart-canvas" aria-hidden="true" />
+      ) : status === 'error' && blocked && 'login' in blocked ? (
+        <div className="mini-chart-login"><MarketLoginPrompt compact /></div>
       ) : status === 'error' ? (
-        <span className="mini-chart-empty">暫無圖表資料</span>
+        <span className="mini-chart-empty">{blocked && 'message' in blocked ? blocked.message : '暫無圖表資料'}</span>
       ) : (
         <span className="skeleton mini-chart-skeleton" aria-hidden="true" />
       )}

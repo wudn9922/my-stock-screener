@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openListActions } from './archive-fixture';
+import { archives, openListActions } from './archive-fixture';
 import { buildReport, mockSite } from './mocks';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
 import { consoleEntry, isCompactConsole, openConsoleSection } from './console-nav';
@@ -103,6 +103,8 @@ test('ordinary visitors can group, set MAs and draw, with zero application persi
   await page.route('**/functions/v1/chart-drawings', route => { personalRequests.push(route.request().url()); return route.fulfill({ status: 403, json: { ok: false } }); });
   page.on('request', request => { if (/github\.com|api\.github\.com/.test(request.url()) && request.method() !== 'GET') personalRequests.push(request.url()); });
   await mockSite(page, { report: buildReport(20) });
+  // Signed out, market-chart is never called: the visitor's chart comes from the published static archive.
+  await archives(page, ['2330.TW']);
   await page.goto('./?page=console');
   await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   await expect(consoleEntry(page, 'admin')).toHaveCount(0);

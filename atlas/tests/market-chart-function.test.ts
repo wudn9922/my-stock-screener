@@ -61,11 +61,11 @@ describe('market-chart Edge Function request validation', () => {
     );
   });
 
-  it('sets cache lifetimes by interval', () => {
-    expect(cacheControlFor('5m')).toBe('public, max-age=60');
-    expect(cacheControlFor('60m')).toBe('public, max-age=60');
-    expect(cacheControlFor('1d')).toBe('public, max-age=600');
-    expect(cacheControlFor('1mo')).toBe('public, max-age=600');
+  it('sets private cache lifetimes by interval (responses are per signed-in user)', () => {
+    expect(cacheControlFor('5m')).toBe('private, max-age=60');
+    expect(cacheControlFor('60m')).toBe('private, max-age=60');
+    expect(cacheControlFor('1d')).toBe('private, max-age=600');
+    expect(cacheControlFor('1mo')).toBe('private, max-age=600');
   });
 
   it('restricts CORS to the Pages origin and localhost', () => {
@@ -78,7 +78,8 @@ describe('market-chart Edge Function request validation', () => {
     expect(isAllowedOrigin(null)).toBe(false);
     expect(corsHeaders('https://wudn9922.github.io')['Access-Control-Allow-Origin']).toBe('https://wudn9922.github.io');
     expect(corsHeaders('https://example.com')['Access-Control-Allow-Origin']).toBeUndefined();
-    expect(corsHeaders(null)).toMatchObject({ Vary: 'Origin', 'Access-Control-Allow-Methods': 'GET, OPTIONS' });
+    expect(corsHeaders(null)).toMatchObject({ Vary: 'X-Atlas-Token, Origin', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Max-Age': '86400' });
+    expect(corsHeaders(null)['Access-Control-Allow-Headers'].split(', ')).toContain('x-atlas-token');
     expect(parseAllowedOrigins('https://a.example/, javascript:alert(1), https://b.example')).toEqual(['https://a.example', 'https://b.example']);
     expect(parseAllowedOrigins('')).toEqual(['https://wudn9922.github.io']);
   });

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { researchFixtureBody } from './research-fixtures';
@@ -7,6 +8,7 @@ import { closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 const tabs = (page: Page) => page.locator('.ws-stock-controls').getByRole('navigation', { name: '個股頁面' });
 
 async function fixtures(page: Page) {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/my-stock-screener/report/research/**', (route) => {
     const path = new URL(route.request().url()).pathname.split('/research/')[1]!;

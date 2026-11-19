@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { clock, archives, live } from './archive-fixture';
 import { mockSite } from './mocks';
 import { openStockMenu } from '../e2e/site-helpers';
 
 test('C4 visible sidebar TW/US rows share one batch and update once a minute',async({page},info)=>{
-  await page.clock.install({time:clock});await mockSite(page);
+  await page.clock.install({time:clock});await mockMarketLogin(page);await mockSite(page);
   const symbols=['2330.TW','2317.TW','2454.TW','NVDA','AAPL','MSFT','TSLA','GOOGL'];
   await archives(page,symbols);const {batches,dailyFiveYears}=await live(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');

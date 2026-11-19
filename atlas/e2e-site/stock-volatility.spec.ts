@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { dailyBars, mockSite, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 
@@ -24,6 +25,9 @@ function fixture(symbol: string, count = 22) {
   result.meta.regularMarketPrice = 999;
   return payload;
 }
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test('daily volatility and independent volume analysis stay beside recommendations without following quote or chart timeframe', async ({ page }, testInfo) => {
   await mockSite(page);

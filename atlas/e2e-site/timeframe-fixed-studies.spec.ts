@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
+import { archives } from './archive-fixture';
 import { accountDatabase, mockDeviceAccount } from './account-fixture';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
 import { searchSymbol, closeStockMenu, openStockMenu } from '../e2e/site-helpers';
@@ -82,6 +83,8 @@ test('hourly, weekly and monthly MAs and drawings fix independently and survive 
 
 test('visitors see a RAM-only warning and reload does not persist timeframe studies', async ({ page }) => {
   await mockSite(page);
+  // Signed out, market-chart is never called: the visitor's chart comes from the published static archive.
+  await archives(page, ['AAPL']);
   await page.goto('./?page=chart&symbol=AAPL&tf=1W'); await loaded(page);
   await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();

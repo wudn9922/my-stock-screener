@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
@@ -46,6 +47,9 @@ async function openCard(section: Locator) {
 }
 /** Element screenshots would include the sticky header and tab bar on top of the card. */
 const unstick = (page: Page) => page.addStyleTag({ content: '.fin-head{position:static!important}.bottom-nav,nav[aria-label]{display:none!important}' });
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test('US stock: annual-only river with five labelled multiples, percentile, basis block, no horizontal scroll', async ({ page }, info) => {
   const errors: string[] = [];

@@ -85,13 +85,15 @@ jobs:
               failed=1
             fi
           }
-          check "invalid interval" "symbol=NVDA&interval=99x&range=5y" 400
-          check "2330.TW 1d/1mo" "symbol=2330.TW&interval=1d&range=1mo" 200
-          check "6488.TWO 1d/1mo" "symbol=6488.TWO&interval=1d&range=1mo" 200
-          check "^TWII 1d/1mo" "symbol=%5ETWII&interval=1d&range=1mo" 200
-          check "AAPL 1d/1mo" "symbol=AAPL&interval=1d&range=1mo&events=0" 200
-          check "NVDA 5m/5d" "symbol=NVDA&interval=5m&range=5d" 200
-          check "000001.SS 1d/1mo" "symbol=000001.SS&interval=1d&range=1mo" 200
+          # market-chart 需要登入（X-Atlas-Token）：未帶或帶假的 token 都應回 401，不會打到 Yahoo
+          check "market-chart without token" "symbol=2330.TW&interval=1d&range=1mo" 401
+          code=$(curl -s -o /tmp/chart.json -w '%{http_code}' --max-time 30 -H 'X-Atlas-Token: invalid.token.value.for.smoke' \
+            "${url}?symbol=AAPL&interval=1d&range=1mo")
+          echo "market-chart with invalid token → HTTP ${code}: $(head -c 200 /tmp/chart.json)"
+          if [ "${code}" != "401" ]; then
+            echo "::warning::market-chart（假 token）預期 HTTP 401，得到 ${code}"
+            failed=1
+          fi
           # user-settings：未帶 LIFF ID Token 應回 401（不需要真的登入）
           code=$(curl -s -o /tmp/settings.json -w '%{http_code}' --max-time 30 -X POST \
             -H 'Content-Type: application/json' -d '{"action":"stocks.list"}' \
@@ -111,7 +113,7 @@ jobs:
             failed=1
           fi
           if [ "${failed}" != "0" ]; then
-            echo "::warning::market-chart 有請求未得到預期結果；HTTP 200 以外多半是 Yahoo 封鎖或限流了 Supabase 的出口 IP"
+            echo "::warning::有函式未得到預期結果（market-chart 現在需要登入，匿名請求應為 401）"
             exit 1
           fi
 

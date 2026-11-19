@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { mockSite, buildReport, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { searchSymbol } from '../e2e/site-helpers';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { openListActions } from './archive-fixture';
 
 async function candlePixels(page: Page) {
@@ -22,6 +22,7 @@ async function candlePixels(page: Page) {
 }
 
 test('switching from a manually scaled low-price stock to a high-price stock shows its candles', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('https://edge.test/functions/v1/market-chart**', route => {
     const url = new URL(route.request().url()), symbol = url.searchParams.get('symbol')!;
@@ -114,6 +115,7 @@ test('all stocks have a continuous chart view with automatic paging and disposab
 });
 
 test('financials uses the same stock tab sizing and identity-first order as the three chart views', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/report/financials/*.json', route => route.fulfill({ contentType: 'application/json',
     body: readFileSync(new URL('../tests/fixtures/financials/us-full.json', import.meta.url), 'utf8') }));

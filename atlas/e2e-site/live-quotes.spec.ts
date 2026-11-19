@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from './mocks';
 import { misOnlyChart, overlayMis, parseMisRow } from '../../supabase/functions/market-chart/twse-mis';
 import { MIS_NOW, MIS_TODAY, misRows, misYahoo } from '../tests/fixtures/twse-mis';
@@ -6,6 +7,9 @@ import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 
 const LIVE_PRICE = 1234.5;
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 /** Answers `market-chart?quotes=` with the chart's own rows, the latest close moved to LIVE_PRICE. */
 async function liveQuotes(page: Page) {

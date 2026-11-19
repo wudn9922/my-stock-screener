@@ -226,11 +226,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     id: string | null;
   }>();
   const sinopacKey = getStorageContextKey() + ':' + selected?.account.id;
+  // SinoPac sync is the owner's own service: only the server-verified administrator sees its panel
+  // (the server refuses everyone else anyway). Others keep editing a legacy CSV SinoPac account.
+  const sinopacAdmin = access.isAdmin;
   const sinopacReadOnly =
     selected?.account.broker === 'sinopac' &&
-    (sinopacManaged?.key !== sinopacKey ||
-      sinopacManaged.id === selected.account.id ||
-      selected.holdings.some((h) => h.source === 'api'));
+    (selected.holdings.some((h) => h.source === 'api') ||
+      (sinopacAdmin && (sinopacManaged?.key !== sinopacKey || sinopacManaged.id === selected.account.id)));
   const subtotal = (items: typeof all) => (
     <>
       {[...summarizeHoldings(items, rates).currencies].map(([currency, value]) => (
@@ -480,7 +482,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   onChange={(event) => setBrokerKey(event.target.value)}
                 >
                   <option value="mexc">MEXC（加密貨幣）</option>
-                  <option value="sinopac">永豐證券（台股）</option>
+                  {sinopacAdmin && <option value="sinopac">永豐證券（台股）</option>}
                 </select>
               </label>
             ) : (
@@ -524,7 +526,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 繼續匯入
               </button>
             )}
-            {method === 'api' && brokerKey === 'sinopac' && (
+            {sinopacAdmin && method === 'api' && brokerKey === 'sinopac' && (
               <p>由維護者設定永豐服務後，使用下方同步按鈕建立擁有者帳戶。</p>
             )}
             {method === 'api' && brokerKey === 'mexc' && (
@@ -568,10 +570,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             )}
         </form>
       )}
-      {creating && method === 'api' && brokerKey === 'sinopac' && (
+      {sinopacAdmin && creating && method === 'api' && brokerKey === 'sinopac' && (
         <SinopacPanel onCreated={() => setCreating(false)} />
       )}
-      {selected?.account.broker === 'sinopac' && (
+      {sinopacAdmin && selected?.account.broker === 'sinopac' && (
         <SinopacPanel
           key={selected.account.id}
           accountId={selected.account.id}

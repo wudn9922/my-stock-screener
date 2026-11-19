@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
@@ -38,6 +39,7 @@ test('tiles view: periods, relative mode and parent filter', async ({ page }) =>
 });
 
 test('a tile opens the detail sheet with description, constituents and an expandable chart', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockThemes(page);
   await page.goto('./?page=themes');
   await page.locator('.theme-tile', { hasText: '光通訊' }).click();
@@ -116,6 +118,7 @@ test('market tabs switch between the US and Taiwan themes and reset the view', a
 });
 
 test('Taiwan deep link opens a theme sheet whose constituents chart with .TW symbols', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockThemes(page);
   await page.goto('./?page=themes&market=tw&theme=cooling');
   const sheet = page.getByRole('dialog', { name: /散熱/ });
