@@ -13,6 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 import requests
+from breakout_alert.atlas_links import plain_ticker_links
 from playwright.sync_api import sync_playwright
 
 
@@ -1806,6 +1807,20 @@ if __name__ == "__main__":
             for item in captured_news
             if item.get("url")
         ]
+
+        # 熱門美股附上 Atlas 圖表連結（只加在 LINE 訊息）
+        trending_symbols = [
+            symbol.strip()
+            for symbol in (stocks_live or "").split(",")
+            if symbol.strip()
+        ]
+
+        if report_text and trending_symbols:
+            report_text = (
+                f"{report_text.rstrip()}\n\n"
+                "📈 Atlas 圖表\n"
+                f"{plain_ticker_links(trending_symbols)}"
+            )
 
         if report_text or image_urls:
             send_line_report(
