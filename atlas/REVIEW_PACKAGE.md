@@ -1570,3 +1570,7 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 - Fixed actual mobile viewport regression: 52px phone top bar, 64px bottom bar, 44px header actions. Preserves compact futures fifth-card viewport; `mexc.spec.ts:661` stays unchanged.
 - Spec-driven E2E updates: candle pixel RGB detection now matches `#FF5A5F` / `#2BC8A8`; phone watchlist heading expectation now matches the visible `自選` title. Handoff step 1 synchronized.
 - Claude locally verified targeted compact and nav cases; this push has not independently rerun CI or WebKit. `workspace-refinements.spec.ts:6` reported as a pre-existing main failure by reviewer, not altered.
+
+### Chart volume readouts (feat/chart-volume) — no independent review
+- 量比(同時間) chip + ^TWII live-bar volume rebuilt from same-source 5m bars only when earlier sessions match the daily unit (`IntradayVolume.ts`); otherwise 「今日量：盤中來源未提供」. No Edge change.
+- Verified: lint, build, related Vitest, `e2e-site/same-time-volume|live-quotes|market-calendar|research-modules` on mobile-chromium. WebKit not installable locally (download blocked); CI covers it.

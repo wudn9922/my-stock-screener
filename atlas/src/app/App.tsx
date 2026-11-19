@@ -79,7 +79,11 @@ import { PUBLIC_BASE, SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
 import { serializeRoute } from './routes';
 import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
-import { getMarketProfile } from '../market-data/MarketProfile';
+import { getMarketProfile, isIndexSymbol } from '../market-data/MarketProfile';
+import { sameTimeVolume } from '../market-data/SameTimeVolume';
+import { intradayIndexVolume, todayVolumeMissing, withIntradayIndexVolume } from '../market-data/IntradayVolume';
+import { useIntradayVolumeBars } from '../ui/useIntradayVolumeBars';
+import { SameTimeVolumeChip } from '../ui/SameTimeVolumeChip';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
 import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
@@ -597,6 +601,14 @@ export function App({
   const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
+  // Volume readouts: one cached 5m series per chart (see useIntradayVolumeBars).
+  const volumeBars = useIntradayVolumeBars(symbol, tf, providers[providerId], result,
+    state.ready && providerId === 'market' && isLiveSymbol(symbol) && !worldAssetFor(symbol));
+  const sameTime = useMemo(() => volumeBars ? sameTimeVolume(volumeBars, symbol) : null, [volumeBars, symbol]);
+  const indexVolume = useMemo(() => tf === '1D' && result && isIndexSymbol(symbol)
+    ? intradayIndexVolume(result.bars, volumeBars, symbol) : null, [tf, result, volumeBars, symbol]);
+  const indexVolumeRef = useRef(indexVolume);
+  indexVolumeRef.current = indexVolume;
   const liveChart = state.ready && providerId === 'market' && !!result
     && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
   useEffect(() => {
@@ -608,7 +620,7 @@ export function App({
         current = liveState.current.result;
       if (!live || !chart || !current) return;
       try {
-        next = usableBarResult(next, symbol, tf);
+        next = withIntradayIndexVolume(usableBarResult(next, symbol, tf), tf === '1D' ? indexVolumeRef.current : null, symbol);
       } catch {
         return;
       }
@@ -694,6 +706,15 @@ export function App({
       clearInterval(timer);
     };
   }, [liveChart, symbol, tf, providerId]);
+  // A verified intraday index volume reaches the loaded daily bar too (live updates patch it in apply).
+  useEffect(() => {
+    const current = liveState.current.result, chart = engine.current;
+    if (tf !== '1D' || !current || !chart || indexVolume?.status !== 'ok') return;
+    const next = withIntradayIndexVolume(current, indexVolume, symbol);
+    if (next === current || !chart.patchBars(next)) return;
+    liveState.current.result = next;
+    setResult(next);
+  }, [indexVolume, symbol, tf]);
   const headerQuote =
     quote && quote.symbol === symbol && quote.provider === providerId
       ? quote.quote
@@ -1646,6 +1667,11 @@ export function App({
                 )}
                 <div ref={headerRef} className="ohlc-header" data-testid="ohlc-header" />
                 <div className="indicator-chips" ref={legendRef}>
+                  {/* First, so the narrow mobile legend row shows it without scrolling. */}
+                  {(showLegacyVolume || activeIndicators.some((i) => i.type === 'Volume' && i.visible)) && (
+                    <SameTimeVolumeChip symbol={symbol} ratio={sameTime} indexVolume={indexVolume}
+                      indexVolumeMissing={todayVolumeMissing(result, symbol)} />
+                  )}
                   {chartIndicators.map((i) => {
                     const repeatedPeriod =
                       i.type !== 'Volume' &&

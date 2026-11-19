@@ -87,4 +87,18 @@ describe("same-session elapsed-time volume", () => {
       check([...old, ...current], { dataState: "simulated" }),
     ).toHaveProperty("status", "unavailable");
   });
+  it("covers indices with real intraday volume and hides those whose source has none", () => {
+    const at = t("2026-11-19T02:32:00Z");
+    const tw = (date: string, count: number, volume: number) => session(`${date}T01:00:00Z`, count, volume);
+    expect(sameTimeVolume(result([...tw("2026-11-18", 54, 100), ...tw("2026-11-19", 18, 150)], at), "^TWII", at))
+      .toMatchObject({ status: "ok", ratio: 1.5, cutoff: "10:30", stale: false });
+    // Zero intraday volume (Yahoo's ^TWII today) is not a 0.00x ratio.
+    expect(sameTimeVolume(result([...tw("2026-11-18", 54, 100), ...tw("2026-11-19", 18, 0)], at), "^TWII", at))
+      .toHaveProperty("status", "unavailable");
+    expect(sameTimeVolume(result([...tw("2026-11-18", 54, 0), ...tw("2026-11-19", 18, 0)], at), "^TWII", at))
+      .toHaveProperty("status", "unavailable");
+    const ny = t("2026-11-19T15:07:00Z");
+    expect(sameTimeVolume(result([...session("2026-11-18T14:30:00Z", 78, 100), ...session("2026-11-19T14:30:00Z", 7, 50)], ny), "^GSPC", ny))
+      .toMatchObject({ status: "ok", ratio: 0.5, cutoff: "10:05" });
+  });
 });
