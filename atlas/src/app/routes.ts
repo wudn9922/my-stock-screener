@@ -14,7 +14,7 @@ export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financ
 export type Page = (typeof PAGES)[number];
 
 /** Phone/tablet 我的 sub-views (`?page=console&view=status`); the desktop page keeps its tabs and ignores this. */
-export const CONSOLE_VIEWS = ['parameters', 'groups', 'app', 'status', 'backup', 'admin'] as const;
+export const CONSOLE_VIEWS = ['parameters', 'groups', 'notifications', 'app', 'status', 'backup', 'admin'] as const;
 export type ConsoleView = (typeof CONSOLE_VIEWS)[number];
 
 export type Route =

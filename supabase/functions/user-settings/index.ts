@@ -5,6 +5,7 @@ import { MexcError, handleMexc } from "./mexc.ts";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
+import { WebPushError, handlePushAction, handlePushNotify, type PushDeps } from "./webPush.ts";
 import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
 
 /**
@@ -27,6 +28,8 @@ import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, p
  *   admin.index.save { ticker, name, mas: number[] }      僅管理員
  *   device.session.create                                 以 LINE ID Token 記住這台裝置（回傳 deviceToken）
  *   device.session.revoke                                 以 deviceToken 登出這台裝置
+ *   push.subscribe / push.unsubscribe / push.status / push.test   手機通知（見 webPush.ts）
+ *   push.notify                                           僅限 Cloud Run 提醒服務（service-role key，不用 idToken）
  *
  * idToken 也可以是 deviceToken（atlasdev. 開頭）；儲存授權仍在每次請求重新檢查。
  */
@@ -251,6 +254,31 @@ Deno.serve(async (request: Request) => {
       return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
 
+    // Phone notifications: errors stay inside this branch with their own generic messages.
+    const pushResponse = (run: () => Promise<unknown>) => run().then(
+      (data) => ({ status: 200, body: { ok: true, data } }),
+      (error) => {
+        const known = error instanceof WebPushError || error instanceof StorageAccessError || error instanceof DeviceSessionError;
+        if (!known) console.error("Web push action failed", error instanceof Error ? error.name : "unknown");
+        return {
+          status: known ? error.status : 503,
+          body: { ok: false, error: known ? error.message : "手機通知暫時無法使用，請稍後再試。", code: error instanceof WebPushError ? error.code : error instanceof StorageAccessError ? error.code : "service" },
+        };
+      },
+    ).then((result) => new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } }));
+    const pushDeps = (db: PushDeps["db"]): PushDeps => ({ db, env: (name) => Deno.env.get(name), fetch: (input, init) => fetch(input, init) });
+
+    // The breakout_alert service authenticates with the service-role key it already holds; no LINE token.
+    if (action === "push.notify") {
+      return pushResponse(async () => {
+        const url = Deno.env.get("SUPABASE_URL"), secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!url || !secret) throw new WebPushError(503, "手機通知服務尚未就緒。");
+        const database = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+        const adminId = adminLineId(Deno.env.get("ADMIN_LINE_USER_ID"));
+        return handlePushNotify(request, body, pushDeps(database), (userId) => requireCloudStorage(database, userId, adminId));
+      });
+    }
+
     const idToken = String(
       body.idToken ?? "",
     ).trim();
@@ -314,6 +342,10 @@ Deno.serve(async (request: Request) => {
     // This gate also covers legacy clients and reads of former cloud data after revocation.
     // It is intentionally checked on every request, not cached at login.
     await requireCloudStorage(supabase, lineUserId, adminId);
+
+    if (action.startsWith("push.")) {
+      return pushResponse(() => handlePushAction(action, lineUserId, body, pushDeps(supabase)));
+    }
 
     if (action.startsWith('holdings.sinopac.')) {
       try {

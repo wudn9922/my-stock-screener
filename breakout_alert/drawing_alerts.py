@@ -848,6 +848,28 @@ def format_alert_block(
     )
 
 
+def push_alert(notifier, alert):
+    """Discord 成功後的手機通知（notifier 有啟用 Web Push 時）；失敗不影響畫線提醒。"""
+    push = getattr(notifier, "push_drawing_alert", None)
+    if not callable(push):
+        return
+    try:
+        push(
+            ticker=alert.plan.entry.ticker,
+            symbol=alert.plan.entry.symbol,
+            display_name=str(
+                getattr(alert.plan.quote, "display_name", "") or ""
+            ).strip(),
+            label=alert.line.label,
+            level=alert.line.level,
+            price=alert.plan.price,
+            direction=alert.direction,
+            timeframe=alert.line.timeframe
+        )
+    except Exception as exc:
+        print(f"⚠️ 畫線手機通知失敗：{type(exc).__name__}")
+
+
 def pack_alert_messages(blocks):
     """
     回傳 [(訊息內容, [區塊索引...])]。
@@ -1408,6 +1430,7 @@ class DrawingAlertEngine:
                         f"{alert.line.level:,.2f}"
                         f"｜{alert.direction}"
                     )
+                    push_alert(self.notifier, alert)
 
             except Exception as exc:
                 summary["alert_failed"] = (

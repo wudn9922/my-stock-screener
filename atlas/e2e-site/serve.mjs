@@ -16,6 +16,8 @@ execFileSync(process.execPath, [resolve(root, 'node_modules/vite/bin/vite.js'), 
     VITE_STATIC_HOSTING: '1',
     VITE_PUBLIC_BASE: base,
     VITE_MARKET_PROXY_URL: 'https://edge.test/functions/v1/market-chart',
+    // Public test key (RFC 8291 example); enables the 手機通知 panel in site tests.
+    VITE_WEB_PUSH_PUBLIC_KEY: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8',
   },
 });
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ttf': 'font/ttf', '.webmanifest': 'application/manifest+json' };

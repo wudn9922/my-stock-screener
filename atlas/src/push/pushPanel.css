@@ -1,0 +1,94 @@
+/* 手機通知 builds on the install card (.pwa-install) look. */
+.push-panel .push-state { color: var(--text-2); }
+.push-panel .push-error { margin: 7px 0 0; color: var(--warn); }
+.push-help {
+  margin: 9px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.push-help p { margin: 0 0 4px; }
+.push-help b { color: var(--text); }
+.push-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  margin: 9px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: pointer;
+}
+.push-toggle > span { display: grid; gap: 2px; min-width: 0; }
+.push-toggle b { color: var(--text); font-size: 14px; font-weight: 600; }
+.push-toggle small, .push-devices small { color: var(--text-3); font-size: 12px; line-height: 1.5; }
+/* A 52×32 switch drawn on the native checkbox, so keyboard/screen-reader behaviour stays native. */
+.push-toggle input {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border-radius: 16px;
+  background: var(--surface-3);
+  transition: background 0.15s var(--ease);
+  cursor: pointer;
+}
+.push-toggle input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s var(--ease);
+}
+.push-toggle input:checked { background: var(--accent); }
+.push-toggle input:checked::after { transform: translateX(20px); background: var(--bg); }
+.push-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.push-toggle input:disabled { opacity: 0.6; }
+.push-test:disabled { opacity: 0.55; cursor: not-allowed; }
+.push-devices { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.push-devices h4 { margin: 0 0 6px; color: var(--text); font-size: 13px; font-weight: 600; }
+.push-devices ul { margin: 0; padding: 0; list-style: none; }
+.push-devices li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 0;
+}
+.push-devices li + li { border-top: 1px solid var(--border); }
+.push-devices li > span { display: grid; min-width: 0; }
+.push-devices li b { color: var(--text); font-size: 13px; font-weight: 500; }
+.push-devices em {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  font-size: 11px;
+  font-style: normal;
+}
+.push-remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text-2);
+  background: transparent;
+}
+.push-remove:hover { color: var(--text); border-color: var(--text-3); }

@@ -20,6 +20,21 @@ before URL routing.
 Fresh external launches require an explicit login tap to restore the SDK
 session and reverify access. See [self-use runbook](../PWA_SELF_USE.md).
 
+## Phone notifications through standard Web Push (2026-11-19)
+
+Alerts also reach phones through the browsers' own push services (VAPID, RFC 8030/8291/8292):
+no Firebase project, app or paid account. Users opt in per device under 我的 → 手機通知; only
+then is a separate push-only worker registered at `<base>push/`. It has no fetch handler and no
+CacheStorage, controls no Atlas page, and is kept by the screener worker retirement, so the
+memory-only/no-background-cache policy above is unchanged. A tap focuses an open Atlas window
+(the page routes itself) or opens the alert's chart URL; only Atlas-scope URLs are accepted.
+iOS/iPadOS needs the Home Screen app (16.4+), so Safari tabs get install steps instead of a toggle.
+Subscriptions are server-only rows behind the existing LINE identity and cloud grant
+(`atlas_private.web_push_subscriptions`); the user-settings function encrypts and signs with
+WebCrypto and the VAPID private key exists only as a Supabase secret. breakout_alert sends
+`push.notify` with its service-role key after a successful Discord alert; Discord is unchanged.
+Real-device delivery (APNs/FCM) is an owner acceptance item.
+
 Retain the React/Vite Web product as the only implementation. The existing production service worker precaches a versioned shell, supports failed-network navigation, and excludes API responses. IndexedDB restores local analysis offline, and deterministic Demo mode requires no network. Yahoo cache fallback is explicitly stale; absent cached data is unavailable, never fabricated. Installability uses the manifest, original icons, HTTPS/localhost and safe-area CSS.
 
 A Capacitor wrapper configuration and runbook under apps/native will point at the same built dist assets after Web/browser regression passes. No Flutter/React Native or second chart implementation. Linux Cloud cannot sign/build iOS, so Xcode, signing and physical WebView/PWA UAT are external device work. Android SDK/Gradle setup must not block Web V1. Native remote SEC/Yahoo requires a deployed free-compatible backend/reverse proxy; no secrets go into the frontend bundle.
