@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from './mocks';
 import { readFileSync } from 'node:fs';
 import { openStockMenu } from '../e2e/site-helpers';
@@ -26,6 +27,9 @@ async function separate(elements: Locator[]) {
     expect(Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))).toBe(0);
   }
 }
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
+
 for (const inline of [false, true]) test(`A3 direct extended price, in-flow details and 88px phone rows (newer batch=${inline})`, async ({ page }, info) => {
   await setup(page, inline);
   let staticRequests = 0;

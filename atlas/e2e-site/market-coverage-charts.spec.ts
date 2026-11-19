@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { buildReport, dailyBars, mockSite } from './mocks';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { formatMarketVolume } from '../src/ui/format';
 
 test('screener chart review follows filters and search, returns to the same rows and scrolls all sixty charts', async ({ page }, info) => {
@@ -49,6 +49,7 @@ test('screener chart review follows filters and search, returns to the same rows
 });
 
 test('published whole-market RS leads comparison and stays independent of comparison controls', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page, { universe: { fields: ['symbol', 'rsRank', 'asOf'], markets: {
     TW: { scope: 'full', benchmark: '^TWII', asOf: '2026-10-29', rows: [['2330.TW', 87, '2026-10-29']] },
   } } });
@@ -70,6 +71,7 @@ test('published whole-market RS leads comparison and stays independent of compar
 });
 
 test('unavailable whole-market RS is explicit while the original comparison still works', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/report/universe.json', route => route.fulfill({ status: 404 }));
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
@@ -82,6 +84,7 @@ test('unavailable whole-market RS is explicit while the original comparison stil
 });
 
 test('US and TW theme candles show actual daily and aggregated weekly volume in market units', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   for (const market of ['us', 'tw']) {
     const suffix = market === 'tw' ? '-tw' : '';

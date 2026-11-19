@@ -3,7 +3,7 @@ import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { isCompactConsole, openConsoleSection } from './console-nav';
-import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
+import { accessEnvelope, installLineAccount, OWNER_USER_ID, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import type { SavedWatchlist } from '../src/watchlists/model';
 
@@ -123,6 +123,7 @@ test('five destinations, 320/390px targets, top search, slash shortcut, gear and
 });
 
 test('market section inventory and remembered selectors, screener filters, chart/financial round trip', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   test.setTimeout(180000);
   await fixtures(page);
   await page.goto('./');

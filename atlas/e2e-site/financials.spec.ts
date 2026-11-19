@@ -1,4 +1,4 @@
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -220,6 +220,7 @@ test('US quarterly-only files remain available when annual figures are absent', 
 });
 
 test('US annual EPS marked as quarter-summed is hidden from statements and P/E', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockFinancials(page, {}, { AAPL: annualEpsSummed });
   await page.goto('./?page=financials&symbol=AAPL&p=a');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
@@ -390,6 +391,7 @@ test('Taiwan financials retain the quarterly controls and do not show a Futu lin
 const stockTabs = (page: Page) => page.getByRole('navigation', { name: '個股頁面' });
 
 test('K線｜財務 keeps the symbol, timeframe and quarterly selection', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockFinancials(page);
@@ -604,6 +606,7 @@ test('ADR page retains period controls and links to Futu and the Taiwan home lis
 });
 
 test('foreign file with EPS on the ADR basis: the basis note replaces the per-ordinary-share remark', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await mockFinancials(page, {}, { TSM: readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/adr-rescaled.json'), 'utf8') });

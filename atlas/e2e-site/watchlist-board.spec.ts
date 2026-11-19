@@ -1,7 +1,7 @@
 import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
+import { accessEnvelope, installLineAccount, OWNER_USER_ID, mockMarketLogin } from './account-fixture';
 
 const board = (page: Page) => page.getByRole('region', { name: '自選行情' });
 const rows = (page: Page) => board(page).getByRole('list', { name: '自選行情列表' }).getByRole('link');
@@ -26,6 +26,7 @@ async function cloudOwner(page: Page) {
 }
 
 test('without lists the board opens on LINE 熱門 with quotes, and explains the empty sources', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   const requested = await mockSite(page);
   await trending(page, ['NVDA', 'AAPL']);
   await page.goto('./?page=watchlist');

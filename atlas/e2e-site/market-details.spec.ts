@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from "./mocks";
 import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 const at = Date.parse("2026-11-03T16:02:00Z") / 1000;
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 test("ANT and Claude find the IPO record, open details and never open a fictitious stock chart", async ({
   page,

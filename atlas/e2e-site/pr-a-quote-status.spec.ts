@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from './mocks';
 import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 for (const phase of ['open', 'closed'] as const) test(`A2 ${phase}: header, source and board show the same regular-session status`, async ({ page }, info) => {
   const now = phase === 'open' ? '2026-11-04T16:00:00Z' : '2026-11-04T22:00:00Z';
