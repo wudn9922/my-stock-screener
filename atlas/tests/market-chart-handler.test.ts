@@ -17,7 +17,7 @@ const DEVICE = 'U33333333333333333333333333333333';
 /** Fake LINE ID tokens accepted by the fake LINE verify endpoint. */
 const LINE_TOKENS: Record<string, string> = { 'line-token-user-0001': USER, 'line-token-cloud-001': CLOUD, 'line-token-admin-001': ADMIN };
 const DEVICE_TOKEN = 'atlasdev.' + 'd'.repeat(43);
-type QuotaLimits = { user: { window: number; daily: number }; cloud: { window: number; daily: number }; siteDaily: number };
+type QuotaLimits = access.QuotaLimits;
 
 /**
  * In-memory stand-in for public.atlas_market_chart_quota with the same semantics as the SQL: count the

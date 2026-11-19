@@ -3,15 +3,21 @@
 // public.atlas_market_chart_quota RPC (supabase/manual/atlas_market_chart_quota.sql).
 import type { StorageMode } from '../_shared/storageAccess.ts';
 
+export interface QuotaLimits {
+  user: { window: number; daily: number };
+  cloud: { window: number; daily: number };
+  siteDaily: number;
+}
+
 // ─── Usage limits: edit only this block, then redeploy market-chart (the SQL takes them as arguments). ───
-export const QUOTA_LIMITS = {
+export const QUOTA_LIMITS: Readonly<QuotaLimits> = {
   /** Signed-in users whose storage_mode is none or device: requests per fixed 10-minute window / per day. */
   user: { window: 200, daily: 3_000 },
   /** Cloud-authorised users (storage_mode cloud). */
   cloud: { window: 600, daily: 15_000 },
   /** Site-wide requests per day; above it only cloud users and the admin are served. */
   siteDaily: 50_000,
-} as const;
+};
 // The admin (adminLineId()) is never counted or refused. "Day" is the Asia/Taipei calendar day and the
 // window is a fixed 10-minute bucket; both are computed by the SQL function.
 // ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -43,7 +49,7 @@ export interface GateDependencies {
   consumeQuota(request: QuotaRequest): Promise<QuotaDecision>;
   adminId: string;
   now?: () => number;
-  limits?: typeof QUOTA_LIMITS;
+  limits?: QuotaLimits;
   warn?: (message: string) => void;
 }
 export interface GateFailure {
