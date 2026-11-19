@@ -3,6 +3,7 @@ import time
 
 import requests
 
+from breakout_alert.atlas_links import append_atlas_link
 from breakout_alert.breakout_engine import (
     BREAKOUT_DOWN_RATIO,
     BREAKOUT_UP_RATIO,
@@ -213,7 +214,11 @@ class DiscordNotifier:
         )
 
         payload = {
-            "content": content[:1950],
+            "content": append_atlas_link(
+                content,
+                ticker,
+                1950
+            ),
             "allowed_mentions": {
                 "parse": []
             }
