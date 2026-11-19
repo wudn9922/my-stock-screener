@@ -153,7 +153,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     # Keep the complete existing browser sweep plus the new feature regressions.
-    timeout-minutes: 45
+    # 近期成功執行已達 40–42 分鐘，留餘裕避免新增測試後被逾時取消
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Restore generated inputs for PR readers after cutover
