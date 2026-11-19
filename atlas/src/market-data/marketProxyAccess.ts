@@ -183,8 +183,9 @@ export class MarketProxyAccess {
   }
 
   /**
-   * The only way to call market-chart: adds `X-Atlas-Token`, and turns 401/429 into the shared
-   * signed-out / quota state (thrown as MarketLoginRequiredError / MarketQuotaError).
+   * The only way to call market-chart: adds `X-Atlas-Token`, and turns 401 / 429 / 503 (AUTH_ or
+   * QUOTA_UNAVAILABLE) into the shared signed-out / paused state (MarketLoginRequiredError /
+   * MarketQuotaError). Any other response, older error shapes included, is returned to the caller.
    */
   async fetch(fetcher: typeof fetch, url: string, init: RequestInit = {}): Promise<Response> {
     const token = this.source.settled() ? this.authorizeNow() : await this.authorize();

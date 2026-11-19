@@ -4,9 +4,6 @@ import { mockSite, yahooChart } from "./mocks";
 import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 const at = Date.parse("2026-11-03T16:02:00Z") / 1000;
 
-// market-chart needs a LINE login; these tests are about the market data it returns.
-test.beforeEach(({ page }) => mockMarketLogin(page));
-
 test("ANT and Claude find the IPO record, open details and never open a fictitious stock chart", async ({
   page,
 }) => {
@@ -39,6 +36,7 @@ test("ANT and Claude find the IPO record, open details and never open a fictitio
 test("stock volume view compares completed 5m sessions, while extended quotes keep regular close separate", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.addInitScript((now) => {
     Date.now = () => now;
@@ -120,6 +118,7 @@ test("stock volume view compares completed 5m sessions, while extended quotes ke
 test("missing extended coverage and missing intraday history explain the cause", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route("https://edge.test/functions/v1/market-chart**", (route) =>
     new URL(route.request().url()).searchParams.get("interval") === "5m"
