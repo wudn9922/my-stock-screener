@@ -23,10 +23,10 @@ class AtlasLinkTest(unittest.TestCase):
     def test_append_keeps_link_when_truncating(self):
         text = al.append_atlas_link("x" * 3000, "2330.TW", 1950)
         self.assertLessEqual(len(text), 1950)
-        self.assertTrue(text.endswith(f"[開啟 Atlas 圖表]({BASE}2330.TW)"))
+        self.assertTrue(text.endswith(f"[開啟 Atlas 圖表](<{BASE}2330.TW>)"))
 
     def test_ticker_links_truncate(self):
-        self.assertEqual(al.ticker_links(["2330", "^TWII"]), f"[2330]({BASE}2330) [^TWII]({BASE}%5ETWII)")
+        self.assertEqual(al.ticker_links(["2330", "^TWII"]), f"[2330](<{BASE}2330>) [^TWII](<{BASE}%5ETWII>)")
         out = al.ticker_links([f"S{i}" for i in range(100)], limit=300)
         self.assertLessEqual(len(out), 300)
         self.assertIn("等另", out)
@@ -56,7 +56,7 @@ class NotifierMessageTest(unittest.TestCase):
             direction="breakout_up",
         )
         self.assertIn("🚨 2330.TW 台積電｜g", sent["content"])
-        self.assertTrue(sent["content"].endswith(f"[開啟 Atlas 圖表]({BASE}2330.TW)"))
+        self.assertTrue(sent["content"].endswith(f"[開啟 Atlas 圖表](<{BASE}2330.TW>)"))
 
 
 if __name__ == "__main__":

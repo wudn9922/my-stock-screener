@@ -19,7 +19,8 @@ def atlas_chart_url(symbol, timeframe="1D"):
 def atlas_markdown_link(symbol, label=ATLAS_LINK_LABEL, timeframe="1D"):
     """Discord markdown 連結；沒有代號時回傳空字串。"""
     url = atlas_chart_url(symbol, timeframe)
-    return f"[{label}]({url})" if url else ""
+    # <url> 讓 Discord 不額外產生網頁預覽卡片，訊息維持精簡
+    return f"[{label}](<{url}>)" if url else ""
 
 
 def append_atlas_link(text, symbol, limit):
@@ -38,7 +39,7 @@ def ticker_links(symbols, limit=1900):
     parts = []
     used = 0
     for index, symbol in enumerate(symbols):
-        part = f"[{symbol}]({atlas_chart_url(symbol)})"
+        part = f"[{symbol}](<{atlas_chart_url(symbol)}>)"
         remaining = len(symbols) - index - 1
         tail = len(f" …等另 {remaining} 檔") if remaining else 0
         if used + len(part) + 1 + tail > limit:
