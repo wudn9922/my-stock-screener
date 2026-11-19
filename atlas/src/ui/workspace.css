@@ -237,6 +237,18 @@
   font-size: 12px;
   white-space: nowrap;
 }
+.volume-readout-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  color: #939fb7;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.volume-readout-chip.muted .indicator-name {
+  color: #939fb7;
+}
 .indicator-name {
   color: #adb6c9;
 }
@@ -2512,7 +2524,7 @@
     font: 400 11px/24px var(--font-num);
   }
   .chart-overlay .indicator-chips { flex: 0 1 auto; max-width: 55%; height: 24px; gap: 8px; }
-  .chart-overlay :is(.indicator-chip, .legacy-volume-chip) { font: 400 11px var(--font-num); }
+  .chart-overlay :is(.indicator-chip, .legacy-volume-chip, .volume-readout-chip) { font: 400 11px var(--font-num); }
   .chart-overlay .manage-indicators { display: none; }
 
   /* Toolbar docked under the plot: timeframes, then 指標 and 繪圖. Full screen and 更多面板 are in the ⋯ menu
