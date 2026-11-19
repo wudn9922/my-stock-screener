@@ -14,7 +14,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote as url_quote
+from breakout_alert.atlas_links import atlas_chart_url
 
 
 # 總開關：改成 False 即停用畫線警示（均線提醒不受影響）
@@ -62,11 +62,6 @@ FALLBACK_KIND = "atlas_lines_state"
 # 避免畫線全部隱藏後又顯示時沿用很久以前的狀態。
 FALLBACK_MAX_AGE_DAYS = 3
 UPSERT_CHUNK_SIZE = 100
-
-CHART_LIFF_URL = (
-    "https://liff.line.me/"
-    "2010330411-6JhrotT9"
-)
 
 VALID_TIMEFRAMES = (
     "5m", "15m", "30m", "1H", "4H", "1D", "1W", "1M"
@@ -802,11 +797,8 @@ def format_neighbour(level, price):
 
 
 def build_chart_url(symbol, timeframe):
-    return (
-        f"{CHART_LIFF_URL}?page=chart"
-        f"&symbol={url_quote(symbol, safe='.-')}"
-        f"&tf={url_quote(timeframe, safe='')}"
-    )
+    # 直接開 Atlas 網頁圖表；<> 讓 Discord 不產生網頁預覽卡片
+    return f"<{atlas_chart_url(symbol, timeframe)}>"
 
 
 def format_alert_block(
