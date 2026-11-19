@@ -87,10 +87,17 @@ class CancellationDecisionTest(unittest.TestCase):
         self.assertTrue(delivered)
         self.assertEqual(len(posts), 1)
 
-    def test_different_workflow_branch_or_equal_creation_never_suppresses(self):
+    def test_different_workflow_branch_or_earlier_run_never_suppresses(self):
         for update in (dict(workflow_id=2), dict(head_branch='other'),
-                       dict(created_at=RUN['created_at']), dict(created_at='2026-11-06T00:59:59Z')):
+                       dict(created_at=RUN['created_at'], id=RUN['id'] - 1), dict(created_at='2026-11-06T00:59:59Z')):
             self.assertTrue(decide(RUN, [], [dict(NEXT, **update)])['notify'])
+
+    def test_same_second_run_with_a_larger_id_is_the_successor(self):
+        # Deploy assembled Pages runs 742/743 were queued in the same second; 743 cancelled 742 and deployed.
+        same_second = dict(NEXT, created_at=RUN['created_at'])
+        self.assertEqual(decide(RUN, [], [same_second]),
+                         dict(notify=False, reason='superseded', supersededBy=NEXT['id']))
+        self.assertTrue(decide(RUN, [], [dict(same_second, id=RUN['id'])])['notify'])
 
     def test_cross_event_successor_suppresses_without_event_query_filter(self):
         for event in ('push', 'workflow_run'):
