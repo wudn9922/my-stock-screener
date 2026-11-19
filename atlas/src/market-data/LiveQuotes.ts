@@ -5,13 +5,15 @@ import { normalizeYahooResponse, YAHOO_SOURCE } from './YahooNormalizer';
 import { defaultMarketProxyUrl, EDGE_YAHOO_SOURCE } from './EdgeYahooProvider';
 import { worldAssetFor } from './worldAssets';
 import { calendarSessionOpen, marketCalendar, type MarketCalendarStore } from './MarketCalendar';
+import { isMarketLoginRequired, isMarketQuotaError, marketProxyAccess, type MarketProxyAccess } from './marketProxyAccess';
 
 /**
  * Live refresh of the stocks on screen: one batched `market-chart?quotes=` request returns the last
  * month of daily rows for up to MAX_BATCH symbols. Symbols are fetched as soon as something
  * subscribes (opening a page always shows a fresh price), then once a minute while their market is
  * in session and the page is visible. Rate limiting or a failed request doubles the interval up to
- * five minutes; a success restores it.
+ * five minutes; a success restores it. Nothing is requested while signed out or while a 429 from the
+ * function is in force (marketProxyAccess); signing in or the quota reopening starts it again.
  */
 export interface LiveDaily {
   symbol: string;
@@ -135,6 +137,8 @@ export interface LiveQuoteFeedOptions {
   visible?: () => boolean;
   inSession?: (symbol: string, nowMs: number) => boolean;
   calendar?: MarketCalendarStore;
+  /** Login/quota gate; default the site-wide `marketProxyAccess`. */
+  access?: MarketProxyAccess;
 }
 
 export class LiveQuoteFeed {
@@ -152,6 +156,8 @@ export class LiveQuoteFeed {
   private kickTimer: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> | null = null;
   private onVisibility: (() => void) | null = null;
+  private stopAccess: (() => void) | null = null;
+  private readonly access: MarketProxyAccess;
   private readonly updateListeners = new Set<(atMs: number) => void>();
   /** Milliseconds of the last batch that came back (0 before the first). */
   lastUpdatedAt = 0;
@@ -162,6 +168,7 @@ export class LiveQuoteFeed {
     this.now = options.now ?? Date.now;
     this.visible = options.visible ?? (() => typeof document === 'undefined' || !document.hidden);
     this.calendar = options.calendar ?? marketCalendar;
+    this.access = options.access ?? marketProxyAccess;
     this.loadCalendar = !options.inSession;
     this.inSession = options.inSession ?? ((symbol, nowMs) => calendarSessionOpen(this.calendar, getMarketProfile(symbol), nowMs)
       ?? inRegularSession(getMarketProfile(symbol), nowMs));
@@ -227,6 +234,8 @@ export class LiveQuoteFeed {
 
   /** Explicit retry uses the existing batched feed, without adding a polling loop. */
   async refresh(symbol: string): Promise<LiveDaily> {
+    // Signed out or over quota: say so, without a request.
+    if (this.proxyUrl && isLiveSymbol(symbol)) await this.access.authorize();
     let latest: LiveDaily | undefined;
     const stop = this.subscribe(symbol, value => { latest = value; });
     const entry = this.entries.get(normalizeSymbol(symbol));
@@ -251,6 +260,8 @@ export class LiveQuoteFeed {
   }
 
   private start() {
+    // Signing in (or a quota window reopening) fetches the symbols that are still waiting.
+    this.stopAccess ??= this.access.subscribe(() => { if (this.access.canRequest()) this.kick(); });
     if (this.timer) return;
     this.schedule();
     if (typeof document !== 'undefined' && !this.onVisibility) {
@@ -265,6 +276,8 @@ export class LiveQuoteFeed {
     if (this.timer) clearTimeout(this.timer);
     if (this.kickTimer) clearTimeout(this.kickTimer);
     this.timer = this.kickTimer = null;
+    this.stopAccess?.();
+    this.stopAccess = null;
     if (this.onVisibility) document.removeEventListener('visibilitychange', this.onVisibility);
     this.onVisibility = null;
   }
@@ -288,6 +301,8 @@ export class LiveQuoteFeed {
 
   private async run(periodic: boolean) {
     if (!this.visible()) return;
+    // Signed out or over quota: nothing is due and nothing is marked as fetched.
+    try { await this.access.authorize(); } catch { return; }
     if (this.loadCalendar) await this.calendar.ensure(this.now());
     if (!this.visible()) return;
     const now = this.now();
@@ -309,7 +324,7 @@ export class LiveQuoteFeed {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(new DOMException('Quote batch timed out', 'TimeoutError')), this.timeoutMs);
       try {
-        const response = await this.fetcher(quotesUrl(this.proxyUrl, batch), { headers: { Accept: 'application/json' }, signal: controller.signal });
+        const response = await this.access.fetch(this.fetcher, quotesUrl(this.proxyUrl, batch), { headers: { Accept: 'application/json' }, signal: controller.signal });
         if (!response.ok) throw new Error(`quotes ${response.status}`);
         const body = (await response.json()) as { results?: Record<string, unknown>; errors?: Record<string, string> };
         if (Object.values(body.errors ?? {}).includes('rate_limited')) failed = true;
@@ -329,12 +344,14 @@ export class LiveQuoteFeed {
           for (const listener of entry.listeners.keys()) listener(value);
         }
         for (const listener of [...this.updateListeners]) listener(this.lastUpdatedAt);
-      } catch {
+      } catch (error) {
         // Retried on the next tick even outside the session (an unanswered first fetch counts as none).
+        // A 401/429 closes the gate instead: nothing is retried until it reopens.
+        const signedOut = isMarketLoginRequired(error);
         for (const symbol of batch) {
           const entry = this.entries.get(symbol);
-          for (const options of entry?.listeners.values() ?? []) options.onError?.();
-          if (entry && !entry.last) entry.fetchedAt = 0;
+          if (!signedOut) for (const options of entry?.listeners.values() ?? []) options.onError?.();
+          if (entry && (!entry.last || signedOut || isMarketQuotaError(error))) entry.fetchedAt = 0;
         }
         failed = true;
         break;

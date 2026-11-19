@@ -18,8 +18,9 @@ function applyRemember(identity: LineIdentity | null, remember: boolean) {
 /**
  * `full` (我的 page): status, login/logout and the remember-device choice. `gate`: the installed app's
  * login page. `alerts` (every other page): only an in-progress login, handoff approval or error.
+ * `prompt` (charts and quotes that need a login): just the same LINE login button and its flows.
  */
-export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' | 'alerts' }) {
+export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' | 'alerts' | 'prompt' }) {
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const compact = useCompactLayout();
   useSyncExternalStore(subscribeDeviceSession, deviceSessionVersion);
@@ -160,6 +161,13 @@ export function StorageNotice({ variant = 'full' }: { variant?: 'full' | 'gate' 
     return <div className="source-note storage-policy-note">
       {message && <p role="status">{message}</p>}
       {flows}
+    </div>;
+  }
+  if (variant === 'prompt') {
+    return <div className="market-login-actions">
+      {message && <p role="status">{message}</p>}
+      {flows}
+      <button type="button" className="primary-button" disabled={busy} onClick={() => void login()}>{busy ? '正在開啟 LINE 登入…' : '使用 LINE 登入'}</button>
     </div>;
   }
   const rememberChoice = <label className="remember-device">
