@@ -1,4 +1,7 @@
-/** Retire only this screener's old shell cache; blocked browser storage must not prevent RAM use. */
+/**
+ * Retire only this screener's old shell cache; blocked browser storage must not prevent RAM use.
+ * The opt-in push-only worker lives at `<scope>push/` (no fetch handler, no caches) and is kept.
+ */
 export async function retireScreenerWorker(scope: string) {
   if ('serviceWorker' in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);

@@ -7,6 +7,7 @@ import './me.css';
 export const CONSOLE_VIEW_TITLES: Record<ConsoleView, string> = {
   parameters: '個股均線參數',
   groups: '自訂分組',
+  notifications: '手機通知',
   app: '安裝到主畫面',
   status: '資料狀態',
   backup: '備份與還原',

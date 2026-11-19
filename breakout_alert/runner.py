@@ -21,6 +21,7 @@ from breakout_alert.supabase_store import (
     SupabaseStore,
 )
 from breakout_alert.account_permissions import CloudStorageDenied
+from breakout_alert.web_push import with_web_push
 
 
 def print_market_decision(decision):
@@ -376,7 +377,8 @@ def main():
     market_data_provider = (
         MarketDataProvider()
     )
-    notifier = DiscordNotifier()
+    # 手機通知（Web Push）與 Discord 並行；未設定時即為原本的 DiscordNotifier
+    notifier = with_web_push(DiscordNotifier(), getattr(store, "user_id", None))
 
     try:
         try:

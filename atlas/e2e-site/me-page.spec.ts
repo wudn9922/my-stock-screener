@@ -23,7 +23,8 @@ test('我的 on phones and tablets: account card, three groups of 52px rows, no 
     return color;
   }));
   expect((await card.getByRole('checkbox').boundingBox())!.width).toBe(20);
-  for (const row of await page.locator('a.me-row').all()) expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(52);
+  // Rounded: a row below a fractional offset measures 51.99997px from float layout coordinates.
+  for (const row of await page.locator('a.me-row').all()) expect(Math.round((await row.boundingBox())!.height)).toBeGreaterThanOrEqual(52);
   expect((await page.locator('.me-row-color').boundingBox())!.height).toBe(56);
   for (const button of await page.locator('.me-seg button').all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(40);
   await expect(page.getByRole('group', { name: '漲跌顏色' }).getByRole('button', { name: /紅漲/ })).toHaveAttribute('aria-pressed', 'true');

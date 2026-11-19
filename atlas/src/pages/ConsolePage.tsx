@@ -1,6 +1,8 @@
 import { DataFacts, DisplaySettings } from '../ui/DisplaySettings';
 import { rememberConsoleListScroll } from '../app/consoleListScroll';
 import { InstallPanel } from '../pwa/InstallPanel';
+import { PushPanel } from '../push/PushPanel';
+import { webPushEnabled } from '../push/pushConfig';
 import { AppUpdate } from '../pwa/AppUpdate';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageModeNotice } from '../ui/StorageAdminPanel';
@@ -359,6 +361,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           return <ParameterConsole part="stocks" />;
         case 'groups':
           return <ParameterConsole part="groups" />;
+        case 'notifications':
+          return <div className="console-card me-app"><PushPanel /></div>;
         case 'app':
           return <div className="console-card me-app"><InstallPanel /><AppUpdate /></div>;
         case 'status':
@@ -406,6 +410,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               <MeRow label="個股均線參數" route={{ page: 'console', view: 'parameters' }} navigate={go}
                 value={<><span className="num">{Object.keys(fixedParameters).length}</span> 檔</>} />
               <MeRow label="自訂分組" route={{ page: 'console', view: 'groups' }} navigate={go} />
+              {webPushEnabled() && <MeRow label="手機通知" route={{ page: 'console', view: 'notifications' }} navigate={go} />}
             </MeGroup>
             <MeGroup label="顯示">
               <MeColorRow />
@@ -477,7 +482,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       {section === 'lists' && listsView === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
         <section className="console-card" aria-label="顯示與App"><DisplaySettings
           reportDate={report.status === 'ok' ? report.report.reportDate : null}
-          generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>
+          generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /><PushPanel /></section>
       ) : tab === 'admin'  && access.isAdmin ? (
         <StorageAdminPanel />
       ) : tab === 'parameters' ? (
