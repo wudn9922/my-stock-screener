@@ -90,3 +90,10 @@
 .list-card-members .text-button { min-height: 40px; padding: 0 6px; }
 .list-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .list-card-actions .list-card-rename { flex: 1 1 200px; }
+.list-notify { display: grid; gap: 6px; }
+.list-notify h3 { margin: 0; font-size: 15px; }
+.list-notify p { margin: 0; line-height: 1.5; }
+.list-notify-all, .list-card-notify label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.list-notify-all input, .list-card-notify input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.list-card-notify { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 4px 0 0; border: 0; border-top: 1px solid var(--border); }
+.list-card-notify legend { padding: 0; color: var(--text-2); font-size: 12px; }

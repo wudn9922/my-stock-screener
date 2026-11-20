@@ -271,6 +271,8 @@ class SupabaseStore:
     # 失敗時不能把大盤指數的狀態列當成孤兒清掉。
     index_configs_loaded = False
     watchlists_loaded = False
+    user_stocks = ()
+    watchlist_rows = ()
 
     def __init__(self):
         self.rest_url = (
@@ -649,13 +651,37 @@ class SupabaseStore:
 
         return configs
 
-    def get_watchlist_monitor_configs(self, fixed_parameters=None):
+    def get_list_notification_settings(self):
+        """Per-list 均線／畫線 notification choices; missing or unreadable means "all lists".
+
+        A revoked cloud grant still raises CloudStorageDenied from _request.
+        """
+        from breakout_alert.list_notifications import DEFAULT_SETTINGS, parse_settings
+        try:
+            rows = self._request("GET", "atlas_alert_settings", params={
+                "select": "settings,line_user_id",
+                "line_user_id": f"eq.{self.user_id}",
+                "limit": "1",
+            })
+        except SupabaseRequestError as exc:
+            # Not deployed yet (PostgREST 404) or a transient error: keep today's alerts.
+            print(f"ℹ️ 清單通知設定無法讀取，沿用「所有清單都通知」：HTTP {exc.status_code}")
+            return DEFAULT_SETTINGS
+        if not isinstance(rows, list) or not rows or not isinstance(rows[0], dict) or rows[0].get("line_user_id") != self.user_id:
+            return DEFAULT_SETTINGS
+        return parse_settings(rows[0].get("settings"))
+
+    def get_watchlist_monitor_configs(self, fixed_parameters=None, enabled_ids=None):
         """Opt-in Atlas lists reuse the existing MA breakout engine/notifier.
 
         Only the configured user's synced lists are read. Malformed or stale
         snapshots never authorize deleting a previous alert baseline.
+        `enabled_ids`: lists whose MA notification is turned on in the per-list
+        settings (custom mode), monitored even when their own switch is off.
         """
         self.watchlists_loaded = False
+        self.watchlist_rows = []
+        enabled_ids = enabled_ids or set()
         if os.environ.get("ATLAS_WATCHLIST_SYNC_ENABLED") != "1":
             return []
         try:
@@ -665,6 +691,7 @@ class SupabaseStore:
             })
             if not isinstance(rows, list):
                 raise ValueError("watchlists response must be a list")
+            self.watchlist_rows = [row for row in rows if isinstance(row, dict) and row.get("line_user_id") == self.user_id]
             configs = []
             complete = True
             for row in rows:
@@ -675,12 +702,14 @@ class SupabaseStore:
                 if not isinstance(definition, dict):
                     complete = False
                     continue
-                if definition.get("monitorBreakouts") is False:
+                list_id = str(row.get("id") or "")
+                if list_id.lower() in enabled_ids:
+                    pass
+                elif definition.get("monitorBreakouts") is False:
                     continue
-                if definition.get("monitorBreakouts") is not True:
+                elif definition.get("monitorBreakouts") is not True:
                     complete = False
                     continue
-                list_id = str(row.get("id") or "")
                 market = definition.get("market")
                 periods = definition.get("maList")
                 if (not re.fullmatch(r"[0-9a-fA-F-]{36}", list_id)
@@ -745,9 +774,11 @@ class SupabaseStore:
             print(f"⚠️ Atlas 清單設定未就緒，本次保留狀態並略過清單提醒：{type(exc).__name__}")
             return []
 
-    def get_monitor_configs(self):
+    def get_monitor_configs(self, notification_settings=None):
         groups = self.get_groups()
         stocks = self.get_user_stocks()
+        # Kept for the per-list drawing notification filter (one read per run).
+        self.user_stocks = stocks
         fixed_parameters = fixed_parameter_map(stocks, self.user_id)
 
         group_mapping = (
@@ -941,7 +972,10 @@ class SupabaseStore:
                     f"｜MA={ma_list}"
                 )
 
-        monitor_configs.extend(self.get_watchlist_monitor_configs(fixed_parameters))
+        monitor_configs.extend(self.get_watchlist_monitor_configs(
+            fixed_parameters,
+            notification_settings.watchlists_with("ma") if notification_settings else None,
+        ))
         monitor_configs.extend(
             self.get_index_monitor_configs()
         )
