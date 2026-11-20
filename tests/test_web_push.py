@@ -111,7 +111,7 @@ class WebPushTests(unittest.TestCase):
             "line_user_id": USER,
             "title": "🚨 2330.TW 台積電 向上突破 MA20",
             "body": "現價 1,050.00（距 MA20 +5.00%）｜量比 1.35",
-            "url": "https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW",
+            "url": "https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW",
             "tag": "2330.TW:ma20",
         })
 
@@ -134,7 +134,7 @@ class WebPushTests(unittest.TestCase):
             self.assertNotIn("1,050", output)
 
     def test_messages_encode_symbols_and_use_drawing_timeframe(self):
-        self.assertEqual(push_chart_url("^TWII"), "https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=%5ETWII")
+        self.assertEqual(push_chart_url("^TWII"), "https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=%5ETWII")
         down = breakout_message(**{**BREAKOUT, "direction": "breakout_down", "display_name": "", "volume_ratio": None})
         self.assertEqual(down["title"], "⚠️ 2330.TW 向下跌破 MA20")
         self.assertEqual(down["body"], "現價 1,050.00（距 MA20 +5.00%）")
@@ -142,7 +142,7 @@ class WebPushTests(unittest.TestCase):
                                price=181.8, direction="breakout_up", timeframe="4H")
         self.assertEqual(line["title"], "🚨 NVDA NVIDIA 向上突破 水平線 180.00")
         self.assertEqual(line["body"], "現價 181.80（+1.00%）｜週期 4H")
-        self.assertEqual(line["url"], "https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=4H&symbol=NVDA")
+        self.assertEqual(line["url"], "https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=4H&symbol=NVDA")
         self.assertEqual(line["tag"], "NVDA:line")
 
     def test_drawing_alert_hook_pushes_each_sent_line(self):

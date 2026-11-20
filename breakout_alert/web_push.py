@@ -16,7 +16,7 @@ from urllib.parse import quote, urlparse
 import requests
 
 PUSH_TIMEOUT_SECONDS = 5
-ATLAS_CHART_BASE_URL = "https://wudn9022.github.io/my-stock-screener/atlas/"
+ATLAS_CHART_BASE_URL = "https://wudn9922.github.io/my-stock-screener/atlas/"
 TAG_UNSAFE = re.compile(r"[^A-Za-z0-9._:^=-]")
 
 

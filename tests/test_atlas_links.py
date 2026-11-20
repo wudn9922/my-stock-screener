@@ -9,7 +9,7 @@ if ROOT not in sys.path:
 from breakout_alert import atlas_links as al  # noqa: E402
 from breakout_alert.discord_notifier import DiscordNotifier  # noqa: E402
 
-BASE = "https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol="
+BASE = "https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol="
 
 
 class AtlasLinkTest(unittest.TestCase):
