@@ -52,7 +52,7 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
   const opened: string[] = [];
   const self = {
     registration: {
-      scope: 'https://wudn9022.github.io/my-stock-screener/atlas/push/',
+      scope: 'https://wudn9922.github.io/my-stock-screener/atlas/push/',
       showNotification: async (title: string, options: Record<string, unknown>) => { shown.push({ title, options }); },
     },
     clients: { matchAll: async () => windows, openWindow: async (url: string) => { opened.push(url); }, claim: async () => {} },
@@ -78,23 +78,23 @@ describe('push-only worker', () => {
   it('shows the alert with icon, badge, tag and an Atlas-only URL', async () => {
     const sw = worker();
     const payload = { title: '🚨 2330.TW 台積電 向上突破 MA20', body: '現價 1,050.00', tag: '2330.TW:ma20',
-      url: 'https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW' };
+      url: 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW' };
     await sw.dispatch('push', { data: { json: () => payload } });
     expect(sw.shown[0].title).toBe(payload.title);
     expect(sw.shown[0].options).toMatchObject({ body: payload.body, tag: payload.tag, data: { url: payload.url },
-      icon: 'https://wudn9022.github.io/my-stock-screener/atlas/icon-192.png', badge: 'https://wudn9022.github.io/my-stock-screener/atlas/badge-96.png' });
+      icon: 'https://wudn9922.github.io/my-stock-screener/atlas/icon-192.png', badge: 'https://wudn9922.github.io/my-stock-screener/atlas/badge-96.png' });
     await sw.dispatch('push', { data: { json: () => ({ title: 'x', url: 'https://evil.example/' }) } });
-    expect(sw.shown[1].options.data).toEqual({ url: 'https://wudn9022.github.io/my-stock-screener/atlas/' });
+    expect(sw.shown[1].options.data).toEqual({ url: 'https://wudn9922.github.io/my-stock-screener/atlas/' });
     await sw.dispatch('push', { data: { json: () => { throw new Error('not json'); }, text: () => 'plain' } });
     expect(sw.shown[2].title).toBe('Atlas 提醒');
   });
 
   it('tap focuses an open Atlas window and asks it to open the chart, else opens a new one', async () => {
-    const url = 'https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=4H&symbol=NVDA';
+    const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=4H&symbol=NVDA';
     const notification = { close: vi.fn(), data: { url } };
     const posted: unknown[] = [];
-    const open = { url: 'https://wudn9022.github.io/my-stock-screener/atlas/?page=markets', focus: vi.fn(async () => open), postMessage: (m: unknown) => posted.push(m) };
-    const withWindow = worker([{ url: 'https://wudn9022.github.io/other/', focus: vi.fn() }, open]);
+    const open = { url: 'https://wudn9922.github.io/my-stock-screener/atlas/?page=markets', focus: vi.fn(async () => open), postMessage: (m: unknown) => posted.push(m) };
+    const withWindow = worker([{ url: 'https://wudn9922.github.io/other/', focus: vi.fn() }, open]);
     await withWindow.dispatch('notificationclick', { notification });
     expect(notification.close).toHaveBeenCalled();
     expect(open.focus).toHaveBeenCalled();
@@ -102,6 +102,6 @@ describe('push-only worker', () => {
     expect(withWindow.opened).toEqual([]);
     const closed = worker();
     await closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url: 'javascript:alert(1)' } } });
-    expect(closed.opened).toEqual(['https://wudn9022.github.io/my-stock-screener/atlas/']);
+    expect(closed.opened).toEqual(['https://wudn9922.github.io/my-stock-screener/atlas/']);
   });
 });

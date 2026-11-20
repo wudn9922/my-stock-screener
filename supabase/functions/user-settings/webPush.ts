@@ -17,7 +17,7 @@ import { encryptPushPayload, base64UrlDecode, base64UrlEncode, importP256Public,
 export const MAX_SUBSCRIPTIONS_PER_USER = 10;
 /** Push services accept 4 KB records; stay well below after encryption overhead. */
 export const MAX_PAYLOAD_BYTES = 3072;
-export const ATLAS_ORIGIN = 'https://wudn9022.github.io';
+export const ATLAS_ORIGIN = 'https://wudn9922.github.io';
 export const ATLAS_PATH = '/my-stock-screener/atlas/';
 const LINE_USER = /^U[0-9a-f]{32}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -253,12 +253,47 @@ export async function handlePushAction(action: string, lineUserId: string, body:
   throw new WebPushError(400, '未知的通知操作。');
 }
 
-/** Cloud Run alert sender. Authorization is the service-role key, compared in constant time. */
+const acceptedServerKeys = new Map<string, number>();
+const ACCEPTED_KEY_TTL_MS = 10 * 60_000;
+const PROBE_ACCOUNT = 'U' + '0'.repeat(32);
+
+/**
+ * Fallback when the bearer is not byte-identical to this runtime's service-role key (e.g. Cloud Run holds the
+ * other key format, legacy JWT vs sb_secret_): ask PostgREST itself whether the key may run the service_role-only
+ * RPC. anon/authenticated keys are refused there, so only a real server key passes. Accepted keys are cached by
+ * digest for 10 minutes; nothing about the key is logged.
+ */
+export async function serverKeyAccepted(header: string | null, deps: PushDeps) {
+  const match = /^Bearer\s+(\S+)$/i.exec((header ?? '').trim());
+  const base = deps.env('SUPABASE_URL');
+  if (!match || match[1].length < 20 || !base) return false;
+  const key = match[1];
+  const id = Array.from(await digest(key), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const now = (deps.now ?? Date.now)();
+  if ((acceptedServerKeys.get(id) ?? 0) > now) return true;
+  try {
+    const headers: Record<string, string> = { apikey: key, 'Content-Type': 'application/json' };
+    if (!key.startsWith('sb_secret_')) headers.Authorization = `Bearer ${key}`;
+    const response = await deps.fetch(new URL('/rest/v1/rpc/atlas_web_push', base), {
+      method: 'POST', headers, redirect: 'error', signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({ operation: 'list', account: PROBE_ACCOUNT, payload: {} }),
+    });
+    await response.body?.cancel();
+    if (!response.ok) return false;
+  } catch {
+    return false;
+  }
+  acceptedServerKeys.set(id, now + ACCEPTED_KEY_TTL_MS);
+  return true;
+}
+
+/** Cloud Run alert sender. Authorization is a Supabase server key: constant-time match, else verified by PostgREST. */
 export async function handlePushNotify(
   request: Request, body: Record<string, unknown>, deps: PushDeps,
   requireCloud: (lineUserId: string) => Promise<unknown>,
 ) {
-  if (!(await bearerMatches(request.headers.get('authorization'), serverKeys(deps.env))))
+  const authorization = request.headers.get('authorization');
+  if (!(await bearerMatches(authorization, serverKeys(deps.env))) && !(await serverKeyAccepted(authorization, deps)))
     throw new WebPushError(401, 'Unauthorized', 'unauthorized');
   const lineUserId = String(body.line_user_id ?? '');
   if (!LINE_USER.test(lineUserId)) throw new WebPushError(400, 'Invalid line_user_id');

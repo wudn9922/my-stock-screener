@@ -1,7 +1,7 @@
 """Atlas 圖表深連結：讓提醒訊息一點就開到該股票的 Atlas 圖表。"""
 from urllib.parse import quote
 
-ATLAS_BASE_URL = "https://wudn9022.github.io/my-stock-screener/atlas/"
+ATLAS_BASE_URL = "https://wudn9922.github.io/my-stock-screener/atlas/"
 ATLAS_LINK_LABEL = "開啟 Atlas 圖表"
 
 
