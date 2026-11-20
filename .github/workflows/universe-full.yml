@@ -233,6 +233,13 @@ jobs:
           pip install --quiet 'exchange-calendars>=4.5,<5.0' yfinance
           python -u scripts/build_market_warnings.py --cache-dir .cache/universe-full --archive-dir .cache/kline-archive
 
+      - id: notice_soft_07
+        name: Build breakout achievement-rate warning
+        if: always() && !cancelled() && steps.archive_checkout.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: python -u scripts/build_breakout_warning.py --archive-dir .cache/kline-archive
+
       - name: Publish owned outputs to generated and durable records to main
         if: (always()) && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
         run: python scripts/generated_branch.py publish universe
@@ -247,6 +254,7 @@ jobs:
           if [ -f docs/report/breakouts.json ]; then git add -f -- docs/report/breakouts.json; fi
           if [ -f docs/report/breadth.json ]; then git add -f -- docs/report/breadth.json; fi
           if [ -f docs/report/market-warnings.json ]; then git add -f -- docs/report/market-warnings.json; fi
+          if [ -f docs/report/breakout-warning.json ]; then git add -f -- docs/report/breakout-warning.json; fi
           if [ -f docs/report/market-closures.json ]; then git add -f -- docs/report/market-closures.json; fi
           if [ -f docs/report/market-warnings-log.csv ]; then git add -f -- docs/report/market-warnings-log.csv; fi
           if [ -f docs/report/breakouts-history.json ]; then git add -f -- docs/report/breakouts-history.json; fi
@@ -276,7 +284,7 @@ jobs:
         continue-on-error: true
         env:
           NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
-          NOTIFY_STEP_NAMES: '{"archive_closure_scan": "Build market closure evidence from read-only archive", "archive_closure_publish": "Publish derived closure evidence including the daily cohort", "archive_checkout": "Shallow checkout permanent K-line archive", "archive_bootstrap": "Seed missing rolling bars from permanent archive", "archive_instruments": "Refresh archive-only ETFs and indices through the existing Yahoo batch reader", "archive_instrument_stage": "Combine archive-only instruments with the accepted stock payload", "notice_soft_05": "Build breadth trading signals", "notice_soft_06": "Build market risk warnings"}'
+          NOTIFY_STEP_NAMES: '{"archive_closure_scan": "Build market closure evidence from read-only archive", "archive_closure_publish": "Publish derived closure evidence including the daily cohort", "archive_checkout": "Shallow checkout permanent K-line archive", "archive_bootstrap": "Seed missing rolling bars from permanent archive", "archive_instruments": "Refresh archive-only ETFs and indices through the existing Yahoo batch reader", "archive_instrument_stage": "Combine archive-only instruments with the accepted stock payload", "notice_soft_05": "Build breadth trading signals", "notice_soft_06": "Build market risk warnings", "notice_soft_07": "Build breakout achievement-rate warning"}'
         run: |
           python - <<'PY'
           import json, os
