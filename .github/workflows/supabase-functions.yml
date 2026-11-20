@@ -53,15 +53,15 @@ jobs:
 
       - name: Deploy market-chart
         if: steps.token.outputs.available == 'true'
-        run: supabase functions deploy market-chart --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
+        run: supabase functions deploy market-chart --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}" --yes
 
       - name: Deploy user-settings
         if: steps.token.outputs.available == 'true'
-        run: supabase functions deploy user-settings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
+        run: supabase functions deploy user-settings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}" --yes
 
       - name: Deploy chart-drawings
         if: steps.token.outputs.available == 'true'
-        run: supabase functions deploy chart-drawings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}"
+        run: supabase functions deploy chart-drawings --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}" --yes
 
       - name: Smoke test
         # 不論這次是否由本 workflow 部署（例如改用 Supabase connector 部署），都實際呼叫一次函式
