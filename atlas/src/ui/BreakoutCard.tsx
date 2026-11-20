@@ -38,7 +38,6 @@ function StrategyRow({ method, stats, rule, params, index, points, months, asOf 
 }) {
   const swing = method.key === 'swingHigh' && !!params.swingCountingModel;
   const comparison = swing && stats?.swingCounting?.countingModel !== params.swingCountingModel ? undefined : stats?.comparison;
-  if (swing) rule = 'hold5';
   const outcome = comparison?.rules[rule];
   const low = outcome && outcome.evaluatedN > 0 && outcome.evaluatedN < params.minSample;
   const note = !stats ? '報表尚未提供此方法' : !comparison || !outcome ? '此口徑資料尚未提供' :
@@ -52,7 +51,7 @@ function StrategyRow({ method, stats, rule, params, index, points, months, asOf 
         {note ? '—' : rate(outcome?.winRate ?? null)}<small>{asOf ? formatDateTime(asOf, false) : '資料日'} 測得</small>
       </b>
     </div>
-    {swing ? <p className="bo-note">每個高點只算第一次、只算更高的高點 · 五日守住</p> : method.key === 'swingHigh' ? <p className="bo-note">舊口徑：含重試、較低高點及收盤失敗，不與新口徑直接比較。</p> : null}
+    {swing ? <p className="bo-note">每個高點只算第一次、只算更高的高點</p> : method.key === 'swingHigh' ? <p className="bo-note">舊口徑：含重試、較低高點及收盤失敗，不與新口徑直接比較。</p> : null}
     <BreakoutHistoryPlot points={points} method={method.key} rule={rule} months={months} countingModel={params.swingCountingModel} />
     {swing && stats?.swingCounting ? <dl className="bo-metrics">
       <div><dt>收盤沒站上比例</dt><dd>{rate(stats.swingCounting.close_fail_share === null ? null : stats.swingCounting.close_fail_share * 100)}</dd></div>
@@ -84,7 +83,6 @@ function ComparisonTable({ current, selected, onSelect }: { current: BreakoutWin
       </th>)}</tr></thead>
       <tbody>{METHODS.map(method => <tr key={method.key}><th scope="row">{method.short}</th>{OUTCOME_RULES.map(rule => {
         const outcome = current.strategies[method.key]?.comparison?.rules[rule.key];
-        if (method.key === 'swingHigh' && current.strategies[method.key]?.swingCounting && rule.key !== 'hold5') return <td key={rule.key}>固定五日守住</td>;
         return <td key={rule.key} className={selected === rule.key ? 'selected' : ''}>{rate(outcome?.winRate ?? null)}
           <small>{outcome ? `${count(outcome.wins)}／${count(outcome.evaluatedN)}` : '未提供'}</small></td>;
       })}</tr>)}</tbody>
