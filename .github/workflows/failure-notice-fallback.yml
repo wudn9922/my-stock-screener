@@ -17,6 +17,7 @@ on:
       - "Permanent K-line Backfill"
       - "Permanent K-line five-year expansion"
       - "MA Recommendations"
+      - "Taiwan stock dividends backfill"
       - "Market trading calendar"
       - "IPO and extended quotes"
       - "Q4 EPS from 8-K (manual)"
