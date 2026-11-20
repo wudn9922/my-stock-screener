@@ -111,6 +111,15 @@ jobs:
         # 初次全量回補由人工（Codex）執行；回補完成前本步驟不抓，避免搶同一個 token 的配額、改到同一批檔案
         run: python -u atlas/scripts/build_financials_tw_finmind.py --budget 1500 --only-after-backfill
 
+      # 台股配股（FinMind TaiwanStockDividend）→ financials/<代號>.TW(O).json 的 stockDividends 區塊，供還原 EPS（追溯調整）使用；每檔 30 天重抓一次
+      - id: notice_soft_05
+        name: Taiwan stock dividends (FinMind, resumable)
+        if: contains(inputs.markets || 'TW,US', 'TW')
+        continue-on-error: true
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+        run: python -u atlas/scripts/build_stock_dividends_tw_finmind.py --budget 900
+
       # 即使上一步失敗，也用 repo 內已有的檔案重建（純離線讀檔，很快）
       - name: Build screener growth data (EPS / revenue YoY)
         if: always()
@@ -146,7 +155,7 @@ jobs:
         continue-on-error: true
         env:
           NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
-          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Taiwan official statements (MOPS / OpenAPI)", "notice_soft_02": "US SEC XBRL frames", "notice_soft_03": "Taiwan history (FinMind, resumable)", "notice_soft_04": "Taiwan statements (FinMind, resumable)"}'
+          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Taiwan official statements (MOPS / OpenAPI)", "notice_soft_02": "US SEC XBRL frames", "notice_soft_03": "Taiwan history (FinMind, resumable)", "notice_soft_04": "Taiwan statements (FinMind, resumable)", "notice_soft_05": "Taiwan stock dividends (FinMind, resumable)"}'
         run: |
           python - <<'PY'
           import json, os

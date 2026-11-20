@@ -24,6 +24,7 @@ import {
   type MetricResult,
   type MetricUnit,
   type PeriodLabel,
+  comparableValues,
 } from '../../fundamentals/financialMetrics';
 import { toneClass } from '../format';
 
@@ -99,7 +100,8 @@ export function buildView(history: FinancialHistory, kind: PeriodKind, span: num
           latestIndex = i;
           break;
         }
-      const changes = values.map((_, index) => yoy(values, ends, index, def.unit));
+      const comparable = comparableValues(results);
+      const changes = comparable.map((_, index) => yoy(comparable, ends, index, def.unit));
       // CAGR only where growth means something; ratios and the sign-flipping non-operating line get an average.
       const ratio = def.unit === 'pct' || def.unit === 'times' || id === 'nonOperatingIncome';
       metrics[id] = {
@@ -112,7 +114,7 @@ export function buildView(history: FinancialHistory, kind: PeriodKind, span: num
         window,
         latestIndex,
         yoy: latestIndex === null ? null : changes[latestIndex]!,
-        cagr: ratio ? null : windowCagr(values, ends, window, kind === 'quarterly' ? quarters : undefined),
+        cagr: ratio ? null : windowCagr(comparable, ends, window, kind === 'quarterly' ? quarters : undefined),
         average: ratio ? windowAverage(values, window) : null,
       };
     }
