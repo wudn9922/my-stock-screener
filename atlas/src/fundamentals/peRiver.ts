@@ -1,4 +1,5 @@
-import type { FinancialHistory, FinancialSeries } from './FinancialHistory';
+import type { FinancialHistory, FinancialSeries, StockDividendEvent } from './FinancialHistory';
+import { adjustEps } from './stockDividendAdjust';
 
 /**
  * P/E river (本益比河流圖): price against EPS(TTM) × a set of P/E multiples taken from the stock's own
@@ -74,6 +75,12 @@ export interface EpsPeriods {
   quarters: EpsPeriod[];
   annuals: EpsPeriod[];
   notes: string[];
+  /**
+   * Taiwan 配股 events (null: none recorded). With them every EPS in `epsAt` is put on the share basis of the
+   * observation day (reported EPS ÷ the stock dividends with ex-rights between its report and that day), the basis
+   * of the unadjusted price, so a TTM that crosses an ex-rights date adds like with like.
+   */
+  stockDividends?: readonly StockDividendEvent[] | null;
 }
 
 export interface EpsPoint {
@@ -156,16 +163,20 @@ export function buildEpsPeriods(history: FinancialHistory): EpsPeriods {
     quarters = [];
     notes.push('季度 EPS 疑似為年初累計值，改用年度 EPS。');
   }
-  return { quarters, annuals, notes };
+  return { quarters, annuals, notes, stockDividends: history.market === 'TW' ? history.stockDividends : null };
 }
 
 const daysBetween = (a: number, b: number) => (b - a) / DAY_SECONDS;
 
 /** EPS(TTM) as known at `obsSec`, or null when neither four published quarters nor a recent annual exist. */
-export function epsAt(obsSec: number, periods: Pick<EpsPeriods, 'quarters' | 'annuals'>): EpsPoint | null {
+export function epsAt(obsSec: number, periods: Pick<EpsPeriods, 'quarters' | 'annuals'> & { stockDividends?: EpsPeriods['stockDividends'] }): EpsPoint | null {
+  const events = periods.stockDividends ?? null;
+  const obsDay = new Date(obsSec * 1000).toISOString().slice(0, 10);
+  const basisEps = (period: EpsPeriod): number | null =>
+    events === null || period.eps === null ? period.eps : adjustEps(period.eps, period.end, events, obsDay);
   const published = periods.quarters.filter((period) => period.availSec <= obsSec);
   const last4 = published.slice(-4);
-  if (last4.length === 4 && last4.every((period) => period.eps !== null)) {
+  if (last4.length === 4 && last4.every((period) => basisEps(period) !== null)) {
     const consecutive = last4.every((period, i) => {
       if (i === 0) return true;
       const gap = daysBetween(last4[i - 1]!.endSec, period.endSec);
@@ -174,7 +185,7 @@ export function epsAt(obsSec: number, periods: Pick<EpsPeriods, 'quarters' | 'an
     const newest = last4[3]!;
     if (consecutive && daysBetween(newest.endSec, obsSec) <= MAX_TTM_AGE_DAYS) {
       return {
-        eps: last4.reduce((sum, period) => sum + period.eps!, 0),
+        eps: last4.reduce((sum, period) => sum + basisEps(period)!, 0),
         basis: 'ttm',
         periodEnd: newest.end,
         usedBasic: last4.some((period) => period.basic),
@@ -182,8 +193,8 @@ export function epsAt(obsSec: number, periods: Pick<EpsPeriods, 'quarters' | 'an
     }
   }
   const annual = periods.annuals.filter((period) => period.availSec <= obsSec).at(-1);
-  if (annual && annual.eps !== null && daysBetween(annual.endSec, obsSec) <= MAX_ANNUAL_AGE_DAYS) {
-    return { eps: annual.eps, basis: 'annual', periodEnd: annual.end, usedBasic: annual.basic };
+  if (annual && basisEps(annual) !== null && daysBetween(annual.endSec, obsSec) <= MAX_ANNUAL_AGE_DAYS) {
+    return { eps: basisEps(annual)!, basis: 'annual', periodEnd: annual.end, usedBasic: annual.basic };
   }
   return null;
 }

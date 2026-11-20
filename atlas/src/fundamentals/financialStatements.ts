@@ -5,6 +5,8 @@ import {
   contextOf,
   costOfRevenue,
   eps,
+  epsAdjusted,
+  comparableValues,
   freeCashFlow,
   grossProfit,
   netIncome,
@@ -58,6 +60,7 @@ export const STATEMENT_ROWS: Record<StatementId, StatementRowDef[]> = {
     rawRow('taxProvision', '所得稅'),
     { id: 'netIncome', label: '淨利', unit: 'money', compute: netIncome },
     { id: 'eps', label: 'EPS', unit: 'eps', compute: eps },
+    { id: 'epsAdjusted', label: '還原 EPS（含配股）', unit: 'eps', compute: epsAdjusted },
   ],
   balance: [
     rawRow('totalAssets', '總資產'),
@@ -97,7 +100,7 @@ const STRUCTURAL_REASONS = [GROSS_NOT_APPLICABLE, GROSS_NOT_SEPARATE];
 export function statementRows(history: FinancialHistory, kind: PeriodKind, statement: StatementId): StatementRow[] {
   const ctx = contextOf(history, kind);
   const ends = ctx.series.end;
-  return STATEMENT_ROWS[statement].map((def): StatementRow => {
+  return STATEMENT_ROWS[statement].filter((def) => def.id !== 'epsAdjusted' || history.market === 'TW').map((def): StatementRow => {
     const results = ends.map((_, index): MetricResult => {
       if (def.compute) return def.compute(ctx, index);
       return { value: null, basis: 'reported', formula: def.label, inputs: [], notes: [], reason: NOT_PROVIDED };
@@ -112,7 +115,7 @@ export function statementRows(history: FinancialHistory, kind: PeriodKind, state
       unit: def.unit,
       values,
       results,
-      changes: values.map((_, index) => yoy(values, ends, index, def.unit)),
+      changes: comparableValues(results).map((_, index, comparable) => yoy(comparable, ends, index, def.unit)),
       absent: def.compute === null || absent,
       note: def.compute === null ? NOT_PROVIDED : absent ? (structural ?? NOT_PROVIDED) : null,
       derived: results.some((result) => result.basis === 'derived' && result.value !== null),

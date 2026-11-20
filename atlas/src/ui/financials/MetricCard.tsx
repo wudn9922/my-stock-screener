@@ -44,6 +44,7 @@ const BASIS_TEXT: Record<string, string> = {
   approx: '近似值',
   'statutory-tax': '法定稅率',
   ttm: '近 4 季（TTM）',
+  restated: '追溯調整（含配股）',
 };
 
 function inputText(input: MetricInput, currency: string, scale: MoneyScale) {

@@ -39,6 +39,12 @@ export const RAW_FIELDS = [
 ] as const;
 export type RawField = (typeof RAW_FIELDS)[number];
 
+/** One 配股 resolution: ex-rights date and stock dividend NT$ per share (par 10). */
+export interface StockDividendEvent {
+  exDate: string;
+  perShare: number;
+}
+
 export type PeriodKind = 'annual' | 'quarterly';
 export type PeriodSource = 'sec' | 'finmind' | 'yahoo';
 export type QualityLevel = 'good' | 'partial' | 'limited';
@@ -90,6 +96,8 @@ export interface FinancialHistory {
   annual: FinancialSeries;
   quarterly: FinancialSeries;
   split: { adjusted: boolean; events: { date: string; ratio: number }[] };
+  /** Taiwan stock dividend (配股) events; null when the file has no such block (adjusted EPS stays unavailable). */
+  stockDividends: StockDividendEvent[] | null;
   quality: {
     level: QualityLevel | null;
     annualYears: number | null;
@@ -170,6 +178,17 @@ const optionalText = z
   .unknown()
   .optional()
   .transform((value) => (typeof value === 'string' && value.trim() ? value.trim() : null));
+function parseStockDividends(value: unknown): StockDividendEvent[] | null {
+  const block = recordOf(value);
+  if (!Array.isArray(block.events)) return null;
+  return block.events.flatMap((item) => {
+    const raw = recordOf(item);
+    const exDate = validDate(raw.exDate);
+    const perShare = finiteOrNull(raw.perShare);
+    return exDate && perShare !== null && perShare > 0 ? [{ exDate, perShare }] : [];
+  });
+}
+
 const arrayOf = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const recordOf = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -259,6 +278,7 @@ const historySchema = z
     annual: z.unknown().optional(),
     quarterly: z.unknown().optional(),
     split: z.unknown().optional(),
+    stockDividends: z.unknown().optional(),
     quality: z.unknown().optional(),
   })
   .transform((raw) => {
@@ -294,6 +314,7 @@ const historySchema = z
           return date && ratio !== null && ratio > 0 ? [{ date, ratio }] : [];
         }),
       },
+      stockDividends: parseStockDividends(raw.stockDividends),
       quality: {
         level: level === 'good' || level === 'partial' || level === 'limited' ? level : null,
         annualYears: count(quality.annualYears),
