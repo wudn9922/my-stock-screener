@@ -240,8 +240,8 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await primary(page).getByRole('button', { name: '我的', exact: true }).click();
   await expect(page.locator('.page-title')).toHaveText('我的');
   const compact = isCompactConsole(page);
-  // Phones and tablets: the 自選清單 row replaces the link, and the storage notice lives under 資料狀態.
-  const watchlistLink = compact ? page.getByRole('link', { name: /^自選清單/ }) : page.getByRole('link', { name: '自選清單 →', exact: true });
+  // Phones and tablets: the 清單 row (自選清單, 分組 and 圖表收藏 together) replaces the link, and the storage notice lives under 資料狀態.
+  const watchlistLink = compact ? page.getByRole('link', { name: /^清單/ }) : page.getByRole('link', { name: '自選清單 →', exact: true });
   await expect(watchlistLink).toBeVisible();
   if (compact) {
     await openConsoleSection(page, 'status');
@@ -289,6 +289,15 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await gear.getByRole('button', { name: '關閉', exact: true }).click();
   await page.screenshot({ path: info.outputPath(info.project.name === 'desktop-chromium' ? 'my-display-desktop.png' : 'my-display-mobile-390.png') });
   await watchlistLink.click();
+  if (compact) {
+    // 清單 lists the saved watchlists with groups and favourites; each opens on 自選.
+    const manager = page.getByRole('region', { name: '清單管理' });
+    const saved = manager.locator('.list-card').filter({ has: page.locator('.list-card-kind', { hasText: /^(自選清單|條件清單)$/ }) });
+    await expect(saved).toHaveCount(2);
+    const card = saved.first();
+    await card.locator('summary').click();
+    await card.getByRole('button', { name: '在自選查看' }).click();
+  }
   await expect(page.locator('.page-title')).toHaveText('自選');
   await expect(page.getByRole('group', { name: '我的自選清單' }).getByRole('option')).toHaveCount(2);
 });
