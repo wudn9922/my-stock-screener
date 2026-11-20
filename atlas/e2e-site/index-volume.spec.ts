@@ -46,8 +46,8 @@ test('three warning charts replace short-window volume ratios, default to 60 day
   await expect(card.locator('.mw-values dd').first()).toHaveText('40.0%');
   await expect(card).toContainText('僅台股有歷史參考價值');
   await expect(card).toContainText('事後標註');
-  expect(await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.slice(0,3).map(n => n.className)))
-    .toEqual(['card market-warning-card','card breakout-card','card breadth-card']);
+  expect(await page.locator('.markets-side > section.card').evaluateAll(nodes => nodes.slice(0,4).map(n => n.className)))
+    .toEqual(['card market-warning-card','card breakout-warning-card','card breakout-card','card breadth-card']);
   await card.getByLabel('警示價量窗口').selectOption('5');
   await expect(card.getByRole('heading', { name: /指數價量/ })).toContainText('每週取一次');
   await expect(card.locator('.mw-values dd').first()).toHaveText('42.0%');
