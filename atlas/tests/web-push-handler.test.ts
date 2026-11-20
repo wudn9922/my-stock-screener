@@ -11,10 +11,12 @@ import { base64UrlDecode, base64UrlEncode } from '../../supabase/functions/user-
 const OWNER = policy.DEFAULT_ADMIN_LINE_ID;
 const A = 'U11111111111111111111111111111111';
 const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiJ9.service-role-offline-test-key.signature';
+// A server key in the other format, held by Cloud Run but not exposed to the Edge runtime env.
+const CLOUD_RUN_KEY = 'sb_secret_cloud_run_offline_test_key';
 // RFC 8291 Appendix A keys: valid P-256 subscription keys, public test data.
 const VAPID = { pub: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8', priv: 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw' };
 const UA = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
-const CHART = 'https://wudn9022.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
+const CHART = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
 type Row = Record<string, unknown>;
 const ENV: Record<string, string> = {
   SUPABASE_URL: 'https://offline.invalid', SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY, ADMIN_LINE_USER_ID: OWNER, LINE_LOGIN_CHANNEL_ID: '2000000000',
@@ -28,6 +30,7 @@ function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string
   const rpcCalls: { operation: string; account: string; payload: Row }[] = [];
   const sent: { url: string; headers: Record<string, string>; body: Uint8Array }[] = [];
   const logs: unknown[][] = [];
+  const probes: string[] = [];
   const db = {
     from: () => {
       const query = {
@@ -51,6 +54,11 @@ function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string
   };
   const pushFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    // Offline PostgREST: only the Cloud Run secret key may run the service_role-only RPC.
+    if (url.endsWith('/rest/v1/rpc/atlas_web_push')) {
+      probes.push((init!.headers as Record<string, string>).apikey);
+      return new Response('[]', { status: (init!.headers as Record<string, string>).apikey === CLOUD_RUN_KEY ? 200 : 401 });
+    }
     sent.push({ url, headers: init!.headers as Record<string, string>, body: new Uint8Array(init!.body as ArrayBuffer) });
     const status = typeof options.status === 'function' ? options.status(url) : options.status ?? 201;
     return new Response(null, { status });
@@ -73,7 +81,7 @@ function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string
     const response = await serve(new Request('https://offline.invalid/', { method: 'POST', headers, body: JSON.stringify(body) }));
     return { status: response.status, body: await response.json() };
   };
-  return { devices, rpcCalls, sent, logs, deps, request };
+  return { devices, rpcCalls, sent, logs, probes, deps, request };
 }
 
 const subscription = (endpoint = 'https://fcm.googleapis.com/fcm/send/abc') => ({ endpoint, keys: UA });
@@ -103,7 +111,7 @@ describe('web push endpoint and payload validation', () => {
 
   it('opens only Atlas URLs and keeps the encrypted payload under the size limit', () => {
     expect(webPush.validateAtlasUrl(CHART)).toBe(CHART);
-    for (const url of ['https://evil.example/my-stock-screener/atlas/', 'https://wudn9022.github.io/other/', 'http://wudn9022.github.io/my-stock-screener/atlas/', 'javascript:alert(1)'])
+    for (const url of ['https://evil.example/my-stock-screener/atlas/', 'https://wudn9922.github.io/other/', 'http://wudn9922.github.io/my-stock-screener/atlas/', 'javascript:alert(1)'])
       expect(() => webPush.validateAtlasUrl(url)).toThrow('Atlas');
     const { payload } = webPush.buildPayload({ title: '標'.repeat(500), body: '長'.repeat(5000), url: CHART, tag: 'x' }, 1);
     const decoded = JSON.parse(new TextDecoder().decode(payload));
@@ -124,6 +132,20 @@ describe('push.notify server-to-server authentication', () => {
     expect(offline.rpcCalls).toHaveLength(0);
     expect(await webPush.bearerMatches(`Bearer ${SERVICE_KEY}`, [SERVICE_KEY])).toBe(true);
     expect(await webPush.bearerMatches(`Bearer ${SERVICE_KEY}`, [])).toBe(false);
+  });
+
+  it('accepts a server key in the other format after PostgREST confirms it, and caches that answer', async () => {
+    const offline = fixture({ grants: [{ line_user_id: A, storage_mode: 'cloud', label: '', updated_at: '2026-11-01T00:00:00Z' }] });
+    offline.devices.push({ id: 'd1', account: A, endpoint: 'https://fcm.googleapis.com/fcm/send/ok', ...UA });
+    const first = await offline.request(notify(), bearer(CLOUD_RUN_KEY));
+    expect(first.status).toBe(200);
+    expect(first.body.data.sent).toBe(1);
+    await offline.request(notify(), bearer(CLOUD_RUN_KEY));
+    expect(offline.probes).toEqual([CLOUD_RUN_KEY]);
+    // A publishable / anon key is refused by PostgREST, so it still gets 401 without touching subscriptions.
+    const rpcBefore = offline.rpcCalls.length;
+    expect((await offline.request(notify(), bearer('sb_publishable_offline_test_key_value'))).status).toBe(401);
+    expect(offline.rpcCalls).toHaveLength(rpcBefore);
   });
 
   it('also accepts a new-style secret key listed in SUPABASE_SECRET_KEYS', () => {

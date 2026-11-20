@@ -147,7 +147,7 @@ reason; `summarizeValuation(valuation, price)` returns both P/E figures.
 ### Recommended moving averages (ma-selector)
 
 `report/ma-selector/<SYMBOL>.json` (+ `index.json`), written weekly by `.github/workflows/ma-recommendations.yml`,
-which checks out the public `wudn9022/ma-selector` repository and runs its `scripts/build_recommendations.py` for every
+which checks out the public `wudn9922/ma-selector` repository and runs its `scripts/build_recommendations.py` for every
 `data/*.csv` symbol (TW + S&P 500, indices skipped; 5 years of Yahoo daily bars per symbol). The selection is
 ma-selector's production SMA selector, unchanged (scores vs. its 83-stock reference, gap 15, long/short reversal
 backtest, rule B + short-range rescue); Atlas only displays it. Shape:
