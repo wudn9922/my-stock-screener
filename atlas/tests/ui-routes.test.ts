@@ -27,7 +27,10 @@ describe('site routes', () => {
     expect(route('?page=console&view=status')).toEqual({ page: 'console', view: 'status' });
     expect(route('?page=console&view=Backup')).toEqual({ page: 'console', view: 'backup' });
     expect(route('?page=console&view=nope')).toEqual({ page: 'console' });
-    expect(serializeRoute({ page: 'console', view: 'groups' })).toBe('?page=console&view=groups');
+    expect(serializeRoute({ page: 'console', view: 'lists' })).toBe('?page=console&view=lists');
+    // The former 自訂分組 sub-view is part of 清單; old links and bookmarks open it.
+    expect(route('?page=console&view=groups')).toEqual({ page: 'console', view: 'lists' });
+    expect(route('?page=console&view=constructor')).toEqual({ page: 'console' });
     expect(serializeRoute({ page: 'console' })).toBe('?page=console');
     expect(sameRoute({ page: 'console' }, { page: 'console', view: 'app' })).toBe(false);
   });

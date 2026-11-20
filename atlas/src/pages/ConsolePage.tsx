@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } fro
 import type { PageProps } from './pageProps';
 import { SecRadar } from '../ui/research/SecRadar';
 import { ParameterConsole } from '../ui/ParameterConsole';
+import { ListManager } from '../ui/ListManager';
 import { watchlistStore } from '../watchlists/store';
 import { createWatchlist, evaluateWatchlist, visitWatchlist, watchlistSchema, type WatchlistVisit } from '../watchlists/model';
 import { refreshCloudWatchlist } from '../watchlists/cloud';
@@ -53,13 +54,11 @@ import { watchlistActionsRequest } from '../app/watchlistActionsRequest';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
-export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings', view, watchlistId }: PageProps & {
+export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings', view }: PageProps & {
   list?: string;
   section?: 'lists' | 'settings';
   /** Phone/tablet 我的 sub-view (`?page=console&view=…`); the desktop page keeps its tabs. */
   view?: ConsoleView;
-  /** The 自選 list that was open when 我的 was reached, for the 自選清單 row. */
-  watchlistId?: string;
 }) {
   const compact = useCompactLayout();
   const me = section === 'settings' && compact;
@@ -69,8 +68,14 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const sync = watchlistCloudSync(store);
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
-  const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display' | 'status'>('parameters');
+  const [settingsTab, setTab] = useState<'parameters' | 'manage' | 'admin' | 'display' | 'status'>(view === 'lists' ? 'manage' : 'parameters');
   const [listsView, setListsView] = useState<'lists' | 'holdings'>('lists');
+  // A 「管理清單」 link from the chart opens the desktop 清單 tab even when this page was kept mounted.
+  const [shownView, setShownView] = useState(view);
+  if (shownView !== view) {
+    setShownView(view);
+    if (view === 'lists') setTab('manage');
+  }
   const tab = section === 'lists' ? listsView : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
   const [visit, setVisit] = useState<(WatchlistVisit & { reasons?: WatchlistChangeReasons }) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -338,12 +343,6 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     : '';
 
   if (me) {
-    const currentList = document.lists.find((entry) => entry.id === watchlistId) ?? document.lists[0];
-    const currentCount = currentList
-      ? currentList.kind === 'manual'
-        ? currentList.symbols.length
-        : (currentList.lastViewed ?? currentList.history.at(-1))?.members.length
-      : undefined;
     const reportDate = report.status === 'ok' ? report.report.reportDate : null;
     // A sub-view entry the list pushed marks itself, so Back can pop to the list; a deep link, reload of an older
     // entry or a return through the tab bar has no list before it and opens the list in place instead.
@@ -359,8 +358,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
       switch (shown) {
         case 'parameters':
           return <ParameterConsole part="stocks" />;
-        case 'groups':
-          return <ParameterConsole part="groups" />;
+        case 'lists':
+          return <ListManager openChart={openChart} navigate={navigate} />;
         case 'notifications':
           return <div className="console-card me-app"><PushPanel /></div>;
         case 'app':
@@ -405,11 +404,11 @@ export default function ConsolePage({ report, navigate, openChart, list: request
             <div className="page-head"><div><h2 className="page-title">我的</h2></div></div>
             <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
             <MeGroup label="個人化">
-              <MeRow label="自選清單" route={currentList ? { page: 'watchlist', list: currentList.id } : { page: 'watchlist' }} navigate={go}
-                value={currentList ? <>{currentList.name}{currentCount !== undefined && <> · <span className="num">{currentCount}</span> 檔</>}</> : 'LINE 熱門'} />
+              {/* One place for 自選清單, 分組 and 圖表收藏 (the old 自訂分組 row and ?view=groups open it). */}
+              <MeRow label="清單" route={{ page: 'console', view: 'lists' }} navigate={go}
+                value="自選・分組・收藏" />
               <MeRow label="個股均線參數" route={{ page: 'console', view: 'parameters' }} navigate={go}
                 value={<><span className="num">{Object.keys(fixedParameters).length}</span> 檔</>} />
-              <MeRow label="自訂分組" route={{ page: 'console', view: 'groups' }} navigate={go} />
               {webPushEnabled() && <MeRow label="手機通知" route={{ page: 'console', view: 'notifications' }} navigate={go} />}
             </MeGroup>
             <MeGroup label="顯示">
@@ -467,6 +466,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         >
           均線參數
         </button>
+        <button type="button" aria-pressed={tab === 'manage'} className={tab === 'manage' ? 'active' : ''} onClick={() => setTab('manage')}>
+          清單
+        </button>
         {access.isAdmin && (
           <button type="button" aria-pressed={tab === 'admin'} className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}>
             管理員
@@ -485,6 +487,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /><PushPanel /></section>
       ) : tab === 'admin'  && access.isAdmin ? (
         <StorageAdminPanel />
+      ) : tab === 'manage' ? (
+        <ListManager openChart={openChart} navigate={navigate} />
       ) : tab === 'parameters' ? (
         <ParameterConsole />
       ) : (

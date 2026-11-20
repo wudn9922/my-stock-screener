@@ -3,10 +3,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
 /** Phones and tablets (1099px and below) open 我的 as grouped rows and sub-views; the desktop page keeps its tabs. */
 export const isCompactConsole = (page: Page) => (page.viewportSize()?.width ?? Number.POSITIVE_INFINITY) <= 1099;
 
-export type ConsoleSection = 'parameters' | 'groups' | 'admin' | 'display' | 'status' | 'backup';
-const TAB: Partial<Record<ConsoleSection, string>> = { parameters: '均線參數', admin: '管理員', display: '顯示與App', status: '資料狀態' };
+export type ConsoleSection = 'parameters' | 'lists' | 'admin' | 'display' | 'status' | 'backup';
+const TAB: Partial<Record<ConsoleSection, string>> = { parameters: '均線參數', lists: '清單', admin: '管理員', display: '顯示與App', status: '資料狀態' };
 const ROW: Record<ConsoleSection, string> = {
-  parameters: '個股均線參數', groups: '自訂分組', admin: '管理員儲存權限', display: '安裝到主畫面', status: '資料狀態', backup: '備份與還原',
+  parameters: '個股均線參數', lists: '清單', admin: '管理員儲存權限', display: '安裝到主畫面', status: '資料狀態', backup: '備份與還原',
 };
 
 /** The 我的 row (compact) or tab (desktop) that opens a section. */

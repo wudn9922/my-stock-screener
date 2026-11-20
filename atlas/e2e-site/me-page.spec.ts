@@ -77,11 +77,14 @@ test('我的 sub-views are routes: a 52px header, browser back and the list scro
   await page.goBack();
   await expect(page).toHaveURL(/page=console$/);
   await expect(row).toBeVisible();
-  // A deep link into a sub-view has no list entry before it: back opens the list in place.
+  // A deep link into a sub-view has no list entry before it: back opens the list in place. The former
+  // 自訂分組 link (view=groups) opens the unified 清單 sub-view, which replaced the separate group page.
   await page.goto('./?page=console&view=groups');
+  await expect(page.locator('.me-subhead h2')).toHaveText('清單');
   await page.getByRole('button', { name: '返回我的', exact: true }).click();
   await expect(page).toHaveURL(/page=console$/);
-  await expect(page.getByRole('link', { name: /^自訂分組/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^清單/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^自訂分組/ })).toHaveCount(0);
 });
 
 test('storage mode and data health no longer follow every page on phones and tablets', async ({ page }) => {
