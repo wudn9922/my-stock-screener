@@ -67,7 +67,7 @@ async function expectConsoleMounted(page: Page) {
     await expect(consoleEntry(page, 'parameters')).toBeVisible();
     return;
   }
-  await expect(page.getByRole('heading', { name: '個股均線（所有清單共用）與個人分組', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '個股均線（所有清單共用）', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
 }
 
