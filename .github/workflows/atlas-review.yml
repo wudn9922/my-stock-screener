@@ -68,6 +68,8 @@ on:
       - 'scripts/market_warnings*'
       - 'scripts/swing_cohort.py'
       - 'tests/test_market_warnings.py'
+      - 'scripts/build_breakout_warning.py'
+      - 'tests/test_breakout_warning.py'
       - 'scripts/swing_breakouts.py'
       - 'scripts/breakout_outcomes.py'
       - 'scripts/preview_swing_breakouts.py'
@@ -312,6 +314,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_swing_breakouts.py' -v
           python -m unittest discover -s tests -p 'test_breakout_outcomes.py' -v
           python -m unittest discover -s tests -p 'test_market_warnings.py' -v
+          python -m unittest discover -s tests -p 'test_breakout_warning.py' -v
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

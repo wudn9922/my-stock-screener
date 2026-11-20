@@ -136,9 +136,12 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 | 資料 | 產生器／來源 | 保存與限制 |
 |---|---|---|
 | `docs/report/market-warnings.json` | `scripts/build_market_warnings.py`；完整市場 cache＋Yahoo 指數日線／唯讀封存備援（SOX量用SOXX，source meta） | universe owner／generated；三年日期序列，歷史不足保留 null；單市場指數失敗明示保留／無資料，兩市場失敗保留整份舊檔 |
+| `docs/report/breakout-warning.json` | `scripts/build_breakout_warning.py`；唯讀 kline-archive 全名單日線（約晚一個交易日） | universe owner／generated；單市場失敗保留舊市場資料，兩市場都失敗不寫檔 |
 | `docs/report/market-closures.json` | XTAI／XNYS＋全市場快照；正量 ≥5%／50檔優先保留，交易日須指數缺列且 ≥95% 零量平盤才判臨時休市 | universe owner／generated；只排除已證實休市，資料缺漏列為 missing-session-data；[判定與限制](docs/MARKET_CLOSURES.md) |
 | `docs/research-verification/market-data-gaps-20261106.json` | `scripts/scan_market_data_gaps.py` 唯讀封存；2021起交易日缺主要指數或 >50%普通股缺列 | 審查用報告，分列既有範圍內缺口與最新收盤待封存，附檔數／官方佐證；不自動補檔或修改archive |
 | `docs/report/market-warnings-log.csv` | 每市場、每資料日首次燈號與數值 | main durable record；只追加，禁止覆寫或截短；包含門檻 SHA-256 |
 | `docs/report/breakouts.json` 的波段新口徑 | 原 ATR 波段偵測＋首次／更高高點／合格收盤，四種判定同箱型、20EMA（市場警示燈號用完整五日守住） | 每週六（台北）計算；asOf 達 7 日補跑；每月同口徑重算、每 20 日保留快照；箱型、20EMA不變 |
 
 多頭末期警示是風險提示，不能預測修正時點，不是買賣訊號；現行名單含存活者偏差。原320根快取尚不足400個突破家數有效值，首次執行的背離門檻會缺值，之後依已觀察序列累積。定義、門檻、追加保護與已知限制見 [MARKET_WARNINGS.md](atlas/docs/MARKET_WARNINGS.md)。
+
+突破達成率警示：全市場突破（卡片口徑、固定五日守住）成功率跌到自己近兩年 P10 以下時亮燈；只顯示 2021–2026 回測中有警示價值的口徑（美股波段前高、美股與台股突破20EMA）。亮燈後 40 個交易日內大盤跌 7% 以上的比例約為任一天的兩倍，但之後報酬並未較差，樣本少且集中在 2022 年，只是風險提示。

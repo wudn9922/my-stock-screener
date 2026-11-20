@@ -10,6 +10,7 @@ import { MARKET_KEYS, type IndexStatus, type MarketKey, type Report } from '../r
 import { LineTextCard } from '../ui/LineTextCard';
 import { BreadthCard } from '../ui/BreadthCard';
 import { BreakoutCard } from '../ui/BreakoutCard';
+import { BreakoutWarningCard } from '../ui/BreakoutWarningCard';
 import { MarketWarningCard } from '../ui/MarketWarningCard';
 import { MarginTemperatureCard } from '../ui/MarginTemperatureCard';
 import { MiniChart } from '../ui/MiniChart';
@@ -154,6 +155,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
         {(market === 'tw' || market === 'us') && (
           <>
             <MarketWarningCard key={market} market={market} />
+            <BreakoutWarningCard key={`bw-${market}`} market={market} />
             <BreakoutCard market={market} />
             <BreadthCard market={market} />
           </>
