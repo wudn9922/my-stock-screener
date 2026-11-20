@@ -1,0 +1,95 @@
+name: Taiwan stock dividends backfill
+
+# 手動回補台股配股資料（FinMind TaiwanStockDividend → docs/report/financials/<代號>.json 的 stockDividends，供還原 EPS 使用）。
+# 每天的 fundamentals.yml 只給這一步 900 秒；第一次全量回補用這裡跑較長的預算，可重複執行，從上次停下的地方接著補。
+# 與 fundamentals.yml／financials.yml 共用 concurrency group，不會同時改同一批檔案。
+on:
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: 'FinMind 請求時間預算（秒，最多約 4800）'
+        default: '4800'
+
+env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: financials-history
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Restore generated inputs
+        id: generated_restore
+        if: vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/generated_branch.py restore
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install --quiet requests 'curl_cffi>=0.7,<1'
+
+      - name: Taiwan stock dividends (FinMind, resumable)
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          BUDGET: ${{ inputs.budget || '4800' }}
+        run: |
+          case "$BUDGET" in ''|*[!0-9]*) echo "::error::budget 必須是數字"; exit 1 ;; esac
+          [ "$BUDGET" -le 4800 ] || BUDGET=4800
+          python -u atlas/scripts/build_stock_dividends_tw_finmind.py --budget "$BUDGET"
+
+      - name: Build screener growth data (EPS / revenue YoY)
+        if: always()
+        working-directory: atlas
+        run: python -u scripts/build_growth.py
+
+      - name: Publish owned outputs to generated and durable records to main
+        if: (always()) && vars.GENERATED_BRANCH_MODE == '1' && steps.generated_restore.outcome == 'success'
+        run: python scripts/generated_branch.py publish fundamentals
+
+      - name: Commit and Push changes
+        if: (always()) && vars.GENERATED_BRANCH_MODE != '1'
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          [ -d docs/report/financials ] && git add -A docs/report/financials
+          [ -f docs/report/growth.json ] && git add docs/report/growth.json
+          git commit -m "Backfill Taiwan stock dividends" || { echo "No changes to commit"; exit 0; }
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              exit 0
+            fi
+            echo "推送失敗（第 ${attempt} 次），稍後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1
+  notify-system-failure:
+    needs: ["build"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
