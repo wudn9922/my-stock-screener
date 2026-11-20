@@ -10,7 +10,8 @@ from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from margin_temperature import DATA, OUTPUT, TwseClient, build_rows, csv_rows, hot_episodes, make_report, parse_index, parse_margin, to_report
+import margin_temperature
+from margin_temperature import DATA, OUTPUT, TwseClient, update, build_rows, csv_rows, hot_episodes, make_report, parse_index, parse_margin, to_report
 
 
 def weekly(closes, amounts):
@@ -22,14 +23,23 @@ def weekly(closes, amounts):
 
 
 class MarginTemperatureTests(unittest.TestCase):
+    # The golden fixture and pinned values describe the data as of this date. The live
+    # files keep growing every trading day, so build the frozen rows from inputs up to
+    # this date; filtering the weekly output instead drops the current week once a later
+    # day in the same week is appended.
+    FIXTURE_END = '2026-11-12'
+
     @classmethod
     def setUpClass(cls):
-        cls.rows = build_rows(csv_rows(DATA / 'taiex.csv'), csv_rows(DATA / 'margin_daily.csv'))
+        idx, mg = csv_rows(DATA / 'taiex.csv'), csv_rows(DATA / 'margin_daily.csv')
+        cls.rows = build_rows(idx, mg)
+        cls.frozen = build_rows([r for r in idx if r['date'] <= cls.FIXTURE_END],
+                                [r for r in mg if r['date'] <= cls.FIXTURE_END])
 
     def test_golden_all_weeks(self):
         with (ROOT / 'tests/fixtures/margin_temperature/gauge_golden.csv').open(newline='') as fp:
             golden = list(csv.DictReader(fp))
-        historical = [row for row in self.rows if row['date'] <= golden[-1]['date']]
+        historical = [row for row in self.frozen if row['date'] <= golden[-1]['date']]
         self.assertEqual(len(historical), len(golden))
         differences = {'pct': [], 'mdd': []}
         for item, expected in zip(historical, golden):
@@ -47,7 +57,7 @@ class MarginTemperatureTests(unittest.TestCase):
             self.assertLess(maximum, .01)
 
     def test_latest_and_status(self):
-        historical = [row for row in self.rows if row['date'] <= '2026-11-12']
+        historical = self.frozen
         r = to_report(historical, date(2026, 11, 13))
         self.assertEqual(r['latest']['date'], '2026-11-12')
         self.assertTrue(r['provisional'])
@@ -144,6 +154,66 @@ class MarginTemperatureTests(unittest.TestCase):
         self.assertEqual(parse_index(day,date(2026,11,12)),{'open':44180.46,'high':44525.24,'low':42943.5,'close':43091.87})
         self.assertIsNone(parse_index(day,date(2026,11,13)))
         self.assertIsNone(parse_index({'stat':'No data'},date(2026,11,14)))
+
+    def test_update_uses_working_twse_routes(self):
+        # rwd/zh/indices/... is not a TWSE route; it redirects to HTML and failed every run.
+        routes = []
+        class Client:
+            def fetch(self, route, params):
+                routes.append(route)
+                return {'stat': '很抱歉，沒有符合條件的資料!'}
+        self.assertIn('休市', update(date(2026, 11, 14), client=Client()))
+        self.assertEqual(routes, ['marginTrading/MI_MARGN', 'TAIEX/MI_5MINS_HIST'])
+
+    def test_catch_up_fills_missed_sessions_and_tolerates_unpublished_today(self):
+        import shutil, tempfile
+        from unittest.mock import patch
+        def roc(day):
+            return f"{day.year - 1911}/{day.month:02d}/{day.day:02d}"
+        published = {date(2026, 11, 13): ('536,598,938', '43,719.75', '43,675.12'),
+                     date(2026, 11, 16): ('524,497,993', '43,512.42', '41,040.08')}
+        class Client:
+            def __init__(self):
+                self.days = []
+            def fetch(self, route, params):
+                day = date(int(params['date'][:4]), int(params['date'][4:6]), int(params['date'][6:]))
+                self.days.append((route.split('/')[0], day))
+                if route.startswith('marginTrading'):
+                    if day not in published or published[day][0] is None:
+                        return {'stat': '很抱歉，沒有符合條件的資料!'}
+                    return {'stat': 'OK', 'tables': [{'data': [['融資金額(仟元)', '1', '2', '3', '4', published[day][0]]]}]}
+                rows = [[roc(d), v[1], v[1], v[2], v[2]] for d, v in published.items()]
+                if day == date(2026, 11, 17):
+                    rows.append([roc(day), '41,100.00', '41,200.00', '40,900.00', '41,000.00'])
+                return {'stat': 'OK', 'fields': ['日期', '開盤指數', '最高指數', '最低指數', '收盤指數'], 'data': rows}
+        with tempfile.TemporaryDirectory() as folder:
+            data = Path(folder) / 'data'
+            data.mkdir()
+            for name in ('taiex.csv', 'margin_daily.csv'):
+                rows = [r for r in csv_rows(DATA / name) if r['date'] <= self.FIXTURE_END]
+                with (data / name).open('w', newline='') as out:
+                    writer = csv.DictWriter(out, fieldnames=list(rows[0]))
+                    writer.writeheader()
+                    writer.writerows(rows)
+            client = Client()
+            with patch.object(margin_temperature, 'DATA', data), \
+                 patch.object(margin_temperature, 'OUTPUT', Path(folder) / 'report.json'):
+                messages = margin_temperature.catch_up(client, date(2026, 11, 17))
+            # Weekend days are never requested; 11-17 has the index but not yet the margin.
+            self.assertEqual(sorted({d for _, d in client.days}),
+                             [date(2026, 11, 13), date(2026, 11, 16), date(2026, 11, 17)])
+            self.assertIn('尚未完整公布', messages[-1])
+            self.assertEqual([r['date'] for r in csv_rows(data / 'taiex.csv')][-2:], ['2026-11-13', '2026-11-16'])
+            self.assertEqual(csv_rows(data / 'margin_daily.csv')[-1]['mrg_amt'], '524497993.0')
+            # An incomplete earlier day is an error, never a silent skip.
+            with patch.object(margin_temperature, 'DATA', data), \
+                 patch.object(margin_temperature, 'OUTPUT', Path(folder) / 'report.json'):
+                published.pop(date(2026, 11, 16))
+                (data / 'taiex.csv').write_text('\n'.join((data / 'taiex.csv').read_text().splitlines()[:-1]) + '\n')
+                (data / 'margin_daily.csv').write_text('\n'.join((data / 'margin_daily.csv').read_text().splitlines()[:-1]) + '\n')
+                published[date(2026, 11, 16)] = (None, '43,512.42', '41,040.08')
+                with self.assertRaises(margin_temperature.IncompleteDayError):
+                    margin_temperature.catch_up(Client(), date(2026, 11, 17))
 
     def test_retry_html_then_success(self):
         calls = []

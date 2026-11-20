@@ -2,7 +2,22 @@
 
 Read-only Yahoo Finance history proxy with a best-effort Taiwan MIS overlay for today. The browser cannot call Yahoo directly
 (no CORS), so Atlas (`atlas/src/market-data/EdgeYahooProvider.ts`) calls this function, which returns
-Yahoo's **raw** chart JSON. Atlas normalizes and validates it client-side. No secrets, no database.
+Yahoo's **raw** chart JSON. Atlas normalizes and validates it client-side.
+
+## Sign-in and usage quota
+
+Every request (except the `OPTIONS` preflight) needs header `X-Atlas-Token: <LINE ID token | atlasdev. device token>`.
+The token is verified with LINE (or `atlas_device_session`) and cached per instance for 5 minutes by its SHA-256.
+Each request then makes one call to `public.atlas_market_chart_quota` (`supabase/manual/atlas_market_chart_quota.sql`).
+Limits live in `QUOTA_LIMITS` in `access.ts`: signed-in users 200 / 10 min and 3,000 / day, cloud users 600 / 15,000;
+after 50,000 site requests per Asia/Taipei day only cloud users and the admin are served; the admin is never counted.
+
+- 401 `{ ok:false, code:'LOGIN_REQUIRED', error }` — missing / malformed / rejected token.
+- 429 `{ ok:false, code:'USER_WINDOW'|'USER_DAILY'|'SITE_DAILY', error, retryAfterSeconds }` + `Retry-After`.
+- 503 `{ ok:false, code:'AUTH_UNAVAILABLE'|'QUOTA_UNAVAILABLE', error, retryAfterSeconds:60 }` — LINE / database unreachable
+  (cloud users and the admin are still served when only the quota RPC fails).
+- Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LINE_LOGIN_CHANNEL_ID`, optional `ADMIN_LINE_USER_ID`
+  (the same ones user-settings uses). All responses are `Cache-Control: private`, `Vary: X-Atlas-Token, Origin`.
 
 ```
 GET /functions/v1/market-chart?symbol=2330.TW&interval=1d&range=5y&events=1
@@ -24,7 +39,7 @@ GET /functions/v1/market-chart?quotes=AAPL,2330.TW,^GSPC
 - Up to 40 symbols (same symbol rules as above; duplicates removed). Each is one Yahoo request
   `interval=1d&range=1mo` (no events), six at a time; the chart JSON keeps only `meta` (without
   `validRanges`/`tradingPeriods`), `timestamp` and `indicators.quote`.
-- Each symbol is cached in the function instance for 20 s; the response has `Cache-Control: public, max-age=20`.
+- Each symbol is cached in the function instance for 20 s; the response has `Cache-Control: private, max-age=20`.
 - After one `rate_limited` answer the rest of the batch is not requested (reported as `rate_limited`);
   the site then doubles its polling interval, up to five minutes.
 
@@ -33,10 +48,11 @@ Behaviour:
 - Upstream: `https://query2.finance.yahoo.com/v8/finance/chart/<symbol>?interval=..&range=..&events=div%2Csplits&includePrePost=false`
   with a browser-like User-Agent and an 8 s timeout; on timeout/5xx/429 it retries `query1`.
 - CORS: `Access-Control-Allow-Origin` is echoed only for `https://wudn9922.github.io` and
-  `http://localhost:*` / `http://127.0.0.1:*`. Requests carrying any other `Origin` get 403. `OPTIONS` → 204.
+  `http://localhost:*` / `http://127.0.0.1:*`. Requests carrying any other `Origin` get 403. `OPTIONS` → 204
+  (allows `X-Atlas-Token`, `Access-Control-Max-Age: 86400`). Requests without an `Origin` still need a token.
   Optional env `ALLOWED_ORIGINS` (comma list) replaces the default origin list (localhost stays allowed).
-- Caching: `Cache-Control: public, max-age=60` for intraday intervals, `max-age=600` for `1d`/`1wk`/`1mo`.
-- Errors are sanitized JSON `{"error":{"code","message"}}` with `Cache-Control: no-store`:
+- Caching: `Cache-Control: private, max-age=60` for intraday intervals, `max-age=600` for `1d`/`1wk`/`1mo`.
+- Errors are sanitized JSON `{"error":{"code","message"}}` with `Cache-Control: private, no-store`:
   400 `invalid_symbol|invalid_interval|invalid_range|invalid_events`, 403 `origin_not_allowed`,
   404 `not_found`, 405 `method_not_allowed`, 502 `upstream_error`, 503 `rate_limited`.
 
@@ -57,9 +73,11 @@ once the repository secret `SUPABASE_ACCESS_TOKEN` exists; without it the workfl
 Smoke test after deploying:
 
 ```sh
-curl -i 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart?symbol=AAPL&interval=1d&range=1mo&events=0'
-curl -i 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart?symbol=AAPL&interval=1d&range=99y'   # 400
+curl -i 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart?symbol=AAPL&interval=1d&range=1mo&events=0'   # 401
+curl -i -H "X-Atlas-Token: $TOKEN" 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart?symbol=AAPL&interval=1d&range=1mo&events=0'
 ```
+
+Apply `supabase/manual/atlas_market_chart_quota.sql` in the SQL editor before deploying this function.
 
 Local run: `supabase functions serve market-chart --no-verify-jwt` (needs Docker).
 

@@ -23,6 +23,26 @@ function signals(state = 'active' as (typeof SIGNAL_STATES)[number]) {
   return parsed.data.markets.us!;
 }
 describe('calibrated breadth presentation', () => {
+  it('shows historical MA counts with an explicit denominator and a date selector', () => {
+    const data = breadth();
+    const n = data.history.dates.length;
+    data.history.ma20Above = Array(n).fill(90);
+    data.history.ma20Total = Array(n).fill(500);
+    data.history.ma60Above = Array(n).fill(189);
+    data.history.ma60Total = Array(n).fill(450);
+    const html = renderToStaticMarkup(<BreadthBody data={data} />);
+    expect(html).toContain('歷史寬度樣本日期');
+    expect(html).toContain('（90／500 檔）');
+    expect(html).toContain('（189／450 檔）');
+    expect(html).toContain('站上均線檔數／當日有成交且具足夠日 K 的可計算檔數');
+    const withSignals = renderToStaticMarkup(<BreadthBody data={data} signals={signals()} />);
+    expect(withSignals).toContain('（90／500 檔）');
+    expect(withSignals).toContain('（189／450 檔）');
+    const legacy = renderToStaticMarkup(<BreadthBody data={breadth()} />);
+    expect(legacy).not.toContain('歷史寬度樣本日期');
+    expect(legacy).toContain('breadth-line ma20');
+  });
+
   it.each(SIGNAL_STATES)(
     'renders %s and its plan or trigger without mixing states',
     (state) => {

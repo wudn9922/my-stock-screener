@@ -24,6 +24,8 @@ import './holdings.css';
 import { MexcPanel } from './MexcPanel';
 import { MexcFuturesPanel } from './MexcFuturesPanel';
 import { HoldingPosition } from './HoldingPosition';
+import { holdingChartTarget } from './chartTarget';
+import { ALL_ACCOUNTS, holdingsViewPreference, resolveView } from './viewPreference';
 import { HoldingsTotals } from './HoldingsTotals';
 import { retainQuotes, retainRates } from './quoteRetention';
 import { useFuturesRefresh } from './useFuturesRefresh';
@@ -84,7 +86,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const [directory, setDirectory] = useState<ImportSymbol[] | null>(null),
     [directoryError, setDirectoryError] = useState(false),
     [directoryAttempt, setDirectoryAttempt] = useState(0);
-  const [accountId, setAccountId] = useState(''),
+  const viewStore = holdingsViewPreference();
+  const viewPreference = useSyncExternalStore(viewStore.subscribe, viewStore.getSnapshot);
+  const [sessionView, setSessionView] = useState<string | undefined>(),
     [draft, setDraft] = useState<HoldingAccount | null>(null),
     [creating, setCreating] = useState(false);
   const [method, setMethod] = useState('csv');
@@ -129,10 +133,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     };
   }, [directoryAttempt]);
   const { document } = snapshot;
-  const selected = document.accounts.find((entry) => entry.account.id === accountId) ?? document.accounts[0];
-  useEffect(() => {
-    if (selected && accountId !== selected.account.id) setAccountId(selected.account.id);
-  }, [selected?.account.id, accountId]);
+  const view = resolveView(
+    document.accounts.map((entry) => entry.account.id),
+    viewPreference.view,
+    sessionView,
+  );
+  // `selected` is the single account being viewed; undefined in 全部帳號, where account-level tools are hidden.
+  const selected = document.accounts.find((entry) => entry.account.id === view);
   const symbols = [...new Set(document.accounts.flatMap((entry) => entry.holdings.map((h) => h.symbol)))]
     .sort()
     .join(',');
@@ -193,22 +200,25 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const hiddenRows = evaluated.filter(
     (row): row is (typeof evaluated)[number] & { hidden: HiddenReason } => row.hidden !== null,
   );
-  const rows = all
-    .filter((row) => row.holding.accountId === selected?.account.id)
-    .sort((a, b) => {
-      const av = a.result[sort],
-        bv = b.result[sort];
-      return av === null
-        ? bv === null
-          ? a.holding.symbol.localeCompare(b.holding.symbol)
-          : 1
-        : bv === null
-          ? -1
-          : new Money(bv).cmp(av);
-    });
+  const byValue = (a: (typeof all)[number], b: (typeof all)[number]) => {
+    const av = a.result[sort],
+      bv = b.result[sort];
+    return av === null
+      ? bv === null
+        ? a.holding.symbol.localeCompare(b.holding.symbol)
+        : 1
+      : bv === null
+        ? -1
+        : new Money(bv).cmp(av);
+  };
+  const shownAccounts = selected ? [selected] : document.accounts;
+  const rowsOf = (accountKey: string) => all.filter((row) => row.holding.accountId === accountKey).sort(byValue);
   const selectedHidden = hiddenRows
     .filter((row) => row.holding.accountId === selected?.account.id)
     .sort((a, b) => a.holding.symbol.localeCompare(b.holding.symbol));
+  // Chart prev/next follows what is on screen: the viewed account, or every account in 全部帳號.
+  const chartRows = shownAccounts.flatMap((entry) => rowsOf(entry.account.id));
+  const chartListName = selected ? `${selected.account.name} 持股` : '全部帳號持股';
   const blocked = snapshot.loading || !!snapshot.error || busy || mexcSnapshot.busy;
   const importAccount = draft ?? selected?.account;
   const [sinopacManaged, setSinopacManaged] = useState<{
@@ -216,11 +226,13 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     id: string | null;
   }>();
   const sinopacKey = getStorageContextKey() + ':' + selected?.account.id;
+  // SinoPac sync is the owner's own service: only the server-verified administrator sees its panel
+  // (the server refuses everyone else anyway). Others keep editing a legacy CSV SinoPac account.
+  const sinopacAdmin = access.isAdmin;
   const sinopacReadOnly =
     selected?.account.broker === 'sinopac' &&
-    (sinopacManaged?.key !== sinopacKey ||
-      sinopacManaged.id === selected.account.id ||
-      selected.holdings.some((h) => h.source === 'api'));
+    (selected.holdings.some((h) => h.source === 'api') ||
+      (sinopacAdmin && (sinopacManaged?.key !== sinopacKey || sinopacManaged.id === selected.account.id)));
   const subtotal = (items: typeof all) => (
     <>
       {[...summarizeHoldings(items, rates).currencies].map(([currency, value]) => (
@@ -254,13 +266,14 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               持股帳戶
               <select
                 aria-label="持股帳戶"
-                value={selected?.account.id ?? ''}
+                value={view}
                 disabled={editing || creating || connecting || mexcSnapshot.busy}
                 onChange={(event) => {
-                  setAccountId(event.target.value);
+                  setSessionView(event.target.value);
                   setDraft(null);
                 }}
               >
+                <option value={ALL_ACCOUNTS}>全部帳號</option>
                 {document.accounts.map((entry) => (
                   <option key={entry.account.id} value={entry.account.id}>
                     {entry.account.name} · {entry.account.currency}
@@ -283,68 +296,77 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           </div>
         </>
       )}
-      {selected && (
-        <section className="holdings-account" aria-label="帳戶損益">
-          <h3 className="holdings-sr-only">
-            {selected.account.name} · {selected.account.currency}
-          </h3>
-          {selected.account.broker === 'mexc' &&
-            mexcSnapshot.state.connections.some((c) => c.accountId === selected.account.id) && (
-              <MexcFuturesPanel
-                futures={mexcSnapshot.accountFutures[selected.account.id]}
-                loading={mexcSnapshot.futuresLoading[selected.account.id]}
-                failed={mexcSnapshot.futuresErrors[selected.account.id]}
-                updatedAt={mexcSnapshot.futuresUpdatedAt[selected.account.id]}
-              />
-            )}
-          {quotesBusy && (
-            <p role="status" className="holdings-muted">
-              讀取報價中，保留上次數值…
-            </p>
-          )}
-          <div className="holdings-cards">
-            {rows.map(({ holding, result }) => (
-              <HoldingPosition
-                key={holding.id}
-                holding={holding}
-                result={result}
-                quote={holdingQuote(holding)}
-                name={directory?.find((entry) => entry.symbol === holding.symbol)?.name}
-                pending={pendingAccounts.has(holding.accountId)}
-                net={net && validDiscount}
-                retained={(mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
-                  holding.symbol,
-                )}
-                onOpen={() =>
-                  holding.market === 'CRYPTO'
-                    ? navigate({ page: 'world', view: 'commodities' })
-                    : openChart({
-                        symbol: holding.symbol,
+      {quotesBusy && shownAccounts.length > 0 && (
+        <p role="status" className="holdings-muted">
+          讀取報價中，保留上次數值…
+        </p>
+      )}
+      {shownAccounts.map((entry) => {
+        const accountRows = rowsOf(entry.account.id);
+        const accountHidden = hiddenRows.filter((row) => row.holding.accountId === entry.account.id);
+        return (
+          <section
+            className="holdings-account"
+            key={entry.account.id}
+            aria-label={selected ? '帳戶損益' : `${entry.account.name} 帳戶損益`}
+          >
+            <h3 className={selected ? 'holdings-sr-only' : 'holdings-account-title'}>
+              {entry.account.name} · {entry.account.currency}
+            </h3>
+            {entry.account.broker === 'mexc' &&
+              mexcSnapshot.state.connections.some((c) => c.accountId === entry.account.id) && (
+                <MexcFuturesPanel
+                  futures={mexcSnapshot.accountFutures[entry.account.id]}
+                  loading={mexcSnapshot.futuresLoading[entry.account.id]}
+                  failed={mexcSnapshot.futuresErrors[entry.account.id]}
+                  updatedAt={mexcSnapshot.futuresUpdatedAt[entry.account.id]}
+                />
+              )}
+            <div className="holdings-cards">
+              {accountRows.map(({ holding, result }) => (
+                <HoldingPosition
+                  key={holding.id}
+                  holding={holding}
+                  result={result}
+                  quote={holdingQuote(holding)}
+                  name={directory?.find((item) => item.symbol === holding.symbol)?.name}
+                  pending={pendingAccounts.has(holding.accountId)}
+                  net={net && validDiscount}
+                  retained={(mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
+                    holding.symbol,
+                  )}
+                  onOpen={() => {
+                    const target = holdingChartTarget(holding);
+                    if (target?.kind === 'world') navigate({ page: 'world', view: 'commodities' });
+                    else if (target)
+                      openChart({
+                        symbol: target.symbol,
                         list: chartList(
-                          `${selected.account.name} 持股`,
-                          rows
-                            .filter((row) => row.holding.market !== 'CRYPTO')
+                          chartListName,
+                          chartRows
+                            .filter((row) => holdingChartTarget(row.holding)?.kind === 'chart')
                             .map((row) => ({ symbol: row.holding.symbol })),
                         ),
-                      })
-                }
-                onHide={() =>
-                  visibility.update((current) => hide(current, holdingKey(holding.accountId, holding.symbol)))
-                }
-              />
-            ))}
-          </div>
-          {!rows.length && (
-            <p>
-              {pendingAccounts.has(selected.account.id)
-                ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
-                : selectedHidden.length
-                  ? '此帳戶的持股都已隱藏，可在下方「已隱藏」取消隱藏。'
-                  : '此帳戶目前沒有持股，可匯入庫存表格。'}
-            </p>
-          )}
-        </section>
-      )}
+                      });
+                  }}
+                  onHide={() =>
+                    visibility.update((current) => hide(current, holdingKey(holding.accountId, holding.symbol)))
+                  }
+                />
+              ))}
+            </div>
+            {!accountRows.length && (
+              <p>
+                {pendingAccounts.has(entry.account.id)
+                  ? '請先確認 MEXC 餘額與平均成本，再計算持股損益。'
+                  : accountHidden.length
+                    ? '此帳戶的持股都已隱藏，可切換到該帳戶，在下方「已隱藏」取消隱藏。'
+                    : '此帳戶目前沒有持股，可匯入庫存表格。'}
+              </p>
+            )}
+          </section>
+        );
+      })}
       {document.accounts.length > 0 && (
         <HoldingsTotals
           rows={all.filter((row) => !pendingAccounts.has(row.holding.accountId))}
@@ -460,7 +482,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   onChange={(event) => setBrokerKey(event.target.value)}
                 >
                   <option value="mexc">MEXC（加密貨幣）</option>
-                  <option value="sinopac">永豐證券（台股）</option>
+                  {sinopacAdmin && <option value="sinopac">永豐證券（台股）</option>}
                 </select>
               </label>
             ) : (
@@ -504,7 +526,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 繼續匯入
               </button>
             )}
-            {method === 'api' && brokerKey === 'sinopac' && (
+            {sinopacAdmin && method === 'api' && brokerKey === 'sinopac' && (
               <p>由維護者設定永豐服務後，使用下方同步按鈕建立擁有者帳戶。</p>
             )}
             {method === 'api' && brokerKey === 'mexc' && (
@@ -548,10 +570,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             )}
         </form>
       )}
-      {creating && method === 'api' && brokerKey === 'sinopac' && (
+      {sinopacAdmin && creating && method === 'api' && brokerKey === 'sinopac' && (
         <SinopacPanel onCreated={() => setCreating(false)} />
       )}
-      {selected?.account.broker === 'sinopac' && (
+      {sinopacAdmin && selected?.account.broker === 'sinopac' && (
         <SinopacPanel
           key={selected.account.id}
           accountId={selected.account.id}
@@ -574,7 +596,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
         </p>
       )}
       {!directory && !directoryError && <p role="status">載入股票目錄中…</p>}
-      {document.accounts.length > 0 && (
+      {selected && (
         <>
           <div className="holdings-toolbar">
             <button
@@ -635,7 +657,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             setDraft(null);
           }}
           onConnected={() => {
-            setAccountId(draft.id);
+            setSessionView(draft.id);
             setConnecting(false);
             setDraft(null);
           }}
@@ -661,13 +683,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           }}
           onSave={async (account, holdings) => {
             await store.replace(account, holdings);
-            setAccountId(account.id);
+            setSessionView(account.id);
             setDraft(null);
             setEditing(false);
             setError('');
             setMessage('已取代此帳戶持股。');
           }}
         />
+      )}
+      {document.accounts.length > 0 && !selected && (
+        <p className="holdings-muted">目前顯示全部帳號。要匯入、修正、刪除或調整隱藏規則，請先在「持股帳戶」選擇單一帳戶。</p>
       )}
       {selected && (
         <section className="console-card" aria-label="帳戶設定">
@@ -702,6 +727,28 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       )}
       {!document.accounts.length && !editing && !creating && !connecting && !snapshot.loading && (
         <p>尚未匯入持股。先新增帳戶，再上傳檔案或貼上庫存表格。</p>
+      )}
+      {document.accounts.length > 0 && (
+        <div className="holdings-fields holdings-default-view">
+            <label>
+          預設開啟
+          <select
+            aria-label="預設開啟帳戶"
+            value={resolveView(
+              document.accounts.map((entry) => entry.account.id),
+              viewPreference.view,
+            )}
+            onChange={(event) => viewStore.set(event.target.value)}
+          >
+            <option value={ALL_ACCOUNTS}>全部帳號</option>
+            {document.accounts.map((entry) => (
+              <option key={entry.account.id} value={entry.account.id}>
+                {entry.account.name} · {entry.account.currency}
+              </option>
+            ))}
+          </select>
+        </label>
+        </div>
       )}
       <p role="note" className="holdings-storage">
         {access.storageMode === 'cloud'

@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite } from './mocks';
 import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 import { D5, intradayFilledPayload } from '../tests/fixtures/intraday-fill';
 
 test('C3 review: #224 filled TWII sessions stay current through consecutive daily quote batches', async ({ page }, info) => {
   await page.clock.install({ time: new Date((D5+3600)*1000) });
+  await mockMarketLogin(page); // the live quote batches need a LINE login
   await mockSite(page);
   const body='Date,Open,High,Low,Close,Volume\n2026-11-03,44481.59,44614.64,43191.58,43307.54,4346200\n2026-11-04,43000,43102,42898,42948.91,200\n';
   const files: string[] = [], fiveYears: string[] = [];

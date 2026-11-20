@@ -179,12 +179,17 @@ class ComputeStockMetricsTest(unittest.TestCase):
             None, "SPY",
         )
         self.assertEqual(metrics["volumeAvg20"], 1100.0)
+        self.assertEqual(metrics["turnover20"], 11000)
         short = report_metrics.compute_stock_metrics(make_prices([10] * 19), None, "SPY")
         self.assertIsNone(short["volumeAvg20"])
+        self.assertIsNone(short["turnover20"])
         zero_day = report_metrics.compute_stock_metrics(
             make_prices([10] * 20, volumes=[1000.0] * 19 + [0.0]), None, "SPY",
         )
         self.assertEqual(zero_day["volumeAvg20"], 950.0)
+        self.assertEqual(zero_day["turnover20"], 9500)
+        all_zero = report_metrics.compute_stock_metrics(make_prices([10] * 20, volumes=[0.0] * 20))
+        self.assertEqual(all_zero["turnover20"], 0)
 
     def test_average_volume_rejects_unknown_volume_without_confusing_real_zero(self):
         for missing in (None, float("nan"), float("inf"), float("-inf"), -1):
@@ -192,11 +197,19 @@ class ComputeStockMetricsTest(unittest.TestCase):
                 frame = make_prices([10] * 20)
                 frame.iloc[-1, frame.columns.get_loc("Volume")] = missing
                 self.assertIsNone(report_metrics.compute_stock_metrics(frame)["volumeAvg20"])
+                self.assertIsNone(report_metrics.compute_stock_metrics(frame)["turnover20"])
                 # The report/universe pipeline may clean a frame before computing metrics.
                 cleaned = report_metrics.clean_prices(frame)
                 self.assertIsNone(report_metrics.compute_stock_metrics(cleaned)["volumeAvg20"])
+                self.assertIsNone(report_metrics.compute_stock_metrics(cleaned)["turnover20"])
         old_gap = make_prices([10] * 21, volumes=[float("nan")] + [1000.0] * 20)
         self.assertEqual(report_metrics.compute_stock_metrics(old_gap)["volumeAvg20"], 1000.0)
+        self.assertEqual(report_metrics.compute_stock_metrics(old_gap)["turnover20"], 10000)
+
+    def test_turnover_rejects_unknown_volume_at_start_of_twenty_bar_window(self):
+        frame = make_prices([10] * 30)
+        frame.attrs[report_metrics.UNKNOWN_VOLUME_DATES] = (frame.index[-20].isoformat(),)
+        self.assertIsNone(report_metrics.compute_stock_metrics(frame)["turnover20"])
 
     def test_average_volume_csv_roundtrip_preserves_unknown_volume(self):
         frame = make_prices([10] * 20, volumes=[1000.0] * 19 + [float("nan")])
@@ -204,6 +217,7 @@ class ComputeStockMetricsTest(unittest.TestCase):
             write_csv(directory, "TEST", frame)
             loaded = report_metrics.read_price_csv(os.path.join(directory, "TEST.csv"))
             self.assertIsNone(report_metrics.compute_stock_metrics(loaded)["volumeAvg20"])
+            self.assertIsNone(report_metrics.compute_stock_metrics(loaded)["turnover20"])
 
     def test_vol_vs_prev_spike_and_drop(self):
         spike = report_metrics.compute_stock_metrics(

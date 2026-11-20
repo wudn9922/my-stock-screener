@@ -1,0 +1,65 @@
+.market-login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  text-align: center;
+  color: var(--text-2);
+}
+.market-login-prompt > b {
+  color: var(--text);
+  font-size: 15px;
+}
+.market-login-prompt > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.market-login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+}
+.market-login-actions > p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+}
+.market-login-prompt.compact {
+  gap: 6px;
+  font-size: 12px;
+}
+.market-login-prompt.compact > b {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.market-login-prompt.compact .primary-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.mini-chart-login {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+.mini-chart-interactive .mini-chart-login {
+  top: 36px;
+}
+.market-quota-notice {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+.wb-login { display: flex; justify-content: center; margin: 4px 0 10px; }

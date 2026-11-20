@@ -19,6 +19,7 @@ import {
   YAHOO_SOURCE,
 } from './YahooNormalizer';
 import { isIndexSymbol, SESSION_CLOSE_SOURCE_QUALIFIER } from './MarketProfile';
+import { isMarketLoginRequired, isMarketQuotaError, marketProxyAccess, type MarketProxyAccess } from './marketProxyAccess';
 
 /** User-facing provenance of every result served through the Supabase `market-chart` function. */
 export const EDGE_YAHOO_SOURCE = 'Yahoo 延遲行情（Supabase 代理，非即時）';
@@ -49,6 +50,8 @@ export interface EdgeYahooProviderOptions {
   dailyTtlMs?: number;
   /** Raw responses kept in memory (oldest evicted first); default 24. */
   maxEntries?: number;
+  /** Login/quota gate; default the site-wide `marketProxyAccess`. */
+  access?: MarketProxyAccess;
 }
 
 interface RawEntry {
@@ -119,6 +122,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
   private readonly intradayTtlMs: number;
   private readonly dailyTtlMs: number;
   private readonly maxEntries: number;
+  private readonly access: MarketProxyAccess;
   private readonly recent = new Map<string, RawEntry>();
   private readonly inFlight = new Map<string, InFlight>();
   private readonly revisions = new Map<string, number>();
@@ -132,6 +136,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
     this.intradayTtlMs = options.intradayTtlMs ?? 60_000;
     this.dailyTtlMs = options.dailyTtlMs ?? 300_000;
     this.maxEntries = options.maxEntries ?? 24;
+    this.access = options.access ?? marketProxyAccess;
   }
 
   /** False when no proxy URL was configured at build time. */
@@ -148,6 +153,7 @@ export class EdgeYahooProvider implements MarketDataProvider {
     const fresh = new EdgeYahooProvider(this.proxyUrl, {
       now: this.now,
       timeoutMs: this.timeoutMs,
+      access: this.access,
       fetcher: (input, init) => {
         const url = new URL(String(input));
         url.searchParams.set('_refresh', crypto.randomUUID());
@@ -381,6 +387,11 @@ export class EdgeYahooProvider implements MarketDataProvider {
   }
 
   private async download(symbol: string, timeframe: YahooTimeframe, signal: AbortSignal, includeEvents = false): Promise<RawEntry> {
+    // Signed out / over quota fails here, before the timeout starts and without any request.
+    if (!this.access.canRequest()) {
+      await this.access.authorize();
+      signal.throwIfAborted();
+    }
     const controller = new AbortController();
     const forward = () => controller.abort(abortError(signal));
     signal.addEventListener('abort', forward, { once: true });
@@ -394,12 +405,14 @@ export class EdgeYahooProvider implements MarketDataProvider {
       try {
         const url = this.requestUrl(symbol, timeframe);
         const eventUrl = includeEvents ? url.replace(/([?&])events=0(?=&|$)/, '$1events=1') : url;
-        response = await this.fetcher(eventUrl, {
+        response = await this.access.fetch(this.fetcher, eventUrl, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         });
       } catch (error) {
         if (signal.aborted && !timedOut) throw abortError(signal);
+        // Signed out or over quota: nothing more to try, and nothing to report as a network failure.
+        if (isMarketLoginRequired(error) || isMarketQuotaError(error)) throw error;
         throw new MarketDataUnavailableError(timedOut ? `${symbol} 行情來源回應逾時` : `${symbol} 無法連線至行情來源`, { cause: error });
       }
       if (!response.ok) {

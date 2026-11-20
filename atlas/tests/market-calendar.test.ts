@@ -3,6 +3,10 @@ import fixture from './fixtures/market-calendar.json';
 import { calendarSessionOpen, MarketCalendarStore, parseMarketCalendar } from '../src/market-data/MarketCalendar';
 import { getMarketProfile } from '../src/market-data/MarketProfile';
 import { LiveQuoteFeed } from '../src/market-data/LiveQuotes';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 const us = getMarketProfile('AAPL'), tw = getMarketProfile('2330.TW');
 const at = (date: string) => Date.parse(date);

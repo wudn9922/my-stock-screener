@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { mockDeviceAccount, accountDatabase } from './account-fixture';
+import { mockDeviceAccount, accountDatabase, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 import { openPanel, closePanel } from '../e2e/site-helpers';
 import { chooseDrawingTool } from '../e2e/drawing-picker-helper';
 import { universeBody } from '../tests/fixtures/industry/universeGen';
+import { isCompactConsole } from './console-nav';
 
 async function setup(page: Page) {
   await mockSite(page);
@@ -89,16 +90,34 @@ test('permission display is immediately before data health at the foot of every 
   for (const route of ['markets', 'world&view=fx', 'themes', 'screener', 'watchlist', 'console', 'chart&symbol=AAPL']) {
     await page.goto(`./?page=${route}`);
     const footer = page.locator('.site-data-footer');
-    await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
-    expect(await footer.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
-    expect(await footer.evaluate(element => element.lastElementChild?.classList.contains('data-health'))).toBe(true);
+    if (isCompactConsole(page)) {
+      // Phones and tablets move the permission display and data health to 我的 › 資料狀態; no page ends with them.
+      await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(0);
+      await expect(page.locator('.data-health')).toHaveCount(0);
+    } else {
+      await expect(footer.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
+      expect(await footer.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
+      expect(await footer.evaluate(element => element.lastElementChild?.classList.contains('data-health'))).toBe(true);
+    }
     expect(await footer.evaluate(element => element === document.getElementById('main')!.lastElementChild)).toBe(true);
+    expect(await noOverflow(page)).toBeLessThanOrEqual(1);
+  }
+  if (isCompactConsole(page)) {
+    await page.goto('./?page=console&view=status');
+    await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toHaveCount(1);
+    expect(await page.getByRole('complementary', { name: '目前儲存權限' }).evaluate(element => element.nextElementSibling?.classList.contains('data-health'))).toBe(true);
     expect(await noOverflow(page)).toBeLessThanOrEqual(1);
   }
   await page.goto('./?page=screener&group=tw_all');
   const list = page.locator('.screener-list');
   await expect(list).toBeVisible();
-  expect((await list.boundingBox())!.height).toBeGreaterThan(page.viewportSize()!.height * .75);
+  const box = (await list.boundingBox())!;
+  if (page.viewportSize()!.width < 1100) {
+    // Phone and tablet: the list fills the screen from the column header down to the actions docked above the tab bar.
+    const dock = (await page.locator('.screener-dock').boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(dock.y + 1);
+    expect(box.y + box.height).toBeGreaterThan(dock.y - 32);
+  } else expect(box.height).toBeGreaterThan(page.viewportSize()!.height * .75);
 });
 
 test('Chinese heatmap preserves original identities and makes narrow cell names readable', async ({ page }) => {
@@ -113,6 +132,7 @@ test('Chinese heatmap preserves original identities and makes narrow cell names 
 });
 
 test('historical P/E follows the full-height K-line with an actual zoomable time series and a clear missing-data state', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await setup(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
@@ -135,6 +155,7 @@ test('historical P/E follows the full-height K-line with an actual zoomable time
 });
 
 test('a currently loss-making stock keeps historical P/E and explicitly says current P/E is inapplicable', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await setup(page);
   const history = JSON.parse(readFileSync(new URL('../../docs/report/financials/AAPL.json', import.meta.url), 'utf8'));
   for (const [key, count] of [['annual', 2], ['quarterly', 8]] as const) {

@@ -1,11 +1,24 @@
+import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { accessEnvelope, installLineAccount, mockDeviceAccount } from './account-fixture';
+import { accessEnvelope, installLineAccount, mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
 
 const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: true });
 const importer = (page: Page) => panel(page).getByRole('region', { name: '匯入持股', exact: true });
 const fixture = (name: string) => new URL(`../tests/fixtures/holdings/${name}`, import.meta.url).pathname;
+async function selectHoldings(page: Page) {
+  const toolbar = page.locator('.watchlist-board .wb-toolbar');
+  await toolbar.waitFor({ state: 'visible' });
+  const sheet = page.getByRole('dialog', { name: '清單操作' });
+  if (await sheet.isVisible()) await page.getByRole('button', { name: '關閉清單操作' }).click();
+  if (await page.locator('.site-tabbar').isVisible()) {
+    // On phones 持股 is the fourth underline tab; desktop retains the original view switch.
+    await toolbar.getByRole('button', { name: '持股', exact: true }).click();
+  } else {
+    await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  }
+}
 async function open(page: Page) {
   await mockSite(page, { fundamentals: true });
   await page.route('**/report/research/**', (route) =>
@@ -15,7 +28,7 @@ async function open(page: Page) {
     }),
   );
   await page.goto('./?page=watchlist');
-  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  await selectHoldings(page);
   await expect(panel(page)).toBeVisible();
 }
 async function create(page: Page, broker = 'cathay') {
@@ -46,6 +59,8 @@ test('guest paste previews errors, supports correction/skip, shows P&L and leaks
     logs: string[] = [];
   page.on('request', (request) => requests.push(request.url() + (request.postData() ?? '')));
   page.on('console', (message) => logs.push(message.text()));
+  // Quotes come from market-chart, which needs a LINE login; storage stays guest-only (no grant).
+  await mockMarketLogin(page);
   await open(page);
   await create(page);
   await expect(panel(page)).toContainText('重新開啟就會消失');
@@ -66,12 +81,17 @@ test('guest paste previews errors, supports correction/skip, shows P&L and leaks
   expect(requests.join('\n')).not.toMatch(/PRIVATE-LOCAL-ONLY|123\.4567890123|815\.252525252525/);
   expect(logs.join('\n')).not.toMatch(/PRIVATE-LOCAL-ONLY|123\.4567890123|815\.252525252525/);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('holdings:v1');
-  await page.getByRole('button', { name: '清單', exact: true }).click();
+  if (await page.getByRole('button', { name: '新增清單' }).isVisible()) {
+    await page.getByRole('group', { name: '行情來源' }).getByRole('button', { name: '我的清單' }).click();
+  } else {
+    await page.getByRole('button', { name: '清單', exact: true }).click();
+  }
+  await openListActions(page);
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
-  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  await selectHoldings(page);
   await expect(panel(page).getByRole('article')).toHaveCount(2);
   await page.reload();
-  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  await selectHoldings(page);
   await expect(panel(page)).toContainText('尚未匯入持股');
 });
 
@@ -97,7 +117,7 @@ test('CSV upload replaces the selected device account, survives reload, and open
   await panel(page).getByRole('textbox', { name: '手續費折扣' }).fill('0.28');
   await expect(panel(page).getByRole('article')).toContainText('預估賣出成本');
   await page.reload();
-  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  await selectHoldings(page);
   await expect(panel(page).getByRole('article')).toHaveCount(1);
   await layout(page);
   await panel(page)
@@ -176,6 +196,7 @@ test('undeployed cloud holdings fail clearly and never fall back to device persi
 });
 
 test('a Taiwan broker 複委託 account holds US stocks in USD', async ({ page }) => {
+  await mockMarketLogin(page); // quotes come from market-chart, which needs a LINE login
   await open(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
   await expect(panel(page)).toContainText('永豐美股請用匯入 CSV');
@@ -242,7 +263,7 @@ test('cloud import sends normalized positions only and reloads from the server w
   expect(positions.filter((body) => body.action === 'holdings.replaceAccount')).toHaveLength(1);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('holdings:v1');
   await page.reload();
-  await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
+  await selectHoldings(page);
   await expect(panel(page).getByRole('article')).toHaveCount(1);
 });
 
@@ -271,7 +292,8 @@ test('six compact stock rows precede totals and operations, with full details on
 
 
 test('account creation offers CSV markets and only supported API connections', async ({ page }, info) => {
-  await mockDeviceAccount(page);
+  // SinoPac API sync is offered to the administrator only (sinopac.spec covers everyone else).
+  await mockDeviceAccount(page, true);
   await open(page);
   await panel(page).getByRole('button', { name: '新增帳戶', exact: true }).click();
   await expect(panel(page).getByLabel('新增方式').getByRole('option')).toHaveText(['API 自動同步', '匯入 CSV']);

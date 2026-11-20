@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isCompactConsole, openConsoleSection } from './console-nav';
 import { expect, test } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
 import { accessEnvelope, mockDeviceAccount } from './account-fixture';
@@ -155,7 +156,7 @@ test('the original parameter API is available inside Atlas and an undeployed clo
     });
   });
   await page.goto('./?page=console');
-  await page.getByRole('button', { name: '均線參數', exact: true }).click();
+  await openConsoleSection(page, 'parameters');
   await page.getByRole('textbox', { name: '參數股票代號' }).fill('NVDA');
   await page.getByRole('combobox', { name: '參數股票分組' }).selectOption('us_g1');
   await page.getByRole('textbox', { name: '股票均線參數' }).fill('20, 50, 200');
@@ -173,7 +174,8 @@ test('the original parameter API is available inside Atlas and an undeployed clo
 
 test('data health is folded at the page bottom and reports source failures explicitly', async ({ page }) => {
   await mockSite(page, { fundamentals: true });
-  await page.goto('./?page=markets');
+  // Phones and tablets keep data health under 我的 › 資料狀態.
+  await page.goto(isCompactConsole(page) ? './?page=console&view=status' : './?page=markets');
   const health = page.locator('.data-health');
   await expect(health).not.toHaveAttribute('open');
   await health.locator('summary').click();

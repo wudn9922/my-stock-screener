@@ -15,6 +15,8 @@ import './watchlistBoard.css';
 import { MonitorSignals } from './MonitorSignals';
 import { PageFooterNote } from './PageFooterNote';
 import { loadFailureReason } from '../market-data/loadFailureReason';
+import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from './MarketLogin';
 import { StockChartList } from './StockChartList';
 import type { ParameterStock } from '../cloud/settingsApi';
 import { usePageActive } from '../app/pageActivity';
@@ -82,7 +84,7 @@ function useNear<T extends Element>() {
   return { ref, near, visible };
 }
 
-function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => void }) {
+function QuoteRow({ row, onOpen, onLoginRequired }: { row: BoardRow; onOpen: (row: BoardRow) => void; onLoginRequired?: () => void }) {
   const { ref, near, visible } = useNear<HTMLLIElement>();
   const [bars, setBars] = useState<readonly Bar[] | null>(null);
   const barsRef = useRef<readonly Bar[] | null>(null);
@@ -129,7 +131,10 @@ function QuoteRow({ row, onOpen }: { row: BoardRow; onOpen: (row: BoardRow) => v
         if (merged?.splitMismatch) replaceSplitHistory();
         setFailure(result.bars.length ? null : '來源沒有有效的日 K 資料');
       } },
-      (error: unknown) => { if (live) setFailure(loadFailureReason(error)); },
+      (error: unknown) => { if (live) {
+        setFailure(loadFailureReason(error));
+        if (isMarketLoginRequired(error)) onLoginRequired?.();
+      } },
     );
     return () => {
       live = false;
@@ -212,7 +217,9 @@ function useTrending(wanted: boolean) {
  * 自選 home: a quote board (saved list / LINE 熱門 / monitor signals with daily change and a
  * 30-day path) above the unchanged list management. Display only: it writes nothing to storage.
  */
-export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+export function WatchlistBoard({ viewSwitch, holdingsActive = false, onShowLists, list, lists, parameters, parameterError, onSelectList, openChart, navigate }: {
+  holdingsActive?: boolean;
+  onShowLists?: () => void;
   viewSwitch?: ReactNode;
   parameters: readonly ParameterStock[];
   parameterError?: string | null;
@@ -226,9 +233,12 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
   const [tab, setTab] = useState<BoardTab>(hasLists ? 'list' : 'trending');
   const [expanded, setExpanded] = useState(false);
   const [charts, setCharts] = useState(false);
+  // A row without static data needs a LINE login; one prompt for the board (rows are links).
+  const [loginRequired, setLoginRequired] = useState(false);
+  const chooseTab = (key: BoardTab) => { onShowLists?.(); setTab(key); };
   const { state: trending, retry } = useTrending(tab === 'trending');
   const liveAt = useLiveUpdatedAt();
-  useEffect(() => { setExpanded(false); setCharts(false); }, [tab, list?.id]);
+  useEffect(() => { setExpanded(false); setCharts(false); setLoginRequired(false); }, [tab, list?.id]);
   // The first saved list becomes the default source.
   useEffect(() => {
     if (hasLists) setTab('list');
@@ -254,7 +264,7 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
     empty = tab === 'list'
       ? hasLists
         ? <p>這份清單還沒有入選股票；下方「清單追蹤結果」載入後會自動更新。</p>
-        : <><p>還沒有自選清單。可以在選股頁用篩選條件建立，或在下方建立手動清單。</p>
+        : <><p>還沒有自選清單。可以到選股頁用篩選條件建立，或建立手動清單。</p>
           <button type="button" className="ghost-button" onClick={() => navigate({ page: 'screener' })}>到選股建立清單</button></>
       : trending?.status === 'error'
           ? <><p>{trending.message}</p><button type="button" className="ghost-button" onClick={retry}>重試</button></>
@@ -262,16 +272,16 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
 
   return (
     <section className="watchlist-board" aria-label="自選行情">
-      <div className="wb-toolbar">{viewSwitch}<div className="wb-tabs" role="group" aria-label="行情來源">
-        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破／跌破']] as const).map(([key, label]) => (
-          <button key={key} type="button" aria-pressed={tab === key} className={tab === key ? 'active' : ''} onClick={() => {
-            setTab(key);
+      <div className="wb-toolbar"><div className="wb-tabs" role="group" aria-label="行情來源">
+        {([['list', '我的清單'], ['trending', 'LINE 熱門'], ['signals', '突破訊號']] as const).map(([key, label]) => (
+          <button key={key} type="button" aria-pressed={!holdingsActive && tab === key} className={!holdingsActive && tab === key ? 'active' : ''} onClick={() => {
+            chooseTab(key);
             if (key === 'list' && lists[0] && list?.id !== lists[0].id) onSelectList(lists[0].id);
           }}>{label}</button>
         ))}
+      </div>{viewSwitch}
       </div>
-      </div>
-      {tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
+      {!holdingsActive && (tab === 'signals' ? <MonitorSignals openChart={openChart} /> : <>
       <div className="wb-list-toolbar">
       {tab === 'list' && hasLists && <div className="wb-list-picker" role="group" aria-label="我的自選清單">
         <label><span className="sr-only">自選清單</span><select aria-label="選擇自選清單" value={list?.id ?? lists[0]!.id} onChange={event => onSelectList(event.target.value)}>
@@ -288,16 +298,17 @@ export function WatchlistBoard({ viewSwitch, list, lists, parameters, parameterE
         <span>{listDate ? `名單日 ${formatDateTime(listDate, false)} · ` : ''}盤中每分鐘更新（Yahoo 延遲報價）</span>
       </p></PageFooterNote>
       {charts && parameterError && <p role="status">{parameterError}</p>}
+      {!charts && !empty && loginRequired && <div className="wb-login"><MarketLoginPrompt compact /></div>}
       {empty ? <div className="wb-empty" role="status">{empty}</div> : charts ? <StockChartList key={`${tab}:${list?.id ?? ''}`} rows={rows}
         parameters={parameters} groupPeriods={tab === 'list' ? list?.maList : undefined} openChart={openFromList} /> : (
         <ul className="wb-rows" aria-label="自選行情列表">
-          {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} />)}
+          {shown.map((row) => <QuoteRow key={row.symbol} row={row} onOpen={open} onLoginRequired={() => setLoginRequired(true)} />)}
         </ul>
       )}
       {!charts && rows.length > shown.length && (
         <button type="button" className="text-button wb-more" onClick={() => setExpanded(true)}>顯示全部 {rows.length} 檔</button>
       )}
-      </>}
+      </>)}
     </section>
   );
 }

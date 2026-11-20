@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openConsoleSection } from './console-nav';
+import { openListActions } from './archive-fixture';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount } from './account-fixture';
 import type { ParameterStock } from '../src/cloud/settingsApi';
 import type { SavedWatchlist } from '../src/watchlists/model';
+import { openStockMenu } from '../e2e/site-helpers';
 
 const stock = (ticker: string, group_id: string, id: number, periods: number[]): ParameterStock => ({ id, ticker, group_id,
   ma1: periods[0] ?? 0, ma2: periods[1] ?? 0, ma3: periods[2] ?? 0, ma4: periods[3] ?? 0 });
@@ -53,6 +56,7 @@ async function movingAveragePixels(host: ReturnType<Page['locator']>) {
 }
 
 async function openFixed(page: Page, symbol = '2330.TW') {
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByTestId('ma-recommendation').getByRole('button', { name: '固定為個股參數' }).click();
   return page.getByRole('dialog', { name: `${symbol} 個股均線（所有清單共用）` });
@@ -87,6 +91,7 @@ test('cloud grouped MAs render on a fresh chart; confirm updates the original ro
 test('editing an original grouped stock remains effective even when legacy dormant duplicates exist', async ({ page }) => {
   const cloud = await cloudParameters(page, [stock('NVDA', 'us_g1', 4, [29, 34, 73]), stock('NVDA', 'ungrouped', 9, [20, 50])]);
   await page.goto('./?page=console');
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.locator('tbody tr').first().getByRole('button', { name: '編輯', exact: true }).click();
@@ -105,6 +110,7 @@ test('editing an original grouped stock remains effective even when legacy dorma
 test('moving out of a group and then joining another group reuses the same id and MAs', async ({ page }) => {
   const cloud = await cloudParameters(page, [stock('AAPL', 'us_g1', 4, [17, 43])]);
   await page.goto('./?page=console');
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await table.getByRole('button', { name: '移出分組' }).click();
@@ -165,6 +171,7 @@ test('a failed save leaves both rows intact and a load error prevents saving gue
 test('continuous charts use saved stock MAs before group MAs and reset to six months; index strip is removed', async ({ page }, testInfo) => {
   await cloudParameters(page, [stock('AAPL', 'ungrouped', 4, [13, 34]), stock('NVDA', 'us_g1', 5, [29, 73])]);
   await page.goto('./?page=watchlist');
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill('六個月持續看圖');
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');

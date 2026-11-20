@@ -104,3 +104,94 @@
 @media (max-width: 767px) {
   .site .site-tabbar button { gap: 4px; font-size: 12px; }
 }
+
+/* 市場 head (phone/tablet): data date on the left, the 大盤/全球/題材 segmented control on the right.
+   At 1100px and wider the wrapper adds no box and the nav keeps its desktop placement. */
+.market-head { display: contents; }
+.market-head-date { display: none; }
+@media (max-width: 1099px) {
+  .market-head {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 14px 16px 10px;
+    background: var(--bg);
+  }
+  /* Shared with the 選股 head (資料日 on the left, 台股｜美股 on the right). */
+  .market-head-date,
+  .screener-head-date {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-2);
+    font: 400 12px/1.4 var(--font-num);
+    font-variant-numeric: tabular-nums;
+  }
+  .market-head .market-section-nav,
+  .screener-market-switch {
+    position: static;
+    flex: none;
+    margin: 0 0 0 auto;
+    padding: 2px;
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: none;
+  }
+  .market-head .market-section-nav > a,
+  .screener-market-switch > button {
+    position: relative;
+    flex: none;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 clamp(10px, 4vw, 16px);
+    border-radius: 10px;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 400;
+  }
+  /* The item is 40px tall inside the 2px container padding; this keeps the full 44px hit area. */
+  .market-head .market-section-nav > a::before,
+  .screener-market-switch > button::before { content: ''; position: absolute; inset: -2px 0; }
+  .market-head .market-section-nav > a.active,
+  .screener-market-switch > button.active { background: var(--surface-3); color: var(--text); font-weight: 700; box-shadow: none; }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .market-head { padding-left: 24px; padding-right: 24px; }
+}
+
+/* Tablet: the top bar already shows the report date, so the 市場 head keeps only the section control. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .market-head-date { display: none; }
+}
+
+/* A 我的 sub-view (phones and tablets) replaces the top bar with its own 52px header. */
+@media (max-width: 1099px) {
+  .site[data-console-view] {
+    grid-template-rows: 0 minmax(0, 1fr) calc(var(--tabbar) + var(--safe-bottom));
+  }
+  .site[data-console-view] .site-topbar {
+    visibility: hidden;
+    padding-top: 0;
+    border: 0;
+    overflow: hidden;
+  }
+  .site[data-console-view] .site-main {
+    padding-top: var(--safe-top);
+  }
+  /* Notes and the legacy-import prompt under the 我的 list follow its column. */
+  .site[data-page='console'] .site-data-footer {
+    max-width: 640px;
+    margin-inline: auto;
+    width: calc(100% - 32px);
+  }
+}

@@ -93,9 +93,44 @@ class RobustStatisticsTests(unittest.TestCase):
                 {"return": 500, "turnover20": 1e9}]  # missing close
         result = stats(rows)
         self.assertEqual((result["count"], result["liquidCount"], result["validCount"]), (7, 3, 3))
+        self.assertEqual(result["volumeUnknownCount"], 1)
         self.assertEqual(result["returnPct"], 2)
         self.assertEqual(result["medianReturnPct"], 2)
         self.assertEqual(result["upShare"], 100)
+
+    def test_unknown_turnover_is_distinct_from_known_low_or_zero_turnover(self):
+        for unknown in (None, float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(unknown=unknown):
+                result = stats([stock(1), stock(2), stock(3), stock(500, turnover=unknown),
+                                stock(500, turnover=0), stock(500, turnover=AMOUNT - 1)])
+                self.assertEqual(result["volumeUnknownCount"], 1)
+                self.assertEqual((result["count"], result["liquidCount"], result["validCount"]), (6, 3, 3))
+                self.assertEqual(result["returnPct"], 2)
+        missing = stock(500)
+        del missing["turnover20"]
+        self.assertEqual(stats([stock(1), stock(2), stock(3), missing])["volumeUnknownCount"], 1)
+
+    def test_unknown_turnover_excludes_price_and_volume_statistics(self):
+        dates = ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-27"]
+        frame = pd.DataFrame({"Close": [100, 100, 100, 100, 100], "Volume": [100] * 5}, index=pd.to_datetime(dates))
+        rows = [{**stock(ret, cap=100), "frame": frame} for ret in (1, 2, 3)]
+        outlier = pd.DataFrame({"Close": [100, 100, 200, 300, 800], "Volume": [100, 100, 100, 1000, 1000]}, index=pd.to_datetime(dates))
+        rows.append({**stock(500, cap=1e12, turnover=None), "frame": outlier})
+        result = summarize(rows, 2, dates, AMOUNT, PRICE)
+        self.assertEqual(result["volumeUnknownCount"], 1)
+        self.assertEqual(result["capWeightedReturnPct"], 2)
+        self.assertEqual(result["volumeRatio"], 1)
+        self.assertEqual((result["volumeCount"], result["pairedCount"]), (3, 3))
+        self.assertEqual(result["previousReturnPct"], 0)
+        self.assertEqual(result["momentumChange"], 0)
+
+    def test_unknown_count_survives_insufficient_sample_return(self):
+        result = stats([stock(1), stock(2), stock(500, turnover=None), stock(500, turnover=0)])
+        self.assertEqual(result["volumeUnknownCount"], 1)
+        self.assertEqual((result["count"], result["liquidCount"], result["validCount"]), (4, 2, 2))
+        self.assertIsNone(result["returnPct"])
+        self.assertEqual(result["volumeCount"], 0)
+        self.assertEqual(stats([stock(1), stock(2), stock(3)])["volumeUnknownCount"], 0)
 
     def test_thresholds_are_inclusive(self):
         result = stats([stock(1, turnover=AMOUNT, close=PRICE)] * 3)
@@ -172,12 +207,27 @@ class BuildOutputTests(unittest.TestCase):
         self.assertEqual(set(market), {"asOf", "scope", "method", "periods"})
         self.assertEqual(set(market["periods"]), {"d1", "w1", "m1", "m3"})
         expected = {"name", "count", "liquidCount", "validCount", "returnPct", "medianReturnPct", "capWeightedReturnPct",
-                    "upShare", "volumeRatio", "volumeCount", "pairedCount", "previousReturnPct", "momentumChange", "rank"}
+                    "upShare", "volumeRatio", "volumeCount", "volumeUnknownCount", "pairedCount", "previousReturnPct", "momentumChange", "rank"}
         for period in market["periods"].values():
             self.assertEqual(set(period), {"startDate", "endDate", "volumePreviousStart", "rows"})
             for entry in period["rows"]:
                 self.assertEqual(set(entry), expected)
         json.dumps(market, allow_nan=False)
+
+    def test_build_reports_unknown_volume_in_ranked_and_unranked_groups(self):
+        rows = [[f"TECH{i}", "2026-11-12", "Tech", 1, 1, 1, 1, 50, 9e6, 1e9] for i in range(3)]
+        rows += [["UNKNOWN", "2026-11-12", "Tech", 500, 500, 500, 500, 50, None, 1e12],
+                 ["ZERO", "2026-11-12", "Tech", 500, 500, 500, 500, 50, 0, 1e12],
+                 ["THIN", "2026-11-12", "Thin", 500, 500, 500, 500, 50, None, 1e12]]
+        market = self.build_us(rows)["markets"]["US"]
+        for period in market["periods"].values():
+            by_name = {row["name"]: row for row in period["rows"]}
+            self.assertEqual(by_name["Tech"]["volumeUnknownCount"], 1)
+            self.assertEqual(by_name["Tech"]["liquidCount"], 3)
+            self.assertEqual(by_name["Tech"]["medianReturnPct"], 1)
+            self.assertEqual(by_name["Thin"]["volumeUnknownCount"], 1)
+            self.assertEqual(by_name["Thin"]["liquidCount"], 0)
+            self.assertIsNone(by_name["Thin"]["rank"])
 
 
 if __name__ == "__main__":

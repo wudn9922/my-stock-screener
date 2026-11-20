@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { researchFixtureBody } from './research-fixtures';
+import { closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 
 const tabs = (page: Page) => page.locator('.ws-stock-controls').getByRole('navigation', { name: '個股頁面' });
 
 async function fixtures(page: Page) {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/my-stock-screener/report/research/**', (route) => {
     const path = new URL(route.request().url()).pathname.split('/research/')[1]!;
@@ -23,21 +26,27 @@ test('K線｜財務｜價量｜研究 switch views of one stock and keep the sam
   await fixtures(page);
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
-  await expect(tabs(page).getByRole('button')).toHaveText(['K線', '財務', '價量', '研究', '建議均線', '波動率']);
+  // Phone/tablet: 建議均線 and 波動率 open from the header's 更多 (⋯) menu instead of sharing the tab row.
+  const compact = await page.getByTestId('stock-more-toggle').isVisible();
+  await expect(tabs(page).getByRole('button')).toHaveText(compact ? ['K線', '財務', '價量', '研究'] : ['K線', '財務', '價量', '研究', '建議均線', '波動率']);
   await expect(tabs(page).getByRole('button', { name: 'K線', exact: true })).toHaveAttribute('aria-current', 'page');
   // Volume analysis is a view; recommendations and volatility open from the shared header.
   await expect(page.getByTestId('volume-analysis-toggle')).toHaveCount(0);
+  await openStockMenu(page);
   await expect(page.getByTestId('volatility-toggle')).toBeVisible();
+  await closeStockMenu(page);
   await page.getByTestId('chart').evaluate((node) => { (window as unknown as { viewsChart: Element }).viewsChart = node; });
 
   await page.getByTestId('stock-tab-volume').click();
   const volume = page.getByRole('region', { name: '價量', exact: true });
   await expect(volume.getByText('上漲縮量比例', { exact: true })).toBeVisible();
   await expect(volume.getByTestId('ma-recommendation')).toHaveCount(0);
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await expect(page.getByRole('region', { name: '建議均線', exact: true })).toBeVisible();
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
   await page.getByTestId('ma-recommendation-toggle').click();
+  await closeStockMenu(page);
   await expect(page.locator('.chart-toolbar')).toBeHidden();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
 

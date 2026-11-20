@@ -13,7 +13,11 @@ def timestamp(value):
 
 
 def newer_run(run, candidates):
-    """A later creation, same workflow id and branch; event/status are irrelevant."""
+    """A later run of the same workflow id and branch; event/status are irrelevant.
+
+    Two triggers can queue runs in the same second (one producer finishing fires several workflow_run events), and
+    the concurrency group then cancels the earlier one. Run ids only grow, so an equal creation time with a larger id
+    is still the successor."""
     if (type(run.get('id')) is not int or type(run.get('workflow_id')) is not int
             or not isinstance(run.get('head_branch'), str)):
         raise ValueError('Incomplete originating run metadata')
@@ -22,7 +26,7 @@ def newer_run(run, candidates):
                if type(candidate.get('id')) is int and candidate['id'] != run['id']
                and candidate.get('workflow_id') == run['workflow_id']
                and candidate.get('head_branch') == run['head_branch']
-               and timestamp(candidate['created_at']) > created]
+               and (timestamp(candidate['created_at']), candidate['id']) > (created, run['id'])]
     return min(matches, key=lambda row: (timestamp(row['created_at']), row['id'])) if matches else None
 
 
@@ -100,7 +104,7 @@ def cancellation_decision(run_url, token, opener, hint='', needs=None):
         if initial['reason'] in ('failed-job', 'failed-run', 'timed-out'):
             return initial
         query = urllib.parse.urlencode({'branch': run['head_branch'],
-                                        'created': '>' + run['created_at']})
+                                        'created': '>=' + run['created_at']})
         for page in api.pages(f'workflows/{int(run["workflow_id"])}/runs?{query}', 'workflow_runs'):
             decision = decide(run, jobs, page, hint=hint, results=results)
             if not decision['notify']:

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { reportUrl } from './loadReport';
 
 /**
- * Recommended moving averages (`report/ma-selector/<symbol>.json`), written monthly by the my-stock-screener
+ * Recommended moving averages (`report/ma-selector/<symbol>.json`), intended to refresh per stock every three months through the my-stock-screener
  * workflow `ma-recommendations.yml`, which runs ma-selector's `scripts/build_recommendations.py`. The selection rules
  * live in the ma-selector repository (production SMA selector); Atlas only reads and displays the result.
  */
@@ -108,7 +108,9 @@ export const maRecommendationSchema = z.object({
   referencePool: z.unknown().optional().transform(marketOrNull),
   /** VERSION 3: prices were dividend-adjusted (absent/invalid: false). */
   adjusted: z.unknown().optional().transform((value) => value === true),
-  /** VERSION 3: scoring mode identifier; accepted, never displayed (absent/invalid: null). */
+  /** Additive accounting mode; absent or unknown modes remain readable as legacy data. */
+  windowMode: z.unknown().optional().transform((value) => (typeof value === 'string' ? value : null)),
+  /** VERSION 3: scoring mode identifier (absent/invalid: null). */
   scoring: z.unknown().optional().transform((value) => (typeof value === 'string' ? value : null)),
   suitability: z
     .unknown()
@@ -151,7 +153,19 @@ export function maMetaParts(data: Pick<MaRecommendation, 'costPct' | 'referenceP
   return parts;
 }
 
-const MISSING = '這檔股票還沒有建議均線（每月更新；只涵蓋報告的台股與 S&P 500）。';
+/** Only corrected period+range windows support comparable drawdown and trade metrics. */
+export const hasComparableMaWindow = (data: Pick<MaRecommendation, 'windowMode' | 'scoring'>): boolean =>
+  data.windowMode === 'mark_to_market' && data.scoring === 'period+range+mark_to_market';
+
+/** Never substitute an old hardcoded pool size when the batch did not supply it. */
+export function maReferenceDescription(data: Pick<MaRecommendation, 'ranges' | 'referencePool'>): string {
+  const sizes = [...new Set(data.ranges.flatMap((range) => range.rank ? [range.rank.n] : []))];
+  const pool = data.referencePool ? `${POOL_LABELS[data.referencePool]}基準股票` : '基準股票';
+  return sizes.length === 1 ? `${sizes[0]} 檔${pool}`
+    : sizes.length > 1 ? `${pool}（檔數依各區間排名標示）` : `${pool}（檔數未提供）`;
+}
+
+const MISSING = '這檔股票還沒有建議均線（每檔每 3 個月更新一次；涵蓋台美股全市場，新股票分批補算）。';
 
 /** Parses an already-fetched body. Never throws. */
 export function parseMaRecommendation(data: unknown, symbol: string, url = ''): MaRecommendationLoadResult {

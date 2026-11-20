@@ -237,6 +237,18 @@
   font-size: 12px;
   white-space: nowrap;
 }
+.volume-readout-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  color: #939fb7;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.volume-readout-chip.muted .indicator-name {
+  color: #939fb7;
+}
 .indicator-name {
   color: #adb6c9;
 }
@@ -2206,4 +2218,380 @@
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   line-height: 1.4;
+}
+
+/* ---- Desktop header (1100px and wider): the price block never overflows onto the symbol. When the row is short of
+   space (iPad landscape, small laptops) the quote time wraps under the price instead of spilling to the left. */
+@media (min-width: 1100px) and (max-width: 1439px) {
+  .ws-header > .ws-symbol,
+  .ws-header > .ws-stock-statistics { flex-shrink: 0; }
+  .ws-header > .ws-symbol .ws-symbol-text small { max-width: 120px; }
+  .ws-header > .ws-price-block { min-width: 240px; }
+  .ws-header > .ws-price-block > .ws-quote { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; }
+}
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .ws-header { gap: 8px; }
+  .ws-header > .ws-symbol .ws-symbol-text small { max-width: 90px; }
+}
+/* Below 1180px the refresh button keeps only its icon (its name stays in aria-label and title). */
+@media (min-width: 1100px) and (max-width: 1179px) {
+  .ws-header > .ws-price-block { min-width: 228px; }
+  .ws-header-actions .ws-refresh-button { width: 40px; gap: 0; padding: 0; justify-content: center; font-size: 0; }
+}
+
+/* ---- 個股 on phone and tablet (1099px and below): the chart is the page. One 50px title row, the price row and
+   the underline view tabs; the plot fills the rest down to the 56px toolbar docked above the tab bar. */
+@media (max-width: 1099px) {
+  .site .app-shell { background: var(--bg); }
+  .ws-header.ws-header-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-height: 0;
+    padding: 0;
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  /* The short-landscape account rule pads the desktop-style header; the title row carries its own 6px. */
+  .site.on-chart .ws-header.ws-header-compact { padding: 0; }
+  .ws-header-compact .ws-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    height: 50px;
+    padding: 6px 8px 0;
+    min-width: 0;
+  }
+  .ws-header-compact .ws-back {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: var(--text);
+  }
+  .ws-header-compact .ws-symbol {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 44px;
+    gap: 6px;
+    padding: 0;
+    border-radius: 10px;
+    background: none;
+  }
+  .ws-header-compact .ws-symbol:hover { background: none; }
+  .ws-header-compact .ws-symbol-text {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+  .ws-header-compact .ws-symbol-text b {
+    flex: none;
+    color: var(--text);
+    font: 600 18px/1.2 var(--font-num);
+    letter-spacing: 0;
+  }
+  .ws-header-compact .ws-ticker-suffix { display: none; }
+  .ws-header-compact .ws-symbol-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-size: 15px;
+  }
+  .ws-header-compact .ws-market-tag {
+    flex: none;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text-2);
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .ws-header-compact .ws-symbol-icon { flex: none; color: var(--text-3); }
+  .ws-header-compact .ws-header-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-left: 0;
+  }
+  .ws-header-compact .ws-header-actions .icon-button,
+  .ws-header-compact .ws-header-actions > .ws-stats-menu > .ws-stats-toggle {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+    color: var(--text);
+  }
+  .ws-header-compact .ws-header-actions .icon-button.active { color: var(--accent); }
+  .ws-header-compact .ws-header-actions .ws-stats-toggle[aria-expanded='true'] { color: var(--accent); background: var(--surface-2); }
+
+  /* Price row: 30px price and change, then 「延遲報價 · time · 本益比 x · TTM y」. */
+  .ws-header-compact .ws-price-row { padding: 2px 16px 0; min-width: 0; }
+  .ws-header-compact .ws-price-block {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+  }
+  .ws-header-compact .ws-quote {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .ws-header-compact .ws-quote b {
+    color: var(--text);
+    font: 600 30px/1 var(--font-num);
+    letter-spacing: 0;
+  }
+  .ws-header-compact .ws-quote span { font: 400 15px/1 var(--font-num); }
+  .ws-header-compact .ws-quote small.ws-quote-unit:not(.sr-only) {
+    display: inline;
+    color: var(--text-3);
+    font-size: 12px;
+  }
+  .ws-header-compact .ws-price-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 17px;
+  }
+  .ws-header-compact .ws-price-meta :is(span, small, dt, dd) { line-height: 17px; }
+  .ws-header-compact .ws-meta-item {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  /* Separators trail their item, so a wrapped line never starts with one. */
+  .ws-header-compact .ws-meta-item:not(:last-child)::after,
+  .ws-header-compact .ws-valuation div:not(:last-child)::after {
+    content: '·';
+    margin: 0 5px;
+    color: var(--text-2);
+    font-family: var(--font-ui);
+  }
+  .ws-header-compact .ws-price-meta .demo-badge {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: 0;
+  }
+  .ws-header-compact .ws-price-meta .demo-badge.demo { color: var(--warn); }
+  .ws-header-compact .ws-live-short {
+    color: var(--text-2);
+    font: 400 12px/17px var(--font-num);
+  }
+  .ws-header-compact .ws-stock-statistics { gap: 0; }
+  .ws-header-compact .ws-valuation { display: inline-flex; gap: 0; margin: 0; padding: 0; }
+  .ws-header-compact .ws-valuation div {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+  }
+  .ws-header-compact .ws-valuation div:not(:last-child)::after { margin: 0 5px 0 1px; }
+  .ws-header-compact .ws-valuation dt { color: var(--text-2); font-size: 12px; }
+  .ws-header-compact .ws-valuation dd {
+    color: var(--text);
+    font: 400 12px/17px var(--font-num);
+  }
+  .ws-header-compact .ws-valuation dd.pe-loss { color: var(--text-3); }
+  .ws-header-compact .ws-stock-statistics > .ws-stats-menu { display: flex; }
+  /* A 20px icon with a 44px hit area. */
+  .ws-header-compact .ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle {
+    position: relative;
+    width: 20px;
+    height: 17px;
+    min-height: 17px;
+    margin-left: 2px;
+    color: var(--text-3);
+  }
+  .ws-header-compact .ws-stock-statistics > .ws-stats-menu > .ws-stats-toggle::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+  }
+  .ws-header-compact .ws-extended-line {
+    position: relative;
+    align-self: flex-start;
+    text-align: left;
+    font-family: var(--font-num);
+  }
+  .ws-header-compact .ws-extended-line::before { content: ''; position: absolute; inset: -10px 0; }
+
+  /* View tabs: underline, 40px, 22px apart. */
+  .ws-header-compact > .ws-stock-controls {
+    display: block;
+    margin-top: 6px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  /* 更多 (⋯) menu: 44px rows; 建議均線, 波動率 and 資料說明 open in place. */
+  .ws-more-menu > .ws-stats-panel {
+    padding: 6px;
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+    font-size: 14px;
+  }
+  .ws-more-list { display: flex; flex-direction: column; }
+  .ws-more-list .ws-stats-menu,
+  .ws-more-list .ws-volatility { display: block; align-self: stretch; }
+  .ws-more-item,
+  .ws-more-list .ws-stats-menu-inline > .ws-stats-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .ws-more-item > svg { flex: none; color: var(--text-2); }
+  .ws-more-list .ws-stats-menu-inline > .ws-stats-toggle > svg:last-child { margin-left: auto; color: var(--text-3); }
+  .ws-more-item:hover:not(:disabled),
+  .ws-more-list .ws-stats-menu-inline > .ws-stats-toggle:hover { background: var(--surface-3); }
+  .ws-more-item:disabled { color: var(--text-3); cursor: default; }
+  .ws-more-list .ws-stats-menu-inline > .ws-stats-toggle[aria-expanded='true'] { color: var(--accent); background: var(--surface-3); }
+  .ws-more-list .demo-switch { border: 0; background: none; color: var(--warn); }
+  .ws-more-list .ws-stats-menu-inline > .ws-stats-panel {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin: 2px 0 6px;
+    padding: 10px 12px;
+    border-color: var(--border);
+    background: var(--surface);
+    box-shadow: none;
+    font-size: 12px;
+  }
+  .ws-more-list .chart-status {
+    display: block;
+    height: auto;
+    min-height: 0;
+    margin-top: 4px;
+    padding: 10px 10px 4px;
+    border-top: 1px solid var(--border);
+    background: none;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .ws-more-list .chart-status > .status-counts { display: inline; }
+  .ws-more-list .chart-status > span[aria-hidden] { display: none; }
+
+  /* Chart: one 24px OHLC legend row, plot on --bg. */
+  .chart-stage,
+  .chart-overlay { background: var(--bg); }
+  .chart-overlay {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 24px;
+    height: 24px;
+    padding: 0 8px 0 12px;
+  }
+  .chart-overlay .ohlc-header {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-2);
+    font: 400 11px/24px var(--font-num);
+  }
+  .chart-overlay .indicator-chips { flex: 0 1 auto; max-width: 55%; height: 24px; gap: 8px; }
+  .chart-overlay :is(.indicator-chip, .legacy-volume-chip, .volume-readout-chip) { font: 400 11px var(--font-num); }
+  .chart-overlay .manage-indicators { display: none; }
+
+  /* Toolbar docked under the plot: timeframes, then 指標 and 繪圖. Full screen and 更多面板 are in the ⋯ menu
+     (and back here in full-screen mode, where the header is hidden). */
+  .app-shell > .chart-toolbar { order: 2; }
+  .chart-toolbar {
+    height: 56px;
+    gap: 6px;
+    padding: 0 12px;
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  .chart-toolbar .timeframe-buttons {
+    flex: 0 1 auto;
+    gap: 0;
+    margin-right: auto;
+    padding: 2px;
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  .chart-toolbar .timeframe-buttons button {
+    position: relative;
+    min-width: 0;
+    height: 40px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--text-2);
+    font: 400 13px var(--font-num);
+  }
+  .chart-toolbar .timeframe-buttons button::before { content: ''; position: absolute; inset: -2px 0; }
+  .chart-toolbar .timeframe-buttons button:hover:not(:disabled) { background: none; color: var(--text); }
+  .chart-toolbar .timeframe-buttons button.active {
+    background: var(--surface-3);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .chart-toolbar .toolbar-button {
+    flex-direction: row;
+    gap: 0;
+    height: 44px;
+    min-width: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: none;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .chart-toolbar .toolbar-button svg { display: none; }
+  .chart-toolbar .toolbar-button.active { border-color: var(--accent); background: none; color: var(--accent); }
+  .app-shell:not(.chart-focus) > .chart-toolbar > .chart-toolbar-right { display: none; }
+  .chart-toolbar-right .icon-button { width: 44px; height: 44px; }
+}
+/* Narrow phones: the badge and search hint give way to the stock name. */
+@media (max-width: 359px) {
+  .ws-header-compact .ws-market-tag,
+  .ws-header-compact .ws-symbol-icon { display: none; }
+}
+
+/* 分享個股連結 inside the desktop 行情資料說明 menu (phone/tablet share from the header icon). */
+.source-details .ws-share-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 12px;
 }

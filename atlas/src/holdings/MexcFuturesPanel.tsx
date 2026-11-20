@@ -1,7 +1,7 @@
 import type { MexcFutures } from '../../../supabase/functions/user-settings/mexcFuturesContract';
 import { Money, formatAmount } from './model';
 import { formatHoldingPrice, formatHoldingPnl } from './displayFormat';
-import { formatDateTime } from '../ui/format';
+import { formatDateTime, toneClass } from '../ui/format';
 import './mexcFutures.css';
 
 const text = (value: string) => {
@@ -9,7 +9,8 @@ const text = (value: string) => {
   return whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction ? '.' + fraction : '');
 };
 const signed = formatHoldingPnl;
-const tone = (value: string) => (value.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit');
+// 盈虧顏色跟隨使用者的漲跌配色設定（紅漲綠跌或相反），多空方向仍用固定色
+const tone = (value: string) => toneClass(Number(value));
 
 export function futuresReturn(unrealized: string, margin: string): string {
   if (new Money(margin).isZero()) return '—';

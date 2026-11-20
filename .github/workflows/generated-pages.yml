@@ -23,7 +23,6 @@ on:
       - MA Recommendations
       - TW Margin Temperature
       - Squash generated snapshot
-      - 🔄 GitHub Actions 永久續命腳本
     types: [completed]
 
 permissions:
@@ -44,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,8 +58,20 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      # GitHub's Pages API occasionally fails transiently (HTTP 500, or the just-uploaded
+      # artifact not yet visible). Wait 10 minutes and retry once before failing the job,
+      # so a one-off platform hiccup does not send a failure notice. A newer run still
+      # cancels this one through the concurrency group, and deploys the latest tips.
       - name: Deploy Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait 10 minutes before retrying a failed Pages deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 600
+      - name: Retry Pages deployment once
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
   notify-system-failure:
     needs: ["deploy"]

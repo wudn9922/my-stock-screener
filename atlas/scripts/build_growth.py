@@ -68,6 +68,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from build_valuation_us import finite_number, read_json, write_atomic
+import tw_stock_dividends as stock_dividends
 
 VERSION = 1
 SOURCE = "financials+official"
@@ -339,6 +340,23 @@ def make_row(key, level, quarterly, annual):
     ]
 
 
+def restate_for_stock_dividends(document, periods):
+    """Taiwan files with stock dividend events: EPS of every period on the latest share basis (追溯調整), so a pair
+    spanning an ex-rights date is comparable. No events block → EPS left as reported (never guessed)."""
+    if document.get("market") != "TW":
+        return
+    events = stock_dividends.events_of(document)
+    if events is None:
+        return
+    for period in periods:
+        info = stock_dividends.factor(period["day"], events)
+        if info is None or info["factor"] == 1:
+            continue
+        for name in ("epsD", "epsB"):
+            if period.get(name) is not None:
+                period[name] = round(period[name] / info["factor"], 4) + 0.0
+
+
 def financials_blocks(document, today):
     """→ (quality level, quarterly block, annual block) of one financials document, or None."""
     if not isinstance(document, dict):
@@ -346,6 +364,7 @@ def financials_blocks(document, today):
     events = split_events(document)
     quarterly = read_periods(document.get("quarterly"), True, document.get("market"))
     annual = read_periods(document.get("annual"), False, document.get("market"))
+    restate_for_stock_dividends(document, quarterly + annual)
     q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS)
     y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS)
     if q is None and y is None:

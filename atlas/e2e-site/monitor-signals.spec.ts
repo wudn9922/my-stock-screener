@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openListActions } from './archive-fixture';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
 import type { MonitorSignal, MonitorSnapshot } from '../../supabase/functions/monitor-signals/contract';
@@ -6,7 +7,7 @@ import type { MonitorSignal, MonitorSnapshot } from '../../supabase/functions/mo
 const signal = (extra: Partial<MonitorSignal> = {}): MonitorSignal => ({ groupId: 'us_g1', groupName: '美股權值精選', ticker: 'NVDA', name: 'NVIDIA', market: 'US',
   direction: 'breakout_up', maPeriod: 20, sentAt: '2026-10-27T15:00:00.000Z', price: 150, maValue: 148, volumeRatio: 1.2, ...extra });
 const snapshot = (signals: MonitorSignal[]): MonitorSnapshot => ({ version: 1, generatedAt: '2026-10-28T10:00:00.000Z', windowStart: '2026-09-28T10:00:00.000Z', signals, truncated: false });
-const source = (page: Page) => page.getByRole('group', { name: '行情來源' }).getByRole('button', { name: '突破／跌破', exact: true });
+const source = (page: Page) => page.getByRole('group', { name: '行情來源' }).getByRole('button', { name: '突破訊號', exact: true });
 const panel = (page: Page) => page.getByRole('region', { name: 'Discord 突破跌破監控' });
 async function setup(page: Page, mode: 'cloud' | 'device' | 'none' = 'cloud') {
   const requested = await mockSite(page, { fundamentals: true });
@@ -35,7 +36,7 @@ test('signals sit next to LINE; group details show coalesced candles, volume and
   await page.goto('./?page=watchlist');
   await expect(source(page)).toBeVisible();
   const names = await page.getByRole('group', { name: '行情來源' }).getByRole('button').allTextContents();
-  expect(names.indexOf('突破／跌破')).toBe(names.indexOf('LINE 熱門') + 1);
+  expect(names.indexOf('突破訊號')).toBe(names.indexOf('LINE 熱門') + 1);
   await source(page).click();
   await expect(panel(page).getByRole('button', { name: '美股權值精選 詳細', exact: true })).toBeVisible();
   await expect(panel(page).locator('.monitor-group').first()).toContainText('突破 1');
@@ -115,6 +116,7 @@ test('a missing reader is explained and retry recovers without breaking saved li
   await expect(panel(page).getByRole('alert')).toContainText('監控訊號讀取服務尚未啟用');
   await panel(page).getByRole('button', { name: '重試', exact: true }).click();
   await expect(panel(page).getByRole('status')).toContainText('最近沒有成功發送');
+  await openListActions(page);
   await expect(page.getByRole('button', { name: '建立手動清單', exact: true })).toBeVisible();
 });
 

@@ -1,0 +1,119 @@
+/* 我的 on phones and tablets (1099px and below): account card (storageNotice.css), grouped link rows and full-page
+   sub-views. Elements here render only in that layout; the desktop page keeps its tabs. */
+.me-group-label {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+.me-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.me-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 15px;
+  text-decoration: none;
+}
+.me-row:last-child { border-bottom: 0; }
+a.me-row:active { background: var(--surface-2); }
+a.me-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.me-row-label { flex: none; }
+.me-row-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.me-row-end svg { flex: none; }
+.me-row-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-row-value .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+/* 漲跌顏色: 56px row with an inline two-way control. */
+.me-row-color { min-height: 56px; padding: 0 12px 0 16px; }
+.me-seg {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.me-seg > button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+/* The item is 40px; the extra 2px each side keeps the whole 44px control tappable. */
+.me-seg > button::before { content: ''; position: absolute; inset: -2px 0; }
+.me-seg > button.active { background: var(--surface-3); color: var(--text); font-weight: 600; }
+.me-seg > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* ▲ shows the colour that option means: 紅漲 is red, 綠漲 is green, whichever convention is active. */
+:root:not([data-colors='us']) .me-opt-tw .me-tri,
+:root[data-colors='us'] .me-opt-us .me-tri { color: var(--up); }
+:root:not([data-colors='us']) .me-opt-us .me-tri,
+:root[data-colors='us'] .me-opt-tw .me-tri { color: var(--down); }
+
+/* Sub-view: 52px header (back 44x44 + title) over today's forms. */
+.me-subhead {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 52px;
+  margin: 0 -16px 8px;
+  padding: 0 16px 0 4px;
+  background: var(--bg);
+}
+.me-subhead h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 700; }
+.me-back {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+}
+.me-back:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.me-subbody { display: block; min-width: 0; }
+.me-stack { display: grid; gap: 12px; min-width: 0; }
+.me-app { padding: 16px; border-radius: 16px; }
+.me-app .pwa-install { margin: 0; padding: 0; border: 0; background: none; }
+.me-live-note { margin: 8px 0 0; }
+
+.console-me { max-width: 672px; padding: 0 16px 24px; }
+.console-me > .page-head { display: none; }
+.console-me.console-sub { padding-top: 0; }
+@media (max-width: 767px) {
+  .console-me { padding: 0 16px 24px; }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .console-me { padding-bottom: 32px; }
+}

@@ -14,7 +14,7 @@ job, not a design job.
   as inline CSS: read the values, do not estimate them from a screenshot.
 - The numbers in the references are a snapshot (report day 2026/11/09). The line and candle shapes are
   drawn by hand as placeholders: real pages keep using real data and the existing chart engine.
-- Scope is the phone layout (`max-width: 767px`). At 768px and wider only the tokens and fonts in step 1
+- Scope is the phone and tablet portrait layout (`max-width: 1099px`). At 1100px and wider only the tokens and fonts in step 1
   change; no desktop layout is redesigned in this round.
 
 ## Rules for every step
@@ -31,6 +31,7 @@ job, not a design job.
    changed assertion and why in the PR. Never skip or loosen a test for any other reason.
 7. Each PR is a draft and carries one 390px-wide screenshot per changed screen (the cost rules allow this
    for layout changes), plus a short list of every place it differs from the reference and why.
+8. Check each PR at 820×1180 (iPad Air portrait) and 1180×820 (iPad Air landscape), as well as 390px.
 
 ## Tokens (step 1 applies them; later steps only use them)
 
@@ -80,9 +81,11 @@ job, not a design job.
    view tabs sit under it, and the plot fills everything down to a 56px toolbar (timeframes, 指標, 繪圖)
    docked above the tab bar. At 390x844 the chart area must be at least 60% of the viewport height.
    `e2e-site/workspace-refinements.spec.ts` measures the header: update it to the new, shorter header.
+   On iPad landscape (1180×820), the stock header symbol `2330.TW` overlaps the price on main; fix this pre-existing issue in step 5.
    Everything in today's header menus (更新 K 線, 建議均線, 波動率, data notes, share) stays reachable.
 6. **我的** (`me.html`). Account card, then grouped setting rows. 個股均線參數 and 自訂分組 open as
    sub-views that hold today's forms unchanged; 資料狀態 and 備份與還原 likewise.
+7. **沒有設計稿的畫面統一字體。** 財務頁與市場頁次要卡片（市場寬度、突破、警示）的價格、百分比、數字改用 `--font-num`。
 
 ## How review works
 

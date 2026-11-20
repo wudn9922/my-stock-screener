@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { buildReport, mockSite } from './mocks';
+import { consoleEntry, isCompactConsole, openConsoleSection } from './console-nav';
 import {
   accessEnvelope,
   accountDatabase,
@@ -56,7 +57,27 @@ const legacyDocument = {
 async function expectConsoleReady(page: Page) {
   // The footer card is outside the route's Suspense boundary. Its enabled button
   // can appear before ConsolePage mounts and moves it during a WebKit click.
-  await expect(page.getByRole('region', { name: '原有均線參數控制台' })).toBeVisible();
+  if (isCompactConsole(page)) await expect(consoleEntry(page, 'parameters')).toBeVisible();
+  else await expect(page.getByRole('region', { name: '原有均線參數控制台' })).toBeVisible();
+}
+
+// The lazy 我的 page is mounted and settled: its parameter console (desktop) or its first row (phones and tablets).
+async function expectConsoleMounted(page: Page) {
+  if (isCompactConsole(page)) {
+    await expect(consoleEntry(page, 'parameters')).toBeVisible();
+    return;
+  }
+  await expect(page.getByRole('heading', { name: '個股均線（所有清單共用）', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
+}
+
+// Phones and tablets keep the storage notice (and its re-check button) under 我的 › 資料狀態; the import prompt stays
+// at the foot of the 我的 list.
+async function openStorageNotice(page: Page) {
+  if (isCompactConsole(page)) await openConsoleSection(page, 'status');
+}
+async function closeStorageNotice(page: Page) {
+  if (isCompactConsole(page)) await page.getByRole('button', { name: '返回我的', exact: true }).click();
 }
 
 async function seedBrowser(page: Page, mode: TestStorageMode, populatedAccount: boolean) {
@@ -214,8 +235,7 @@ for (const mode of ['device', 'cloud'] as const) {
     await page.getByRole('button', { name: '我的', exact: true }).click();
     // The footer sits outside Suspense. Wait for the lazy page and its initial
     // layout before scrolling to/tapping the import action on mobile WebKit.
-    await expect(page.getByRole('heading', { name: '個股均線（所有清單共用）與個人分組', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
+    await expectConsoleMounted(page);
     const card = page.getByTestId('legacy-import-card');
     await expect(card).toBeVisible();
     await expect(card).toContainText(/畫線\s*2/);
@@ -251,9 +271,10 @@ for (const mode of ['device', 'cloud'] as const) {
     await expect(page.getByTestId('ohlc-header')).toBeVisible();
     await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
     await page.getByRole('button', { name: '我的', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '個股均線（所有清單共用）與個人分組', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '重新載入參數', exact: true })).toBeEnabled();
+    await expectConsoleMounted(page);
+    await openStorageNotice(page);
     await page.getByTestId('legacy-import-reopen').click();
+    await closeStorageNotice(page);
     await expect(page.getByTestId('legacy-import-card')).toBeVisible();
     await expectConsoleReady(page);
     await page.getByTestId('legacy-import-confirm').click();
@@ -296,9 +317,11 @@ test('dismissal is per browser account, can be reopened, and leaves legacy avail
   await page.getByTestId('legacy-import-dismiss').click();
   await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
   await page.reload();
+  await openStorageNotice(page);
   await expect(page.getByTestId('legacy-import-reopen')).toBeVisible();
   await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
   await page.getByTestId('legacy-import-reopen').click();
+  await closeStorageNotice(page);
   await expectConsoleReady(page);
   await page.getByTestId('legacy-import-confirm').click();
   await expect(page.getByTestId('legacy-import-card')).toContainText(/匯入完成|已匯入/);
@@ -309,7 +332,9 @@ test('dismissal is per browser account, can be reopened, and leaves legacy avail
     state.__lineToken = `token-${id}`;
     window.dispatchEvent(new Event('focus'));
   }, SECOND_USER_ID);
+  await openStorageNotice(page);
   await expect(page.getByRole('complementary', { name: '目前儲存權限' })).toContainText(SECOND_USER_ID);
+  await closeStorageNotice(page);
   await expect(page.getByTestId('legacy-import-card')).toBeVisible();
   await expectConsoleReady(page);
   await page.getByTestId('legacy-import-confirm').click();

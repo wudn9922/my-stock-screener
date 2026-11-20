@@ -1,6 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from breakout_alert.atlas_links import append_atlas_link
 from breakout_alert.supabase_store import (
     SupabaseStore,
 )
@@ -395,8 +396,8 @@ class CacheQueryService:
 
         message = "\n".join(lines)
 
-        # Discord 單則訊息上限為 2,000 字元
-        return message[:1950]
+        # Discord 單則訊息上限為 2,000 字元；連結固定保留在最後一行
+        return append_atlas_link(message, ticker, 1950)
 
     def close(self):
         self.store.close()

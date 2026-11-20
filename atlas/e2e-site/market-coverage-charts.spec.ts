@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { buildReport, dailyBars, mockSite } from './mocks';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { formatMarketVolume } from '../src/ui/format';
 
 test('screener chart review follows filters and search, returns to the same rows and scrolls all sixty charts', async ({ page }, info) => {
@@ -13,7 +13,8 @@ test('screener chart review follows filters and search, returns to the same rows
   const expected = await page.locator('.screener-row .row-id > small').allTextContents();
   const charts = page.getByRole('region', { name: '連續股票圖表' });
   const toggle = page.locator('.screener-chart-toggle');
-  await expect(toggle).toHaveText('連續看全部股票圖表（3 檔）');
+  // Phone and tablet dock the toggle above the tab bar with the shorter label.
+  await expect(toggle).toHaveText(page.viewportSize()!.width < 1100 ? '連續看圖 · 3 檔' : '連續看全部股票圖表（3 檔）');
   await toggle.click();
   await expect(charts.locator('.stock-chart-name h3')).toHaveText(expected);
   const first = charts.locator('.stock-chart-card').first();
@@ -48,6 +49,7 @@ test('screener chart review follows filters and search, returns to the same rows
 });
 
 test('published whole-market RS leads comparison and stays independent of comparison controls', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page, { universe: { fields: ['symbol', 'rsRank', 'asOf'], markets: {
     TW: { scope: 'full', benchmark: '^TWII', asOf: '2026-10-29', rows: [['2330.TW', 87, '2026-10-29']] },
   } } });
@@ -69,6 +71,7 @@ test('published whole-market RS leads comparison and stays independent of compar
 });
 
 test('unavailable whole-market RS is explicit while the original comparison still works', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/report/universe.json', route => route.fulfill({ status: 404 }));
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
@@ -81,6 +84,7 @@ test('unavailable whole-market RS is explicit while the original comparison stil
 });
 
 test('US and TW theme candles show actual daily and aggregated weekly volume in market units', async ({ page }, info) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   for (const market of ['us', 'tw']) {
     const suffix = market === 'tw' ? '-tw' : '';

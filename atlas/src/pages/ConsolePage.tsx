@@ -1,4 +1,14 @@
-import { DisplaySettings } from '../ui/DisplaySettings';
+import { DataFacts, DisplaySettings } from '../ui/DisplaySettings';
+import { rememberConsoleListScroll } from '../app/consoleListScroll';
+import { InstallPanel } from '../pwa/InstallPanel';
+import { PushPanel } from '../push/PushPanel';
+import { webPushEnabled } from '../push/pushConfig';
+import { AppUpdate } from '../pwa/AppUpdate';
+import { DataHealthPanel } from '../ui/DataHealthPanel';
+import { StorageModeNotice } from '../ui/StorageAdminPanel';
+import { MeColorRow, MeGroup, MeRow, MeSubview, CONSOLE_VIEW_TITLES } from '../ui/MeHome';
+import { useCompactLayout } from '../ui/useCompactLayout';
+import type { ConsoleView, Route } from '../app/routes';
 import { DataStatusPanel } from '../ui/DataStatusPanel';
 import { WatchlistBoard } from '../ui/WatchlistBoard';
 import { WatchlistChanges } from '../ui/WatchlistChanges';
@@ -8,6 +18,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } fro
 import type { PageProps } from './pageProps';
 import { SecRadar } from '../ui/research/SecRadar';
 import { ParameterConsole } from '../ui/ParameterConsole';
+import { ListManager } from '../ui/ListManager';
 import { watchlistStore } from '../watchlists/store';
 import { createWatchlist, evaluateWatchlist, visitWatchlist, watchlistSchema, type WatchlistVisit } from '../watchlists/model';
 import { refreshCloudWatchlist } from '../watchlists/cloud';
@@ -33,23 +44,38 @@ import { getDailyBars, getScreenerPeFigures } from '../app/dataSources';
 import { loadScreenerFixedMAs } from './screenerFixedMAs';
 import { HoldingsPanel } from '../holdings/HoldingsPanel';
 import { getStorageContextKey } from '../auth/storage';
+import { useDialogFocus } from '../ui/useDialogFocus';
 import { useStockParameters } from '../cloud/useStockParameters';
 import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters';
 import { loadPeRiverFile } from '../fundamentals/peRiverRank';
 import { useWhileActive } from '../app/pageActivity';
 import { chartList } from '../app/listContext';
+import { watchlistActionsRequest } from '../app/watchlistActionsRequest';
 
 type CloudList = { id: string; definition: unknown; updated_at: string };
 
-export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings' }: PageProps & { list?: string; section?: 'lists' | 'settings' }) {
+export default function ConsolePage({ report, navigate, openChart, list: requested, section = 'settings', view }: PageProps & {
+  list?: string;
+  section?: 'lists' | 'settings';
+  /** Phone/tablet 我的 sub-view (`?page=console&view=…`); the desktop page keeps its tabs. */
+  view?: ConsoleView;
+}) {
+  const compact = useCompactLayout();
+  const me = section === 'settings' && compact;
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const cloudAllowed = access.storageMode === 'cloud';
   const store = watchlistStore();
   const sync = watchlistCloudSync(store);
   const { document, error: storageError } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const selected = document.lists.find((entry) => entry.id === requested) ?? document.lists[0];
-  const [settingsTab, setTab] = useState<'parameters' | 'admin' | 'display' | 'status'>('parameters');
+  const [settingsTab, setTab] = useState<'parameters' | 'manage' | 'admin' | 'display' | 'status'>(view === 'lists' ? 'manage' : 'parameters');
   const [listsView, setListsView] = useState<'lists' | 'holdings'>('lists');
+  // A 「管理清單」 link from the chart opens the desktop 清單 tab even when this page was kept mounted.
+  const [shownView, setShownView] = useState(view);
+  if (shownView !== view) {
+    setShownView(view);
+    if (view === 'lists') setTab('manage');
+  }
   const tab = section === 'lists' ? listsView : settingsTab === 'admin' && !access.isAdmin ? 'parameters' : settingsTab;
   const [visit, setVisit] = useState<(WatchlistVisit & { reasons?: WatchlistChangeReasons }) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +86,20 @@ export default function ConsolePage({ report, navigate, openChart, list: request
   const [cloudMessage, setCloudMessage] = useState('');
   const [cloudLists, setCloudLists] = useState<CloudList[]>([]);
   const [creating, setCreating] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const pendingActions = useSyncExternalStore(watchlistActionsRequest.subscribe, watchlistActionsRequest.getSnapshot);
+  useDialogFocus(actionsOpen, 'watchlist-actions');
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setActionsOpen(false); } };
+    globalThis.document.addEventListener('keydown', close);
+    return () => globalThis.document.removeEventListener('keydown', close);
+  }, [actionsOpen]);
+  useEffect(() => {
+    if (section !== 'lists' || !pendingActions) return;
+    setActionsOpen(true);
+    watchlistActionsRequest.consume();
+  }, [section, pendingActions]);
   const [name, setName] = useState('');
   const [manual, setManual] = useState('');
   const [market, setMarket] = useState<'TW' | 'US'>('TW');
@@ -253,6 +293,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
     anchor.click();
     URL.revokeObjectURL(url);
   };
+  const importFile = (file: File | undefined) => {
+    if (file)
+      void file.text().then((raw) =>
+        action(() => {
+          if (confirm('匯入會取代目前的條件清單，建議先匯出備份。是否繼續？')) {
+            store.importJson(raw);
+            setAttempt((value) => value + 1);
+          }
+        }),
+      );
+  };
   const create = (event: FormEvent) => {
     event.preventDefault();
     action(() => {
@@ -291,6 +342,92 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         : '已儲存的選股群組'
     : '';
 
+  if (me) {
+    const reportDate = report.status === 'ok' ? report.report.reportDate : null;
+    // A sub-view entry the list pushed marks itself, so Back can pop to the list; a deep link, reload of an older
+    // entry or a return through the tab bar has no list before it and opens the list in place instead.
+    const go = (route: Route) => {
+      if (route.page === 'console') rememberConsoleListScroll();
+      navigate(route, route.page === 'console' ? { state: { consoleFromList: true } } : undefined);
+    };
+    const back = () => {
+      if ((window.history.state as { consoleFromList?: boolean } | null)?.consoleFromList === true) window.history.back();
+      else navigate({ page: 'console' }, { replace: true });
+    };
+    const content = (shown: ConsoleView) => {
+      switch (shown) {
+        case 'parameters':
+          return <ParameterConsole part="stocks" />;
+        case 'lists':
+          return <ListManager openChart={openChart} navigate={navigate} />;
+        case 'notifications':
+          return <div className="console-card me-app"><PushPanel /></div>;
+        case 'app':
+          return <div className="console-card me-app"><InstallPanel /><AppUpdate /></div>;
+        case 'status':
+          return (
+            <div className="me-stack">
+              <DataStatusPanel />
+              <section className="console-card me-facts" aria-label="報告與行情說明">
+                <DataFacts reportDate={reportDate} generatedAt={report.status === 'ok' ? report.report.generatedAt : null} />
+                <p className="muted me-live-note">盤中每分鐘更新（Yahoo 延遲報價）</p>
+              </section>
+              <StorageModeNotice />
+              <DataHealthPanel report={report} />
+            </div>
+          );
+        case 'backup':
+          return (
+            <section className="console-card me-backup" aria-label="清單備份">
+              {(error || storageError) && <p role="alert" className="console-message">{error || storageError}</p>}
+              <p className="muted">備份與還原你的自選與條件清單；匯入會取代目前的條件清單，建議先匯出備份。{!canPersist() && '目前僅暫存，未獲保存授權；登入後可匯出。'}</p>
+              <div className="console-actions">
+                <button type="button" className="ghost-button" disabled={!canPersist()} onClick={download}
+                  title={!canPersist() ? '目前僅暫存，未獲保存授權' : undefined}>匯出清單備份</button>
+                <button type="button" className="ghost-button" onClick={() => imported.current?.click()}>匯入備份</button>
+                <input type="file" ref={imported} accept="application/json,.json" hidden
+                  onChange={(event) => { importFile(event.target.files?.[0]); event.target.value = ''; }} />
+              </div>
+            </section>
+          );
+        case 'admin':
+          return access.isAdmin ? <StorageAdminPanel /> : <p className="muted">此帳號沒有管理員權限。</p>;
+      }
+    };
+    return (
+      <div className={`page console-page console-me${view ? ' console-sub' : ''}`}>
+        {view ? (
+          <MeSubview title={CONSOLE_VIEW_TITLES[view]} onBack={back}>{content(view)}</MeSubview>
+        ) : (
+          <>
+            {/* The top bar already names the page; the heading stays in the document for assistive technology and tests. */}
+            <div className="page-head"><div><h2 className="page-title">我的</h2></div></div>
+            <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
+            <MeGroup label="個人化">
+              {/* One place for 自選清單, 分組 and 圖表收藏 (the old 自訂分組 row and ?view=groups open it). */}
+              <MeRow label="清單" route={{ page: 'console', view: 'lists' }} navigate={go}
+                value="自選・分組・收藏" />
+              <MeRow label="個股均線參數" route={{ page: 'console', view: 'parameters' }} navigate={go}
+                value={<><span className="num">{Object.keys(fixedParameters).length}</span> 檔</>} />
+              {webPushEnabled() && <MeRow label="手機通知" route={{ page: 'console', view: 'notifications' }} navigate={go} />}
+            </MeGroup>
+            <MeGroup label="顯示">
+              <MeColorRow />
+              <MeRow label="安裝到主畫面" route={{ page: 'console', view: 'app' }} navigate={go} />
+            </MeGroup>
+            <MeGroup label="資料">
+              <MeRow label="資料狀態" route={{ page: 'console', view: 'status' }} navigate={go}
+                value={reportDate ? <>報告日 <span className="num">{formatDateTime(reportDate, false)}</span></> : undefined} />
+              <MeRow label="備份與還原" route={{ page: 'console', view: 'backup' }} navigate={go}
+                value={canPersist() ? <><span className="num">{document.lists.length}</span> 份清單</> : '登入後可匯出'} />
+              {access.isAdmin && <MeRow label="管理員儲存權限" route={{ page: 'console', view: 'admin' }} navigate={go} />}
+            </MeGroup>
+          </>
+        )}
+      </div>
+    );
+  }
+
   const viewSwitch = <div className="segmented console-tabs wb-view-switch" role="group" aria-label="自選檢視">
     <button type="button" className={listsView === 'lists' ? 'active' : ''} aria-pressed={listsView === 'lists'} onClick={() => setListsView('lists')}>清單</button>
     <button type="button" className={listsView === 'holdings' ? 'active' : ''} aria-pressed={listsView === 'holdings'} onClick={() => setListsView('holdings')}>持股</button>
@@ -303,9 +440,17 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         </div>
       </div>
       <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
-      {section === 'lists' && listsView === 'holdings' && viewSwitch}
-      {section === 'lists' && listsView === 'lists' && (
-        <WatchlistBoard viewSwitch={viewSwitch} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
+      {section === 'lists' && actionsOpen && <div className="wb-action-backdrop" onClick={() => setActionsOpen(false)}>
+        <section className="wb-action-sheet" role="dialog" aria-modal="true" aria-label="清單操作" data-dialog-focus="watchlist-actions" onClick={event => event.stopPropagation()}>
+          <div className="wb-action-sheet-title"><b>清單操作</b><button type="button" aria-label="關閉清單操作" onClick={() => setActionsOpen(false)}>關閉</button></div>
+          <button type="button" onClick={() => { setActionsOpen(false); navigate({ page: 'screener', group: 'universe-tw' }); }}>以篩選條件建立清單</button>
+          <button type="button" onClick={() => { setActionsOpen(false); setListsView('lists'); setCreating(true); }}>建立手動清單</button>
+          <button type="button" disabled={!canPersist()} onClick={() => { setActionsOpen(false); download(); }}>匯出清單備份</button>
+          <button type="button" onClick={() => { setActionsOpen(false); imported.current?.click(); }}>匯入備份</button>
+        </section>
+      </div>}
+      {section === 'lists' && (
+        <WatchlistBoard viewSwitch={viewSwitch} holdingsActive={listsView === 'holdings'} onShowLists={() => setListsView('lists')} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
@@ -321,6 +466,9 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         >
           均線參數
         </button>
+        <button type="button" aria-pressed={tab === 'manage'} className={tab === 'manage' ? 'active' : ''} onClick={() => setTab('manage')}>
+          清單
+        </button>
         {access.isAdmin && (
           <button type="button" aria-pressed={tab === 'admin'} className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}>
             管理員
@@ -333,12 +481,14 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           資料狀態
         </button>
       </div>}
-      {tab === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
+      {section === 'lists' && listsView === 'holdings' ? <HoldingsPanel key={getStorageContextKey()} openChart={openChart} navigate={navigate} /> : tab === 'status' ? <DataStatusPanel /> : tab === 'display' ? (
         <section className="console-card" aria-label="顯示與App"><DisplaySettings
           reportDate={report.status === 'ok' ? report.report.reportDate : null}
-          generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /></section>
+          generatedAt={report.status === 'ok' ? report.report.generatedAt : null} /><PushPanel /></section>
       ) : tab === 'admin'  && access.isAdmin ? (
         <StorageAdminPanel />
+      ) : tab === 'manage' ? (
+        <ListManager openChart={openChart} navigate={navigate} />
       ) : tab === 'parameters' ? (
         <ParameterConsole />
       ) : (
@@ -351,7 +501,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
           {selected?.market === 'US' && (
             <SecRadar key={selected.id} symbols={activeVisit?.members.map((m) => m.symbol) ?? selected.symbols} />
           )}
-          <div className="console-actions">
+          <div className="console-actions wb-legacy-actions">
             <button type="button" className="primary-button" onClick={() => navigate({ page: 'screener', group: 'universe-tw' })}>
               以篩選條件建立清單
             </button>
@@ -376,16 +526,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               accept="application/json,.json"
               hidden
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file)
-                  void file.text().then((raw) =>
-                    action(() => {
-                      if (confirm('匯入會取代目前的條件清單，建議先匯出備份。是否繼續？')) {
-                        store.importJson(raw);
-                        setAttempt((value) => value + 1);
-                      }
-                    }),
-                  );
+                importFile(event.target.files?.[0]);
                 event.target.value = '';
               }}
             />
@@ -418,7 +559,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
               </button>
             </form>
           )}
-          {!selected ? (
+          {!selected && section === 'lists' && listsView === 'lists' ? null : !selected ? (
             <div className="page-state empty">
               <b>還沒有條件清單</b>
               <p>到選股頁套用技術或財務條件後，按「存成自選清單」；可以保存多組不同策略。</p>

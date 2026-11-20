@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite } from './mocks';
 import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 
@@ -6,6 +7,9 @@ const root = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline
 // Synthetic prices: 10/22 is an individual halt on an open market date and must
 // remain. Only 10/23 is the independently audited market-wide legacy closure.
 const body = 'Date,Open,High,Low,Close,Volume\n2026-10-21,99,101,98,100,1000\n2026-10-22,100,100,100,100,0\n2026-10-23,100,100,100,100,0\n';
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading'] as const) {
   test(`closed market: ${mode} filters daily/weekly/monthly without erasing individual halts`, async ({ page }, info) => {

@@ -87,6 +87,23 @@ describe('breadth schema', () => {
     expect(tw.history.ma60Pct).toEqual([null, null]);
   });
 
+  it('keeps optional historical counts aligned, without inventing counts for legacy data', () => {
+    const legacy = parseBreadth(sample);
+    if (legacy.status !== 'ok') throw new Error('Invalid legacy breadth');
+    expect(legacy.data.markets.tw!.history.ma20Above).toBeUndefined();
+    const result = parseBreadth({ markets: { tw: { ...sample.markets.tw, history: {
+      dates: ['2026-10-07', 'bad-date', '2026-10-09'],
+      ma20Pct: [50, 50, 100], ma60Pct: [null, null, 0],
+      ma20Above: ['2', 99, 3], ma20Total: [4, 100, 3],
+      ma60Above: [0, 99, -1], ma60Total: [0, 100, 'bad'],
+    } } } });
+    if (result.status !== 'ok') throw new Error('Invalid count breadth');
+    expect(result.data.markets.tw!.history).toMatchObject({
+      dates: ['2026-10-07', '2026-10-09'], ma20Above: [2, 3], ma20Total: [4, 3],
+      ma60Above: [0, null], ma60Total: [0, null],
+    });
+  });
+
   it('reports a document without any market as missing and a non-object as invalid', () => {
     expect(parseBreadth({ version: 1, markets: {} }).status).toBe('missing');
     expect(parseBreadth({ version: 1 }).status).toBe('missing');

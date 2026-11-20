@@ -230,3 +230,6 @@
 .mexc-connected-status button { flex-shrink: 0; font-size: 12px; }
 .mexc-settings > summary { color: var(--text-3); font-size: 12px; }
 .mexc-settings[open] { display: grid; gap: 12px; }
+.holdings-default-view { grid-template-columns: minmax(0, 1fr); margin-top: 8px; }
+.holdings-default-view label { font-size: 11px; color: var(--text-3); }
+.holdings-account-title { margin: 12px 0 6px; font-size: 14px; }

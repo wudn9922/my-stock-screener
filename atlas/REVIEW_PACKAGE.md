@@ -1,3 +1,7 @@
+## 2026-11-20 Unified 清單 and chart-star 加入清單
+Primary self-review only; no independent sign-off. 我的 › 清單 shows groups, saved watchlists and chart favourites over the existing stores (no data migration); the chart star opens an optimistic multi-list picker; group joins reuse the ticker's single MA row or the ma-selector picks.
+Verification: lint, typecheck, `tests/unified-lists.test.ts`, `tests/ui-routes.test.ts` and the related e2e-site specs on desktop/mobile Chromium; WebKit could not be downloaded in this container.
+
 ## 2026-11-10 Site review polish: 我的 account card, screener toolbar and CSV export
 Primary self-review only; no independent sign-off. Presentation-only CSS/markup for the 我的 account card and heading, pinned 台股/美股 chip labels, short phone search placeholder, tab-bar marker, search-row glyphs, Open Graph tags; new `screenerCsv` export (formula-injection guarded) with unit tests.
 Verification: lint, typecheck, Pages build, `tests/screener-csv.test.ts`, and the related e2e-site specs on desktop/mobile Chromium; `workspace-refinements.spec.ts:6` (header 124.3px vs 124) and the non-CI `site.spec.ts` landing tests fail identically on unmodified main in this container. WebKit not run locally.
@@ -1570,3 +1574,7 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 - Fixed actual mobile viewport regression: 52px phone top bar, 64px bottom bar, 44px header actions. Preserves compact futures fifth-card viewport; `mexc.spec.ts:661` stays unchanged.
 - Spec-driven E2E updates: candle pixel RGB detection now matches `#FF5A5F` / `#2BC8A8`; phone watchlist heading expectation now matches the visible `自選` title. Handoff step 1 synchronized.
 - Claude locally verified targeted compact and nav cases; this push has not independently rerun CI or WebKit. `workspace-refinements.spec.ts:6` reported as a pre-existing main failure by reviewer, not altered.
+
+### Chart volume readouts (feat/chart-volume) — no independent review
+- 量比(同時間) chip + ^TWII live-bar volume rebuilt from same-source 5m bars only when earlier sessions match the daily unit (`IntradayVolume.ts`); otherwise 「今日量：盤中來源未提供」. No Edge change.
+- Verified: lint, build, related Vitest, `e2e-site/same-time-volume|live-quotes|market-calendar|research-modules` on mobile-chromium. WebKit not installable locally (download blocked); CI covers it.

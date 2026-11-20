@@ -42,6 +42,10 @@ HIGH_WINDOW = 252
 MA_WINDOW = 50
 # A constituent whose last bar is this many days older than the benchmark's last bar is treated as stale.
 STALE_DAYS = 3
+# Internal gaps may carry a close for at most three benchmark sessions. This never relaxes the
+# existing three-calendar-day freshness gate at the latest date (weekends still count there).
+# Carried closes are for alignment only: returns require observed endpoints.
+MAX_CARRY_SESSIONS = 3
 # Theme needs at least this many valid constituents to be ranked.
 MIN_VALID = 3
 # Average turnover (close x volume) per constituent: the latest 20 sessions, at least 15 of them present.
@@ -52,7 +56,8 @@ TURNOVER_MIN_DAYS = 15
 # download than a real market, and keeping yesterday's file is the safer outcome.
 MIN_COVERAGE = 0.6
 BATCH_SIZE = 40
-# Momentum score weights: w1, m1, m3 and 3-month strength relative to the benchmark.
+# Retain the existing 3-month emphasis. Within one market rs3m is an affine transform of m3,
+# not an independent ranking signal: the m3 coefficient is .30 + .25 / (1 + benchmark_m3/100).
 MOMENTUM_WEIGHTS = {"w1": 0.2, "m1": 0.25, "m3": 0.3, "rs3m": 0.25}
 
 
@@ -115,20 +120,32 @@ def parse_date(text):
     return date.fromisoformat(text)
 
 
-def align(bars, calendar, last_date):
-    """Closes on the benchmark calendar: forward-filled after the first bar, None before it."""
+def align_with_observations(bars, calendar, last_date):
+    """Bounded closes and a real-bar mask on the benchmark calendar; never backfill or look ahead."""
     by_date = {day: close for day, close in bars if day <= last_date}
-    out = []
+    out, observed = [], []
     current = None
+    gap = 0
     for day in calendar:
         if day in by_date:
             current = by_date[day]
-        out.append(current)
-    return out
+            gap = 0
+        else:
+            gap += 1
+        out.append(current if gap <= MAX_CARRY_SESSIONS else None)
+        observed.append(day in by_date)
+    return out, observed
 
 
-def period_return(values, bars_back):
+def align(bars, calendar, last_date):
+    """Closes aligned with at most MAX_CARRY_SESSIONS forward fills, and None before listing."""
+    return align_with_observations(bars, calendar, last_date)[0]
+
+
+def period_return(values, bars_back, observed=None):
     if len(values) <= bars_back:
+        return None
+    if observed is not None and not (observed[-1 - bars_back] and observed[-1]):
         return None
     start, end = values[-1 - bars_back], values[-1]
     if start is None or end is None or start <= 0:
@@ -136,22 +153,24 @@ def period_return(values, bars_back):
     return (end / start - 1) * 100
 
 
-def ytd_return(values, calendar):
+def ytd_return(values, calendar, observed=None):
     year_start = f"{calendar[-1][:4]}-01-01"
     base = None
     for index in range(len(calendar) - 1, -1, -1):
         if calendar[index] < year_start:
+            if observed is not None and not observed[index]:
+                return None
             base = values[index]
             break
     end = values[-1]
-    if base is None or end is None or base <= 0:
+    if base is None or end is None or base <= 0 or (observed is not None and not observed[-1]):
         return None
     return (end / base - 1) * 100
 
 
-def all_returns(values, calendar):
-    result = {key: period_return(values, bars) for key, bars in PERIOD_BARS.items()}
-    result["ytd"] = ytd_return(values, calendar)
+def all_returns(values, calendar, observed=None):
+    result = {key: period_return(values, bars, observed) for key, bars in PERIOD_BARS.items()}
+    result["ytd"] = ytd_return(values, calendar, observed)
     return result
 
 
@@ -165,15 +184,17 @@ def mean(values):
     return sum(values) / len(values) if values else None
 
 
-def constituent_metrics(values, calendar, bench_returns):
-    returns = all_returns(values, calendar)
+def constituent_metrics(values, calendar, bench_returns, observed=None):
+    returns = all_returns(values, calendar, observed)
     window = values[-MA_WINDOW:]
     above = None
-    if len(window) == MA_WINDOW and all(v is not None for v in window):
+    if (len(window) == MA_WINDOW and all(v is not None for v in window)
+            and (observed is None or all(observed[-MA_WINDOW:]))):
         above = values[-1] > sum(window) / MA_WINDOW
-    history = [v for v in values[-HIGH_WINDOW:] if v is not None]
+    history = [v for index, v in enumerate(values) if index >= len(values) - HIGH_WINDOW
+               and v is not None and (observed is None or observed[index])]
     from_high = None
-    if len(history) >= 60 and values[-1] is not None:
+    if len(history) >= 60 and values[-1] is not None and (observed is None or observed[-1]):
         from_high = min(0.0, (values[-1] / max(history) - 1) * 100)
     return {
         "close": values[-1],
@@ -184,17 +205,59 @@ def constituent_metrics(values, calendar, bench_returns):
     }
 
 
-def equal_weight_series(members, point_count):
-    """Daily-rebalanced equal-weight index (start 100) over the last point_count aligned closes."""
-    series = [100.0]
+def equal_weight_daily_returns(members, point_count, observed_members=None):
+    """(Daily return, contributor count), with None when no genuine consecutive closes exist."""
+    out = []
     for offset in range(-point_count + 1, 0):
         daily = []
-        for values in members:
+        for index, values in enumerate(members):
+            if observed_members is not None and not (observed_members[index][offset - 1] and observed_members[index][offset]):
+                continue
             before, after = values[offset - 1], values[offset]
             if before is not None and after is not None and before > 0:
                 daily.append(after / before - 1)
-        series.append(series[-1] * (1 + (sum(daily) / len(daily) if daily else 0.0)))
+        out.append((mean(daily), len(daily)))
+    return out
+
+
+def equal_weight_series(members, point_count, observed_members=None):
+    """Daily equal-weight index over genuine consecutive closes only.
+
+    A missing day and its recovery day both omit that member: a multi-session move must not be
+    assigned to the recovery day. With no eligible members the index holds its prior level; this
+    is an unavailable return, not evidence that the market was flat. Plain unfilled input may
+    omit observed_members; aligned/filled input must supply the masks.
+    """
+    series = [100.0]
+    for daily, _ in equal_weight_daily_returns(members, point_count, observed_members):
+        series.append(series[-1] * (1 + (daily if daily is not None else 0.0)))
     return series
+
+
+def series_data_quality(members, observed_members, dates):
+    """Optional gap diagnostics; pre-listing history is not counted as a carried or expired quote."""
+    carried, expired = 0, 0
+    for values, observed in zip(members, observed_members):
+        started = False
+        first_index = len(values) - len(dates)
+        for index, real in enumerate(observed):
+            started = started or real
+            if index >= first_index and started and not real:
+                if values[index] is None:
+                    expired += 1
+                else:
+                    carried += 1
+    contributors = [count for _, count in equal_weight_daily_returns(members, len(dates), observed_members)]
+    if not (carried or expired) and all(contributors):
+        return {}
+    return {"dataQuality": {
+        "maxCarrySessions": MAX_CARRY_SESSIONS,
+        "carriedObservations": carried,
+        "expiredObservations": expired,
+        # One count per interval; item zero ends at payload.dates[1].
+        "seriesReturnContributors": contributors,
+        "seriesUnavailableDates": [day for day, count in zip(dates[1:], contributors) if count == 0],
+    }}
 
 
 def momentum_score(returns, rs_m3):
@@ -223,7 +286,7 @@ def build_payload(prices, config, today, turnover=None):
     if len(bench_bars) < PERIOD_BARS["m6"] + 1:
         raise InsufficientData(f"{bench_symbol} history too short ({len(bench_bars)} bars)")
     constituent_symbols = sorted({t[0] for theme in config["themes"] for t in theme["tickers"]})
-    # The benchmark sets the calendar, but only days on which most constituents also have a bar count: Yahoo
+    # The benchmark sets the calendar, but a trailing day needs most constituents to have a bar: Yahoo
     # sometimes serves an index one session ahead of its stocks (^TWII had 10-12, every stock stopped at 10-08),
     # and forward-filling the stocks over that day would show a 0% one-day move for all of them.
     present = [symbol for symbol in constituent_symbols if prices.get(symbol)]
@@ -231,7 +294,11 @@ def build_payload(prices, config, today, turnover=None):
     for symbol in present:
         for day, _ in prices[symbol]:
             coverage_by_day[day] = coverage_by_day.get(day, 0) + 1
-    calendar = [day for day, _ in bench_bars if not present or coverage_by_day.get(day, 0) * 2 >= len(present)]
+    # Preserve interior benchmark sessions: deleting an outage would compress its multi-day move
+    # into a false one-day recovery return. Only trim unsupported sessions at the end.
+    calendar = [day for day, _ in bench_bars]
+    while calendar and present and coverage_by_day.get(calendar[-1], 0) * 2 < len(present):
+        calendar.pop()
     if len(calendar) < PERIOD_BARS["m6"] + 1:
         raise InsufficientData(f"{bench_symbol} calendar with constituent data too short ({len(calendar)} days)")
     last_date = calendar[-1]
@@ -242,19 +309,22 @@ def build_payload(prices, config, today, turnover=None):
     dates = calendar[-SERIES_POINTS:]
 
     def usable(symbol):
-        bars = prices.get(symbol) or []
+        bars = [(day, close) for day, close in (prices.get(symbol) or []) if day <= last_date]
         if not bars:
-            return None, "missing"
+            return None, None, "missing"
         if (last_day - parse_date(bars[-1][0])).days > STALE_DAYS:
-            return None, "stale"
-        values = align(bars, calendar, last_date)
-        return (values if values[-1] is not None else None), "missing"
+            return None, None, "stale"
+        values, observed = align_with_observations(bars, calendar, last_date)
+        if values[-1] is None:
+            return None, None, "stale"
+        return values, observed, None
 
-    cache = {}
+    cache, observations = {}, {}
     skipped = {"missing": [], "stale": []}
     for symbol in constituent_symbols:
-        values, reason = usable(symbol)
+        values, observed, reason = usable(symbol)
         cache[symbol] = values
+        observations[symbol] = observed
         if values is None:
             skipped[reason].append(symbol)
 
@@ -283,7 +353,7 @@ def build_payload(prices, config, today, turnover=None):
             values = cache.get(symbol)
             if values is None:
                 continue
-            metrics = constituent_metrics(values, calendar, bench_returns)
+            metrics = constituent_metrics(values, calendar, bench_returns, observations[symbol])
             members.append((symbol, name, note, values, metrics))
         per_period = {key: [m[4]["returns"][key] for m in members if m[4]["returns"][key] is not None] for key in PERIOD_KEYS}
         mean_returns = {key: mean(per_period[key]) for key in PERIOD_KEYS}
@@ -298,10 +368,11 @@ def build_payload(prices, config, today, turnover=None):
         momentum = momentum_score(mean_returns, rs["m3"]) if valid_count >= MIN_VALID else None
         etf = None
         if theme.get("etf"):
-            etf_values, _ = usable(theme["etf"])
+            etf_values, etf_observed, _ = usable(theme["etf"])
             if etf_values is not None:
-                etf = {"symbol": theme["etf"], "returns": rounded_returns(all_returns(etf_values, calendar))}
-        series = equal_weight_series([m[3] for m in members], SERIES_POINTS) if members else None
+                etf = {"symbol": theme["etf"], "returns": rounded_returns(all_returns(etf_values, calendar, etf_observed))}
+        series = equal_weight_series([m[3] for m in members], SERIES_POINTS,
+                                     [observations[m[0]] for m in members]) if members else None
         ordered = sorted(
             members,
             key=lambda m: (m[4]["returns"]["m1"] is None, -(m[4]["returns"]["m1"] or 0.0)),
@@ -322,6 +393,7 @@ def build_payload(prices, config, today, turnover=None):
                 "momentum": round2(momentum),
                 "rank": None,
                 "series": [round2(v) for v in series] if series else [],
+                **series_data_quality([m[3] for m in members], [observations[m[0]] for m in members], dates),
                 "constituents": [
                     {
                         "symbol": symbol,
@@ -332,6 +404,8 @@ def build_payload(prices, config, today, turnover=None):
                         "rs3m": round2(metrics["rs3m"]),
                         "aboveMa50": metrics["aboveMa50"],
                         "fromHi52": round2(metrics["fromHi52"]),
+                        **({"priceAsOf": next(day for day, _ in reversed(prices[symbol]) if day <= last_date)}
+                           if not observations[symbol][-1] else {}),
                         **turnover_field(turnover, symbol, last_date),
                     }
                     for symbol, name, note, _values, metrics in ordered

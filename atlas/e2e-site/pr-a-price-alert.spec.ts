@@ -2,10 +2,13 @@ import { expect, test } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount } from './account-fixture';
 import { openPanel } from '../e2e/site-helpers';
+import { archives } from './archive-fixture';
 
 for (const mode of ['guest', 'none', 'device', 'cloud'] as const) test(`A5 ${mode}: price alert offers Discord only through the existing cloud horizontal drawing`, async ({ page }, info) => {
   await mockSite(page);
   if (mode !== 'guest') await installLineAccount(page);
+  // Signed out, market-chart is never called: the guest chart comes from the published static archive.
+  else await archives(page, ['AAPL']);
   await page.route('**/functions/v1/user-settings', route => {
     const body = route.request().postDataJSON();
     if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(undefined, mode === 'none' ? 'none' : mode === 'cloud' ? 'cloud' : 'device') });

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { dailyBars, mockSite, yahooChart, NO_LIVE_QUOTES } from './mocks';
+import { closeStockMenu, openStockMenu } from '../e2e/site-helpers';
 
 // Deliberately simple synthetic prices: 20 TRs of 4, then one overnight gap with TR=12.
 function fixture(symbol: string, count = 22) {
@@ -24,6 +26,9 @@ function fixture(symbol: string, count = 22) {
   return payload;
 }
 
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
+
 test('daily volatility and independent volume analysis stay beside recommendations without following quote or chart timeframe', async ({ page }, testInfo) => {
   await mockSite(page);
   const intervals: string[] = [];
@@ -40,6 +45,7 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await page.goto('./?page=chart&symbol=NVDA&tf=1W');
   const stats = page.getByTestId('stock-volatility');
   await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
+  await openStockMenu(page);
   await expect(stats.getByTestId('volatility-toggle')).toHaveAccessibleName('波動率');
   await stats.getByTestId('volatility-toggle').click();
   await expect(stats.getByRole('region', { name: '波動率', exact: true })).toBeVisible();
@@ -57,14 +63,20 @@ test('daily volatility and independent volume analysis stay beside recommendatio
       overflow: document.scrollingElement!.scrollWidth - innerWidth,
     };
   });
-  expect(Math.abs(geometry.volatility - geometry.volume)).toBeLessThanOrEqual(12);
+  // Desktop: volatility sits in the tab row beside 建議均線. Phone/tablet: both are rows of the 更多 (⋯) menu.
+  if (await page.getByTestId('stock-more-toggle').isVisible()) {
+    await expect(page.locator('.ws-more-list').getByTestId('volatility-toggle')).toBeVisible();
+    await expect(page.locator('.ws-more-list').getByTestId('ma-recommendation-toggle')).toBeVisible();
+  } else expect(Math.abs(geometry.volatility - geometry.volume)).toBeLessThanOrEqual(12);
   expect(geometry.tabsOverlap).toBe(0);
   expect(geometry.overflow).toBeLessThanOrEqual(0);
+  await closeStockMenu(page);
   // 價量 opens analysis directly; recommendations remain a separate header menu.
   await page.getByTestId('stock-tab-volume').click();
   await expect(page.getByRole('region', { name: '價量', exact: true })).toBeVisible();
   await expect(page.getByTestId('stock-tab-volume')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('region', { name: '價量', exact: true }).getByTestId('ma-recommendation')).toHaveCount(0);
+  await openStockMenu(page);
   await page.getByTestId('ma-recommendation-toggle').click();
   await page.getByRole('region', { name: '建議均線', exact: true }).getByText('日 K 建議與監控參數', { exact: true }).click();
   await expect(page.getByTestId('ma-recommendation')).toBeVisible();
@@ -72,10 +84,12 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await expect(page.getByTestId('chart')).toBeHidden();
   // The volatility controls stay in the header and usable from every view.
   await expect(stats).toBeVisible();
+  await closeStockMenu(page);
   await page.getByTestId('stock-tab-chart').click();
   await expect(page.getByRole('region', { name: '價量', exact: true })).toBeHidden();
   await page.getByRole('button', { name: '週期 1D', exact: true }).click();
   await expect(stats.locator('[data-volatility-value]')).toHaveText(['4.00%', '4.00%']);
+  await openStockMenu(page);
   await stats.getByTestId('volatility-toggle').click();
   const popup = stats.getByRole('region', { name: '波動率', exact: true });
   await popup.getByText('ATR（20）% 計算說明', { exact: true }).click();
@@ -84,6 +98,7 @@ test('daily volatility and independent volume analysis stay beside recommendatio
   await expect(popup).toContainText('不含隔夜跳空');
   await page.keyboard.press('Escape');
   // Keyboard focus moving to a sibling dismisses the previous popup.
+  await openStockMenu(page);
   await stats.getByTestId('volatility-toggle').focus();
   await page.keyboard.press('Enter');
   await expect(stats.getByTestId('volatility-toggle')).toHaveAttribute('aria-expanded', 'true');
