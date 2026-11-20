@@ -109,6 +109,9 @@ import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
 import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
 import { MarketLoginPrompt } from '../ui/MarketLogin';
+import { ListPicker } from '../ui/ListPicker';
+import { symbolInAnyList } from '../lists/unifiedLists';
+import { watchlistStore } from '../watchlists/store';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
@@ -198,6 +201,8 @@ export interface ChartWorkspaceProps {
   onShowPeChart?: () => void;
   /** Phone/tablet header back button: returns to the page the chart was opened from. */
   onBack?: () => void;
+  /** Opens 我的 › 清單 from the 加入清單 sheet. */
+  onManageLists?: () => void;
 }
 
 export function App({
@@ -210,6 +215,7 @@ export function App({
   view = 'chart',
   onViewChange,
   onShowPeChart,
+  onManageLists,
   onBack,
 }: ChartWorkspaceProps = {}) {
   const store = getChartStore();
@@ -222,6 +228,10 @@ export function App({
     tf = s.preferences.timeframe;
   const providerId = state.app.provider as ProviderId;
   const parameters = useStockParameters(state.ready && providerId !== 'demo' && !symbol.startsWith('^'));
+  const savedListStore = watchlistStore();
+  const { document: savedLists } = useSyncExternalStore(savedListStore.subscribe, savedListStore.getSnapshot);
+  const [listPickerOpen, setListPickerOpen] = useState(false);
+  const closeListPicker = useCallback(() => setListPickerOpen(false), []);
   const parameter = stockParameterRows(parameters.stocks, symbol)[0];
   const parameterKey = parameter ? `${parameter.id}:${parameterMAs(parameter).join(',')}` : '';
   useEffect(() => {
@@ -376,6 +386,7 @@ export function App({
   };
   const tablet = mobile && window.innerWidth >= 768;
   const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen || quickEditing);
+  const inertBackground = modal || (active && listPickerOpen);
   const errors = useSyncExternalStore(errorLog.subscribe, errorLog.getSnapshot);
   const alertSession = useRef('');
   useDialogFocus(modal, drawingPickerOpen ? 'drawing-tool-picker' : undefined);
@@ -1215,7 +1226,17 @@ export function App({
   const showLegacyVolume =
     legacyVolumeFor(symbol, s.preferences, tf) && !activeIndicators.some((i) => i.type === 'Volume');
   const changeTone = toneClass(headerQuote?.change);
-  const inWatchlist = state.app.watchlist.includes(symbol);
+  // The star opens 加入清單 and is filled when this symbol is in any list (favourites, watchlists or a group).
+  const inAnyList = symbolInAnyList(symbol, { favorites: state.app.watchlist, watchlists: savedLists.lists, stocks: parameters.stocks });
+  const starProps = {
+    'aria-label': inAnyList ? `已在清單中，管理 ${symbol} 的清單` : `加入清單：${symbol}`,
+    title: inAnyList ? '已在清單中（點選管理）' : '加入清單',
+    'aria-haspopup': 'dialog' as const,
+    'aria-expanded': listPickerOpen,
+    'data-testid': 'list-star',
+    disabled: !state.ready,
+    onClick: () => setListPickerOpen(true),
+  };
   const peTitle = (label: string, value: number | null) =>
     value !== null
       ? `${label}${peFigures?.source ? ` · ${peFigures.source}` : ''}${peFigures?.asOf ? ` · ${peFigures.asOf}` : ''}`
@@ -1268,7 +1289,7 @@ export function App({
     ?.replace(/^(即時|延遲|模擬)報價 · /, '')
     .replace(/^已收盤 · 最後成交 (\d{2}\/\d{2}) \d{2}:\d{2}$/, '$1 收盤');
   const compactHeader = (
-    <header className="ws-header ws-header-compact" inert={modal} aria-hidden={modal}>
+    <header className="ws-header ws-header-compact" inert={inertBackground} aria-hidden={inertBackground}>
       <div className="ws-title-row">
         {onBack && (
           <button type="button" className="icon-button ws-back" aria-label="返回" title="返回" onClick={onBack}>
@@ -1291,14 +1312,9 @@ export function App({
           {onOpenSearch && <Search size={15} className="ws-symbol-icon" aria-hidden="true" />}
         </button>
         <div className="ws-header-actions">
-          <IconButton
-            label={inWatchlist ? '已加入圖表收藏' : '加入圖表收藏'}
-            active={inWatchlist}
-            disabled={inWatchlist}
-            onClick={() => store.updateApp({ watchlist: [...state.app.watchlist, symbol] })}
-          >
-            <Star size={22} fill={inWatchlist ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
-          </IconButton>
+          <button type="button" className={`icon-button ws-list-star ${inAnyList ? 'active' : ''}`} {...starProps}>
+            <Star size={22} fill={inAnyList ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
+          </button>
           <IconButton label="分享個股連結" onClick={() => void shareStock()}>
             <Share size={21} strokeWidth={1.8} aria-hidden="true" />
           </IconButton>
@@ -1419,7 +1435,7 @@ export function App({
       ref={chartFocus.containerRef}
       className={`app-shell ${tablet && sheet ? 'tablet-context-open' : ''} ${chartFocus.isFocused ? 'chart-focus' : ''} ${stockView !== 'chart' ? 'stock-view-open' : ''}`}
     >
-      {mobile ? compactHeader : <header className="ws-header" inert={modal} aria-hidden={modal}>
+      {mobile ? compactHeader : <header className="ws-header" inert={inertBackground} aria-hidden={inertBackground}>
         <button
           type="button"
           className="ws-symbol"
@@ -1508,14 +1524,9 @@ export function App({
               模擬資料 · 改用真實行情
             </button>
           )}
-          <IconButton
-            label={inWatchlist ? '已加入圖表收藏' : '加入圖表收藏'}
-            active={inWatchlist}
-            disabled={inWatchlist}
-            onClick={() => store.updateApp({ watchlist: [...state.app.watchlist, symbol] })}
-          >
-            <span className="star-glyph" aria-hidden="true">{inWatchlist ? '★' : '☆'}</span>
-          </IconButton>
+          <button type="button" className={`icon-button ws-list-star ${inAnyList ? 'active' : ''}`} {...starProps}>
+            <span className="star-glyph" aria-hidden="true">{inAnyList ? '★' : '☆'}</span>
+          </button>
           {SCREENER_HOSTING ? (
             <button className="ghost-button ws-refresh-button" type="button" aria-label={`更新 ${symbol} K 線`}
               title="只重新抓取目前股票的最新可用 K 線；Yahoo 仍為延遲行情。"
@@ -1546,7 +1557,7 @@ export function App({
         <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active />
       </section>}
       {stockViews && visitedViews.has('volume') && (
-        <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
+        <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={inertBackground} aria-hidden={inertBackground}>
           <div className="stock-view-card">
             <h2>價量分析</h2>
             <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
@@ -1554,7 +1565,7 @@ export function App({
         </section>
       )}
       {stockViews && visitedViews.has('research') && (
-        <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={modal} aria-hidden={modal}>
+        <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={inertBackground} aria-hidden={inertBackground}>
           <div className="stock-view-card">
             <Suspense fallback={<p>載入相對大盤比較…</p>}><RelativeStrengthPanel key={symbol} symbol={symbol} /></Suspense>
           </div>
@@ -1571,7 +1582,7 @@ export function App({
           )}
         </section>
       )}
-      <div className="chart-toolbar" inert={modal} aria-hidden={modal}>
+      <div className="chart-toolbar" inert={inertBackground} aria-hidden={inertBackground}>
         <div className="timeframe-buttons" ref={timeframesRef} role="group" aria-label="K 線週期">
           {timeframes
             .filter((t) => availableTimeframes.includes(t))
@@ -1656,7 +1667,7 @@ export function App({
           )}
         </div>
       </div>
-      <div className="workspace" inert={modal} aria-hidden={modal}>
+      <div className="workspace" inert={inertBackground} aria-hidden={inertBackground}>
         <main className="main-workspace">
           {result?.archive?.status === 'unavailable' && <p className="archive-availability" role="status" data-testid="archive-availability">
             即時報價暫時無法取得，顯示至 {result.archive.lastDate} 收盤
@@ -1918,6 +1929,7 @@ export function App({
           </div>
         </div>
       )}
+      {active && listPickerOpen && <ListPicker key={symbol} symbol={symbol} appStore={store} onClose={closeListPicker} onManage={onManageLists} />}
       {active && quickEditing && selectedDrawing && <ConsoleDialog title="修改畫線" onClose={() => setQuickEditing(false)}>
         <button type="button" autoFocus className="ghost-button" style={{ minHeight: 44 }} onClick={() => setQuickEditing(false)}>取消</button>
         <DrawingSettings store={store} drawing={selectedDrawing} onCancelGesture={() => engine.current?.controller?.cancel()} onSaved={() => setQuickEditing(false)} />

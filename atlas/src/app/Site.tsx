@@ -229,6 +229,7 @@ export function Site() {
       navigate(next, { ...options, state: next.page === 'chart' || next.page === 'financials' ? listState(window.history.state) : null }),
     [navigate],
   );
+  const manageLists = useCallback(() => navigate({ page: 'console', view: 'lists' }), [navigate]);
   const onSearchSelect = useCallback(
     (result: SearchResult) => openChart({ symbol: result.symbol, name: result.name }),
     [openChart],
@@ -330,11 +331,8 @@ export function Site() {
       case 'themes': return <ThemesPage {...pageProps} theme={shown.theme} market={shown.market} view={shown.v} />;
       case 'screener': return <ScreenerPage {...pageProps} group={shown.group} f={shown.f} />;
       case 'watchlist': return <ConsolePage {...pageProps} section="lists" list={shown.list} />;
-      case 'console': {
-        const lastList = routeMemory.current.pages.watchlist;
-        return <ConsolePage {...pageProps} section="settings" view={shown.page === 'console' ? shown.view : undefined}
-          watchlistId={lastList?.page === 'watchlist' ? lastList.list : undefined} />;
-      }
+      case 'console':
+        return <ConsolePage {...pageProps} section="settings" view={shown.page === 'console' ? shown.view : undefined} />;
       default: return null;
     }
   };
@@ -438,6 +436,7 @@ export function Site() {
                 view={stockView}
                 onViewChange={setStockView}
                 onBack={chartBack}
+                onManageLists={manageLists}
                 reportSymbols={localSymbols}
               />
               </Suspense>

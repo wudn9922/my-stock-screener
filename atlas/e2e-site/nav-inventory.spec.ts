@@ -255,9 +255,9 @@ test('watchlists retain actions and cloud lists; 我的 retains parameters, admi
   await expect(parameters).toBeVisible();
   await expect(parameters.getByRole('textbox', { name: '參數股票代號' })).toBeVisible();
   await expect(parameters.locator('a[href*="liff.line.me"]').first()).toHaveAttribute('href', /page=console$/);
-  // The custom groups are their own sub-view on phones and tablets, and part of the 均線參數 tab on the desktop.
-  if (compact) await openConsoleSection(page, 'groups');
-  await expect(page.getByRole('region', { name: '原有均線參數控制台' }).getByText('管理自訂分組', { exact: true })).toBeVisible();
+  // Custom groups, saved lists and chart favourites are managed together in 清單 (sub-view on phones, tab on the desktop).
+  await openConsoleSection(page, 'lists');
+  await expect(page.getByRole('region', { name: '清單管理' }).getByRole('form', { name: '新增清單' })).toBeVisible();
   await openConsoleSection(page, 'admin');
   await expect(page.getByRole('region', { name: '管理員儲存權限' })).toBeVisible();
   await openConsoleSection(page, 'display');

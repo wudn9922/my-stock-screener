@@ -10,14 +10,15 @@ async function openParameters(page: Page) {
   await expect(page.getByRole('region', { name: '原有均線參數控制台' })).toBeVisible();
 }
 async function createParameters(page: Page, name: string) {
-  // Phones and tablets open 自訂分組 and 個股均線參數 as two sub-views; its group manager starts open.
-  if (isCompactConsole(page)) await openConsoleSection(page, 'groups');
-  const details = page.locator('.parameter-console details').filter({ hasText: '管理自訂分組' });
-  if (!await details.evaluate(node => (node as HTMLDetailsElement).open)) await details.locator('summary').click();
-  await details.getByRole('textbox', { name: '新增個人分組名稱' }).fill(name);
-  await details.getByRole('button', { name: '新增分組', exact: true }).click();
-  await expect(details.getByRole('textbox', { name: `分組 ${name} 名稱` })).toBeVisible();
-  if (isCompactConsole(page)) await openConsoleSection(page, 'parameters');
+  // Groups are created in 我的 › 清單 (the unified list manager); per-stock MAs stay in 個股均線參數.
+  await openConsoleSection(page, 'lists');
+  const manager = page.getByRole('region', { name: '清單管理' });
+  const create = manager.getByRole('form', { name: '新增清單' });
+  await create.getByRole('textbox', { name: '清單名稱' }).fill(name);
+  await create.getByRole('combobox', { name: '清單類型' }).selectOption('group');
+  await create.getByRole('button', { name: '建立清單' }).click();
+  await expect(manager.locator('.list-card').filter({ hasText: name })).toContainText('分組');
+  await openConsoleSection(page, 'parameters');
   await expect(page.getByRole('combobox', { name: '參數股票分組' })).toContainText(name);
   await page.getByRole('textbox', { name: '參數股票代號' }).fill('NVDA');
   await page.getByRole('combobox', { name: '參數股票分組' }).selectOption({ label: name });

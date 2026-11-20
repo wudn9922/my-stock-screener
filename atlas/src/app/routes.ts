@@ -14,7 +14,9 @@ export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financ
 export type Page = (typeof PAGES)[number];
 
 /** Phone/tablet 我的 sub-views (`?page=console&view=status`); the desktop page keeps its tabs and ignores this. */
-export const CONSOLE_VIEWS = ['parameters', 'groups', 'notifications', 'app', 'status', 'backup', 'admin'] as const;
+export const CONSOLE_VIEWS = ['parameters', 'lists', 'notifications', 'app', 'status', 'backup', 'admin'] as const;
+/** Old 我的 links: 自訂分組 is now part of 清單. */
+const CONSOLE_VIEW_ALIASES: Record<string, ConsoleView> = { groups: 'lists' };
 export type ConsoleView = (typeof CONSOLE_VIEWS)[number];
 
 export type Route =
@@ -167,10 +169,11 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
   } else if (page === 'console' || page === 'watchlist') {
     const list = params.get('list');
     const validList = list && /^[0-9a-f-]{36}$/i.test(list) ? list : undefined;
-    const view = params.get('view')?.trim().toLowerCase();
+    const rawView = params.get('view')?.trim().toLowerCase() ?? '';
+    const view: string = Object.hasOwn(CONSOLE_VIEW_ALIASES, rawView) ? CONSOLE_VIEW_ALIASES[rawView]! : rawView;
     route = page === 'watchlist' || (page === 'console' && validList)
       ? { page: 'watchlist', ...(validList ? { list: validList } : {}) }
-      : { page: 'console', ...((CONSOLE_VIEWS as readonly string[]).includes(view ?? '') ? { view: view as ConsoleView } : {}) };
+      : { page: 'console', ...((CONSOLE_VIEWS as readonly string[]).includes(view) ? { view: view as ConsoleView } : {}) };
   } else if (page === 'chart') {
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
     route = { page, ...(symbol ? { symbol } : {}), ...(tf ? { tf } : {}) };

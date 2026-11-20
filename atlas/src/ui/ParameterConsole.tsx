@@ -20,10 +20,8 @@ import { stockParametersChanged } from '../cloud/useStockParameters';
 import { getStorageContextKey } from '../auth/storage';
 
 /** The original control panel's authenticated API, rendered inside the Atlas shell. */
-export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | 'groups' }) {
-  // 我的 on phones and tablets opens the stock parameters and the custom groups as two sub-views of the same forms.
-  const showStocks = part !== 'groups';
-  const showGroups = part !== 'stocks';
+export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' }) {
+  // Groups are created, renamed and deleted in 我的 › 清單 (ListManager); this keeps per-stock MA and group editing.
   const access = useSyncExternalStore(accessState.subscribe, accessState.getSnapshot);
   const [groups, setGroups] = useState<ParameterGroup[]>([]);
   const [stocks, setStocks] = useState<ParameterStock[]>([]);
@@ -42,7 +40,6 @@ export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | '
   const [editMas, setEditMas] = useState('');
   const [editGroup, setEditGroup] = useState('');
   const [cleanupFailure, setCleanupFailure] = useState<StockParameterCleanupError | null>(null);
-  const [groupName, setGroupName] = useState('');
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setMessage('');
@@ -102,8 +99,8 @@ export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | '
   );
   return (
     <section className="parameter-console" aria-label="原有均線參數控制台">
-      {part === 'all' && <h2>個股均線（所有清單共用）與個人分組</h2>}
-      {showStocks && <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>}
+      {part === 'all' && <h2>個股均線（所有清單共用）</h2>}
+      <HelpDisclosure label="參數使用說明">各自設定股票、分組及均線；新增或改名分組請到「清單」。只有允許雲端保存的帳號，才會交由既有每日掃描與突破提醒服務使用。</HelpDisclosure>
       {message && (
         <p role="status" className="console-message">
           {message}
@@ -117,7 +114,7 @@ export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | '
           在 LINE 開啟 Atlas
         </a>
       </div>
-      {showStocks && <>
+      <>
       <form className="console-form" onSubmit={save}>
         <label>
           股票代號
@@ -356,56 +353,8 @@ export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | '
           )}
         </ConsoleDialog>
       )}
-      </>}
-      {showGroups && <details className="research-disclosure" open={part === 'groups' ? true : undefined}>
-        <summary>管理自訂分組</summary>
-        <div className="research-disclosure-body">
-          <form
-            className="console-actions"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run(async () => {
-                await settingsApi('groups.create', { name: groupName });
-                setGroupName('');
-                await reload();
-              });
-            }}
-          >
-            <input
-              aria-label="新增個人分組名稱"
-              value={groupName}
-              onChange={(event) => setGroupName(event.target.value)}
-              maxLength={30}
-              required
-              placeholder="分組名稱"
-            />
-            <button type="submit" className="ghost-button" disabled={busy}>
-              新增分組
-            </button>
-          </form>
-          {groups.map((group) => (
-            <GroupEditor
-              key={group.id}
-              group={group}
-              busy={busy}
-              onRename={(name) =>
-                void run(async () => {
-                  await settingsApi('groups.rename', { id: group.id, name });
-                  await reload();
-                })
-              }
-              onDelete={() => {
-                if (confirm(`確定刪除「${group.name}」？分組內必須先移除所有股票。`))
-                  void run(async () => {
-                    await settingsApi('groups.delete', { id: group.id });
-                    await reload();
-                  });
-              }}
-            />
-          ))}
-        </div>
-      </details>}
-      {showStocks && access.isAdmin && access.storageMode === 'cloud' && (
+      </>
+      {access.isAdmin && access.storageMode === 'cloud' && (
         <details className="research-disclosure">
           <summary>大盤指數均線參數（管理員）</summary>
           <div className="research-disclosure-body">
@@ -445,42 +394,6 @@ export function ParameterConsole({ part = 'all' }: { part?: 'all' | 'stocks' | '
   );
 }
 
-function GroupEditor({
-  group,
-  busy,
-  onRename,
-  onDelete,
-}: {
-  group: ParameterGroup;
-  busy: boolean;
-  onRename: (name: string) => void;
-  onDelete: () => void;
-}) {
-  const [name, setName] = useState(group.name);
-  return (
-    <form
-      className="console-actions"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onRename(name);
-      }}
-    >
-      <input
-        aria-label={`分組 ${group.name} 名稱`}
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        required
-        maxLength={30}
-      />
-      <button type="submit" className="ghost-button" disabled={busy}>
-        重新命名
-      </button>
-      <button type="button" className="text-button" disabled={busy} onClick={onDelete}>
-        刪除分組
-      </button>
-    </form>
-  );
-}
 function IndexEditor({ index, busy, onSave }: { index: IndexParameter; busy: boolean; onSave: (mas: string) => void }) {
   const [mas, setMas] = useState([index.ma1, index.ma2, index.ma3, index.ma4].filter((n) => n > 0).join(', '));
   return (
