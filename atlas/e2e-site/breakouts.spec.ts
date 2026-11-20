@@ -249,7 +249,7 @@ test('monthly recalculations have distinct bars, current values, and a five-mont
   await noOverflow(page);
 });
 
-test('new swing cohorts show exclusions, use hold5 and do not compare an old monthly point', async ({ page }) => {
+test('new swing cohorts show exclusions, follow the selected rule and do not compare an old monthly point', async ({ page }) => {
   const payload = JSON.parse(body);
   payload.params.swingCountingModel = 'first-higher-close-v1';
   const market = payload.markets.tw;
@@ -267,7 +267,9 @@ test('new swing cohorts show exclusions, use hold5 and do not compare an old mon
   await expect(row(page)).toContainText('25.0%'); await expect(row(page)).toContainText('49.0%');
   await expect(row(page)).toContainText('80（65）');
   await picker(page).getByRole('button',{ name:/隔日再創高/ }).click();
-  await expect(row(page).locator('.bo-win')).toContainText('50.0%'); // New swing stays hold5.
+  // New swing follows the selected rule like the other methods (it used to stay on hold5).
+  await expect(row(page).locator('.bo-win')).toContainText(`${swing.comparison.rules.nextHigh.winRate.toFixed(1)}%`);
+  await expect(row(page).locator('.bo-ratio')).toContainText(`${swing.comparison.rules.nextHigh.wins}／${swing.comparison.rules.nextHigh.evaluatedN}`);
   await expect(row(page,'box20').locator('.bo-win')).toContainText('60.0%'); // Existing box outcome unchanged.
   await expect(row(page).getByRole('img')).toHaveAttribute('aria-label', /2026-09-09 無完整結果/);
   await card(page).getByText('每月測試數值與涵蓋',{exact:true}).click();
