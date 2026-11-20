@@ -1,3 +1,7 @@
+## 2026-11-20 Per-list notifications (均線／畫線)
+Primary self-review only. `atlas_alert_settings` + `alerts.settings.*`; breakout runner filters MA/drawing alerts by list once per run (absent = all lists, baselines never pruned by settings); UI in 我的 › 清單.
+Verification: pytest list_notifications/runner/watchlists, Vitest alert-settings/settings-handler/unified-lists, e2e-site unified-lists etc. on desktop/mobile Chromium; WebKit unavailable here.
+
 ## 2026-11-20 Unified 清單 and chart-star 加入清單
 Primary self-review only; no independent sign-off. 我的 › 清單 shows groups, saved watchlists and chart favourites over the existing stores (no data migration); the chart star opens an optimistic multi-list picker; group joins reuse the ticker's single MA row or the ma-selector picks.
 Verification: lint, typecheck, `tests/unified-lists.test.ts`, `tests/ui-routes.test.ts` and the related e2e-site specs on desktop/mobile Chromium; WebKit could not be downloaded in this container.

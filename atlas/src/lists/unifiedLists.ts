@@ -24,6 +24,8 @@ export interface UnifiedList {
   customGroupId?: number;
   watchlistId?: string;
   market?: 'TW' | 'US';
+  /** A watchlist's own 「監控突破提醒」 switch (what MA alerts follow while every list notifies). */
+  monitored?: boolean;
 }
 
 export const FAVORITES_KEY = 'favorites';
@@ -60,6 +62,7 @@ export function buildUnifiedLists(input: {
       editable: list.kind === 'manual',
       watchlistId: list.id,
       market: list.market,
+      monitored: list.monitorBreakouts,
     });
   for (const group of input.groups) {
     const groupId = `custom_${group.id}`;

@@ -4,6 +4,7 @@ import { HoldingsError, handleHoldings } from "./holdings.ts";
 import { MexcError, handleMexc } from "./mexc.ts";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
+import { ALERT_SETTINGS_DEFAULT, validateAlertSettings } from "./alertSettings.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
 import { WebPushError, handlePushAction, handlePushNotify, type PushDeps } from "./webPush.ts";
 import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
@@ -24,6 +25,7 @@ import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, p
  *   stocks.save   { id?, ticker, groupId, mas: number[] }  有 id 為修改，否則新增（同代號同分組則覆蓋均線）
  *                 groupId：tw_g1…us_g4 或 custom_<groups.id>
  *   stocks.delete { id }
+ *   alerts.settings.get / alerts.settings.save { settings }  每份清單的均線／畫線通知（atlas_alert_settings）
  *   admin.index.list                                      僅管理員（回傳目前已設定的大盤均線）
  *   admin.index.save { ticker, name, mas: number[] }      僅管理員
  *   device.session.create                                 以 LINE ID Token 記住這台裝置（回傳 deviceToken）
@@ -411,6 +413,29 @@ Deno.serve(async (request: Request) => {
 
       return !!data;
     };
+
+    // Per-list 均線／畫線 notification choices; absent row = every list notifies (today's behaviour).
+    if (action === "alerts.settings.get" || action === "alerts.settings.save") {
+      const tableError = (error: { code?: string }) => {
+        if (error.code === "42P01" || error.code === "PGRST205") throw new HttpError(503, "通知設定資料表尚未部署，請先套用 atlas_alert_settings.sql");
+        throw error;
+      };
+      if (action === "alerts.settings.get") {
+        const { data, error } = await supabase.from("atlas_alert_settings").select("settings,updated_at")
+          .eq("line_user_id", lineUserId).maybeSingle();
+        if (error) tableError(error);
+        let settings: unknown = ALERT_SETTINGS_DEFAULT;
+        try { if (data?.settings) settings = validateAlertSettings(data.settings); } catch { settings = ALERT_SETTINGS_DEFAULT; }
+        return jsonResponse({ ok: true, data: { settings, updated_at: data?.updated_at ?? null } });
+      }
+      let settings: ReturnType<typeof validateAlertSettings>;
+      try { settings = validateAlertSettings(body.settings); }
+      catch (error) { throw new HttpError(400, error instanceof Error ? error.message : "通知設定格式不正確"); }
+      const { data, error } = await supabase.from("atlas_alert_settings")
+        .upsert({ line_user_id: lineUserId, settings }, { onConflict: "line_user_id" }).select("settings,updated_at").maybeSingle();
+      if (error) tableError(error);
+      return jsonResponse({ ok: true, data });
+    }
 
     if (action.startsWith("watchlists.")) {
       const dbError = (error: { code?: string; message?: string }) => {
