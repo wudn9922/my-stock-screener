@@ -1,0 +1,12 @@
+# Storage-branch relay; implementation always comes from main.
+name: Generated Pages relay
+on:
+  push:
+    branches: [generated]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    uses: wudn9922/my-stock-screener/.github/workflows/generated-pages.yml@main

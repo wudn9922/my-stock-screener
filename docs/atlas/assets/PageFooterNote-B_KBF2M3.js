@@ -1,0 +1,1 @@
+import{r as t,b as r,av as n,j as c}from"./index-4c25gM3L.js";function g({children:a}){const[e,s]=t.useState(null),o=r();return t.useEffect(()=>s(document.getElementById("site-page-notes")),[]),e&&o?n.createPortal(c.jsx("div",{className:"page-footer-note",children:a}),e):null}export{g as P};

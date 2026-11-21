@@ -1,0 +1,2616 @@
+{
+ "version": 1,
+ "rulesVersion": 1,
+ "generatedAt": "2026-11-02T04:59:27+00:00",
+ "sample": {
+  "start": "2003-03-28",
+  "end": "2026-10-30",
+  "days": 5937,
+  "split": "2016-01-01",
+  "universe": "NasdaqTrader 美股普通股與 ADR（與網站 universe 相同規則）"
+ },
+ "thresholds": {
+  "ma20": {
+   "p5": 18.4,
+   "p10": 25.3,
+   "p50": 53.6,
+   "p90": 74.6,
+   "p95": 78.5
+  },
+  "ma60": {
+   "p5": 19.5,
+   "p10": 26.7,
+   "p50": 54.7,
+   "p90": 75.9,
+   "p95": 81.2
+  }
+ },
+ "rule": {
+  "oversoldQuantile": 0.1,
+  "drawdownLookback": 60,
+  "cooldown": 10,
+  "maxHold": 60
+ },
+ "indices": {
+  "^GSPC": {
+   "name": "S&P 500",
+   "swing": 0.05,
+   "trades": 63,
+   "hitRate": 0.6825,
+   "hitRateEarly": 0.7059,
+   "tradesEarly": 34,
+   "hitRateLate": 0.6552,
+   "tradesLate": 29,
+   "baseRate": 0.4761,
+   "avgReturn": 0.0205,
+   "medianDays": 12,
+   "winnersMaeP90": -0.0444,
+   "nearSwingLowRate": 0.8254,
+   "events": [
+    {
+     "signal": "2004-03-22",
+     "entry": "2004-03-23",
+     "exit": "2004-04-05",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 10
+    },
+    {
+     "signal": "2004-05-07",
+     "entry": "2004-05-10",
+     "exit": "2004-08-04",
+     "outcome": "timeout",
+     "ret": -0.0001,
+     "days": 60
+    },
+    {
+     "signal": "2004-08-12",
+     "entry": "2004-08-13",
+     "exit": "2004-09-02",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 15
+    },
+    {
+     "signal": "2005-04-15",
+     "entry": "2005-04-18",
+     "exit": "2005-06-01",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 32
+    },
+    {
+     "signal": "2005-10-12",
+     "entry": "2005-10-13",
+     "exit": "2005-11-14",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 23
+    },
+    {
+     "signal": "2006-05-23",
+     "entry": "2006-05-24",
+     "exit": "2006-08-17",
+     "outcome": "timeout",
+     "ret": 0.0326,
+     "days": 60
+    },
+    {
+     "signal": "2007-03-05",
+     "entry": "2007-03-06",
+     "exit": "2007-04-05",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 23
+    },
+    {
+     "signal": "2007-07-27",
+     "entry": "2007-07-30",
+     "exit": "2007-08-16",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 14
+    },
+    {
+     "signal": "2007-11-09",
+     "entry": "2007-11-12",
+     "exit": "2008-01-09",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 40
+    },
+    {
+     "signal": "2008-03-06",
+     "entry": "2008-03-07",
+     "exit": "2008-04-01",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 17
+    },
+    {
+     "signal": "2008-06-11",
+     "entry": "2008-06-12",
+     "exit": "2008-07-01",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 14
+    },
+    {
+     "signal": "2008-09-15",
+     "entry": "2008-09-16",
+     "exit": "2008-09-19",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 4
+    },
+    {
+     "signal": "2008-11-12",
+     "entry": "2008-11-13",
+     "exit": "2008-11-13",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 1
+    },
+    {
+     "signal": "2008-12-01",
+     "entry": "2008-12-02",
+     "exit": "2008-12-03",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 2
+    },
+    {
+     "signal": "2009-01-20",
+     "entry": "2009-01-21",
+     "exit": "2009-01-26",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 4
+    },
+    {
+     "signal": "2009-02-17",
+     "entry": "2009-02-18",
+     "exit": "2009-02-23",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 4
+    },
+    {
+     "signal": "2009-06-22",
+     "entry": "2009-06-23",
+     "exit": "2009-07-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 17
+    },
+    {
+     "signal": "2009-10-28",
+     "entry": "2009-10-29",
+     "exit": "2009-11-10",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 9
+    },
+    {
+     "signal": "2010-01-28",
+     "entry": "2010-01-29",
+     "exit": "2010-03-09",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 27
+    },
+    {
+     "signal": "2010-05-06",
+     "entry": "2010-05-07",
+     "exit": "2010-05-21",
+     "outcome": "stop",
+     "ret": -0.053,
+     "days": 11
+    },
+    {
+     "signal": "2010-05-28",
+     "entry": "2010-06-01",
+     "exit": "2010-06-30",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 22
+    },
+    {
+     "signal": "2010-08-23",
+     "entry": "2010-08-24",
+     "exit": "2010-09-13",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 14
+    },
+    {
+     "signal": "2011-03-16",
+     "entry": "2011-03-17",
+     "exit": "2011-03-30",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 10
+    },
+    {
+     "signal": "2011-06-06",
+     "entry": "2011-06-07",
+     "exit": "2011-07-07",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 22
+    },
+    {
+     "signal": "2011-08-01",
+     "entry": "2011-08-02",
+     "exit": "2011-08-04",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 3
+    },
+    {
+     "signal": "2011-08-25",
+     "entry": "2011-08-26",
+     "exit": "2011-08-30",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 3
+    },
+    {
+     "signal": "2011-09-21",
+     "entry": "2011-09-22",
+     "exit": "2011-10-03",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 8
+    },
+    {
+     "signal": "2011-11-21",
+     "entry": "2011-11-22",
+     "exit": "2011-12-02",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 8
+    },
+    {
+     "signal": "2012-05-15",
+     "entry": "2012-05-16",
+     "exit": "2012-08-06",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 57
+    },
+    {
+     "signal": "2012-11-14",
+     "entry": "2012-11-15",
+     "exit": "2012-12-03",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 12
+    },
+    {
+     "signal": "2013-06-24",
+     "entry": "2013-06-25",
+     "exit": "2013-07-10",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 11
+    },
+    {
+     "signal": "2014-02-03",
+     "entry": "2014-02-04",
+     "exit": "2014-02-14",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 9
+    },
+    {
+     "signal": "2014-10-10",
+     "entry": "2014-10-13",
+     "exit": "2014-10-31",
+     "outcome": "target",
+     "ret": 0.0501,
+     "days": 15
+    },
+    {
+     "signal": "2015-08-21",
+     "entry": "2015-08-24",
+     "exit": "2015-10-23",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 44
+    },
+    {
+     "signal": "2016-01-07",
+     "entry": "2016-01-08",
+     "exit": "2016-01-20",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 8
+    },
+    {
+     "signal": "2016-06-27",
+     "entry": "2016-06-28",
+     "exit": "2016-07-01",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 4
+    },
+    {
+     "signal": "2018-02-05",
+     "entry": "2018-02-06",
+     "exit": "2018-02-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 9
+    },
+    {
+     "signal": "2018-03-23",
+     "entry": "2018-03-26",
+     "exit": "2018-06-05",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 50
+    },
+    {
+     "signal": "2018-10-11",
+     "entry": "2018-10-12",
+     "exit": "2018-10-26",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 11
+    },
+    {
+     "signal": "2018-12-07",
+     "entry": "2018-12-10",
+     "exit": "2018-12-19",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 8
+    },
+    {
+     "signal": "2019-05-29",
+     "entry": "2019-05-30",
+     "exit": "2019-06-18",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 14
+    },
+    {
+     "signal": "2019-08-05",
+     "entry": "2019-08-06",
+     "exit": "2019-09-12",
+     "outcome": "target",
+     "ret": 0.0517,
+     "days": 27
+    },
+    {
+     "signal": "2020-02-25",
+     "entry": "2020-02-26",
+     "exit": "2020-02-27",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 2
+    },
+    {
+     "signal": "2020-03-27",
+     "entry": "2020-03-30",
+     "exit": "2020-04-07",
+     "outcome": "target",
+     "ret": 0.0702,
+     "days": 7
+    },
+    {
+     "signal": "2020-09-08",
+     "entry": "2020-09-09",
+     "exit": "2020-10-12",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 24
+    },
+    {
+     "signal": "2020-10-28",
+     "entry": "2020-10-29",
+     "exit": "2020-11-04",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 5
+    },
+    {
+     "signal": "2022-01-20",
+     "entry": "2022-01-21",
+     "exit": "2022-01-24",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 2
+    },
+    {
+     "signal": "2022-02-23",
+     "entry": "2022-02-24",
+     "exit": "2022-02-25",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 2
+    },
+    {
+     "signal": "2022-04-22",
+     "entry": "2022-04-25",
+     "exit": "2022-05-09",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 11
+    },
+    {
+     "signal": "2022-05-18",
+     "entry": "2022-05-19",
+     "exit": "2022-05-27",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 7
+    },
+    {
+     "signal": "2022-06-13",
+     "entry": "2022-06-14",
+     "exit": "2022-07-20",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 25
+    },
+    {
+     "signal": "2022-08-29",
+     "entry": "2022-08-30",
+     "exit": "2022-09-16",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 13
+    },
+    {
+     "signal": "2022-10-07",
+     "entry": "2022-10-10",
+     "exit": "2022-10-25",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 12
+    },
+    {
+     "signal": "2022-12-16",
+     "entry": "2022-12-19",
+     "exit": "2023-01-26",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 26
+    },
+    {
+     "signal": "2023-03-09",
+     "entry": "2023-03-10",
+     "exit": "2023-03-31",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 16
+    },
+    {
+     "signal": "2023-09-21",
+     "entry": "2023-09-22",
+     "exit": "2023-10-27",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 26
+    },
+    {
+     "signal": "2024-04-19",
+     "entry": "2024-04-22",
+     "exit": "2024-05-10",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 15
+    },
+    {
+     "signal": "2024-08-05",
+     "entry": "2024-08-06",
+     "exit": "2024-08-15",
+     "outcome": "target",
+     "ret": 0.0566,
+     "days": 8
+    },
+    {
+     "signal": "2025-03-04",
+     "entry": "2025-03-05",
+     "exit": "2025-03-31",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 19
+    },
+    {
+     "signal": "2025-04-03",
+     "entry": "2025-04-04",
+     "exit": "2025-04-07",
+     "outcome": "stop",
+     "ret": -0.0639,
+     "days": 2
+    },
+    {
+     "signal": "2025-04-21",
+     "entry": "2025-04-22",
+     "exit": "2025-04-23",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 2
+    },
+    {
+     "signal": "2025-11-20",
+     "entry": "2025-11-21",
+     "exit": "2025-12-05",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 10
+    },
+    {
+     "signal": "2026-03-18",
+     "entry": "2026-03-19",
+     "exit": "2026-04-14",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 18
+    }
+   ]
+  },
+  "^IXIC": {
+   "name": "那斯達克",
+   "swing": 0.07,
+   "trades": 62,
+   "hitRate": 0.6613,
+   "hitRateEarly": 0.6667,
+   "tradesEarly": 33,
+   "hitRateLate": 0.6552,
+   "tradesLate": 29,
+   "baseRate": 0.4706,
+   "avgReturn": 0.0293,
+   "medianDays": 17,
+   "winnersMaeP90": -0.0536,
+   "nearSwingLowRate": 0.7258,
+   "events": [
+    {
+     "signal": "2004-03-22",
+     "entry": "2004-03-23",
+     "exit": "2004-04-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 10
+    },
+    {
+     "signal": "2004-04-30",
+     "entry": "2004-05-03",
+     "exit": "2004-07-28",
+     "outcome": "timeout",
+     "ret": -0.0365,
+     "days": 60
+    },
+    {
+     "signal": "2004-08-06",
+     "entry": "2004-08-09",
+     "exit": "2004-09-13",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 25
+    },
+    {
+     "signal": "2005-03-23",
+     "entry": "2005-03-24",
+     "exit": "2005-06-17",
+     "outcome": "timeout",
+     "ret": 0.0464,
+     "days": 60
+    },
+    {
+     "signal": "2005-10-11",
+     "entry": "2005-10-12",
+     "exit": "2005-11-11",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 23
+    },
+    {
+     "signal": "2006-05-17",
+     "entry": "2006-05-18",
+     "exit": "2006-07-14",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 40
+    },
+    {
+     "signal": "2006-07-17",
+     "entry": "2006-07-18",
+     "exit": "2006-08-30",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 32
+    },
+    {
+     "signal": "2007-03-05",
+     "entry": "2007-03-06",
+     "exit": "2007-04-20",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 33
+    },
+    {
+     "signal": "2007-08-03",
+     "entry": "2007-08-06",
+     "exit": "2007-09-26",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 37
+    },
+    {
+     "signal": "2007-11-09",
+     "entry": "2007-11-12",
+     "exit": "2008-01-09",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 40
+    },
+    {
+     "signal": "2008-03-06",
+     "entry": "2008-03-07",
+     "exit": "2008-04-01",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 17
+    },
+    {
+     "signal": "2008-06-24",
+     "entry": "2008-06-25",
+     "exit": "2008-07-11",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 12
+    },
+    {
+     "signal": "2008-09-15",
+     "entry": "2008-09-16",
+     "exit": "2008-09-19",
+     "outcome": "target",
+     "ret": 0.0718,
+     "days": 4
+    },
+    {
+     "signal": "2008-11-12",
+     "entry": "2008-11-13",
+     "exit": "2008-11-19",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 5
+    },
+    {
+     "signal": "2008-12-01",
+     "entry": "2008-12-02",
+     "exit": "2008-12-08",
+     "outcome": "target",
+     "ret": 0.0826,
+     "days": 5
+    },
+    {
+     "signal": "2009-01-20",
+     "entry": "2009-01-21",
+     "exit": "2009-02-06",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 13
+    },
+    {
+     "signal": "2009-02-17",
+     "entry": "2009-02-18",
+     "exit": "2009-02-27",
+     "outcome": "stop",
+     "ret": -0.0703,
+     "days": 8
+    },
+    {
+     "signal": "2010-01-29",
+     "entry": "2010-02-01",
+     "exit": "2010-03-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 24
+    },
+    {
+     "signal": "2010-05-06",
+     "entry": "2010-05-07",
+     "exit": "2010-05-25",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 13
+    },
+    {
+     "signal": "2010-05-28",
+     "entry": "2010-06-01",
+     "exit": "2010-07-01",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 23
+    },
+    {
+     "signal": "2010-08-24",
+     "entry": "2010-08-25",
+     "exit": "2010-09-13",
+     "outcome": "target",
+     "ret": 0.0733,
+     "days": 13
+    },
+    {
+     "signal": "2011-03-16",
+     "entry": "2011-03-17",
+     "exit": "2011-04-26",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 28
+    },
+    {
+     "signal": "2011-06-10",
+     "entry": "2011-06-13",
+     "exit": "2011-07-06",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 17
+    },
+    {
+     "signal": "2011-08-02",
+     "entry": "2011-08-03",
+     "exit": "2011-08-05",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 3
+    },
+    {
+     "signal": "2011-08-25",
+     "entry": "2011-08-26",
+     "exit": "2011-08-30",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 3
+    },
+    {
+     "signal": "2011-09-21",
+     "entry": "2011-09-22",
+     "exit": "2011-10-14",
+     "outcome": "target",
+     "ret": 0.0767,
+     "days": 17
+    },
+    {
+     "signal": "2011-11-21",
+     "entry": "2011-11-22",
+     "exit": "2012-01-10",
+     "outcome": "target",
+     "ret": 0.0742,
+     "days": 33
+    },
+    {
+     "signal": "2012-05-15",
+     "entry": "2012-05-16",
+     "exit": "2012-08-09",
+     "outcome": "timeout",
+     "ret": 0.0392,
+     "days": 60
+    },
+    {
+     "signal": "2012-11-14",
+     "entry": "2012-11-15",
+     "exit": "2012-12-18",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 23
+    },
+    {
+     "signal": "2014-04-11",
+     "entry": "2014-04-14",
+     "exit": "2014-06-06",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 38
+    },
+    {
+     "signal": "2014-10-10",
+     "entry": "2014-10-13",
+     "exit": "2014-10-30",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 14
+    },
+    {
+     "signal": "2015-08-21",
+     "entry": "2015-08-24",
+     "exit": "2015-08-24",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 1
+    },
+    {
+     "signal": "2015-09-28",
+     "entry": "2015-09-29",
+     "exit": "2015-10-15",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 13
+    },
+    {
+     "signal": "2016-01-07",
+     "entry": "2016-01-08",
+     "exit": "2016-01-20",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 8
+    },
+    {
+     "signal": "2016-06-27",
+     "entry": "2016-06-28",
+     "exit": "2016-07-11",
+     "outcome": "target",
+     "ret": 0.0716,
+     "days": 9
+    },
+    {
+     "signal": "2018-02-05",
+     "entry": "2018-02-06",
+     "exit": "2018-02-21",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 11
+    },
+    {
+     "signal": "2018-03-23",
+     "entry": "2018-03-26",
+     "exit": "2018-06-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 50
+    },
+    {
+     "signal": "2018-10-10",
+     "entry": "2018-10-11",
+     "exit": "2018-11-20",
+     "outcome": "stop",
+     "ret": -0.0705,
+     "days": 29
+    },
+    {
+     "signal": "2018-12-07",
+     "entry": "2018-12-10",
+     "exit": "2018-12-20",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 9
+    },
+    {
+     "signal": "2019-05-29",
+     "entry": "2019-05-30",
+     "exit": "2019-07-01",
+     "outcome": "target",
+     "ret": 0.0767,
+     "days": 23
+    },
+    {
+     "signal": "2019-08-05",
+     "entry": "2019-08-06",
+     "exit": "2019-10-29",
+     "outcome": "timeout",
+     "ret": 0.0605,
+     "days": 60
+    },
+    {
+     "signal": "2020-02-25",
+     "entry": "2020-02-26",
+     "exit": "2020-02-28",
+     "outcome": "stop",
+     "ret": -0.0823,
+     "days": 3
+    },
+    {
+     "signal": "2020-03-27",
+     "entry": "2020-03-30",
+     "exit": "2020-04-07",
+     "outcome": "target",
+     "ret": 0.0721,
+     "days": 7
+    },
+    {
+     "signal": "2020-09-08",
+     "entry": "2020-09-09",
+     "exit": "2020-10-12",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 24
+    },
+    {
+     "signal": "2020-10-28",
+     "entry": "2020-10-29",
+     "exit": "2020-11-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 6
+    },
+    {
+     "signal": "2022-01-20",
+     "entry": "2022-01-21",
+     "exit": "2022-02-23",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 23
+    },
+    {
+     "signal": "2022-04-22",
+     "entry": "2022-04-25",
+     "exit": "2022-05-09",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 11
+    },
+    {
+     "signal": "2022-05-18",
+     "entry": "2022-05-19",
+     "exit": "2022-05-31",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 8
+    },
+    {
+     "signal": "2022-06-13",
+     "entry": "2022-06-14",
+     "exit": "2022-06-27",
+     "outcome": "target",
+     "ret": 0.0701,
+     "days": 9
+    },
+    {
+     "signal": "2022-08-29",
+     "entry": "2022-08-30",
+     "exit": "2022-09-21",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 16
+    },
+    {
+     "signal": "2022-10-07",
+     "entry": "2022-10-10",
+     "exit": "2022-11-15",
+     "outcome": "target",
+     "ret": 0.0764,
+     "days": 27
+    },
+    {
+     "signal": "2022-12-19",
+     "entry": "2022-12-20",
+     "exit": "2023-01-23",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 22
+    },
+    {
+     "signal": "2023-03-09",
+     "entry": "2023-03-10",
+     "exit": "2023-03-31",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 16
+    },
+    {
+     "signal": "2023-08-17",
+     "entry": "2023-08-18",
+     "exit": "2023-08-31",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 10
+    },
+    {
+     "signal": "2023-09-21",
+     "entry": "2023-09-22",
+     "exit": "2023-11-20",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 42
+    },
+    {
+     "signal": "2024-04-19",
+     "entry": "2024-04-22",
+     "exit": "2024-05-14",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 17
+    },
+    {
+     "signal": "2024-08-05",
+     "entry": "2024-08-06",
+     "exit": "2024-08-15",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 8
+    },
+    {
+     "signal": "2025-02-27",
+     "entry": "2025-02-28",
+     "exit": "2025-03-31",
+     "outcome": "stop",
+     "ret": -0.0775,
+     "days": 22
+    },
+    {
+     "signal": "2025-04-03",
+     "entry": "2025-04-04",
+     "exit": "2025-04-07",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 2
+    },
+    {
+     "signal": "2025-04-21",
+     "entry": "2025-04-22",
+     "exit": "2025-04-25",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 4
+    },
+    {
+     "signal": "2025-11-20",
+     "entry": "2025-11-21",
+     "exit": "2026-01-07",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 31
+    },
+    {
+     "signal": "2026-03-18",
+     "entry": "2026-03-19",
+     "exit": "2026-04-14",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 18
+    }
+   ]
+  },
+  "^DJI": {
+   "name": "道瓊工業",
+   "swing": 0.05,
+   "trades": 60,
+   "hitRate": 0.65,
+   "hitRateEarly": 0.6667,
+   "tradesEarly": 33,
+   "hitRateLate": 0.6296,
+   "tradesLate": 27,
+   "baseRate": 0.4618,
+   "avgReturn": 0.0177,
+   "medianDays": 13,
+   "winnersMaeP90": -0.0304,
+   "nearSwingLowRate": 0.7,
+   "events": [
+    {
+     "signal": "2004-03-22",
+     "entry": "2004-03-23",
+     "exit": "2004-04-06",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 11
+    },
+    {
+     "signal": "2004-05-07",
+     "entry": "2004-05-10",
+     "exit": "2004-08-04",
+     "outcome": "timeout",
+     "ret": 0.001,
+     "days": 60
+    },
+    {
+     "signal": "2004-08-06",
+     "entry": "2004-08-09",
+     "exit": "2004-09-03",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 20
+    },
+    {
+     "signal": "2005-04-15",
+     "entry": "2005-04-18",
+     "exit": "2005-06-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 43
+    },
+    {
+     "signal": "2006-06-12",
+     "entry": "2006-06-13",
+     "exit": "2006-08-04",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 38
+    },
+    {
+     "signal": "2007-03-02",
+     "entry": "2007-03-05",
+     "exit": "2007-04-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 30
+    },
+    {
+     "signal": "2007-07-27",
+     "entry": "2007-07-30",
+     "exit": "2007-08-16",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 14
+    },
+    {
+     "signal": "2007-11-09",
+     "entry": "2007-11-12",
+     "exit": "2007-12-10",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 20
+    },
+    {
+     "signal": "2008-01-04",
+     "entry": "2008-01-07",
+     "exit": "2008-01-17",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 9
+    },
+    {
+     "signal": "2008-03-06",
+     "entry": "2008-03-07",
+     "exit": "2008-04-01",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 17
+    },
+    {
+     "signal": "2008-06-11",
+     "entry": "2008-06-12",
+     "exit": "2008-06-26",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 11
+    },
+    {
+     "signal": "2008-09-15",
+     "entry": "2008-09-16",
+     "exit": "2008-09-19",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 4
+    },
+    {
+     "signal": "2008-11-12",
+     "entry": "2008-11-13",
+     "exit": "2008-11-13",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 1
+    },
+    {
+     "signal": "2008-12-01",
+     "entry": "2008-12-02",
+     "exit": "2008-12-03",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 2
+    },
+    {
+     "signal": "2009-01-20",
+     "entry": "2009-01-21",
+     "exit": "2009-01-28",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 6
+    },
+    {
+     "signal": "2009-02-17",
+     "entry": "2009-02-18",
+     "exit": "2009-02-23",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 4
+    },
+    {
+     "signal": "2009-06-22",
+     "entry": "2009-06-23",
+     "exit": "2009-07-20",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 19
+    },
+    {
+     "signal": "2010-01-28",
+     "entry": "2010-01-29",
+     "exit": "2010-03-12",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 30
+    },
+    {
+     "signal": "2010-05-06",
+     "entry": "2010-05-07",
+     "exit": "2010-05-21",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 11
+    },
+    {
+     "signal": "2010-05-28",
+     "entry": "2010-06-01",
+     "exit": "2010-07-01",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 23
+    },
+    {
+     "signal": "2010-08-24",
+     "entry": "2010-08-25",
+     "exit": "2010-09-13",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 13
+    },
+    {
+     "signal": "2011-03-16",
+     "entry": "2011-03-17",
+     "exit": "2011-03-25",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 7
+    },
+    {
+     "signal": "2011-06-03",
+     "entry": "2011-06-06",
+     "exit": "2011-08-04",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 43
+    },
+    {
+     "signal": "2011-08-25",
+     "entry": "2011-08-26",
+     "exit": "2011-08-31",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 4
+    },
+    {
+     "signal": "2011-09-21",
+     "entry": "2011-09-22",
+     "exit": "2011-10-04",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 9
+    },
+    {
+     "signal": "2011-11-21",
+     "entry": "2011-11-22",
+     "exit": "2011-12-02",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 8
+    },
+    {
+     "signal": "2012-05-16",
+     "entry": "2012-05-17",
+     "exit": "2012-08-10",
+     "outcome": "timeout",
+     "ret": 0.0484,
+     "days": 60
+    },
+    {
+     "signal": "2012-11-14",
+     "entry": "2012-11-15",
+     "exit": "2012-12-11",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 18
+    },
+    {
+     "signal": "2013-08-27",
+     "entry": "2013-08-28",
+     "exit": "2013-09-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 13
+    },
+    {
+     "signal": "2014-02-03",
+     "entry": "2014-02-04",
+     "exit": "2014-02-14",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 9
+    },
+    {
+     "signal": "2014-10-13",
+     "entry": "2014-10-14",
+     "exit": "2014-10-30",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 13
+    },
+    {
+     "signal": "2015-08-21",
+     "entry": "2015-08-24",
+     "exit": "2015-08-24",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 1
+    },
+    {
+     "signal": "2015-09-28",
+     "entry": "2015-09-29",
+     "exit": "2015-10-06",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 6
+    },
+    {
+     "signal": "2016-01-07",
+     "entry": "2016-01-08",
+     "exit": "2016-01-20",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 8
+    },
+    {
+     "signal": "2016-06-27",
+     "entry": "2016-06-28",
+     "exit": "2016-07-08",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 8
+    },
+    {
+     "signal": "2018-02-05",
+     "entry": "2018-02-06",
+     "exit": "2018-02-07",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 2
+    },
+    {
+     "signal": "2018-03-23",
+     "entry": "2018-03-26",
+     "exit": "2018-05-21",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 40
+    },
+    {
+     "signal": "2018-10-11",
+     "entry": "2018-10-12",
+     "exit": "2018-10-29",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 12
+    },
+    {
+     "signal": "2018-12-07",
+     "entry": "2018-12-10",
+     "exit": "2018-12-20",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 9
+    },
+    {
+     "signal": "2019-05-29",
+     "entry": "2019-05-30",
+     "exit": "2019-06-18",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 14
+    },
+    {
+     "signal": "2019-08-05",
+     "entry": "2019-08-06",
+     "exit": "2019-09-11",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 26
+    },
+    {
+     "signal": "2020-02-25",
+     "entry": "2020-02-26",
+     "exit": "2020-02-27",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 2
+    },
+    {
+     "signal": "2020-03-27",
+     "entry": "2020-03-30",
+     "exit": "2020-04-06",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 6
+    },
+    {
+     "signal": "2020-09-08",
+     "entry": "2020-09-09",
+     "exit": "2020-10-29",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 37
+    },
+    {
+     "signal": "2021-11-30",
+     "entry": "2021-12-01",
+     "exit": "2021-12-28",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 19
+    },
+    {
+     "signal": "2022-01-20",
+     "entry": "2022-01-21",
+     "exit": "2022-02-24",
+     "outcome": "stop",
+     "ret": -0.0539,
+     "days": 24
+    },
+    {
+     "signal": "2022-04-22",
+     "entry": "2022-04-25",
+     "exit": "2022-05-10",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 12
+    },
+    {
+     "signal": "2022-05-18",
+     "entry": "2022-05-19",
+     "exit": "2022-05-27",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 7
+    },
+    {
+     "signal": "2022-06-13",
+     "entry": "2022-06-14",
+     "exit": "2022-07-22",
+     "outcome": "target",
+     "ret": 0.0515,
+     "days": 27
+    },
+    {
+     "signal": "2022-08-29",
+     "entry": "2022-08-30",
+     "exit": "2022-09-16",
+     "outcome": "stop",
+     "ret": -0.05,
+     "days": 13
+    },
+    {
+     "signal": "2022-10-07",
+     "entry": "2022-10-10",
+     "exit": "2022-10-21",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 10
+    },
+    {
+     "signal": "2022-12-19",
+     "entry": "2022-12-20",
+     "exit": "2023-03-17",
+     "outcome": "timeout",
+     "ret": -0.0267,
+     "days": 60
+    },
+    {
+     "signal": "2023-09-26",
+     "entry": "2023-09-27",
+     "exit": "2023-11-24",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 42
+    },
+    {
+     "signal": "2024-04-15",
+     "entry": "2024-04-16",
+     "exit": "2024-05-15",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 22
+    },
+    {
+     "signal": "2024-08-05",
+     "entry": "2024-08-06",
+     "exit": "2024-08-16",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 9
+    },
+    {
+     "signal": "2024-12-18",
+     "entry": "2024-12-19",
+     "exit": "2025-01-27",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 24
+    },
+    {
+     "signal": "2025-03-04",
+     "entry": "2025-03-05",
+     "exit": "2025-04-04",
+     "outcome": "stop",
+     "ret": -0.0569,
+     "days": 23
+    },
+    {
+     "signal": "2025-04-21",
+     "entry": "2025-04-22",
+     "exit": "2025-04-29",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 6
+    },
+    {
+     "signal": "2025-11-20",
+     "entry": "2025-11-21",
+     "exit": "2025-12-05",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 10
+    },
+    {
+     "signal": "2026-03-18",
+     "entry": "2026-03-19",
+     "exit": "2026-04-14",
+     "outcome": "target",
+     "ret": 0.05,
+     "days": 18
+    },
+    {
+     "signal": "2026-09-16",
+     "entry": "2026-09-17",
+     "exit": "2026-10-30",
+     "outcome": "open",
+     "ret": -0.0022,
+     "days": 32
+    }
+   ]
+  },
+  "^RUT": {
+   "name": "羅素 2000",
+   "swing": 0.07,
+   "trades": 67,
+   "hitRate": 0.6418,
+   "hitRateEarly": 0.6944,
+   "tradesEarly": 36,
+   "hitRateLate": 0.5806,
+   "tradesLate": 31,
+   "baseRate": 0.4518,
+   "avgReturn": 0.0238,
+   "medianDays": 17,
+   "winnersMaeP90": -0.0439,
+   "nearSwingLowRate": 0.7015,
+   "events": [
+    {
+     "signal": "2004-03-22",
+     "entry": "2004-03-23",
+     "exit": "2004-04-02",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 9
+    },
+    {
+     "signal": "2004-04-30",
+     "entry": "2004-05-03",
+     "exit": "2004-07-28",
+     "outcome": "timeout",
+     "ret": -0.0332,
+     "days": 60
+    },
+    {
+     "signal": "2004-08-06",
+     "entry": "2004-08-09",
+     "exit": "2004-09-01",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 18
+    },
+    {
+     "signal": "2005-03-29",
+     "entry": "2005-03-30",
+     "exit": "2005-06-17",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 57
+    },
+    {
+     "signal": "2005-10-06",
+     "entry": "2005-10-07",
+     "exit": "2005-11-23",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 34
+    },
+    {
+     "signal": "2006-05-17",
+     "entry": "2006-05-18",
+     "exit": "2006-06-13",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 18
+    },
+    {
+     "signal": "2006-07-17",
+     "entry": "2006-07-18",
+     "exit": "2006-09-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 35
+    },
+    {
+     "signal": "2007-03-05",
+     "entry": "2007-03-06",
+     "exit": "2007-04-13",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 28
+    },
+    {
+     "signal": "2007-07-26",
+     "entry": "2007-07-27",
+     "exit": "2007-10-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 50
+    },
+    {
+     "signal": "2007-11-09",
+     "entry": "2007-11-12",
+     "exit": "2008-01-07",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 38
+    },
+    {
+     "signal": "2008-03-06",
+     "entry": "2008-03-07",
+     "exit": "2008-03-25",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 12
+    },
+    {
+     "signal": "2008-06-24",
+     "entry": "2008-06-25",
+     "exit": "2008-07-07",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 8
+    },
+    {
+     "signal": "2008-09-15",
+     "entry": "2008-09-16",
+     "exit": "2008-09-19",
+     "outcome": "target",
+     "ret": 0.0848,
+     "days": 4
+    },
+    {
+     "signal": "2008-11-12",
+     "entry": "2008-11-13",
+     "exit": "2008-11-13",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 1
+    },
+    {
+     "signal": "2008-12-01",
+     "entry": "2008-12-02",
+     "exit": "2008-12-03",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 2
+    },
+    {
+     "signal": "2009-01-20",
+     "entry": "2009-01-21",
+     "exit": "2009-01-28",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 6
+    },
+    {
+     "signal": "2009-02-17",
+     "entry": "2009-02-18",
+     "exit": "2009-02-23",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 4
+    },
+    {
+     "signal": "2009-06-22",
+     "entry": "2009-06-23",
+     "exit": "2009-07-22",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 21
+    },
+    {
+     "signal": "2009-10-28",
+     "entry": "2009-10-29",
+     "exit": "2009-12-15",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 33
+    },
+    {
+     "signal": "2010-01-29",
+     "entry": "2010-02-01",
+     "exit": "2010-03-02",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 21
+    },
+    {
+     "signal": "2010-05-06",
+     "entry": "2010-05-07",
+     "exit": "2010-05-13",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 5
+    },
+    {
+     "signal": "2010-05-28",
+     "entry": "2010-06-01",
+     "exit": "2010-06-08",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 6
+    },
+    {
+     "signal": "2010-06-29",
+     "entry": "2010-06-30",
+     "exit": "2010-07-26",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 18
+    },
+    {
+     "signal": "2010-08-13",
+     "entry": "2010-08-16",
+     "exit": "2010-09-13",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 20
+    },
+    {
+     "signal": "2011-06-06",
+     "entry": "2011-06-07",
+     "exit": "2011-07-07",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 22
+    },
+    {
+     "signal": "2011-07-29",
+     "entry": "2011-08-01",
+     "exit": "2011-08-04",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 4
+    },
+    {
+     "signal": "2011-08-25",
+     "entry": "2011-08-26",
+     "exit": "2011-08-29",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 2
+    },
+    {
+     "signal": "2011-09-21",
+     "entry": "2011-09-22",
+     "exit": "2011-10-04",
+     "outcome": "stop",
+     "ret": -0.072,
+     "days": 9
+    },
+    {
+     "signal": "2011-11-21",
+     "entry": "2011-11-22",
+     "exit": "2011-12-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 9
+    },
+    {
+     "signal": "2012-04-10",
+     "entry": "2012-04-11",
+     "exit": "2012-06-04",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 38
+    },
+    {
+     "signal": "2012-11-14",
+     "entry": "2012-11-15",
+     "exit": "2012-12-03",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 12
+    },
+    {
+     "signal": "2014-02-03",
+     "entry": "2014-02-04",
+     "exit": "2014-02-24",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 14
+    },
+    {
+     "signal": "2014-04-11",
+     "entry": "2014-04-14",
+     "exit": "2014-07-01",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 55
+    },
+    {
+     "signal": "2014-07-31",
+     "entry": "2014-08-01",
+     "exit": "2014-10-15",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 53
+    },
+    {
+     "signal": "2015-08-21",
+     "entry": "2015-08-24",
+     "exit": "2015-11-06",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 54
+    },
+    {
+     "signal": "2015-12-14",
+     "entry": "2015-12-15",
+     "exit": "2016-01-11",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 18
+    },
+    {
+     "signal": "2016-06-27",
+     "entry": "2016-06-28",
+     "exit": "2016-07-08",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 8
+    },
+    {
+     "signal": "2016-11-02",
+     "entry": "2016-11-03",
+     "exit": "2016-11-10",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 6
+    },
+    {
+     "signal": "2018-02-05",
+     "entry": "2018-02-06",
+     "exit": "2018-03-09",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 23
+    },
+    {
+     "signal": "2018-04-02",
+     "entry": "2018-04-03",
+     "exit": "2018-05-09",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 27
+    },
+    {
+     "signal": "2018-10-10",
+     "entry": "2018-10-11",
+     "exit": "2018-10-26",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 12
+    },
+    {
+     "signal": "2018-12-07",
+     "entry": "2018-12-10",
+     "exit": "2018-12-19",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 8
+    },
+    {
+     "signal": "2019-05-29",
+     "entry": "2019-05-30",
+     "exit": "2019-07-31",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 44
+    },
+    {
+     "signal": "2019-08-14",
+     "entry": "2019-08-15",
+     "exit": "2019-09-11",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 19
+    },
+    {
+     "signal": "2019-10-08",
+     "entry": "2019-10-09",
+     "exit": "2019-11-01",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 18
+    },
+    {
+     "signal": "2020-02-25",
+     "entry": "2020-02-26",
+     "exit": "2020-02-28",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 3
+    },
+    {
+     "signal": "2020-03-27",
+     "entry": "2020-03-30",
+     "exit": "2020-04-03",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 5
+    },
+    {
+     "signal": "2020-09-23",
+     "entry": "2020-09-24",
+     "exit": "2020-10-05",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 8
+    },
+    {
+     "signal": "2021-07-16",
+     "entry": "2021-07-19",
+     "exit": "2021-10-11",
+     "outcome": "timeout",
+     "ret": 0.0282,
+     "days": 60
+    },
+    {
+     "signal": "2021-11-26",
+     "entry": "2021-11-29",
+     "exit": "2022-01-19",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 36
+    },
+    {
+     "signal": "2022-01-20",
+     "entry": "2022-01-21",
+     "exit": "2022-04-18",
+     "outcome": "timeout",
+     "ret": -0.016,
+     "days": 60
+    },
+    {
+     "signal": "2022-04-22",
+     "entry": "2022-04-25",
+     "exit": "2022-05-09",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 11
+    },
+    {
+     "signal": "2022-05-18",
+     "entry": "2022-05-19",
+     "exit": "2022-06-02",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 10
+    },
+    {
+     "signal": "2022-06-13",
+     "entry": "2022-06-14",
+     "exit": "2022-07-22",
+     "outcome": "target",
+     "ret": 0.0711,
+     "days": 27
+    },
+    {
+     "signal": "2022-08-30",
+     "entry": "2022-08-31",
+     "exit": "2022-09-22",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 16
+    },
+    {
+     "signal": "2022-10-07",
+     "entry": "2022-10-10",
+     "exit": "2022-10-26",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 13
+    },
+    {
+     "signal": "2022-12-19",
+     "entry": "2022-12-20",
+     "exit": "2023-01-12",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 16
+    },
+    {
+     "signal": "2023-03-09",
+     "entry": "2023-03-10",
+     "exit": "2023-06-05",
+     "outcome": "timeout",
+     "ret": -0.0082,
+     "days": 60
+    },
+    {
+     "signal": "2023-08-17",
+     "entry": "2023-08-18",
+     "exit": "2023-10-04",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 33
+    },
+    {
+     "signal": "2023-10-20",
+     "entry": "2023-10-23",
+     "exit": "2023-11-14",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 17
+    },
+    {
+     "signal": "2024-04-15",
+     "entry": "2024-04-16",
+     "exit": "2024-05-15",
+     "outcome": "target",
+     "ret": 0.071,
+     "days": 22
+    },
+    {
+     "signal": "2024-08-05",
+     "entry": "2024-08-06",
+     "exit": "2024-08-23",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 14
+    },
+    {
+     "signal": "2024-12-18",
+     "entry": "2024-12-19",
+     "exit": "2025-03-03",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 48
+    },
+    {
+     "signal": "2025-04-03",
+     "entry": "2025-04-04",
+     "exit": "2025-04-07",
+     "outcome": "stop",
+     "ret": -0.07,
+     "days": 2
+    },
+    {
+     "signal": "2025-04-21",
+     "entry": "2025-04-22",
+     "exit": "2025-05-02",
+     "outcome": "target",
+     "ret": 0.0718,
+     "days": 9
+    },
+    {
+     "signal": "2025-11-20",
+     "entry": "2025-11-21",
+     "exit": "2025-11-25",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 3
+    },
+    {
+     "signal": "2026-03-18",
+     "entry": "2026-03-19",
+     "exit": "2026-04-08",
+     "outcome": "target",
+     "ret": 0.07,
+     "days": 14
+    },
+    {
+     "signal": "2026-09-29",
+     "entry": "2026-09-30",
+     "exit": "2026-10-30",
+     "outcome": "open",
+     "ret": -0.0014,
+     "days": 23
+    }
+   ]
+  },
+  "^SOX": {
+   "name": "費城半導體",
+   "swing": 0.1,
+   "trades": 57,
+   "hitRate": 0.6316,
+   "hitRateEarly": 0.6364,
+   "tradesEarly": 33,
+   "hitRateLate": 0.625,
+   "tradesLate": 24,
+   "baseRate": 0.4776,
+   "avgReturn": 0.0361,
+   "medianDays": 20,
+   "winnersMaeP90": -0.0863,
+   "nearSwingLowRate": 0.5614,
+   "events": [
+    {
+     "signal": "2004-03-22",
+     "entry": "2004-03-23",
+     "exit": "2004-04-02",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 9
+    },
+    {
+     "signal": "2004-04-30",
+     "entry": "2004-05-03",
+     "exit": "2004-05-28",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 20
+    },
+    {
+     "signal": "2004-07-22",
+     "entry": "2004-07-23",
+     "exit": "2004-08-11",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 14
+    },
+    {
+     "signal": "2005-04-15",
+     "entry": "2005-04-18",
+     "exit": "2005-05-19",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 24
+    },
+    {
+     "signal": "2005-10-12",
+     "entry": "2005-10-13",
+     "exit": "2005-11-18",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 27
+    },
+    {
+     "signal": "2006-05-17",
+     "entry": "2006-05-18",
+     "exit": "2006-06-27",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 28
+    },
+    {
+     "signal": "2006-07-17",
+     "entry": "2006-07-18",
+     "exit": "2006-08-17",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 23
+    },
+    {
+     "signal": "2007-08-03",
+     "entry": "2007-08-06",
+     "exit": "2007-10-29",
+     "outcome": "timeout",
+     "ret": -0.06,
+     "days": 60
+    },
+    {
+     "signal": "2007-11-09",
+     "entry": "2007-11-12",
+     "exit": "2008-01-03",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 36
+    },
+    {
+     "signal": "2008-01-04",
+     "entry": "2008-01-07",
+     "exit": "2008-01-23",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 12
+    },
+    {
+     "signal": "2008-03-06",
+     "entry": "2008-03-07",
+     "exit": "2008-04-18",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 30
+    },
+    {
+     "signal": "2008-06-23",
+     "entry": "2008-06-24",
+     "exit": "2008-07-11",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 13
+    },
+    {
+     "signal": "2008-09-15",
+     "entry": "2008-09-16",
+     "exit": "2008-09-19",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 4
+    },
+    {
+     "signal": "2008-11-12",
+     "entry": "2008-11-13",
+     "exit": "2008-11-19",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 5
+    },
+    {
+     "signal": "2008-12-01",
+     "entry": "2008-12-02",
+     "exit": "2008-12-09",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 6
+    },
+    {
+     "signal": "2009-01-20",
+     "entry": "2009-01-21",
+     "exit": "2009-01-28",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 6
+    },
+    {
+     "signal": "2009-02-17",
+     "entry": "2009-02-18",
+     "exit": "2009-03-18",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 21
+    },
+    {
+     "signal": "2009-06-22",
+     "entry": "2009-06-23",
+     "exit": "2009-07-15",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 16
+    },
+    {
+     "signal": "2009-10-28",
+     "entry": "2009-10-29",
+     "exit": "2009-12-04",
+     "outcome": "target",
+     "ret": 0.1015,
+     "days": 26
+    },
+    {
+     "signal": "2010-01-28",
+     "entry": "2010-01-29",
+     "exit": "2010-03-17",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 33
+    },
+    {
+     "signal": "2010-05-06",
+     "entry": "2010-05-07",
+     "exit": "2010-08-02",
+     "outcome": "timeout",
+     "ret": 0.0156,
+     "days": 60
+    },
+    {
+     "signal": "2010-08-13",
+     "entry": "2010-08-16",
+     "exit": "2010-09-29",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 32
+    },
+    {
+     "signal": "2011-03-15",
+     "entry": "2011-03-16",
+     "exit": "2011-06-09",
+     "outcome": "timeout",
+     "ret": -0.0247,
+     "days": 60
+    },
+    {
+     "signal": "2011-06-10",
+     "entry": "2011-06-13",
+     "exit": "2011-08-04",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 38
+    },
+    {
+     "signal": "2011-08-25",
+     "entry": "2011-08-26",
+     "exit": "2011-09-14",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 13
+    },
+    {
+     "signal": "2011-09-21",
+     "entry": "2011-09-22",
+     "exit": "2011-10-27",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 26
+    },
+    {
+     "signal": "2011-11-23",
+     "entry": "2011-11-25",
+     "exit": "2011-12-05",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 7
+    },
+    {
+     "signal": "2012-05-15",
+     "entry": "2012-05-16",
+     "exit": "2012-07-17",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 43
+    },
+    {
+     "signal": "2012-11-14",
+     "entry": "2012-11-15",
+     "exit": "2013-01-02",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 32
+    },
+    {
+     "signal": "2014-10-10",
+     "entry": "2014-10-13",
+     "exit": "2014-10-28",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 12
+    },
+    {
+     "signal": "2015-07-08",
+     "entry": "2015-07-09",
+     "exit": "2015-08-20",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 31
+    },
+    {
+     "signal": "2015-08-21",
+     "entry": "2015-08-24",
+     "exit": "2015-08-27",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 4
+    },
+    {
+     "signal": "2015-09-28",
+     "entry": "2015-09-29",
+     "exit": "2015-10-08",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 8
+    },
+    {
+     "signal": "2016-01-07",
+     "entry": "2016-01-08",
+     "exit": "2016-03-18",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 49
+    },
+    {
+     "signal": "2018-02-08",
+     "entry": "2018-02-09",
+     "exit": "2018-02-26",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 11
+    },
+    {
+     "signal": "2018-03-28",
+     "entry": "2018-03-29",
+     "exit": "2018-06-22",
+     "outcome": "timeout",
+     "ret": 0.0447,
+     "days": 60
+    },
+    {
+     "signal": "2018-10-10",
+     "entry": "2018-10-11",
+     "exit": "2018-10-29",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 13
+    },
+    {
+     "signal": "2018-12-07",
+     "entry": "2018-12-10",
+     "exit": "2019-01-25",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 32
+    },
+    {
+     "signal": "2019-05-29",
+     "entry": "2019-05-30",
+     "exit": "2019-06-20",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 16
+    },
+    {
+     "signal": "2019-08-05",
+     "entry": "2019-08-06",
+     "exit": "2019-09-11",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 26
+    },
+    {
+     "signal": "2020-02-25",
+     "entry": "2020-02-26",
+     "exit": "2020-03-09",
+     "outcome": "stop",
+     "ret": -0.1139,
+     "days": 9
+    },
+    {
+     "signal": "2020-03-27",
+     "entry": "2020-03-30",
+     "exit": "2020-04-09",
+     "outcome": "target",
+     "ret": 0.1022,
+     "days": 9
+    },
+    {
+     "signal": "2020-09-08",
+     "entry": "2020-09-09",
+     "exit": "2020-10-09",
+     "outcome": "target",
+     "ret": 0.112,
+     "days": 23
+    },
+    {
+     "signal": "2022-01-20",
+     "entry": "2022-01-21",
+     "exit": "2022-03-07",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 31
+    },
+    {
+     "signal": "2022-04-22",
+     "entry": "2022-04-25",
+     "exit": "2022-06-13",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 35
+    },
+    {
+     "signal": "2022-08-29",
+     "entry": "2022-08-30",
+     "exit": "2022-09-22",
+     "outcome": "stop",
+     "ret": -0.1,
+     "days": 17
+    },
+    {
+     "signal": "2022-10-07",
+     "entry": "2022-10-10",
+     "exit": "2022-10-13",
+     "outcome": "stop",
+     "ret": -0.1036,
+     "days": 4
+    },
+    {
+     "signal": "2022-12-22",
+     "entry": "2022-12-23",
+     "exit": "2023-01-12",
+     "outcome": "target",
+     "ret": 0.1021,
+     "days": 13
+    },
+    {
+     "signal": "2023-08-17",
+     "entry": "2023-08-18",
+     "exit": "2023-11-10",
+     "outcome": "timeout",
+     "ret": 0.0528,
+     "days": 60
+    },
+    {
+     "signal": "2024-04-17",
+     "entry": "2024-04-18",
+     "exit": "2024-05-15",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 20
+    },
+    {
+     "signal": "2024-08-05",
+     "entry": "2024-08-06",
+     "exit": "2024-08-15",
+     "outcome": "target",
+     "ret": 0.1046,
+     "days": 8
+    },
+    {
+     "signal": "2025-02-27",
+     "entry": "2025-02-28",
+     "exit": "2025-03-31",
+     "outcome": "stop",
+     "ret": -0.1048,
+     "days": 22
+    },
+    {
+     "signal": "2025-04-03",
+     "entry": "2025-04-04",
+     "exit": "2025-04-09",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 4
+    },
+    {
+     "signal": "2025-04-21",
+     "entry": "2025-04-22",
+     "exit": "2025-04-24",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 3
+    },
+    {
+     "signal": "2025-11-20",
+     "entry": "2025-11-21",
+     "exit": "2025-11-28",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 5
+    },
+    {
+     "signal": "2026-03-27",
+     "entry": "2026-03-30",
+     "exit": "2026-04-08",
+     "outcome": "target",
+     "ret": 0.1304,
+     "days": 7
+    },
+    {
+     "signal": "2026-09-16",
+     "entry": "2026-09-17",
+     "exit": "2026-09-25",
+     "outcome": "target",
+     "ret": 0.1,
+     "days": 7
+    }
+   ]
+  }
+ },
+ "overbought": {
+  "index": "^GSPC",
+  "quantile": 0.95,
+  "events": 110,
+  "dropFirstRate": 0.3,
+  "baseRate": 0.3172
+ }
+}
