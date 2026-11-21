@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-20T17:23:11.236756+00:00",
+  "generatedAt": "2026-11-21T11:10:13.988053+00:00",
   "threshold": 0.95,
   "method": "calendar-session-guard-v3",
   "markets": {
@@ -3401,7 +3401,7 @@
       "dataGaps": {
         "status": "ok",
         "startDate": "2021-01-01",
-        "through": "2026-11-19",
+        "through": "2026-11-20",
         "calendar": "XNYS",
         "missingStockThreshold": 0.5,
         "comparison": "strictly-greater",
@@ -3409,19 +3409,37 @@
         "primaryFirstDate": "2021-01-04",
         "primaryLastDate": "2026-11-19",
         "reason": null,
-        "sessions": []
+        "sessions": [
+          {
+            "date": "2026-11-20",
+            "reason": "missing-session-data",
+            "reasons": [
+              "primary-index-missing",
+              "majority-stock-rows-missing"
+            ],
+            "calendar": "XNYS",
+            "calendarSession": true,
+            "primaryIndexMissing": true,
+            "eligibleSymbols": 5391,
+            "observedSymbols": 0,
+            "missingSymbols": 5391,
+            "missingShare": 1.0,
+            "coveragePosition": "after-primary-coverage",
+            "officialSources": []
+          }
+        ]
       }
     }
   },
   "scan": {
-    "archiveCommit": "d0d15cd682a2eee9afb2b4d07b1f05e61fd3acc3",
-    "symbols": 7707,
-    "rows": 9859235,
-    "yearFiles": 41532,
+    "archiveCommit": "452eab2122542b8b66c9565929bb5e430980f77c",
+    "symbols": 7708,
+    "rows": 9859236,
+    "yearFiles": 41533,
     "invalidRows": 0,
     "errors": [],
     "suspectedDatesWithRows": 0,
     "suspectedRows": 0,
-    "seconds": 61.819
+    "seconds": 46.6
   }
 }
