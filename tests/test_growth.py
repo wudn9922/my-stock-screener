@@ -460,6 +460,42 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(summary["official"]["tw"], 0)
 
 
+class TaiwanSplitTest(unittest.TestCase):
+    """8422.TW: 1 拆 10 on 2025-11-06; FinMind keeps the pre-split EPS (implied ~113M shares) next to the post-split
+    ones (~1,340M). YoY must compare on one basis: restated when the implied share counts confirm it, else dropped."""
+
+    def document(self, splits=(("2025-11-06", 10),), q1_2025_income=444724000):
+        ends = ["2024-03-31", "2024-06-30", "2024-09-30", "2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30",
+                "2025-12-31", "2026-03-31", "2026-06-30", "2026-09-30"]
+        q = {"end": ends, "fy": [int(e[:4]) for e in ends], "fq": [1, 2, 3, 4] * 2 + [1, 2, 3], "src": ["finmind"] * 11,
+             "values": {"epsBasic": [2.26, 2.51, 2.6, 3.33, 3.97, 4.03, 2.48, -9.18, 0.21, 0.34, 0.42],
+                        "netIncome": [247000000, 273707000, 283458000, 367799000, q1_2025_income, 452885000,
+                                      281726000, 279523000, 280916000, 458983000, 568605000]}}
+        a = {"end": ["2024-12-31", "2025-12-31"], "fy": [2024, 2025], "fq": [None, None], "src": ["finmind"] * 2,
+             "values": {"epsBasic": [10.7, 1.29], "netIncome": [1172133000, 1458858000]}}
+        return {"version": 1, "symbol": "8422.TW", "market": "TW", "annual": a, "quarterly": q,
+                "split": {"adjusted": True, "events": [list(item) for item in splits]},
+                "stockDividends": {"source": "FinMind TaiwanStockDividend", "par": 10.0, "checked": "2026-11-20", "events": []},
+                "quality": {"level": "good", "issues": ["split-adjusted", "q4-derived"]}}
+
+    def test_8422_quarters_and_years_on_one_basis(self):
+        _, q, y = growth.financials_blocks(self.document(), date(2026, 11, 22))
+        # slots from Q3 2026 back: Q1 2026 0.21 vs Q1 2025 3.97 ÷ 10 = 0.397 → −47.1% (not −94.7%)
+        self.assertEqual(q["eps"][2], -47.1)
+        self.assertEqual(q["eps"][0], round((0.42 / 0.248 - 1) * 100, 1))
+        # Q4 2025: 1.29 − (0.397 + 0.403 + 0.248) = 0.242 vs Q4 2024 3.33 ÷ 10
+        self.assertEqual(q["eps"][3], round((0.242 / 0.333 - 1) * 100, 1))
+        self.assertEqual(y["eps"][0], round((1.29 / 1.07 - 1) * 100, 1))
+
+    def test_unconfirmed_split_drops_the_yoy_instead_of_guessing(self):
+        # Q1 2025 without net income: no implied share count, so it cannot be restated → its pair has no EPS YoY
+        _, q, _ = growth.financials_blocks(self.document(q1_2025_income=None), date(2026, 11, 22))
+        self.assertIsNone(q["eps"][2])
+        # a split the implied counts confirm but whose later period lacks evidence: the earlier one is still restated
+        _, q, _ = growth.financials_blocks(self.document(), date(2026, 11, 22))
+        self.assertEqual(q["eps"][1], round((0.34 / 0.403 - 1) * 100, 1))
+
+
 class RepoDataTest(unittest.TestCase):
     """The checked-in docs/report/financials (skipped when absent)."""
 

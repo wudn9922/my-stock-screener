@@ -38,6 +38,10 @@ YoY always compares the SAME period of the year before, never the neighbouring p
 - A split of >= 1.5x between the two period ends whose share counts still differ by about that
   ratio means the pair is not on one share basis: its EPS YoY is null instead of a fake number. The
   frames / Taiwan sources have no split events: there a share count change of >= 1.5x is enough.
+  Taiwan financials files (FinMind EPS as published): periods still on a pre-split basis by their
+  implied share count (net income / EPS) are restated first (restate_splits, the epsBasis.ts rule);
+  a pair a split separates whose implied counts still jump >= 1.5x, or that lacks that evidence,
+  has no EPS YoY (tw_pair).
 - Staleness: a newest quarter older than 270 days (annual: 560) gives no quarterly (annual) values.
 Nothing is estimated; whatever cannot be computed stays null. The only derived periods are the Taiwan
 quarters (differences of year-to-date figures) and the SEC frames Q4s (fiscal year minus its first
@@ -64,6 +68,7 @@ newest RECENT_YEAR_SLOTS years (the choice is the same as with the 3-year horizo
 with it when it wins.
 """
 import json
+import math
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -149,6 +154,7 @@ def read_periods(section, quarterly, market=None):
     eps_d, eps_b = column(values, "epsDiluted", count), column(values, "epsBasic", count)
     eps_quality = section.get("epsQuality") if isinstance(section.get("epsQuality"), list) else []
     revenue, shares = column(values, "revenue", count), column(values, "dilutedShares", count)
+    income = column(values, "netIncome", count)
     periods = []
     for i, end in enumerate(ends):
         day = parse_day(end)
@@ -170,7 +176,7 @@ def read_periods(section, quarterly, market=None):
         src = srcs[i] if i < len(srcs) and isinstance(srcs[i], str) else "yahoo"
         periods.append({
             "end": end, "day": day, "fy": fy, "fq": fq,
-            "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i],
+            "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i], "ni": income[i],
             # a gated Q4 still anchors this filing block's recency (dropping it could switch to a shorter block)
             "gatedQ4Eps": bool(gated and q4),
             "src": src if src in ("sec", "finmind") else "yahoo",
@@ -348,6 +354,8 @@ def restate_periods(periods, events):
         return
     for period in periods:
         info = stock_dividends.factor(period["day"], events, annual=period.get("fq") is None)
+        if info is not None:
+            period["shareFactor"] = info["factor"]
         if info is None or info["factor"] == 1:
             continue
         for name in ("epsD", "epsB"):
@@ -365,27 +373,128 @@ def restate_for_stock_dividends(document, periods):
     restate_periods(periods, stock_dividends.events_of(document))
 
 
+MIN_EVIDENCE_EPS = 0.05     # |EPS| below this: cent rounding alone moves the implied share count by > 10%
+
+
+def tw_split_events(document, events):
+    """Usable split events (>= 1.5x or <= 1/1.5) of a Taiwan file, oldest first, without those on a 配股 / 減資 date
+    (Yahoo records them as splits: that event, not a second one). events: stock_dividends.events_of(document)."""
+    known = [day for day in (stock_dividends.day_of(event.get("exDate")) for event in events or []) if day is not None]
+    known += [day for day in (stock_dividends.day_of(event.get("date")) for event in capital_reductions.events_of(document) or []
+                              if isinstance(event, dict)) if day is not None]
+    return sorted((day, ratio) for day, ratio in split_events(document)
+                  if (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO) and all(abs((day - other).days) > 7 for other in known))
+
+
+def implied_shares(period):
+    """Net income ÷ EPS (diluted, else basic) when both are usable (same sign, |EPS| >= MIN_EVIDENCE_EPS), else None."""
+    eps = period.get("epsD") if period.get("epsD") is not None else period.get("epsB")
+    income = period.get("ni")
+    if eps is None or income is None or income == 0 or abs(eps) < MIN_EVIDENCE_EPS:
+        return None
+    shares = income / eps
+    return shares if shares > 0 else None
+
+
+def _median(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def restate_splits(periods, splits):
+    """
+    Taiwan FinMind EPS are as published, so periods printed before a split (8422.TW 1 拆 10 on 2025-11-06) sit on the
+    old share basis. Mirror of src/fundamentals/epsBasis.ts splitFactors, in place, on one block (after the 配股 / 減資
+    restatement): walking from the newest period back, a period's implied share count (net income ÷ EPS) × the
+    product of a suffix of the splits after its end must land within ±SPLIT_MATCH of the median of the next (up to)
+    three newer adjusted counts and of the next newer one, beat leaving it alone, and the splits must fall before
+    that newer period's report (+90 days) unless the period continues its factor. Then EPS ÷ factor. Every period gets
+    "splitFactor" and "splitApplied" (days); periods without an implied count keep factor 1.
+    """
+    for period in periods:
+        period["splitFactor"], period["splitApplied"] = 1.0, ()
+    if not splits:
+        return
+    order = sorted((p for p in periods if implied_shares(p) is not None), key=lambda p: p["day"], reverse=True)
+    newer, previous = [], None
+    for period in order:
+        shares = implied_shares(period)
+        if newer and previous is not None:
+            reference = _median(newer[-3:])
+            after = [split for split in splits if split[0] > period["day"]]
+            best, best_count, best_distance, product = 1.0, 0, abs(math.log(shares / reference)), 1.0
+            for k in range(len(after) - 1, -1, -1):
+                product *= after[k][1]
+                distance = abs(math.log(shares * product / reference))
+                if distance < best_distance:
+                    best, best_count, best_distance = product, len(after) - k, distance
+            applied = after[len(after) - best_count:] if best_count else []
+            due_of_newer = previous["day"] + timedelta(days=90)
+            known = set(previous["splitApplied"])
+            transition = all(day in known or day <= due_of_newer for day, _ in applied)
+            continuation = previous["splitFactor"] == best
+            neighbour = newer[-1]
+
+            def matches(count, best=best, shares=shares):
+                return abs(shares * best / count - 1) <= SPLIT_MATCH
+
+            if best != 1 and matches(reference) and matches(neighbour) and (transition or continuation):
+                period["splitFactor"], period["splitApplied"] = best, tuple(day for day, _ in applied)
+        newer.append(shares * period["splitFactor"])
+        previous = period
+    for period in periods:
+        if period["splitFactor"] != 1:
+            for name in ("epsD", "epsB"):
+                if period.get(name) is not None:
+                    period[name] = round(period[name] / period["splitFactor"], 4) + 0.0
+
+
+def tw_pair(splits, quarterly):
+    """
+    Taiwan financials files (after restate_splits): a pair with a split between the earlier period's end and the
+    later period's report is compared only when it is on one basis: both implied share counts (net income ÷ EPS)
+    known and not >= 1.5x apart, or, without them, the earlier period restated for every such split and the later
+    one not possibly left on the old basis. Otherwise the EPS YoY is dropped (never guessed); revenue YoY is
+    unaffected. Without a recorded split nothing is dropped: FinMind net income can include minority interests
+    (2006.TW 2026Q3), so implied counts alone are not evidence.
+    """
+    def pair(current, base):
+        revenue = growth_pct(current["rev"], base["rev"])
+        due = current["day"] + timedelta(days=stock_dividends.delay_days(current["day"]) if quarterly
+                                         else stock_dividends.DELAY_DAYS["yearEnd"])
+        relevant = [day for day, _ in splits if base["day"] < day <= due]
+        if relevant:
+            now_shares, base_shares = implied_shares(current), implied_shares(base)
+            if now_shares and base_shares:
+                if share_count_jump({"shares": now_shares}, {"shares": base_shares}):
+                    return None, False, revenue
+            elif not all(day in base.get("splitApplied", ()) and (day <= current["day"] or day in current.get("splitApplied", ()))
+                         for day in relevant):
+                return None, False, revenue
+        value, turn = eps_values(current, base)
+        return value, turn, revenue
+    return pair
+
+
 def recompute_derived_q4(document, quarterly, annual):
     """
     Taiwan derived fourth quarters (annual − Q1..Q3, quality issue "q4-derived") across a share-basis change, in place,
-    after restate_for_stock_dividends (mirror of atlas/src/fundamentals/epsBasis.ts). The published Q4 is the annual
-    less the Q3 report's year-to-date figure, so a 配股 / 減資彌補虧損 between the Q3 and the annual report mixes two
-    bases: Q4 = restated annual − Σ restated Q1..Q3 (a piece missing → the Q4 EPS is dropped). A split in that window
-    (8422.TW 2025-11-06) is not restated here (no implied-share confirmation in this script): that Q4 EPS is dropped
-    instead of compared. The builder leaves Q4 as published (build_financials_tw_finmind.py).
+    after restate_for_stock_dividends and restate_splits (mirror of atlas/src/fundamentals/epsBasis.ts). The published
+    Q4 is the annual less the Q3 report's year-to-date figure, so a 配股 / 減資彌補虧損 / split between the Q3 and the
+    annual report mixes two bases: when Q3's factor differs from the annual's, Q4 = restated annual − Σ restated
+    Q1..Q3 (a piece missing → the Q4 EPS is dropped). A split in that window the implied share counts could not
+    confirm leaves the Q4 EPS dropped instead of compared. The builder leaves Q4 as published
+    (build_financials_tw_finmind.py).
     """
     if document.get("market") != "TW" or "q4-derived" not in ((document.get("quality") or {}).get("issues") or []):
         return
-    events = stock_dividends.events_of(document)
-    if events is None:
-        return
-    # a split on a 配股 / 減資 date is that event (Yahoo records them as splits), not a second one
-    known = [day for day in (stock_dividends.day_of(event.get("exDate")) for event in events) if day is not None]
-    known += [day for day in (stock_dividends.day_of(event.get("date")) for event in capital_reductions.events_of(document) or []
-                              if isinstance(event, dict)) if day is not None]
-    splits = [(day, ratio) for day, ratio in split_events(document)
-              if (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO) and all(abs((day - other).days) > 7 for other in known)]
+    splits = tw_split_events(document, stock_dividends.events_of(document))
     years = {period["day"]: period for period in annual}
+
+    def factor(period):
+        return period.get("shareFactor", 1.0) * period.get("splitFactor", 1.0)
+
     for q4 in quarterly:
         if q4.get("fq") != 4:
             continue
@@ -395,14 +504,12 @@ def recompute_derived_q4(document, quarterly, annual):
         q3 = pieces.get(3)
         if year is None or q3 is None:
             continue
-        due_q3 = q3["day"] + timedelta(days=stock_dividends.delay_days(q3["day"]))
-        due_year = year["day"] + timedelta(days=stock_dividends.DELAY_DAYS["yearEnd"])
-        if any(due_q3 < day <= due_year for day, _ in splits):
-            q4["epsD"] = q4["epsB"] = None
-            continue
-        q3_factor = stock_dividends.factor(q3["day"], events)["factor"]
-        year_factor = stock_dividends.factor(year["day"], events, annual=True)["factor"]
-        if abs(q3_factor / year_factor - 1) <= 1e-6:
+        crossing = abs(factor(q3) / factor(year) - 1) > 1e-6 or abs(factor(q4) / factor(year) - 1) > 1e-6
+        if not crossing:
+            due_q3 = q3["day"] + timedelta(days=stock_dividends.delay_days(q3["day"]))
+            due_year = year["day"] + timedelta(days=stock_dividends.DELAY_DAYS["yearEnd"])
+            if any(due_q3 < day <= due_year for day, _ in splits):
+                q4["epsD"] = q4["epsB"] = None          # an unconfirmed split in the window: no basis to trust
             continue
         for name in ("epsD", "epsB"):
             values = [year.get(name)] + [pieces.get(fq, {}).get(name) for fq in (1, 2, 3)]
@@ -425,9 +532,16 @@ def financials_blocks(document, today):
     quarterly = read_periods(document.get("quarterly"), True, document.get("market"))
     annual = read_periods(document.get("annual"), False, document.get("market"))
     restate_for_stock_dividends(document, quarterly + annual)
+    q_pair = y_pair = None
+    if document.get("market") == "TW":
+        # FinMind EPS are never split-adjusted: restate on implied-share evidence, drop what stays ambiguous
+        splits = tw_split_events(document, stock_dividends.events_of(document))
+        restate_splits(quarterly, splits)
+        restate_splits(annual, splits)
+        q_pair, y_pair = tw_pair(splits, True), tw_pair(splits, False)
     recompute_derived_q4(document, quarterly, annual)
-    q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS)
-    y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS)
+    q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS, q_pair)
+    y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS, y_pair)
     if q is None and y is None:
         return None
     quality = document.get("quality") if isinstance(document.get("quality"), dict) else {}

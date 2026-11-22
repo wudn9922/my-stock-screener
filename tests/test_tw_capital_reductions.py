@@ -89,7 +89,8 @@ class Restate(unittest.TestCase):
         q, _ = growth.financials_blocks(document(cap.parse_events([LOSS])), date(2026, 9, 1))[1:]
         self.assertEqual(q["eps"][0], 20.0)
         plain, _ = growth.financials_blocks(document(cap.parse_events([CASH])), date(2026, 9, 1))[1:]
-        self.assertEqual(plain["eps"][0], 140.0)
+        self.assertEqual(plain["eps"][0], 140.0)                               # cash reduction: not restated
+        self.assertEqual(div.events_of(document(cap.parse_events([CASH]))), [])
 
 
 class DerivedQ4(unittest.TestCase):
