@@ -2,7 +2,7 @@ import { userStorage } from '../../auth/storage';
 import { useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import type { MetricResult } from '../../fundamentals/financialMetrics';
-import { ADJUSTED_EPS_HELP } from '../../fundamentals/stockDividendAdjust';
+import { RESTATED_EPS_HELP, type EpsDisplayBasis } from '../../fundamentals/epsBasis';
 import { STATEMENT_TABS, statementRows, type StatementId } from '../../fundamentals/financialStatements';
 import { formatDateTime } from '../format';
 import { FinancialNote } from './FinancialNote';
@@ -43,7 +43,7 @@ const writeShowYoy = (show: boolean) => {
 const adjustedTitle = (result: MetricResult): string | undefined =>
   result.basis === 'restated' || (result.comparable != null && result.comparable !== result.value) ? result.notes.join('；') : undefined;
 
-export function StatementTable({ history, view }: { history: FinancialHistory; view: FinancialsView }) {
+export function StatementTable({ history, view, epsBasis = 'restated' }: { history: FinancialHistory; view: FinancialsView; epsBasis?: EpsDisplayBasis }) {
   const [statement, setStatement] = useState<StatementId>('income');
   const [showYoy, setShowYoy] = useState<boolean>(readShowYoy);
   const onShowYoy = (next: boolean) => {
@@ -53,7 +53,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
   const series = history[view.kind];
   const order = series.end.map((_, index) => index).reverse();
   const quarterly = view.kind === 'quarterly';
-  const rows = useMemo(() => statementRows(history, view.kind, statement), [history, view.kind, statement]);
+  const rows = useMemo(() => statementRows(history, view.kind, statement, epsBasis), [history, view.kind, statement, epsBasis]);
   const title = STATEMENT_TABS.find((tab) => tab.id === statement)!.label;
   const periodTitle = (index: number) => (quarterly ? view.labels[index]!.long.replace('FY20', 'FY') : view.labels[index]!.long);
 
@@ -103,7 +103,7 @@ export function StatementTable({ history, view }: { history: FinancialHistory; v
               return (
                 <tr key={row.id} className={row.absent ? 'fin-absent-row' : undefined}>
                   <th scope="row" className="fin-sticky">
-                    <span className="fin-row-name" title={row.id === 'epsAdjusted' ? ADJUSTED_EPS_HELP : undefined}>{row.label}</span>
+                    <span className="fin-row-name" title={row.label.startsWith('還原') || row.label === '公告 EPS' ? RESTATED_EPS_HELP : undefined}>{row.label}</span>
                     <small>
                       {unitText(row.unit, history.currency, scale)}
                       {row.derived ? ' · 部分推算' : ''}

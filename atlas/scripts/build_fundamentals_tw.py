@@ -646,8 +646,9 @@ def symbol_map(universe, extra_keys=()):
     return mapping
 
 
-def growth_candidates(document, symbols, today):
-    """tw.json + {code: symbol} → {symbol: (None, quarterly block, annual block)} (src "mops")."""
+def growth_candidates(document, symbols, today, dividends=None):
+    """tw.json + {code: symbol} → {symbol: (None, quarterly block, annual block)} (src "mops"). dividends:
+    {symbol: stock dividend events} → EPS restated to the latest share basis first (build_growth.restate_periods)."""
     store = load_store(document)
     result = {}
     for code, row in store["data"].items():
@@ -655,6 +656,7 @@ def growth_candidates(document, symbols, today):
         if symbol is None:
             continue
         quarters, annual = company_periods(row)
+        growth.restate_periods(quarters + annual, (dividends or {}).get(symbol))
         q = growth.yoy_series(quarters, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, tw_pair)
         y = growth.yoy_series(annual, False, growth.RECENT_YEAR_SLOTS, [], today, growth.STALE_ANNUAL_DAYS, tw_pair)
         if q is not None or y is not None:
