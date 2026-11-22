@@ -10,9 +10,12 @@ share count, IAS 33.64). The reported value is never overwritten: callers keep b
 Source: FinMind TaiwanStockDividend (one row per dividend resolution): StockEarningsDistribution +
 StockStatutorySurplus = stock dividend NT$ per share, StockExDividendTradingDate = ex-rights date. Cash-only rows
 (factor 1) are not kept. A row with a stock dividend but no ex-rights date yet is kept as "pending" and not applied.
-Not handled (documented limits): capital reductions (減資) and cash capital increases (現金增資) change the share count
-too but are other datasets; par value is assumed 10 (TW default).
+Capital reductions to offset losses (減資彌補虧損) are restated the same way (tw_capital_reductions.py): events_of()
+adds them as share-basis events {"exDate", "shareRatio": new ÷ old shares}, and factor() multiplies by the ratio.
+Not handled (documented limits): cash capital reductions (現金減資) and cash capital increases (現金增資) change the
+share count too but are not restated (IAS 33); par value is assumed 10 (TW default).
 """
+import tw_capital_reductions as reductions
 from datetime import date, timedelta
 
 PAR = 10.0
@@ -82,7 +85,11 @@ def factor(end, events, as_of=None, annual=False):
         if ex is None or ex <= due or (limit is not None and ex > limit):
             continue
         applied.append(event)
-        total *= 1.0 + number(event.get("perShare")) / PAR
+        if "shareRatio" in event:
+            ratio = number(event.get("shareRatio"))
+            total *= ratio if 0 < ratio < 1 else 1.0          # a loss-offset capital reduction (new ÷ old shares)
+        else:
+            total *= 1.0 + number(event.get("perShare")) / PAR
     return {"factor": round(total, 6), "events": applied}
 
 
@@ -100,7 +107,14 @@ def block(events, checked):
 
 
 def events_of(document):
-    """A financials document → its stock dividend events, or None when the block is absent / malformed."""
+    """A financials document → its stock dividend events plus the loss-offset capital reductions of its
+    "capitalReductions" block (tw_capital_reductions.share_events), ascending; None when the stockDividends block is
+    absent / malformed (no share-basis data: never guess)."""
     stored = document.get("stockDividends") if isinstance(document, dict) else None
     events = stored.get("events") if isinstance(stored, dict) else None
-    return events if isinstance(events, list) else None
+    if not isinstance(events, list):
+        return None
+    extra = reductions.share_events(document)
+    if not extra:
+        return events
+    return sorted(events + extra, key=lambda e: str(e.get("exDate") or "9999"))

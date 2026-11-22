@@ -112,6 +112,7 @@ jobs:
         run: python -u atlas/scripts/build_financials_tw_finmind.py --budget 1500 --only-after-backfill
 
       # 台股配股（FinMind TaiwanStockDividend）→ financials/<代號>.TW(O).json 的 stockDividends 區塊，供還原 EPS（追溯調整）使用；每檔 30 天重抓一次
+      # 同一步也抓減資（TaiwanStockCapitalReductionReferencePrice，全市場一次請求）→ capitalReductions 區塊
       - id: notice_soft_05
         name: Taiwan stock dividends (FinMind, resumable)
         if: contains(inputs.markets || 'TW,US', 'TW')

@@ -1,6 +1,6 @@
 import { growth, margin } from './FinancialCalculations';
 import type { FinancialHistory, FinancialSeries, PeriodKind, RawField, StockDividendEvent } from './FinancialHistory';
-import { MIXED_Q4_REASON, RESTATED_EPS_HELP, adjustmentText, epsAdjustments, restatedEps, type EpsAdjustment, type EpsDisplayBasis } from './epsBasis';
+import { DERIVED_Q4_REPORTED_NOTE, MIXED_Q4_REASON, RESTATED_EPS_HELP, adjustmentText, epsAdjustments, restatedEps, type EpsAdjustment, type EpsDisplayBasis } from './epsBasis';
 
 /**
  * Derived statement metrics for the financials page. This is the only place the formulas live
@@ -377,6 +377,25 @@ export function eps(ctx: MetricContext, index: number): MetricResult {
   if (adjustment.mixedQ4) {
     if (ctx.epsBasis === 'reported') return { ...reported, comparable: null, notes: [...reported.notes, MIXED_Q4_REASON] };
     return missing('公告 EPS ÷ 股數調整係數', [input('公告 EPS', reported.value, 'eps')], MIXED_Q4_REASON, { comparable: null, reported: reported.value });
+  }
+  const derived = adjustment.derivedQ4;
+  if (derived) {
+    const [year, ...quarters] = derived.parts;
+    const formula = `還原全年 EPS ${year!.restated} − 還原前三季 (${quarters.map((part) => part.restated).join(' + ')}) = ${derived.restated}`;
+    const detail = `公告第四季 EPS ${reported.value} 為全年 EPS ${year!.reported} 減前三季 ${quarters.map((part) => part.reported).join(' + ')} 推算，跨越股數變動${derived.events ? `（${derived.events}）` : ''}`;
+    if (ctx.epsBasis === 'reported')
+      return { ...reported, comparable: derived.restated, notes: [...reported.notes, DERIVED_Q4_REPORTED_NOTE, `還原 EPS ${derived.restated}：${formula}`] };
+    return result(
+      derived.restated,
+      '還原全年 EPS − 還原前三季 EPS',
+      derived.parts.map((part) => input(part.label === '全年' ? '還原全年 EPS' : `還原 ${part.label} EPS`, part.restated, 'eps')),
+      {
+        basis: 'restated',
+        notes: [...reported.notes, `${detail}；改以各期換算成目前股數後推算：${formula}`, RESTATED_EPS_HELP],
+        comparable: derived.restated,
+        reported: reported.value,
+      },
+    );
   }
   if (adjustment.factor === 1) return { ...reported, comparable: restated };
   const detail = `係數 ${adjustment.factor}：${adjustmentText(adjustment)}`;
