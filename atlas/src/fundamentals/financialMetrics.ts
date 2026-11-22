@@ -1,6 +1,6 @@
 import { growth, margin } from './FinancialCalculations';
 import type { FinancialHistory, FinancialSeries, PeriodKind, RawField, StockDividendEvent } from './FinancialHistory';
-import { ADJUSTED_EPS_HELP, adjustEps, dividendFactor, eventText } from './stockDividendAdjust';
+import { MIXED_Q4_REASON, RESTATED_EPS_HELP, adjustmentText, epsAdjustments, restatedEps, type EpsAdjustment, type EpsDisplayBasis } from './epsBasis';
 
 /**
  * Derived statement metrics for the financials page. This is the only place the formulas live
@@ -36,8 +36,10 @@ export interface MetricResult {
   abnormal?: boolean;
   /** Which operating income line an OI-based metric used. */
   oiField?: 'operatingIncomeReported' | 'operatingIncome';
-  /** EPS only: the value restated for later stock dividends (追溯調整); year-over-year and CAGR compare these. */
+  /** EPS only: the value on today's share basis (追溯調整); year-over-year and CAGR compare these. */
   comparable?: number | null;
+  /** EPS only, when `value` is the restated figure: the reported (公告) EPS behind it. */
+  reported?: number | null;
 }
 
 export interface MetricContext {
@@ -48,6 +50,10 @@ export interface MetricContext {
   financialSector: boolean;
   /** Taiwan 配股 events of the file; null when it has none recorded. */
   stockDividends?: readonly StockDividendEvent[] | null;
+  /** Per period: what puts the EPS on today's share basis (epsBasis.ts); absent → EPS as reported only. */
+  epsAdjustments?: readonly (EpsAdjustment | null)[];
+  /** Which EPS `eps` shows: restated (default) or reported (公告). Year-over-year always compares restated values. */
+  epsBasis?: EpsDisplayBasis;
 }
 /**
  * Financial-sector format, as the builder flags it: the recent periods have no gross profit (or revenue with
@@ -56,12 +62,14 @@ export interface MetricContext {
 export function isFinancialSector(history: FinancialHistory): boolean {
   return history.quality.issues.includes('financial-sector-format');
 }
-export const contextOf = (history: FinancialHistory, kind: PeriodKind): MetricContext => ({
+export const contextOf = (history: FinancialHistory, kind: PeriodKind, epsBasis: EpsDisplayBasis = 'restated'): MetricContext => ({
   kind,
   series: history[kind],
   market: history.market,
   financialSector: isFinancialSector(history),
   stockDividends: history.market === 'TW' ? history.stockDividends : null,
+  epsAdjustments: epsAdjustments(history, kind),
+  epsBasis,
 });
 
 export const FIELD_LABELS: Record<RawField, string> = {
@@ -255,6 +263,8 @@ function result(
     ...(extra.reason ? { reason: extra.reason } : {}),
     ...(extra.abnormal ? { abnormal: true } : {}),
     ...(extra.oiField ? { oiField: extra.oiField } : {}),
+    ...(extra.comparable !== undefined ? { comparable: extra.comparable } : {}),
+    ...(extra.reported !== undefined ? { reported: extra.reported } : {}),
   };
 }
 const missing = (formula: string, inputs: MetricInput[], reason: string, extra: Partial<MetricResult> = {}) =>
@@ -351,18 +361,38 @@ export function operatingIncome(ctx: MetricContext, index: number): MetricResult
   });
 }
 
-/** EPS as reported (diluted, else basic). Taiwan files also carry `comparable`: the same EPS restated for later 配股. */
+/**
+ * EPS (diluted, else basic). By default on today's share basis (還原 EPS: reported ÷ the factor of the later 配股 and
+ * splits, epsBasis.ts) with the reported figure in `reported`, the inputs and the notes; with epsBasis 'reported' the
+ * 公告 EPS. `comparable` is always the restated value (year over year and CAGR). Without dividend data (Taiwan file
+ * lacking the block) the reported EPS is shown and nothing is compared.
+ */
 export function eps(ctx: MetricContext, index: number): MetricResult {
   const reported = reportedEps(ctx, index);
-  if (ctx.market !== 'TW' || reported.value === null) return reported;
-  const events = ctx.stockDividends ?? null;
-  const end = ctx.series.end[index]!;
-  const comparable = adjustEps(reported.value, end, events);
-  const info = dividendFactor(end, events);
-  const notes = [...reported.notes];
-  if (comparable !== null && info !== null && info.factor !== 1)
-    notes.push(`還原 EPS ${comparable}（係數 ${info.factor}：${eventText(info.events)}）；年增率與 CAGR 以還原 EPS 計算。${ADJUSTED_EPS_HELP}`);
-  return { ...reported, notes, comparable };
+  const adjustments = ctx.epsAdjustments;
+  if (reported.value === null || adjustments === undefined) return reported;
+  const adjustment = adjustments[index] ?? null;
+  if (adjustment === null) return { ...reported, comparable: null, notes: [...reported.notes, '缺配股資料，EPS 未追溯調整，不計算年增率'] };
+  const restated = restatedEps(reported.value, adjustment);
+  if (adjustment.mixedQ4) {
+    if (ctx.epsBasis === 'reported') return { ...reported, comparable: null, notes: [...reported.notes, MIXED_Q4_REASON] };
+    return missing('公告 EPS ÷ 股數調整係數', [input('公告 EPS', reported.value, 'eps')], MIXED_Q4_REASON, { comparable: null, reported: reported.value });
+  }
+  if (adjustment.factor === 1) return { ...reported, comparable: restated };
+  const detail = `係數 ${adjustment.factor}：${adjustmentText(adjustment)}`;
+  if (ctx.epsBasis === 'reported')
+    return { ...reported, comparable: restated, notes: [...reported.notes, `還原 EPS ${restated}（${detail}）；年增率與 CAGR 以還原 EPS 計算`] };
+  return result(restated, `${reported.formula} ÷ 股數調整係數`, [input('公告 EPS', reported.value, 'eps'), input('調整係數', adjustment.factor, 'times')], {
+    basis: 'restated',
+    notes: [...reported.notes, `公告 EPS ${reported.value} ÷ ${detail}`, RESTATED_EPS_HELP],
+    comparable: restated,
+    reported: reported.value,
+  });
+}
+
+/** The reported (公告) EPS, diluted else basic, whatever the display basis. */
+export function epsReported(ctx: MetricContext, index: number): MetricResult {
+  return reportedEps(ctx, index);
 }
 
 function reportedEps(ctx: MetricContext, index: number): MetricResult {
@@ -378,21 +408,16 @@ function reportedEps(ctx: MetricContext, index: number): MetricResult {
 }
 
 /**
- * 還原 EPS（追溯調整，含配股）: reported EPS ÷ Π(1 + 配股元 ÷ 10) of the stock dividends whose ex-rights date is after the
- * report was due. Never overwrites the reported EPS; null (with the reason) when the dividend data is missing.
+ * 還原 EPS whatever the display basis (the statement table's second EPS row under 公告): reported EPS ÷ the factor
+ * of the later 配股 and confirmed splits. Never overwrites the reported EPS; null (with the reason) when the dividend
+ * data is missing.
  */
 export function epsAdjusted(ctx: MetricContext, index: number): MetricResult {
   const reported = reportedEps(ctx, index);
-  if (reported.value === null) return missing('報告 EPS ÷ 配股調整係數', [], '缺 EPS');
-  const info = dividendFactor(ctx.series.end[index]!, ctx.stockDividends ?? null);
-  const inputs = [input('報告 EPS', reported.value, 'eps')];
-  if (info === null) return missing('報告 EPS ÷ 配股調整係數', inputs, '缺配股資料，不推算還原 EPS');
-  const value = adjustEps(reported.value, ctx.series.end[index]!, ctx.stockDividends ?? null);
-  const note = info.events.length ? `調整係數 ${info.factor}：${eventText(info.events)}` : '之後沒有配股，係數 1，與報告 EPS 相同';
-  return result(value, '報告 EPS ÷ (1 + 配股元 ÷ 10) 逐次相乘', inputs, {
-    basis: 'restated',
-    notes: [ADJUSTED_EPS_HELP, note],
-  });
+  if (reported.value === null) return missing('公告 EPS ÷ 股數調整係數', [], '缺 EPS');
+  if (!ctx.epsAdjustments?.[index])
+    return missing('公告 EPS ÷ 股數調整係數', [input('公告 EPS', reported.value, 'eps')], '缺配股資料，不推算還原 EPS');
+  return eps({ ...ctx, epsBasis: 'restated' }, index);
 }
 
 /** Values a year-over-year / CAGR comparison should use: restated where the metric has them. */

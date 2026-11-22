@@ -340,21 +340,35 @@ def make_row(key, level, quarterly, annual):
     ]
 
 
-def restate_for_stock_dividends(document, periods):
-    """Taiwan files with stock dividend events: EPS of every period on the latest share basis (追溯調整), so a pair
-    spanning an ex-rights date is comparable. No events block → EPS left as reported (never guessed)."""
-    if document.get("market") != "TW":
-        return
-    events = stock_dividends.events_of(document)
+def restate_periods(periods, events):
+    """EPS (and the share count) of every period on the latest share basis (追溯調整) for the given Taiwan stock
+    dividend events, in place, so a pair spanning an ex-rights date is comparable. events None → untouched."""
     if events is None:
         return
     for period in periods:
-        info = stock_dividends.factor(period["day"], events)
+        info = stock_dividends.factor(period["day"], events, annual=period.get("fq") is None)
         if info is None or info["factor"] == 1:
             continue
         for name in ("epsD", "epsB"):
             if period.get(name) is not None:
                 period[name] = round(period[name] / info["factor"], 4) + 0.0
+        if period.get("shares"):
+            period["shares"] = period["shares"] * info["factor"]
+
+
+def restate_for_stock_dividends(document, periods):
+    """Taiwan files with stock dividend events: EPS of every period on the latest share basis (追溯調整), so a pair
+    spanning an ex-rights date is comparable. No events block → EPS left as reported (never guessed)."""
+    if document.get("market") != "TW":
+        return
+    restate_periods(periods, stock_dividends.events_of(document))
+
+
+def dividend_events(files):
+    """{Taiwan key: stock dividend events} of the financials documents that carry the block (for the official
+    Taiwan sources, whose per-period EPS are as reported)."""
+    return {key: events for key, document in files
+            if market_of(key) == "TW" and (events := stock_dividends.events_of(document)) is not None}
 
 
 def financials_blocks(document, today):
@@ -549,8 +563,9 @@ def same_content(old, new):
     return isinstance(old, dict) and all(old.get(key) == new.get(key) for key in keys)
 
 
-def official_candidates(fundamentals_dir, universe, today, tw_keys=()):
-    """{key: [(level, q, y)]} from fundamentals/tw.json and fundamentals/us-sec.json, plus a summary."""
+def official_candidates(fundamentals_dir, universe, today, tw_keys=(), dividends=None):
+    """{key: [(level, q, y)]} from fundamentals/tw.json and fundamentals/us-sec.json, plus a summary. dividends:
+    {Taiwan key: stock dividend events} → the Taiwan EPS are restated before their YoY (restate_periods)."""
     extra, summary = {}, {}
     if not fundamentals_dir:
         return extra, summary
@@ -560,11 +575,12 @@ def official_candidates(fundamentals_dir, universe, today, tw_keys=()):
     tw_rows = {}
     if store is not None:
         try:
-            tw_rows = tw.growth_candidates(store, tw.symbol_map(universe, tw_keys), today)
+            tw_rows = tw.growth_candidates(store, tw.symbol_map(universe, tw_keys), today, dividends)
         except tw.StoreError as error:
             print(f"::warning::{TW_FILE} ignored: {error}")
         summary["tw"] = len(tw_rows)
-    tw_rows = finmind_candidates(fundamentals_dir, tw.symbol_map(universe, tw_keys), today, store, tw_rows, summary)
+    tw_rows = finmind_candidates(fundamentals_dir, tw.symbol_map(universe, tw_keys), today, store, tw_rows, summary,
+                                 dividends)
     for key, blocks in tw_rows.items():
         extra.setdefault(key, []).append(blocks)
     frames = sec_frame_candidates(read_json(os.path.join(fundamentals_dir, US_SEC_FILE)), today)
@@ -574,7 +590,7 @@ def official_candidates(fundamentals_dir, universe, today, tw_keys=()):
     return extra, summary
 
 
-def finmind_candidates(fundamentals_dir, symbols, today, official, tw_rows, summary):
+def finmind_candidates(fundamentals_dir, symbols, today, official, tw_rows, summary, dividends=None):
     """tw.json candidates combined with fundamentals/tw-finmind.json (when present) → one per Taiwan symbol."""
     import build_fundamentals_tw_finmind as finmind  # noqa: PLC0415 - that module imports this one
 
@@ -582,7 +598,7 @@ def finmind_candidates(fundamentals_dir, symbols, today, official, tw_rows, summ
     if document is None:
         return tw_rows
     try:
-        rows, summary["finmind"] = finmind.growth_candidates(document, symbols, today, official)
+        rows, summary["finmind"] = finmind.growth_candidates(document, symbols, today, official, dividends=dividends)
     except finmind.StoreError as error:
         print(f"::warning::{finmind.FILE_NAME} ignored: {error}")
         summary["finmind"] = {"rows": 0, "error": str(error)}
@@ -595,7 +611,7 @@ def run(financials_dir, out_path, now=None, fundamentals_dir=None, universe_path
     files, bad = read_documents(financials_dir)
     universe = read_json(universe_path) if universe_path else None
     tw_keys = [key for key, _ in files if market_of(key) == "TW"]
-    extra, official = official_candidates(fundamentals_dir, universe, now.date(), tw_keys)
+    extra, official = official_candidates(fundamentals_dir, universe, now.date(), tw_keys, dividend_events(files))
     if not files and not extra:
         raise RuntimeError(f"no readable financials files in {financials_dir} and no official fundamentals")
     document = build_document(files, now, extra)

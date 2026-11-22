@@ -63,16 +63,17 @@ def delay_days(end):
     return DELAY_DAYS["yearEnd"] if month == 12 else DELAY_DAYS["secondQuarter"] if month == 6 else DELAY_DAYS["quarter"]
 
 
-def factor(end, events, as_of=None):
+def factor(end, events, as_of=None, annual=False):
     """Retroactive factor of the period ending `end` (ISO or date): → {"factor": float, "events": [applied events]},
     or None when `events` is None (dividend data missing: never guess). Events count when their ex-rights date is
-    after the report due date (end + delay) and, with `as_of`, not after that day (share basis of that day)."""
+    after the report due date (end + delay; an annual period always end + 90) and, with `as_of`, not after that day
+    (share basis of that day)."""
     if events is None:
         return None
     end_day = end if isinstance(end, date) else day_of(end)
     if end_day is None:
         return None
-    due = end_day + timedelta(days=delay_days(end_day))
+    due = end_day + timedelta(days=DELAY_DAYS["yearEnd"] if annual else delay_days(end_day))
     limit = day_of(as_of) if as_of is not None else None
     applied = []
     total = 1.0
@@ -85,9 +86,9 @@ def factor(end, events, as_of=None):
     return {"factor": round(total, 6), "events": applied}
 
 
-def adjust(value, end, events, as_of=None):
+def adjust(value, end, events, as_of=None, annual=False):
     """Reported EPS → (restated EPS, factor info); (None, None) when the EPS or the dividend data is missing."""
-    info = factor(end, events, as_of)
+    info = factor(end, events, as_of, annual)
     if info is None or value is None:
         return None, info
     return round(value / info["factor"], 4) + 0.0, info

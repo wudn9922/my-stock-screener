@@ -684,7 +684,7 @@ def cross_check(data, modes, official_document):
     return result
 
 
-def growth_candidates(document, symbols, today, official=None, log=print):
+def growth_candidates(document, symbols, today, official=None, log=print, dividends=None):
     """
     tw-finmind.json + {code: symbol} → ({symbol: (None, quarterly block, annual block)}, info). Nothing when
     the revenue verdict is not decisive or the cross-check with the official file fails.
@@ -714,6 +714,7 @@ def growth_candidates(document, symbols, today, official=None, log=print):
         if symbol is None or code in bad:
             continue
         quarters, annual = company_periods(row, modes, official_annual.get(code))
+        growth.restate_periods(quarters + annual, (dividends or {}).get(symbol))
         q = growth.yoy_series(quarters, True, growth.QUARTER_SLOTS, [], today, growth.STALE_QUARTER_DAYS, tw.tw_pair)
         y = growth.yoy_series(annual, False, annual_slots(annual), [], today, growth.STALE_ANNUAL_DAYS, tw.tw_pair)
         if q is not None or y is not None:

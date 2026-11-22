@@ -6,7 +6,7 @@ import type { StockDividendEvent } from './FinancialHistory';
  * restated EPS = reported EPS ÷ Π(1 + D/10) over every stock dividend whose ex-rights date is after the report
  * was due (period end + delay; earlier ones are already in the reported figure). Mirror of
  * atlas/scripts/tw_stock_dividends.py. Events null (no data) → no factor: the caller shows null, never a guess.
- * Not handled: capital reductions (減資) and cash capital increases.
+ * Not handled: capital reductions (減資) and cash capital increases (no event data; nothing is shown for them).
  */
 export const PAR_VALUE = 10;
 
@@ -26,11 +26,17 @@ export interface DividendFactor {
 
 /**
  * Factor of the period ending `end`; `asOf` (YYYY-MM-DD) restricts to events up to that day, i.e. the share basis
- * an unadjusted price of that day is on. Null when `events` is null.
+ * an unadjusted price of that day is on. `annual`: an annual period, whose report is always due after 90 days.
+ * Null when `events` is null.
  */
-export function dividendFactor(end: string, events: readonly StockDividendEvent[] | null, asOf?: string): DividendFactor | null {
+export function dividendFactor(
+  end: string,
+  events: readonly StockDividendEvent[] | null,
+  asOf?: string,
+  annual = false,
+): DividendFactor | null {
   if (events === null) return null;
-  const due = parse(end) + reportDelayDays(end) * DAY_MS;
+  const due = parse(end) + (annual ? 90 : reportDelayDays(end)) * DAY_MS;
   const limit = asOf === undefined ? Infinity : parse(asOf);
   const applied = events.filter((event) => {
     const ex = parse(event.exDate);
@@ -41,8 +47,14 @@ export function dividendFactor(end: string, events: readonly StockDividendEvent[
 }
 
 /** Reported EPS ÷ factor (4 decimals); null when the EPS or the dividend data is missing. */
-export function adjustEps(eps: number | null, end: string, events: readonly StockDividendEvent[] | null, asOf?: string): number | null {
-  const info = dividendFactor(end, events, asOf);
+export function adjustEps(
+  eps: number | null,
+  end: string,
+  events: readonly StockDividendEvent[] | null,
+  asOf?: string,
+  annual = false,
+): number | null {
+  const info = dividendFactor(end, events, asOf, annual);
   if (eps === null || info === null) return null;
   return Math.round((eps / info.factor) * 1e4) / 1e4 + 0;
 }

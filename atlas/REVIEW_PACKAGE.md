@@ -1582,3 +1582,7 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 ### Chart volume readouts (feat/chart-volume) — no independent review
 - 量比(同時間) chip + ^TWII live-bar volume rebuilt from same-source 5m bars only when earlier sessions match the daily unit (`IntradayVolume.ts`); otherwise 「今日量：盤中來源未提供」. No Edge change.
 - Verified: lint, build, related Vitest, `e2e-site/same-time-volume|live-quotes|market-calendar|research-modules` on mobile-chromium. WebKit not installable locally (download blocked); CI covers it.
+
+### EPS on today's share basis (fix/eps-share-basis) — no independent review
+- 還原 EPS (配股 + implied-share-confirmed splits, `epsBasis.ts`) is now the displayed EPS (cards, charts, table, peers, TW header P/E via `restatedPe.ts`); 公告 toggle keeps reported values; growth.json restates the official TW sources too.
+- Verified: lint, build, related Vitest + Python unittest, `e2e-site/financials|financials-finmind|pe-river|eps-share-basis|stock-views|site|workspace-refinements|pr-a-extended-quotes` on mobile-chromium. WebKit not installable locally; CI covers it.
