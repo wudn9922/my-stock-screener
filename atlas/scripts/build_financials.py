@@ -863,6 +863,16 @@ def adjust_splits(sections, events):
     return changed
 
 
+def split_adjusted(adjusted_now, stored_adjusted, periods):
+    """The document's split.adjusted: True when this run put EPS on the latest split basis, or an earlier run did and
+    the file has no FinMind periods. FinMind EPS are never split-adjusted (the client restates them,
+    src/fundamentals/epsBasis.ts), so a flag carried over from the Yahoo-era file would claim an adjustment that never
+    happened (8422.TW, 7780.TW, 8932.TWO)."""
+    if adjusted_now:
+        return True
+    return bool(stored_adjusted) and not any(p.get("src") == "finmind" for p in periods)
+
+
 def split_factors(events, end):
     """Every product of a subset of the split ratios after `end` (without 1), largest first."""
     ratios = [
@@ -1430,7 +1440,7 @@ def update_document(previous, payload, key, now, fetch_splits=None):
             events = merge_events(events, fetched)
             adjusted = adjust_splits([annual, quarterly], events) or adjusted
     adjusted = repair_split_eps([annual, quarterly], events) > 0 or adjusted
-    adjusted = adjusted or stored["adjusted"]
+    adjusted = split_adjusted(adjusted, stored["adjusted"], annual + quarterly)
 
     end_month = fy_end_month([p["end"] for p in annual])
     if end_month is None and market == "TW":

@@ -1586,3 +1586,6 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 ### EPS on today's share basis (fix/eps-share-basis) — no independent review
 - 還原 EPS (配股 + implied-share-confirmed splits, `epsBasis.ts`) is now the displayed EPS (cards, charts, table, peers, TW header P/E via `restatedPe.ts`); 公告 toggle keeps reported values; growth.json restates the official TW sources too.
 - Verified: lint, build, related Vitest + Python unittest, `e2e-site/financials|financials-finmind|pe-river|eps-share-basis|stock-views|site|workspace-refinements|pr-a-extended-quotes` on mobile-chromium. WebKit not installable locally; CI covers it.
+
+### Derived Q4 recompute + 減資彌補虧損 (fix/eps-q4-and-capital-reduction) — no independent review
+- Derived Q4 across a Q3→annual share-basis change = restated annual − Σ restated Q1..Q3 (8422.TW Q4 2025 0.242, `epsBasis.ts`, mirrored in `build_growth.recompute_derived_q4`); loss-offset 減資 from FinMind `TaiwanStockCapitalReductionReferencePrice` restated like a reverse split, cash 減資 never. FinMind field values not verified live (API blocked in sandbox).

@@ -45,6 +45,20 @@ export interface StockDividendEvent {
   perShare: number;
 }
 
+/**
+ * One capital reduction (減資) from FinMind TaiwanStockCapitalReductionReferencePrice, as stored by
+ * atlas/scripts/tw_capital_reductions.py. `ratio` = new shares ÷ old shares (null when it could not be derived);
+ * `kind` 'loss' (減資彌補虧損: shares cancelled, no cash returned) is the only kind that restates EPS (like a reverse
+ * split); 'cash' (現金減資／退還股款), 'mixed' and 'other' are kept for provenance and never applied (IAS 33).
+ */
+export interface CapitalReductionEvent {
+  /** Trading resumption date (恢復買賣日): the share basis changes here. */
+  date: string;
+  ratio: number | null;
+  kind: 'loss' | 'cash' | 'mixed' | 'other';
+  reason: string;
+}
+
 export type PeriodKind = 'annual' | 'quarterly';
 export type PeriodSource = 'sec' | 'finmind' | 'yahoo';
 export type QualityLevel = 'good' | 'partial' | 'limited';
@@ -98,6 +112,8 @@ export interface FinancialHistory {
   split: { adjusted: boolean; events: { date: string; ratio: number }[] };
   /** Taiwan stock dividend (配股) events; null when the file has no such block (adjusted EPS stays unavailable). */
   stockDividends: StockDividendEvent[] | null;
+  /** Taiwan capital reductions (減資); null when the file has no such block (nothing is restated for them). */
+  capitalReductions: CapitalReductionEvent[] | null;
   quality: {
     level: QualityLevel | null;
     annualYears: number | null;
@@ -186,6 +202,20 @@ function parseStockDividends(value: unknown): StockDividendEvent[] | null {
     const exDate = validDate(raw.exDate);
     const perShare = finiteOrNull(raw.perShare);
     return exDate && perShare !== null && perShare > 0 ? [{ exDate, perShare }] : [];
+  });
+}
+
+const REDUCTION_KINDS = ['loss', 'cash', 'mixed', 'other'] as const;
+function parseCapitalReductions(value: unknown): CapitalReductionEvent[] | null {
+  const block = recordOf(value);
+  if (!Array.isArray(block.events)) return null;
+  return block.events.flatMap((item) => {
+    const raw = recordOf(item);
+    const date = validDate(raw.date);
+    if (!date) return [];
+    const ratio = finiteOrNull(raw.ratio);
+    const kind = (REDUCTION_KINDS as readonly unknown[]).includes(raw.kind) ? (raw.kind as CapitalReductionEvent['kind']) : 'other';
+    return [{ date, ratio: ratio !== null && ratio > 0 ? ratio : null, kind, reason: typeof raw.reason === 'string' ? raw.reason : '' }];
   });
 }
 
@@ -279,6 +309,7 @@ const historySchema = z
     quarterly: z.unknown().optional(),
     split: z.unknown().optional(),
     stockDividends: z.unknown().optional(),
+    capitalReductions: z.unknown().optional(),
     quality: z.unknown().optional(),
   })
   .transform((raw) => {
@@ -315,6 +346,7 @@ const historySchema = z
         }),
       },
       stockDividends: parseStockDividends(raw.stockDividends),
+      capitalReductions: parseCapitalReductions(raw.capitalReductions),
       quality: {
         level: level === 'good' || level === 'partial' || level === 'limited' ? level : null,
         annualYears: count(quality.annualYears),

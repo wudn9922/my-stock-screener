@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { parseFinancials, type FinancialHistory } from '../src/fundamentals/FinancialHistory';
-import { epsAdjustments, hasEpsRestatement, restatedEpsLabel, MIXED_Q4_REASON } from '../src/fundamentals/epsBasis';
+import { DERIVED_Q4_REPORTED_NOTE, epsAdjustments, hasEpsRestatement, restatedEpsLabel, MIXED_Q4_REASON } from '../src/fundamentals/epsBasis';
 import { contextOf, eps } from '../src/fundamentals/financialMetrics';
 import { statementRows } from '../src/fundamentals/financialStatements';
 import { peerFigures } from '../src/fundamentals/peerComparison';
 import { buildEpsPeriods, epsAt, dateToSec } from '../src/fundamentals/peRiver';
 import { latestDueQuarter, restatePeFigures, restatedAnnualEps, restatedTtmEps } from '../src/fundamentals/restatedPe';
 import type { PeFigures } from '../src/fundamentals/peFigures';
+import { adjustEps } from '../src/fundamentals/stockDividendAdjust';
 import { buildView } from '../src/ui/financials/financialsView';
 
 function ok(data: unknown): FinancialHistory {
@@ -143,7 +144,7 @@ describe('2755.TWO on today\'s share basis', () => {
 describe('splits', () => {
   // 可寧衛 8422.TW: 1 拆 10 (par value change) on 2025-11-06. The FinMind file keeps the pre-split EPS (implied shares
   // ~113M) next to the post-split ones (~1,340M); its Q4 2025 (annual − Q1..Q3) mixes the two bases.
-  const kingNet = ok({
+  const kingNetRaw = {
     version: 1,
     symbol: '8422.TW',
     market: 'TW',
@@ -162,7 +163,8 @@ describe('splits', () => {
     split: { adjusted: true, events: [['2025-11-06', 10]] },
     stockDividends: { events: [] },
     quality: { level: 'good', issues: ['split-adjusted', 'q4-derived'] },
-  });
+  };
+  const kingNet = ok(kingNetRaw);
 
   it('a Taiwan par-value split is applied where the implied share count is still pre-split', () => {
     const values = buildView(kingNet, 'quarterly').metrics.eps.values;
@@ -175,14 +177,76 @@ describe('splits', () => {
     expect(q.notes.join()).toContain('股票分割 1 拆 10（2025-11-06）');
   });
 
-  it('a derived Q4 across the split is not shown (no fabricated basis)', () => {
+  it('a derived Q4 across the split is recomputed: restated annual − restated Q1..Q3 = 1.29 − 1.048 = 0.242', () => {
     const q4 = eps(contextOf(kingNet, 'quarterly'), 3);
+    expect(q4.value).toBe(0.242); // Q4 NI 279.5M ÷ ~1.34B shares ≈ 0.209 (the gap is weighted-average shares)
+    expect(q4.basis).toBe('restated');
+    expect(q4.reported).toBe(-9.18);
+    expect(q4.comparable).toBe(0.242);
+    expect(q4.inputs.map((item) => [item.label, item.value])).toEqual([
+      ['還原全年 EPS', 1.29],
+      ['還原 Q1 EPS', 0.397],
+      ['還原 Q2 EPS', 0.403],
+      ['還原 Q3 EPS', 0.248],
+    ]);
+    expect(q4.notes.join()).toContain('股票分割 1 拆 10（2025-11-06）');
+    expect(buildView(kingNet, 'quarterly').metrics.eps.values[3]).toBe(0.242);
+    // P/E river: pre-split quarters divided by 10, the derived Q4 recomputed
+    const periods = buildEpsPeriods(kingNet);
+    expect(periods.quarters.map((period) => period.eps)).toEqual([0.397, 0.403, 0.248, 0.242, 0.21, 0.34, 0.42]);
+  });
+
+  it('公告 shows the published derived Q4 with a note, and still compares the recomputed value', () => {
+    const q4 = eps(contextOf(kingNet, 'quarterly', 'reported'), 3);
+    expect(q4.value).toBe(-9.18);
+    expect(q4.comparable).toBe(0.242);
+    expect(q4.notes).toContain(DERIVED_Q4_REPORTED_NOTE);
+    expect(DERIVED_Q4_REPORTED_NOTE).toBe('此季為全年減前三季推算，跨越股數變動，請參考還原值');
+  });
+
+  it('a derived Q4 across a split is hidden only when a piece is missing', () => {
+    const raw = JSON.parse(JSON.stringify({ ...kingNetRaw }));
+    raw.quarterly.values.epsBasic[1] = null; // Q2 2025 missing
+    const gap = ok(raw);
+    const q4 = eps(contextOf(gap, 'quarterly'), 3);
     expect(q4.value).toBeNull();
     expect(q4.reason).toBe(MIXED_Q4_REASON);
-    expect(eps(contextOf(kingNet, 'quarterly', 'reported'), 3).value).toBe(-9.18);
-    // P/E river: pre-split quarters divided by 10, the mixed Q4 unusable
-    const periods = buildEpsPeriods(kingNet);
-    expect(periods.quarters.map((period) => period.eps)).toEqual([0.397, 0.403, 0.248, null, 0.21, 0.34, 0.42]);
+    expect(eps(contextOf(gap, 'quarterly', 'reported'), 3).value).toBe(-9.18);
+  });
+
+  it('a 配股 between the Q3 and the annual report also makes the derived Q4 mixed; one between Q2 and Q3 does not', () => {
+    const file = (exDate: string) =>
+      ok({
+        version: 1, symbol: '1234.TW', market: 'TW',
+        annual: { end: ['2025-12-31'], fy: [2025], fq: [null], src: ['finmind'], values: { epsBasic: [4.0], netIncome: [440] } },
+        quarterly: {
+          end: ['2025-03-31', '2025-06-30', '2025-09-30', '2025-12-31'], fy: [2025, 2025, 2025, 2025], fq: [1, 2, 3, 4], src: Array(4).fill('finmind'),
+          // 100 shares until the ex-rights date, 110 after (配股 1 元); annual on 110 shares, Q4 = 4.00 − (1.1 + 1.1 + 1.1)
+          values: { epsBasic: [1.1, 1.1, 1.1, 0.7], netIncome: [110, 110, 110, 110] },
+        },
+        split: { adjusted: false, events: [] },
+        stockDividends: { events: [{ exDate, perShare: 1 }] },
+        quality: { level: 'good', issues: ['q4-derived'] },
+      });
+    // ex-rights 2025-12-10: Q1..Q3 on 100 shares (÷ 1.1 → 1.0 each), annual already on 110 → Q4 = 4.0 − 3.0 = 1.0
+    expect(buildView(file('2025-12-10'), 'quarterly').metrics.eps.values).toEqual([1, 1, 1, 1]);
+    // ex-rights 2025-10-01 (after the Q2 report, before Q3's): the Q3 year-to-date was already on 110 shares
+    expect(epsAdjustments(file('2025-10-01'), 'quarterly')[3]!.derivedQ4).toBeNull();
+  });
+
+  it('a US derived Q4 whose sign contradicts its net income next to a reverse split is recomputed (SAFE 2022)', () => {
+    const safe = ok({
+      version: 1, symbol: 'SAFE', market: 'US',
+      annual: { end: ['2022-12-31'], fy: [2022], fq: [null], src: ['sec'], values: { epsDiluted: [2.17], netIncome: [135423000] } },
+      quarterly: {
+        end: ['2022-03-31', '2022-06-30', '2022-09-30', '2022-12-31', '2023-03-31'], fy: [2022, 2022, 2022, 2022, 2023], fq: [1, 2, 3, 4, 1],
+        src: Array(5).fill('sec'),
+        values: { epsDiluted: [0.42, 0.36, 1.04, -1, 0.07], netIncome: [24873000, 22678000, 66077000, 21795000, 4682000] },
+      },
+      split: { adjusted: false, events: [['2023-03-31', 0.16]] },
+      quality: { level: 'good', issues: ['q4-derived'] },
+    });
+    expect(eps(contextOf(safe, 'quarterly'), 3).value).toBe(0.35);
   });
 
   it('SEC EPS left on the pre-split basis is restated; an adjusted file is untouched', () => {
@@ -220,5 +284,52 @@ describe('splits', () => {
       quality: { level: 'good', issues: [] },
     });
     expect(epsAdjustments(doubled, 'quarterly').map((item) => item?.factor)).toEqual([1.5, 1, 1, 1]);
+  });
+});
+
+describe('capital reductions (減資)', () => {
+  // 100M shares → 50M on 2025-09-01. Loss offset (彌補虧損): no cash returned, restated like a 2-for-1 reverse split.
+  const file = (kind: string, ratio: number | null = 0.5, split: unknown[] = []) =>
+    ok({
+      version: 1, symbol: '9999.TW', market: 'TW',
+      annual: { end: ['2024-12-31'], fy: [2024], fq: [null], src: ['finmind'], values: { epsBasic: [-3.0], netIncome: [-300000000] } },
+      quarterly: {
+        end: ['2025-03-31', '2025-06-30', '2025-09-30'], fy: [2025, 2025, 2025], fq: [1, 2, 3], src: Array(3).fill('finmind'),
+        values: { epsBasic: [-1.0, -0.8, -1.2], netIncome: [-100000000, -80000000, -60000000] },
+      },
+      split: { adjusted: false, events: split },
+      stockDividends: { events: [] },
+      capitalReductions: {
+        source: 'FinMind TaiwanStockCapitalReductionReferencePrice',
+        events: [{ date: '2025-09-01', ratio, kind, reason: kind === 'loss' ? '彌補虧損' : '退還股款', raw: {} }],
+      },
+      quality: { level: 'good', issues: [] },
+    });
+
+  it('a loss-offset reduction restates earlier EPS: −1.00 on 100M shares → −2.00 on today\'s 50M', () => {
+    const history = file('loss');
+    expect(buildView(history, 'quarterly').metrics.eps.values).toEqual([-2, -1.6, -1.2]); // Q3 due 11-14, already on 50M
+    expect(buildView(history, 'annual').metrics.eps.values).toEqual([-6]);
+    const q1 = eps(contextOf(history, 'quarterly'), 0);
+    expect(q1.reported).toBe(-1);
+    expect(q1.notes.join()).toContain('減資彌補虧損（每股換發 0.5 股，恢復買賣 2025-09-01）');
+    expect(restatedEpsLabel(history)).toBe('還原 EPS（依減資追溯調整）');
+    // the P/E river applies it from the resumption day only (the unadjusted price's basis)
+    const reductions = buildEpsPeriods(history).capitalReductions!;
+    expect(adjustEps(-1, '2025-03-31', [], '2025-08-29', false, reductions)).toBe(-1);
+    expect(adjustEps(-1, '2025-03-31', [], '2025-09-01', false, reductions)).toBe(-2);
+  });
+
+  it('a cash capital reduction (退還股款) and a reduction without a ratio are not restated', () => {
+    for (const history of [file('cash'), file('other'), file('loss', null), file('mixed')]) {
+      expect(hasEpsRestatement(history)).toBe(false);
+      expect(buildView(history, 'quarterly').metrics.eps.values).toEqual([-1, -0.8, -1.2]);
+    }
+  });
+
+  it('a Yahoo reverse split on the reduction date is that reduction, not a second event', () => {
+    expect(epsAdjustments(file('loss', 0.5, [['2025-09-01', 0.5]]), 'quarterly').map((item) => item?.factor)).toEqual([0.5, 0.5, 1]);
+    // a cash reduction recorded by Yahoo as a reverse split must not be restated through the split block either
+    expect(epsAdjustments(file('cash', 0.5, [['2025-09-01', 0.5]]), 'quarterly').map((item) => item?.factor)).toEqual([1, 1, 1]);
   });
 });

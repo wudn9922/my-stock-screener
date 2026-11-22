@@ -1,4 +1,4 @@
-import type { FinancialHistory, FinancialSeries, StockDividendEvent } from './FinancialHistory';
+import type { CapitalReductionEvent, FinancialHistory, FinancialSeries, StockDividendEvent } from './FinancialHistory';
 import { adjustEps } from './stockDividendAdjust';
 import { epsAdjustments } from './epsBasis';
 
@@ -85,6 +85,8 @@ export interface EpsPeriods {
    * of the unadjusted price, so a TTM that crosses an ex-rights date adds like with like.
    */
   stockDividends?: readonly StockDividendEvent[] | null;
+  /** Taiwan loss-offset capital reductions (減資彌補虧損), applied like the 配股 on the observation day's basis. */
+  capitalReductions?: readonly CapitalReductionEvent[] | null;
 }
 
 export interface EpsPoint {
@@ -117,27 +119,39 @@ function gradeUsable(grade: string | undefined, isQ4: boolean): boolean {
   return STRICT_Q4_EPS ? grade === 'A' : grade === undefined || grade === 'A' || grade === 'Y';
 }
 
+/** Per period: the split factor to divide the file's EPS by, or the EPS to use instead (a recomputed derived Q4). */
+type PeriodBasis = number | { eps: number };
+
 /**
  * Split basis per period of a block: split-adjusted prices need EPS on the latest split basis, so a period the file
- * left on a pre-split basis (confirmed by its implied share count, epsBasis.ts) is divided by that split ratio; a
- * derived Q4 that mixes bases has no usable EPS (NaN). Taiwan 配股 stay for epsAt (observation-day basis).
+ * left on a pre-split basis (confirmed by its implied share count, epsBasis.ts) is divided by that split ratio. A
+ * derived Q4 across a share-basis change uses its recomputed value (restated annual − restated Q1..Q3, epsBasis.ts)
+ * brought back to its report's 配股／減資 basis (× shareFactor), since epsAt applies those up to the observation day;
+ * one that cannot be recomputed has no usable EPS (NaN).
  */
-function splitBasis(history: FinancialHistory, kind: 'annual' | 'quarterly'): number[] {
-  return epsAdjustments(history, kind).map((adjustment) => (adjustment === null ? 1 : adjustment.mixedQ4 ? NaN : adjustment.splitFactor));
+function splitBasis(history: FinancialHistory, kind: 'annual' | 'quarterly'): PeriodBasis[] {
+  return epsAdjustments(history, kind).map((adjustment) => {
+    if (adjustment === null) return 1;
+    if (adjustment.mixedQ4) return NaN;
+    if (adjustment.derivedQ4) return { eps: Math.round(adjustment.derivedQ4.restated * adjustment.shareFactor * 1e4) / 1e4 + 0 };
+    return adjustment.splitFactor;
+  });
 }
 
-function periodsOf(series: FinancialSeries, kind: 'quarter' | 'annual', market: 'US' | 'TW', annualEnds: ReadonlySet<string>, cutoff: string | null, basis?: readonly number[]): EpsPeriod[] {
+function periodsOf(series: FinancialSeries, kind: 'quarter' | 'annual', market: 'US' | 'TW', annualEnds: ReadonlySet<string>, cutoff: string | null, basis?: readonly PeriodBasis[]): EpsPeriod[] {
   const out: EpsPeriod[] = [];
   series.end.forEach((end, index) => {
     if (cutoff !== null && end < cutoff) return;
-    const splitFactor = basis?.[index] ?? 1;
+    const periodBasis = basis?.[index] ?? 1;
+    const splitFactor = typeof periodBasis === 'number' ? periodBasis : 1;
     const evidence = series.epsQuality?.[index];
     const isQ4 = market === 'US' && kind === 'quarter' && series.fq[index] === 4;
     const gated = market === 'US';
     const diluted = gated && !gradeUsable(evidence?.epsDiluted, isQ4) ? null : (series.values.epsDiluted[index] ?? null);
     const basicValue = gated && !gradeUsable(evidence?.epsBasic, isQ4) ? null : (series.values.epsBasic[index] ?? null);
     const raw = diluted ?? basicValue;
-    const eps = raw === null || Number.isNaN(splitFactor) ? null : splitFactor === 1 ? raw : raw / splitFactor;
+    const eps =
+      raw === null || Number.isNaN(splitFactor) ? null : typeof periodBasis !== 'number' ? periodBasis.eps : splitFactor === 1 ? raw : raw / splitFactor;
     // a value cannot be known before it was filed (look-ahead guard)
     const filed = diluted !== null ? evidence?.epsDilutedFiled : evidence?.epsBasicFiled;
     const isYearEnd = kind === 'annual' || series.fq[index] === 4 || annualEnds.has(end);
@@ -178,17 +192,22 @@ export function buildEpsPeriods(history: FinancialHistory): EpsPeriods {
     quarters = [];
     notes.push('季度 EPS 疑似為年初累計值，改用年度 EPS。');
   }
-  return { quarters, annuals, notes, stockDividends: history.market === 'TW' ? history.stockDividends : null };
+  const taiwan = history.market === 'TW';
+  return { quarters, annuals, notes, stockDividends: taiwan ? history.stockDividends : null, capitalReductions: taiwan ? history.capitalReductions : null };
 }
 
 const daysBetween = (a: number, b: number) => (b - a) / DAY_SECONDS;
 
 /** EPS(TTM) as known at `obsSec`, or null when neither four published quarters nor a recent annual exist. */
-export function epsAt(obsSec: number, periods: Pick<EpsPeriods, 'quarters' | 'annuals'> & { stockDividends?: EpsPeriods['stockDividends'] }): EpsPoint | null {
+export function epsAt(
+  obsSec: number,
+  periods: Pick<EpsPeriods, 'quarters' | 'annuals'> & Pick<EpsPeriods, 'stockDividends' | 'capitalReductions'>,
+): EpsPoint | null {
   const events = periods.stockDividends ?? null;
+  const reductions = periods.capitalReductions ?? null;
   const obsDay = new Date(obsSec * 1000).toISOString().slice(0, 10);
   const basisEps = (period: EpsPeriod): number | null =>
-    events === null || period.eps === null ? period.eps : adjustEps(period.eps, period.end, events, obsDay);
+    events === null || period.eps === null ? period.eps : adjustEps(period.eps, period.end, events, obsDay, false, reductions);
   const published = periods.quarters.filter((period) => period.availSec <= obsSec);
   const last4 = published.slice(-4);
   if (last4.length === 4 && last4.every((period) => basisEps(period) !== null)) {

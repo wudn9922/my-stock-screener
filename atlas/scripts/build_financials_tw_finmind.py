@@ -35,7 +35,10 @@ later report); a missing earlier cumulative figure leaves the single quarter emp
 quarter after a missing quarter is not treated as a single. Annual: income statement and cash flow are the sum
 of four singles; annual EPS uses official MOPS EPS when available, otherwise it is summed only on a stable Q1–Q3
 share basis (flag "eps-annual-summed"). The balance sheet is Q4. Q4 singles are the full year less Q1..Q3
-(flag "q4-derived").
+(flag "q4-derived"); the Q4 EPS stays as published (the annual less the Q3 report's year-to-date EPS) even across a
+share-basis change: the readers restate it (annual − Q1..Q3, every piece on today's share basis) in one place,
+src/fundamentals/epsBasis.ts (build_growth.recompute_derived_q4 for the YoY). Splits: FinMind EPS are never
+split-adjusted, so split.adjusted is false (not carried over from a Yahoo-era file, build_financials.split_adjusted).
 
 State: <report-dir>/fundamentals/tw-financials-finmind.json: the verdicts (with evidence), per stock
 [checked day, newest quarter, "ok" | "empty"], and the type / origin_name pairs seen per dataset.
@@ -505,7 +508,9 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
                                     annual_m, quarterly_m, renamed)
     flags = set(flags)
     flags.update(revision["kind"] for revision in revisions)
-    if sections and sections["adjusted"]:
+    # FinMind EPS are as published, never split-adjusted: the flag is not carried over from the Yahoo-era file
+    adjusted = fin.split_adjusted(False, bool(sections and sections["adjusted"]), annual_m + quarterly_m)
+    if adjusted:
         flags.add("split-adjusted")
     label = fin.source_label(annual_m + quarterly_m, filled)
     if previous is not None and previous.get("source") == fin.SOURCE_FINMIND_MIXED and label == fin.SOURCE_FINMIND:
@@ -521,7 +526,7 @@ def write_stock(out_dir, symbol, annual, quarterly, flags, now, today):
         "source": label, "fyEndMonth": 12,
         "annual": fin.write_section(annual_m, sections["extras"]["annual"] if sections else {}, False),
         "quarterly": fin.write_section(quarterly_m, sections["extras"]["quarterly"] if sections else {}, True),
-        "split": {"adjusted": bool(sections and sections["adjusted"]), "events": sections["events"] if sections else []},
+        "split": {"adjusted": adjusted, "events": sections["events"] if sections else []},
         "quality": grade,
     }
     if sections:

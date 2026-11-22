@@ -68,6 +68,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from build_valuation_us import finite_number, read_json, write_atomic
+import tw_capital_reductions as capital_reductions
 import tw_stock_dividends as stock_dividends
 
 VERSION = 1
@@ -364,6 +365,51 @@ def restate_for_stock_dividends(document, periods):
     restate_periods(periods, stock_dividends.events_of(document))
 
 
+def recompute_derived_q4(document, quarterly, annual):
+    """
+    Taiwan derived fourth quarters (annual − Q1..Q3, quality issue "q4-derived") across a share-basis change, in place,
+    after restate_for_stock_dividends (mirror of atlas/src/fundamentals/epsBasis.ts). The published Q4 is the annual
+    less the Q3 report's year-to-date figure, so a 配股 / 減資彌補虧損 between the Q3 and the annual report mixes two
+    bases: Q4 = restated annual − Σ restated Q1..Q3 (a piece missing → the Q4 EPS is dropped). A split in that window
+    (8422.TW 2025-11-06) is not restated here (no implied-share confirmation in this script): that Q4 EPS is dropped
+    instead of compared. The builder leaves Q4 as published (build_financials_tw_finmind.py).
+    """
+    if document.get("market") != "TW" or "q4-derived" not in ((document.get("quality") or {}).get("issues") or []):
+        return
+    events = stock_dividends.events_of(document)
+    if events is None:
+        return
+    # a split on a 配股 / 減資 date is that event (Yahoo records them as splits), not a second one
+    known = [day for day in (stock_dividends.day_of(event.get("exDate")) for event in events) if day is not None]
+    known += [day for day in (stock_dividends.day_of(event.get("date")) for event in capital_reductions.events_of(document) or []
+                              if isinstance(event, dict)) if day is not None]
+    splits = [(day, ratio) for day, ratio in split_events(document)
+              if (ratio >= MIN_SPLIT_RATIO or ratio <= 1 / MIN_SPLIT_RATIO) and all(abs((day - other).days) > 7 for other in known)]
+    years = {period["day"]: period for period in annual}
+    for q4 in quarterly:
+        if q4.get("fq") != 4:
+            continue
+        year = years.get(q4["day"])
+        pieces = {period["fq"]: period for period in quarterly
+                  if period.get("fy") == q4["fy"] and period.get("fq") in (1, 2, 3) and period["day"] < q4["day"]}
+        q3 = pieces.get(3)
+        if year is None or q3 is None:
+            continue
+        due_q3 = q3["day"] + timedelta(days=stock_dividends.delay_days(q3["day"]))
+        due_year = year["day"] + timedelta(days=stock_dividends.DELAY_DAYS["yearEnd"])
+        if any(due_q3 < day <= due_year for day, _ in splits):
+            q4["epsD"] = q4["epsB"] = None
+            continue
+        q3_factor = stock_dividends.factor(q3["day"], events)["factor"]
+        year_factor = stock_dividends.factor(year["day"], events, annual=True)["factor"]
+        if abs(q3_factor / year_factor - 1) <= 1e-6:
+            continue
+        for name in ("epsD", "epsB"):
+            values = [year.get(name)] + [pieces.get(fq, {}).get(name) for fq in (1, 2, 3)]
+            q4[name] = (round(values[0] - sum(values[1:]), 4) + 0.0
+                        if q4.get(name) is not None and len(pieces) == 3 and None not in values else None)
+
+
 def dividend_events(files):
     """{Taiwan key: stock dividend events} of the financials documents that carry the block (for the official
     Taiwan sources, whose per-period EPS are as reported)."""
@@ -379,6 +425,7 @@ def financials_blocks(document, today):
     quarterly = read_periods(document.get("quarterly"), True, document.get("market"))
     annual = read_periods(document.get("annual"), False, document.get("market"))
     restate_for_stock_dividends(document, quarterly + annual)
+    recompute_derived_q4(document, quarterly, annual)
     q = yoy_series(quarterly, True, QUARTER_SLOTS, events, today, STALE_QUARTER_DAYS)
     y = yoy_series(annual, False, YEAR_SLOTS, events, today, STALE_ANNUAL_DAYS)
     if q is None and y is None:

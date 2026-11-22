@@ -6,11 +6,15 @@ import { mockSite, valuation } from './mocks';
 
 /** 揚秦 2755.TWO statements (FinMind, trimmed) with its 配股 events: ex 2025-09-04 1.9738 and 2026-07-16 2.4646 元. */
 const file = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tw-2755-stock-dividends.json'), 'utf8');
+/** 可寧衛 8422.TW (FinMind, trimmed): 1 拆 10 on 2025-11-06; Q4 2025 published as 1.29 − (3.97 + 4.03 + 2.48) = −9.18. */
+const kingNet = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tw-8422-split.json'), 'utf8');
 
 async function routeFile(page: Page) {
-  await page.route('**/my-stock-screener/report/financials/*.json', (route) =>
-    route.request().url().includes('2755.TWO') ? route.fulfill({ status: 200, contentType: 'application/json', body: file }) : route.fulfill({ status: 404, body: 'not found' }),
-  );
+  await page.route('**/my-stock-screener/report/financials/*.json', (route) => {
+    const url = route.request().url();
+    const body = url.includes('2755.TWO') ? file : url.includes('8422.TW') ? kingNet : null;
+    return body ? route.fulfill({ status: 200, contentType: 'application/json', body }) : route.fulfill({ status: 404, body: 'not found' });
+  });
 }
 
 test('financials EPS on today\'s share basis by default, 公告 on request; 390px phone', async ({ page }, testInfo) => {
@@ -66,4 +70,29 @@ test('chart header P/E uses the restated trailing EPS (5.74, not the reported 6.
   await expect(valuationBox).not.toContainText('12.3');
   await page.getByTestId('valuation-help-toggle').click();
   await expect(page.getByTestId('valuation-eps-note')).toContainText('近四季 EPS 公告 6.42 → 還原 5.74');
+});
+
+test('a derived Q4 across a split is recomputed on today\'s basis (8422.TW Q4 2025 0.24, 公告 −9.18 with a note); 390px', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSite(page);
+  await routeFile(page);
+  await page.goto('./?page=financials&symbol=8422.TW&p=q');
+
+  const toggle = page.getByTestId('eps-basis');
+  await expect(toggle).toContainText('還原 EPS（依分割追溯調整）');
+  const growth = page.locator('.fin-card[data-group="growth"]');
+  await growth.getByRole('button', { name: /^FY2025 Q4 還原 EPS/ }).click();
+  await expect(growth.locator('.fin-detail-value b')).toHaveText('0.24 元');
+  await expect(growth.getByTestId('fin-reported-eps')).toHaveText('公告 -9.18');
+  await expect(growth).toContainText('還原全年 EPS 1.29 − 還原前三季 (0.397 + 0.403 + 0.248) = 0.242');
+  const shot = process.env.EPS_Q4_SCREENSHOT;
+  await growth.screenshot({ path: shot || testInfo.outputPath('eps-q4-recomputed-phone.png') });
+
+  await toggle.getByRole('button', { name: '公告' }).click();
+  await growth.getByRole('button', { name: /^FY2025 Q4 EPS -9\.18/ }).click();
+  await expect(growth.locator('.fin-detail-value b')).toHaveText('-9.18 元');
+  await expect(growth).toContainText('此季為全年減前三季推算，跨越股數變動，請參考還原值');
+  expect(errors).toEqual([]);
 });
