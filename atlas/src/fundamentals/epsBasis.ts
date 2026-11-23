@@ -1,5 +1,5 @@
 import type { CapitalReductionEvent, FinancialHistory, FinancialSeries, PeriodKind, StockDividendEvent } from './FinancialHistory';
-import { dividendFactor, eventText, reductionFactor, reductionText } from './stockDividendAdjust';
+import { dividendFactor, eventText, reductionFactor, reductionText, reportDelayDays, restatesEps } from './stockDividendAdjust';
 
 /**
  * EPS on today's share basis (還原 EPS). Reported EPS stays in the file untouched; this module only works out, per
@@ -13,6 +13,10 @@ import { dividendFactor, eventText, reductionFactor, reductionText } from './sto
  *    share count the EPS implies (net income ÷ EPS) confirms that the period is still on the pre-split basis, the
  *    same test as build_financials.adjust_splits. SEC files the builder already adjusted pass the test with factor 1;
  *    Taiwan FinMind files (par-value changes such as 8422.TW 1 拆 10 on 2025-11-06) are not adjusted by the builder.
+ *    Taiwan files also carry FinMind split / par-value change events (block `twSplits`, atlas/scripts/tw_splits.py),
+ *    and without any recorded event a clean jump of the implied share count is inferred as a split (inferSplits,
+ *    marked 推定 with its evidence). The annual block also walks the quarters after its newest year for evidence
+ *    (5904.TWO 2025: the split is between the 2026 Q2 and Q3 reports, before any annual report on the new basis).
  *  - Derived fourth quarters (annual − Q1..Q3, quality issue `q4-derived`) across a share-basis change between the Q3
  *    and the annual report (8422.TW 2025: annual after the split, Q1..Q3 before it) are recomputed on today's basis: restated annual −
  *    Σ restated Q1..Q3 (`derivedQ4`). The builder leaves Q4 as published (build_financials_tw_finmind.py); this is the
@@ -24,9 +28,24 @@ import { dividendFactor, eventText, reductionFactor, reductionText } from './sto
 
 export type EpsDisplayBasis = 'restated' | 'reported';
 
+/** Evidence of an inferred split: the two quarters whose implied share counts (net income ÷ EPS) jump. */
+export interface InferredSplitEvidence {
+  before: string;
+  after: string;
+  sharesBefore: number;
+  sharesAfter: number;
+  periodsBefore: number;
+  periodsAfter: number;
+}
+
 export interface SplitEvent {
   date: string;
   ratio: number;
+  /** Where the event comes from: the file's `split` block (Yahoo era), FinMind `twSplits`, or inferSplits. */
+  source?: 'yahoo' | 'finmind' | 'inferred';
+  /** FinMind kind (par: 面額變更). */
+  kind?: 'split' | 'reverse' | 'par';
+  evidence?: InferredSplitEvidence;
 }
 
 /** One piece of a recomputed derived Q4: its label, reported EPS and restated EPS. */
@@ -84,23 +103,142 @@ export function reportedEpsAt(series: FinancialSeries, index: number): number | 
   return series.values.epsDiluted[index] ?? series.values.epsBasic[index] ?? null;
 }
 
+const memo = new WeakMap<FinancialHistory, SplitEvent[]>();
+
 /**
  * Split events to test, oldest first. A US file the builder already split-adjusted (`split.adjusted`: adjust_splits and
  * repair_split_eps on its share counts) is trusted as is. Taiwan FinMind statements are never split-adjusted by the
  * builder (the flag there is carried over from the earlier Yahoo file), so Taiwan events are always tested; a split on a
- * 配股 ex-rights date is that dividend, not a second event.
+ * 配股 ex-rights date is that dividend, not a second event. Taiwan: the applied FinMind events (`twSplits`) win over a
+ * Yahoo event within 7 days (the same split), and with a stockDividends block the splits inferSplits finds are added.
+ * Mirror of atlas/scripts/build_growth.py tw_split_events.
  */
 export function splitEventsOf(history: FinancialHistory): SplitEvent[] {
+  const cached = memo.get(history);
+  if (cached) return cached;
+  const events = computeSplitEvents(history);
+  memo.set(history, events);
+  return events;
+}
+
+function computeSplitEvents(history: FinancialHistory): SplitEvent[] {
   if (history.market !== 'TW' && history.split.adjusted) return [];
-  const dividends = history.market === 'TW' ? (history.stockDividends ?? []) : [];
+  const taiwan = history.market === 'TW';
+  const dividends = taiwan ? (history.stockDividends ?? []) : [];
   // Yahoo records a 減資 as a reverse split: a loss-offset one is restated from the reduction block instead, a cash
   // one must not be restated at all.
-  const reductions = history.market === 'TW' ? (history.capitalReductions ?? []) : [];
-  return history.split.events
+  const reductions = taiwan ? (history.capitalReductions ?? []) : [];
+  const finmind: SplitEvent[] = taiwan
+    ? (history.twSplits ?? [])
+        .filter((event) => event.applied && usableRatio(event.ratio))
+        .map((event) => ({ date: event.date, ratio: event.ratio, source: 'finmind', kind: event.kind }))
+    : [];
+  const yahoo: SplitEvent[] = history.split.events
     .filter((event) => usableRatio(event.ratio))
     .filter((event) => !dividends.some((dividend) => Math.abs(parse(dividend.exDate) - parse(event.date)) <= 5 * DAY_MS))
     .filter((event) => !reductions.some((reduction) => Math.abs(parse(reduction.date) - parse(event.date)) <= 7 * DAY_MS))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
+    .filter((event) => !finmind.some((other) => Math.abs(parse(other.date) - parse(event.date)) <= 7 * DAY_MS))
+    .map((event) => ({ date: event.date, ratio: event.ratio, source: 'yahoo' }));
+  const recorded = [...finmind, ...yahoo].sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!taiwan || history.stockDividends === null) return recorded;
+  const blockers = [
+    ...recorded.map((event) => event.date),
+    ...history.split.events.map((event) => event.date),
+    ...dividends.filter((event) => event.perShare >= BIG_STOCK_DIVIDEND).map((event) => event.exDate),
+    ...reductions.filter((event) => !restatesEps(event)).map((event) => event.date),
+  ];
+  const q = history.quarterly;
+  const points = q.end.map((end, index) => {
+    const reported = reportedEpsAt(q, index);
+    const dividend = dividendFactor(end, history.stockDividends);
+    const reduction = reductionFactor(end, history.capitalReductions);
+    return {
+      end,
+      eps: reported === null || dividend === null ? null : reported / (dividend.factor * reduction.factor),
+      netIncome: q.values.netIncome[index] ?? null,
+      revenue: q.values.revenue[index] ?? null,
+      due: addDays(end, reportDelayDays(end)),
+    };
+  });
+  const inferred = inferSplits(points, blockers);
+  return [...recorded, ...inferred].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** Inferred-split rule constants (atlas/scripts/tw_splits.py has the same values and the measurement behind them). */
+export const INFER = { minRatio: 2, tolerance: 0.01, minEps: 0.2, stable: 0.15, minBefore: 3, maxGapDays: 200, revenue: 2.5, window: 4 };
+/** 配股 of at least this NT$ per share (par 10) is a ≥ 1.5x share change. */
+const BIG_STOCK_DIVIDEND = 5;
+
+export interface InferencePoint {
+  end: string;
+  /** EPS on the 配股／減資-restated basis. */
+  eps: number | null;
+  netIncome: number | null;
+  revenue: number | null;
+  /** Report due date (YYYY-MM-DD). */
+  due: string;
+}
+
+const addDays = (day: string, days: number) => new Date(parse(day) + days * DAY_MS).toISOString().slice(0, 10);
+
+/**
+ * Splits inferred from consecutive quarterly implied share counts (net income ÷ EPS) when no event is recorded: a jump
+ * by a near-integer n ≥ 2 (or 1/n) between two quarters ≤ 200 days apart, within 1% + cent rounding of both EPS, with a
+ * stable level before (≥ 3 quarters within ±15%) and after (the newer quarter and up to 3 later ones within ±15%),
+ * revenue continuing (median after ÷ before within [1/2.5, 2.5]), positive net income on both sides when the newer
+ * quarter is the newest one, and no blocker (recorded split, big 配股, unrestated 減資) between the older quarter's end
+ * and the newer one's report. A constant offset (2006.TW: NI includes minority interests) is no jump, a small issuance
+ * is not near-integer, a merger brings revenue with it. Dated the day after the older quarter's end.
+ * Mirror of atlas/scripts/tw_splits.py infer_splits.
+ */
+export function inferSplits(points: readonly InferencePoint[], blockers: readonly string[]): SplitEvent[] {
+  const usable = points
+    .flatMap((point) => {
+      const { eps, netIncome } = point;
+      if (eps === null || netIncome === null || netIncome === 0 || Math.abs(eps) < INFER.minEps) return [];
+      const shares = netIncome / eps;
+      return shares > 0 && Number.isFinite(shares) ? [{ ...point, eps, netIncome, shares }] : [];
+    })
+    .sort((a, b) => (a.end < b.end ? -1 : 1));
+  const found: SplitEvent[] = [];
+  for (let index = 1; index < usable.length; index++) {
+    const older = usable[index - 1]!;
+    const newer = usable[index]!;
+    if ((parse(newer.end) - parse(older.end)) / DAY_MS > INFER.maxGapDays) continue;
+    const jump = newer.shares / older.shares;
+    const size = jump >= 1 ? jump : 1 / jump;
+    const whole = Math.round(size);
+    if (whole < INFER.minRatio) continue;
+    if (Math.abs(size / whole - 1) > INFER.tolerance + 0.005 / Math.abs(older.eps) + 0.005 / Math.abs(newer.eps)) continue;
+    const before = usable.slice(Math.max(0, index - INFER.window), index);
+    const after = usable.slice(index, index + INFER.window);
+    if (before.length < INFER.minBefore) continue;
+    const levelBefore = median(before.map((point) => point.shares));
+    const levelAfter = median(after.map((point) => point.shares));
+    if (before.some((point) => Math.abs(point.shares / levelBefore - 1) > INFER.stable)) continue;
+    if (after.some((point) => Math.abs(point.shares / levelAfter - 1) > INFER.stable)) continue;
+    const revenueBefore = before.flatMap((point) => (point.revenue ? [point.revenue] : []));
+    const revenueAfter = after.flatMap((point) => (point.revenue ? [point.revenue] : []));
+    if (!revenueBefore.length || !revenueAfter.length || median(revenueBefore) <= 0) continue;
+    const revenue = median(revenueAfter) / median(revenueBefore);
+    if (revenue < 1 / INFER.revenue || revenue > INFER.revenue) continue;
+    if (after.length < 2 && !(older.netIncome > 0 && newer.netIncome > 0)) continue;
+    if (blockers.some((day) => day > older.end && day <= newer.due)) continue;
+    found.push({
+      date: addDays(older.end, 1),
+      ratio: jump >= 1 ? whole : Math.round((1 / whole) * 1e6) / 1e6,
+      source: 'inferred',
+      evidence: {
+        before: older.end,
+        after: newer.end,
+        sharesBefore: Math.round(older.shares),
+        sharesAfter: Math.round(newer.shares),
+        periodsBefore: before.length,
+        periodsAfter: after.length,
+      },
+    });
+  }
+  return found;
 }
 
 /**
@@ -110,12 +248,20 @@ export function splitEventsOf(history: FinancialHistory): SplitEvent[] {
  * and beat leaving it alone; it must match the next newer period's count as well. The splits must also fall before
  * that newer period's report, unless the period just continues its factor. Periods without an implied count (no net income, loss/profit sign
  * mismatch, |EPS| < MIN_EVIDENCE_EPS) keep factor 1.
+ *
+ * Dated events (FinMind `twSplits` and inferred splits, `dues` given: each period's report due date): a period whose
+ * report was due before such an event is on the pre-split basis whatever its neighbours show (FinMind EPS are as
+ * published), so where the evidence above does not settle it, it takes the product of those events unless its implied
+ * count already matches the newer periods' basis without them (a report that restated its comparatives). This keeps
+ * periods across an unrelated share change (2327.TW: a cash capital reduction in 2022) and periods without an implied
+ * count on today's basis.
  */
 export function splitFactors(
   ends: readonly string[],
   eps: readonly (number | null)[],
   netIncome: readonly (number | null)[],
   splits: readonly SplitEvent[],
+  dues?: readonly string[],
 ): { factor: number; splits: SplitEvent[] }[] {
   const out = ends.map(() => ({ factor: 1, splits: [] as SplitEvent[] }));
   if (!splits.length) return out;
@@ -131,6 +277,9 @@ export function splitFactors(
     .map((_, index) => index)
     .filter((index) => implied(index) !== null)
     .sort((a, b) => (ends[a]! < ends[b]! ? 1 : -1));
+  const datedAfter = (index: number): SplitEvent[] =>
+    dues ? splits.filter((event) => (event.source === 'finmind' || event.source === 'inferred') && event.date > dues[index]!) : [];
+  const productOf = (events: readonly SplitEvent[]) => events.reduce((product, event) => product * event.ratio, 1);
   const newer: number[] = [];
   let previous: number | null = null;
   for (const index of order) {
@@ -164,9 +313,25 @@ export function splitFactors(
       if (best !== 1 && matches(reference) && matches(neighbour) && (transition || continuation))
         out[index] = { factor: best, splits: applied };
     }
+    const dated = out[index]!.factor === 1 ? datedAfter(index) : [];
+    if (dated.length) {
+      const product = productOf(dated);
+      const reference = newer.length ? median(newer.slice(-3)) : null;
+      const already =
+        reference !== null &&
+        Math.abs(shares / reference - 1) <= SPLIT_MATCH &&
+        Math.abs(Math.log(shares / reference)) < Math.abs(Math.log((shares * product) / reference));
+      if (!already) out[index] = { factor: Math.round(product * 1e6) / 1e6, splits: dated };
+    }
     newer.push(shares * out[index]!.factor);
     previous = index;
   }
+  // No implied count: nothing contradicts the dates.
+  ends.forEach((_, index) => {
+    if (implied(index) !== null) return;
+    const dated = datedAfter(index);
+    if (dated.length) out[index] = { factor: Math.round(productOf(dated) * 1e6) / 1e6, splits: dated };
+  });
   return out;
 }
 
@@ -198,7 +363,9 @@ function baseAdjustments(history: FinancialHistory, kind: PeriodKind): (EpsAdjus
     value === null || dividends[index] === null ? null : value / (dividends[index]!.factor * reductions[index]!.factor),
   );
   const splits = splitEventsOf(history);
-  const factors = splitFactors(series.end, base, series.values.netIncome, splits);
+  const dues = series.end.map((end) => addDays(end, annual ? 90 : reportDelayDays(end)));
+  const factors =
+    annual && taiwan && splits.length ? annualSplitFactors(history, base, splits) : splitFactors(series.end, base, series.values.netIncome, splits, dues);
   const derivedQ4 = history.quality.issues.includes('q4-derived');
   return series.end.map((end, index) => {
     const dividend = dividends[index];
@@ -231,6 +398,33 @@ function baseAdjustments(history: FinancialHistory, kind: PeriodKind): (EpsAdjus
       mixedQ4,
     };
   });
+}
+
+/**
+ * Taiwan annual split factors: the quarters after the newest year (on their 配股／減資-restated basis) join the walk as
+ * evidence only, so a year before a split no annual report reaches yet (5904.TWO 2025) is still confirmed. Mirror of
+ * build_growth.restate_splits(annual, splits, anchors).
+ */
+function annualSplitFactors(history: FinancialHistory, base: readonly (number | null)[], splits: readonly SplitEvent[]) {
+  const a = history.annual;
+  const q = history.quarterly;
+  const newest = a.end[a.end.length - 1];
+  const anchors = q.end.flatMap((end, index) => {
+    if (newest === undefined || end <= newest) return [];
+    const reported = reportedEpsAt(q, index);
+    const dividend = dividendFactor(end, history.stockDividends);
+    const reduction = reductionFactor(end, history.capitalReductions);
+    const eps = reported === null || dividend === null ? null : reported / (dividend.factor * reduction.factor);
+    return [{ end, eps, netIncome: q.values.netIncome[index] ?? null }];
+  });
+  const factors = splitFactors(
+    [...a.end, ...anchors.map((anchor) => anchor.end)],
+    [...base, ...anchors.map((anchor) => anchor.eps)],
+    [...a.end.map((_, index) => a.values.netIncome[index] ?? null), ...anchors.map((anchor) => anchor.netIncome)],
+    splits,
+    [...a.end.map((end) => addDays(end, 90)), ...anchors.map((anchor) => addDays(anchor.end, reportDelayDays(anchor.end)))],
+  );
+  return factors.slice(0, a.end.length);
 }
 
 const restatedBy = (reported: number, adjustment: EpsAdjustment) => reported / adjustment.factor;
@@ -303,13 +497,38 @@ const trim = (value: number) => (Number.isInteger(value) ? String(value) : value
 /** 4 → 「1 拆 4」; a reverse split 0.1 → 「10 併 1」. */
 export const splitRatioText = (ratio: number) => (ratio >= 1 ? `1 拆 ${trim(ratio)}` : `${trim(1 / ratio)} 併 1`);
 
+const sharesText = (shares: number) => `${(shares / 1e8).toFixed(2)} 億股`;
+
+/** 「面額變更 1 拆 10（恢復買賣 2026-08-10）」, 「推定股票分割 1 拆 10（隱含股數 …）」, 「股票分割 1 拆 10（2025-11-06）」 */
+export function splitEventText(split: SplitEvent): string {
+  if (split.source === 'inferred' && split.evidence) {
+    const e = split.evidence;
+    return `推定股票分割 ${splitRatioText(split.ratio)}（無分割公告資料，依隱含股數 ${e.before} ${sharesText(e.sharesBefore)} → ${e.after} ${sharesText(e.sharesAfter)} 推定）`;
+  }
+  if (split.kind === 'par') return `面額變更 ${splitRatioText(split.ratio)}（恢復買賣 ${split.date}）`;
+  if (split.kind === 'reverse') return `反分割 ${splitRatioText(split.ratio)}（${split.date}）`;
+  return `股票分割 ${splitRatioText(split.ratio)}（${split.date}）`;
+}
+
 /** 「配股 1.9738 元（除權 2025-09-04）、股票分割 1 拆 10（2025-11-06）」 */
 export function adjustmentText(adjustment: EpsAdjustment): string {
   const parts = [];
   if (adjustment.dividends.length) parts.push(eventText(adjustment.dividends));
   if (adjustment.reductions.length) parts.push(reductionText(adjustment.reductions));
-  for (const split of adjustment.splits) parts.push(`股票分割 ${splitRatioText(split.ratio)}（${split.date}）`);
+  for (const split of adjustment.splits) parts.push(splitEventText(split));
   return parts.join('、');
+}
+
+/** Page note for Taiwan FinMind / inferred split events (Yahoo-era events have their own note); null without any. */
+export function twSplitNote(history: FinancialHistory): string | null {
+  if (history.market !== 'TW') return null;
+  const events = splitEventsOf(history).filter((event) => event.source === 'finmind' || event.source === 'inferred');
+  if (!events.length) return null;
+  const sources = [
+    events.some((event) => event.source === 'finmind') && 'FinMind 分割／面額變更資料',
+    events.some((event) => event.source === 'inferred') && '推定事件僅在財報隱含股數證實時套用',
+  ].filter((part): part is string => !!part);
+  return `還原 EPS 依股數變動換算：${events.map(splitEventText).join('、')}。${sources.join('；')}。`;
 }
 
 const changed = (adjustment: EpsAdjustment | null) => !!adjustment && (adjustment.factor !== 1 || adjustment.mixedQ4 || !!adjustment.derivedQ4);
@@ -338,7 +557,7 @@ export function restatedEpsLabel(history: FinancialHistory): string {
 }
 
 export const RESTATED_EPS_HELP =
-  '還原 EPS：公告 EPS ÷ 之後的配股（1 + 配股元 ÷ 10）、股票分割與減資彌補虧損（新股數 ÷ 舊股數）比例，換算成目前股數，前後期才能比較；由全年減前三季推算的第四季，以還原全年 EPS 減還原前三季 EPS 計算。公告 EPS 為公司當時財報的數字。現金減資（退還股款）與現金增資依 IAS 33 不追溯調整。';
+  '還原 EPS：公告 EPS ÷ 之後的配股（1 + 配股元 ÷ 10）、股票分割／面額變更與減資彌補虧損（新股數 ÷ 舊股數）比例，換算成目前股數，前後期才能比較；由全年減前三季推算的第四季，以還原全年 EPS 減還原前三季 EPS 計算。公告 EPS 為公司當時財報的數字。現金減資（退還股款）與現金增資依 IAS 33 不追溯調整。';
 export const MIXED_Q4_REASON = '第四季 EPS 由全年減前三季推算且跨越股數變動，但缺全年或前三季 EPS，無法換算成目前股數，不顯示';
 /** 公告 mode note of a derived Q4 whose pieces sit on different share bases. */
 export const DERIVED_Q4_REPORTED_NOTE = '此季為全年減前三季推算，跨越股數變動，請參考還原值';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseFinancials, type FinancialHistory } from '../src/fundamentals/FinancialHistory';
-import { DERIVED_Q4_REPORTED_NOTE, epsAdjustments, hasEpsRestatement, restatedEpsLabel, MIXED_Q4_REASON } from '../src/fundamentals/epsBasis';
+import { DERIVED_Q4_REPORTED_NOTE, epsAdjustments, hasEpsRestatement, inferSplits, restatedEpsLabel, MIXED_Q4_REASON, splitEventsOf, twSplitNote } from '../src/fundamentals/epsBasis';
 import { contextOf, eps } from '../src/fundamentals/financialMetrics';
 import { statementRows } from '../src/fundamentals/financialStatements';
 import { peerFigures } from '../src/fundamentals/peerComparison';
@@ -331,5 +331,123 @@ describe('capital reductions (減資)', () => {
     expect(epsAdjustments(file('loss', 0.5, [['2025-09-01', 0.5]]), 'quarterly').map((item) => item?.factor)).toEqual([0.5, 0.5, 1]);
     // a cash reduction recorded by Yahoo as a reverse split must not be restated through the split block either
     expect(epsAdjustments(file('cash', 0.5, [['2025-09-01', 0.5]]), 'quarterly').map((item) => item?.factor)).toEqual([1, 1, 1]);
+  });
+});
+
+// 寶雅 5904.TWO as in docs/report/financials (FinMind): par 10 → 1 between the 2026 Q2 and Q3 reports, no split event.
+const POYA_END = ['2023-09-30', '2023-12-31', '2024-03-31', '2024-06-30', '2024-09-30', '2024-12-31', '2025-03-31', '2025-06-30', '2025-09-30', '2025-12-31', '2026-03-31', '2026-06-30', '2026-09-30'];
+const POYA_EPS = [6.89, 6.57, 6.78, 5.61, 7.27, 7.15, 7.48, 5.58, 7.59, 8.98, 9.3, 8.15, 0.95];
+const POYA_NI = [712928000, 679732000, 701515000, 589084000, 762984000, 750810000, 784586000, 594048000, 808340000, 955557000, 990042000, 867577000, 1015678000];
+const POYA_REV = [5869731000, 5634862000, 5873699000, 5627850000, 6124615000, 6002058000, 6295928000, 6044385000, 6400814000, 6578714000, 7094656000, 6932323000, 7359183000];
+const poya = (extra: Record<string, unknown> = {}, eps = POYA_EPS, ni = POYA_NI) =>
+  ok({
+    version: 1,
+    symbol: '5904.TWO',
+    market: 'TW',
+    currency: 'TWD',
+    fyEndMonth: 12,
+    annual: {
+      end: ['2022-12-31', '2023-12-31', '2024-12-31', '2025-12-31'],
+      fy: [2022, 2023, 2024, 2025],
+      src: ['finmind', 'finmind', 'finmind', 'finmind'],
+      values: { epsBasic: [20.26, 24.41, 26.74, 29.54], netIncome: [2068075000, 2525392000, 2804393000, 3142531000] },
+    },
+    quarterly: {
+      end: POYA_END,
+      fy: POYA_END.map((end) => Number(end.slice(0, 4))),
+      fq: [3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3],
+      src: POYA_END.map(() => 'finmind'),
+      values: { epsBasic: eps, netIncome: ni, revenue: POYA_REV },
+    },
+    split: { adjusted: false, events: [] },
+    stockDividends: { events: [{ exDate: '2024-06-21', perShare: 0.1 }, { exDate: '2025-07-15', perShare: 0.1 }] },
+    quality: { level: 'good', issues: ['q4-derived', 'eps-annual-summed', 'debt-approx'] },
+    ...extra,
+  });
+const PAR_EVENT = { twSplits: { source: 'FinMind TaiwanStockSplitPrice + TaiwanStockParValueChange', checked: '2026-11-23', events: [{ date: '2026-08-10', ratio: 10, kind: 'par', applied: true, raw: { before_close: 720, after_ref_close: 72 } }] } };
+
+describe('寶雅 5904.TWO split / par-value change', () => {
+  const poyaAt = (end: string) => POYA_END.indexOf(end);
+  for (const [name, history] of [
+    ['inferred from the implied share counts', poya()],
+    ['FinMind par-value change event', poya(PAR_EVENT)],
+  ] as const) {
+    it(`restates the pre-split periods (${name})`, () => {
+      const view = buildView(history, 'quarterly');
+      const values = view.metrics.eps.values;
+      expect(values[poyaAt('2026-06-30')]).toBe(0.815);
+      expect(values[poyaAt('2026-03-31')]).toBe(0.93);
+      expect(values[poyaAt('2025-09-30')]).toBe(0.759);
+      expect(values[poyaAt('2026-09-30')]).toBe(0.95); // already on the new basis
+      expect(view.metrics.eps.changes[poyaAt('2026-09-30')]!.value).toBeCloseTo((0.95 / 0.759 - 1) * 100, 1); // ≈ +25%
+      expect(restatedAnnualEps(history, 2025)).toEqual({ restated: 2.954, reported: 29.54, periodEnd: '2025-12-31' });
+      expect(restatedTtmEps(history, '2026-11-23')).toEqual({ restated: 3.593, reported: 27.38, periodEnd: '2026-09-30' });
+      expect(view.metrics.eps.title).toBe('還原 EPS（依配股與分割追溯調整）');
+    });
+  }
+
+  it('says where the split comes from', () => {
+    const inferred = poya();
+    const note = buildView(inferred, 'quarterly').metrics.eps.results[poyaAt('2026-06-30')]!.notes.join();
+    expect(note).toContain('推定股票分割 1 拆 10');
+    expect(note).toContain('2026-06-30 1.06 億股 → 2026-09-30 10.69 億股');
+    expect(twSplitNote(inferred)).toContain('推定事件僅在財報隱含股數證實時套用');
+    const recorded = poya(PAR_EVENT);
+    expect(splitEventsOf(recorded)).toEqual([{ date: '2026-08-10', ratio: 10, source: 'finmind', kind: 'par' }]);
+    expect(buildView(recorded, 'quarterly').metrics.eps.results[poyaAt('2026-06-30')]!.notes.join()).toContain('面額變更 1 拆 10（恢復買賣 2026-08-10）');
+  });
+
+  it('parses twSplits tolerantly and applies only applied events', () => {
+    const history = poya({
+      twSplits: {
+        events: [
+          { date: '2025-06-18', ratio: 4, kind: 'split', applied: true },
+          { date: '2024-12-11', ratio: 0.142857, kind: 'reverse', applied: true },
+          { date: '2025-01-02', ratio: 4, kind: 'split', applied: false },
+          { date: 'bad', ratio: 2 },
+          { date: '2023-01-02', ratio: 2, kind: 'weird', applied: true },
+        ],
+      },
+    });
+    expect(history.twSplits).toEqual([
+      { date: '2025-06-18', ratio: 4, kind: 'split', applied: true },
+      { date: '2024-12-11', ratio: 0.142857, kind: 'reverse', applied: true },
+      { date: '2025-01-02', ratio: 4, kind: 'split', applied: false },
+      { date: '2023-01-02', ratio: 2, kind: 'split', applied: true },
+    ]);
+    // older recorded events do not block the 2026 jump; every event is still tested by the implied share counts
+    expect(splitEventsOf(history).map((event) => `${event.source} ${event.date}`)).toEqual(['finmind 2023-01-02', 'finmind 2024-12-11', 'finmind 2025-06-18', 'inferred 2026-07-01']);
+    expect(epsAdjustments(history, 'quarterly')[POYA_END.indexOf('2025-09-30')]!.splits.map((event) => event.source)).toEqual(['inferred']);
+    expect(poya({ twSplits: 'bad' }).twSplits).toBeNull();
+  });
+});
+
+describe('inferred splits', () => {
+  const points = (eps: number[], ni: number[], revenue = POYA_REV) =>
+    POYA_END.map((end, index) => ({ end, eps: eps[index]!, netIncome: ni[index]!, revenue: revenue[index]!, due: end }));
+
+  it('5904.TWO: a clean 10x step', () => {
+    const found = inferSplits(points(POYA_EPS, POYA_NI), []);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ date: '2026-07-01', ratio: 10, source: 'inferred', evidence: { before: '2026-06-30', after: '2026-09-30', periodsAfter: 1 } });
+    expect(inferSplits(points(POYA_EPS, POYA_NI), ['2026-08-10'])).toEqual([]);
+  });
+
+  it('2006.TW style constant minority-interest offset is no jump', () => {
+    const eps = [1.0, 1.1, 0.9, 1.2, 1.0, 1.05, 0.95, 1.1, 1.0, 0.9, 1.1, 1.0, 1.05];
+    const history = poya({}, eps, eps.map((value) => Math.round(value * 2.7e8)));
+    expect(splitEventsOf(history)).toEqual([]);
+    expect(hasEpsRestatement(history)).toBe(true); // the 配股 only
+    expect(epsAdjustments(history, 'quarterly').every((adjustment) => adjustment!.splitFactor === 1)).toBe(true);
+  });
+
+  it('an issuance or a merger is not a split', () => {
+    const issued = [...POYA_EPS.slice(0, -1), Math.round((1015678000 / 117e6) * 100) / 100];
+    expect(inferSplits(points(issued, POYA_NI), [])).toEqual([]);
+    // 20x shares with 5x revenue (5314.TWO 2025): a deal, not a split
+    const eps = POYA_EPS.map((value, index) => (index < 9 ? value : Math.round((POYA_NI[index]! / 2.13e9) * 100) / 100));
+    expect(inferSplits(points(eps, POYA_NI, POYA_REV.map((value, index) => (index < 9 ? value : value * 5))), [])).toEqual([]);
+    // a halving shown only by a newest quarter in loss (8291.TWO 2026Q3)
+    expect(inferSplits(points([...POYA_EPS.slice(0, -1), -9.39], [...POYA_NI.slice(0, -1), -500000000]), [])).toEqual([]);
   });
 });

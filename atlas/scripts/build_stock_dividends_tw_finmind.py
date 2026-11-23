@@ -1,9 +1,10 @@
 """
 Taiwan stock dividend events from FinMind (TaiwanStockDividend, one request per stock) → the "stockDividends" block
 of docs/report/financials/<code>.TW(O).json, and capital reductions (TaiwanStockCapitalReductionReferencePrice,
-減資恢復買賣參考價) → the "capitalReductions" block. The statements themselves are untouched: the Atlas financials page,
+減資恢復買賣參考價) → the "capitalReductions" block, and stock splits / par-value changes (TaiwanStockSplitPrice +
+TaiwanStockParValueChange, two requests per stock) → the "twSplits" block. The statements themselves are untouched: the Atlas financials page,
 the P/E river and build_growth.py derive the retroactively restated EPS from the reported EPS and these events
-(tw_stock_dividends.py / tw_capital_reductions.py have the rules). Stocks without a financials file are skipped; a
+(tw_stock_dividends.py / tw_capital_reductions.py / tw_splits.py have the rules). Stocks without a financials file are skipped; a
 stock is fetched again after RECHECK_DAYS (a new resolution can appear any time).
 
 Capital reductions: FinMind serves that dataset without data_id ("Free" tier), so one request fetches every stock
@@ -21,6 +22,7 @@ import time
 from datetime import date, datetime, timezone
 
 import tw_capital_reductions as cap
+import tw_splits as splits
 import tw_stock_dividends as div
 from build_valuation_us import read_json, write_atomic
 from finmind_client import (AuthError, FinMindError, Http, LimitReached, RateLimited, fetch_rows, request_interval)
@@ -32,7 +34,7 @@ MIN_ALL_DATES = 5
 
 
 def due(document, today, name="stockDividends"):
-    """True when this stock's block (stockDividends / capitalReductions) is missing or older than RECHECK_DAYS."""
+    """True when this stock's block (stockDividends / capitalReductions / twSplits) is missing or older than RECHECK_DAYS."""
     stored = document.get(name)
     checked = div.day_of(stored.get("checked")) if isinstance(stored, dict) else None
     return checked is None or (today - checked).days >= RECHECK_DAYS
@@ -87,21 +89,22 @@ def run(args, http=None, sleep=time.sleep, clock=time.monotonic, log=print, toda
         document = read_json(path)
         if not isinstance(document, dict):
             continue
-        if wanted or due(document, today):
-            stored = document.get("stockDividends")
-            work.append((str(stored.get("checked")) if isinstance(stored, dict) else "", code, path))
+        for name in ("stockDividends", "twSplits"):
+            if wanted or due(document, today, name):
+                stored = document.get(name)
+                work.append((str(stored.get("checked")) if isinstance(stored, dict) else "", code, name, path))
         if wanted or due(document, today, "capitalReductions"):
             stored = document.get("capitalReductions")
             reduction_work.append((str(stored.get("checked")) if isinstance(stored, dict) else "", code, path))
-    work.sort(key=lambda item: (item[0], item[1]))
+    work.sort(key=lambda item: (item[0], item[1], item[2]))
     reduction_work.sort(key=lambda item: (item[0], item[1]))
-    log(f"stock dividends: {len(work)} stocks to fetch, capital reductions: {len(reduction_work)} due, "
+    log(f"stock dividends / splits: {len(work)} blocks to fetch, capital reductions: {len(reduction_work)} due, "
         f"{'with' if token else 'without'} token, one request every {request_interval(token):.1f}s, budget {args.budget:.0f}s")
     http = http or Http()
     counter = {"requests": 0, "limit": args.limit}
     deadline = clock() + args.budget
     interval = request_interval(token)
-    written = {"stockDividends": 0, "capitalReductions": 0}
+    written = {"stockDividends": 0, "capitalReductions": 0, "twSplits": 0}
 
     def pace():
         """Sleeps between requests; False when the budget is used up."""
@@ -139,28 +142,42 @@ def run(args, http=None, sleep=time.sleep, clock=time.monotonic, log=print, toda
                     log(f"::warning::{code} capital reductions: {error}; skipped")
                     continue
                 store_reductions(code, path, rows)
-        # 2. stock dividends, one request per stock
-        for _, code, path in [] if paused else work:
-            if not pace():
+        # 2. stock dividends (one request) and splits / par-value changes (one request per dataset), per stock, the
+        #    oldest check first
+        for _, code, name, path in [] if paused else work:
+            datasets = (div.DATASET,) if name == "stockDividends" else splits.DATASETS
+            answers = []
+            for dataset in datasets:
+                if not pace():
+                    paused = True
+                    break
+                try:
+                    answers.append(fetch_rows(http, dataset, code, START_DATE, token, sleep, log, counter))
+                except FinMindError as error:
+                    log(f"::warning::{code} {dataset}: {error}; skipped")
+                    break
+            if paused:
                 break
-            try:
-                rows = fetch_rows(http, div.DATASET, code, START_DATE, token, sleep, log, counter)
-            except FinMindError as error:
-                log(f"::warning::{code}: {error}; skipped")
+            if len(answers) < len(datasets):
                 continue
-            store(path, "stockDividends", div.block(div.parse_events(rows), today.isoformat()), div.SOURCE)
+            if name == "stockDividends":
+                store(path, name, div.block(div.parse_events(answers[0]), today.isoformat()), div.SOURCE)
+            else:
+                events = splits.parse_events(answers[0], answers[1], code, log)
+                store(path, name, splits.block(events, today.isoformat()), splits.SOURCE)
     except AuthError as error:
         log(f"::error::STOPPED: {error}")
         return 1
     except (RateLimited, LimitReached) as error:
         log(f"PAUSED: {error}")
     log(f"stock dividends: {written['stockDividends']} files written, capital reductions: "
-        f"{written['capitalReductions']} files written, {counter['requests']} requests")
+        f"{written['capitalReductions']} files written, splits: {written['twSplits']} files written, "
+        f"{counter['requests']} requests")
     return 0
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="FinMind stock dividends / capital reductions → financials/<code>.json")
+    parser = argparse.ArgumentParser(description="FinMind stock dividends / capital reductions / splits → financials/<code>.json")
     parser.add_argument("--report-dir", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs", "report"))
     parser.add_argument("--out-dir", default=None)

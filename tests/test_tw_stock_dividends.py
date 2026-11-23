@@ -92,7 +92,8 @@ class Builder(unittest.TestCase):
             json.dump(doc, open(path, "w"))
             class Http:
                 def get(self, url, headers):
-                    if "TaiwanStockCapitalReductionReferencePrice" in url:
+                    if "TaiwanStockCapitalReductionReferencePrice" in url or "TaiwanStockSplitPrice" in url \
+                            or "TaiwanStockParValueChange" in url:
                         return 200, json.dumps({"msg": "success", "status": 200, "data": []}).encode()
                     assert "TaiwanStockDividend" in url and "data_id=1773" in url
                     return 200, json.dumps({"msg": "success", "status": 200, "data": ROWS}).encode()

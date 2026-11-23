@@ -8,11 +8,13 @@ import { mockSite, valuation } from './mocks';
 const file = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tw-2755-stock-dividends.json'), 'utf8');
 /** 可寧衛 8422.TW (FinMind, trimmed): 1 拆 10 on 2025-11-06; Q4 2025 published as 1.29 − (3.97 + 4.03 + 2.48) = −9.18. */
 const kingNet = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tw-8422-split.json'), 'utf8');
+/** 寶雅 5904.TWO (FinMind, as on main 2026-11-23 without sourceCorrections): par 10 → 1 between the 2026 Q2 and Q3 reports, no split event. */
+const poya = readFileSync(resolve(import.meta.dirname, '../tests/fixtures/financials/tw-5904-par-split.json'), 'utf8');
 
 async function routeFile(page: Page) {
   await page.route('**/my-stock-screener/report/financials/*.json', (route) => {
     const url = route.request().url();
-    const body = url.includes('2755.TWO') ? file : url.includes('8422.TW') ? kingNet : null;
+    const body = url.includes('2755.TWO') ? file : url.includes('8422.TW') ? kingNet : url.includes('5904.TWO') ? poya : null;
     return body ? route.fulfill({ status: 200, contentType: 'application/json', body }) : route.fulfill({ status: 404, body: 'not found' });
   });
 }
@@ -94,5 +96,30 @@ test('a derived Q4 across a split is recomputed on today\'s basis (8422.TW Q4 20
   await growth.getByRole('button', { name: /^FY2025 Q4 EPS -9\.18/ }).click();
   await expect(growth.locator('.fin-detail-value b')).toHaveText('-9.18 元');
   await expect(growth).toContainText('此季為全年減前三季推算，跨越股數變動，請參考還原值');
+  expect(errors).toEqual([]);
+});
+
+test('an inferred par-value change restates the earlier quarters (5904.TWO Q2 2026 0.815, Q3 YoY +25%); 390px', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSite(page);
+  await routeFile(page);
+  await page.goto('./?page=financials&symbol=5904.TWO&p=q');
+
+  const toggle = page.getByTestId('eps-basis');
+  await expect(toggle.getByRole('button', { name: '還原' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).toContainText('還原 EPS（依配股與分割追溯調整）');
+  const growth = page.locator('.fin-card[data-group="growth"]');
+  await growth.getByRole('button', { name: /^FY2026 Q2 還原 EPS/ }).click();
+  await expect(growth.locator('.fin-detail-value b')).toHaveText('0.81 元');
+  await expect(growth.getByTestId('fin-reported-eps')).toHaveText('公告 8.15');
+  await expect(growth).toContainText('推定股票分割 1 拆 10');
+  await growth.getByRole('button', { name: /^FY2026 Q3 還原 EPS/ }).click();
+  await expect(growth.locator('.fin-detail-value b')).toHaveText('0.95 元');
+  await expect(growth).toContainText('+25.2%');
+  const shot = process.env.EPS_SPLIT_SCREENSHOT;
+  await growth.screenshot({ path: shot || testInfo.outputPath('eps-inferred-split-phone.png') });
+  await expect(page.locator('.fin-notes')).toContainText('推定股票分割 1 拆 10');
   expect(errors).toEqual([]);
 });

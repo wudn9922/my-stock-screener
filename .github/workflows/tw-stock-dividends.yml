@@ -2,6 +2,7 @@ name: Taiwan stock dividends backfill
 
 # 手動回補台股配股資料（FinMind TaiwanStockDividend → docs/report/financials/<代號>.json 的 stockDividends，供還原 EPS 使用），
 # 同一支腳本也抓減資資料（TaiwanStockCapitalReductionReferencePrice，全市場一次請求 → capitalReductions，減資彌補虧損才追溯調整）。
+# 以及股票分割／面額變更（TaiwanStockSplitPrice + TaiwanStockParValueChange，每檔兩次請求 → twSplits，每 30 天重抓）。
 # 每天的 fundamentals.yml 只給這一步 900 秒；第一次全量回補用這裡跑較長的預算，可重複執行，從上次停下的地方接著補。
 # 與 fundamentals.yml／financials.yml 共用 concurrency group，不會同時改同一批檔案。
 on:
