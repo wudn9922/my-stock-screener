@@ -1,6 +1,9 @@
 ## 2026-11-23 Drawing loupe and financials header
 Primary self-review of touch placement, endpoint editing, and the shared stock header layout.
 
+## 2026-11-23 Shared LINE ID token verification
+Primary self-review. 142 targeted Vitest cases, 34 native PostgreSQL tests, 15 account-permission tests, lint, build and both Deno checks passed.
+
 ## 2026-11-23 Email statement sync
 Primary self-review. Owner-only 「Email 對帳單」 account method + status panel; trades come from statement-sync (Cloud Run) and apply via atlas_statement_apply (one transaction with replaceAccount).
 Verified: native-PG SQL suite, Python parser/service tests, statement-handler Vitest, statement-sync/holdings/sinopac e2e on desktop/mobile Chromium.

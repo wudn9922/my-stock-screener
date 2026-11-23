@@ -6,6 +6,7 @@ import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as watchlists from '../../supabase/functions/user-settings/watchlists';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
+import * as lineIdToken from '../../supabase/functions/_shared/lineIdToken';
 import * as holdings from '../../supabase/functions/user-settings/holdings';
 
 const OWNER = policy.DEFAULT_ADMIN_LINE_ID;
@@ -113,7 +114,7 @@ function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Recor
   let serve!: (request: Request) => Promise<Response>;
   const source = readFileSync(new URL(`../../supabase/functions/${kind}/index.ts`, import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '');
   runInNewContext(transformSync(source, { loader: 'ts', target: 'es2022', format: 'cjs' }).code, {
-    ...policy, ...watchlists, ...lineHandoff, ...deviceSession, ...holdings,
+    ...policy, ...watchlists, ...lineHandoff, ...deviceSession, ...lineIdToken, ...holdings,
     Deno: { env: { get: (key: string) => key === 'ADMIN_LINE_USER_ID' ? OWNER : key === 'ATLAS_FIXED_PARAMETERS_ENABLED' ? '1' : 'offline-test-only' }, serve: (callback: typeof serve) => { serve = callback; } },
     createClient: () => fixture.db,
     fetch: async (_url: string, init: RequestInit) => {

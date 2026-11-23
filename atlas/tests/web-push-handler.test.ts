@@ -4,6 +4,7 @@ import { transformSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
+import * as lineIdToken from '../../supabase/functions/_shared/lineIdToken';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 import * as webPush from '../../supabase/functions/user-settings/webPush';
 import { base64UrlDecode, base64UrlEncode } from '../../supabase/functions/user-settings/webPushCrypto';
@@ -67,7 +68,7 @@ function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string
   let serve!: (request: Request) => Promise<Response>;
   const source = readFileSync(new URL('../../supabase/functions/user-settings/index.ts', import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '');
   runInNewContext(transformSync(source, { loader: 'ts', target: 'es2022', format: 'cjs' }).code, {
-    ...policy, ...deviceSession, ...lineHandoff, ...webPush,
+    ...policy, ...deviceSession, ...lineIdToken, ...lineHandoff, ...webPush,
     Deno: { env: { get: (name: string) => env[name] }, serve: (callback: typeof serve) => { serve = callback; } },
     createClient: () => db,
     // LINE verification for browser actions; every other fetch is a push service.
