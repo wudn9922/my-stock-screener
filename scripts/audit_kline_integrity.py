@@ -15,7 +15,7 @@ import kline_integrity as kline
 def audit(root=ROOT / 'data', log=None):
     results, total = [], 0
     for path in sorted(Path(root).rglob('*.csv')):
-        frame = pd.read_csv(path, index_col=0)
+        frame = pd.read_csv(path, index_col=0, **kline.ROUND_TRIP)
         total += len(frame)
         prices = frame[kline.FIELDS[:4]]
         mask = ~((prices > 0).all(axis=1) & (prices < float('inf')).all(axis=1)

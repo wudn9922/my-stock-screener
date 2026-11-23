@@ -24,6 +24,10 @@ from scripts.kline_journal import dump_journal, fact, merge_logs, prune_main_jou
 
 ROOT = Path(__file__).resolve().parent
 LOG_PATH = Path(os.environ.get("KLINE_CORRECTIONS_LOG", ROOT / "docs/report/kline-corrections.json"))
+# pandas 3.1+ parses floats round-trip by default and deprecates float_precision. Older pandas (the
+# Python 3.10 workflows install 2.x; 3.0.x differs too) must still ask for it, or the last bit of a
+# price can change when a K-line CSV is read and written back.
+ROUND_TRIP = {} if tuple(int(part) for part in pd.__version__.split(".")[:2]) >= (3, 1) else {"float_precision": "round_trip"}
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
 
 
@@ -198,8 +202,7 @@ def usable_frame(frame, symbol=None, log_path=None):
 
 
 def read_csv(path, **kwargs):
-    # The pandas 3.1+ C parser uses round-trip float conversion by default.
-    frame = pd.read_csv(path, **kwargs)
+    frame = pd.read_csv(path, **{**ROUND_TRIP, **kwargs})
     frame.attrs["symbol"] = Path(path).stem
     return usable_frame(frame, Path(path).stem)
 
@@ -328,7 +331,7 @@ def write_csv(path, frame, *, symbol=None, source_url=None, fetched_at=None, log
     symbol = symbol or path.stem
     accepted = accept_frame(frame[FIELDS], symbol, source_url=source_url,
                             fetched_at=fetched_at, log_path=log_path, **kwargs)
-    retained = pd.read_csv(path, index_col=0, parse_dates=True) if path.exists() else pd.DataFrame(columns=FIELDS)
+    retained = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP) if path.exists() else pd.DataFrame(columns=FIELDS)
     for day, row in accepted.iterrows():
         if day in retained.index:
             old, new = bar_values(retained.loc[day]), bar_values(row)
@@ -374,7 +377,7 @@ def _write_preserving_lines(path, updates):
 def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None):
     if violation(values):
         raise ValueError("Refusing an invalid replacement")
-    frame = pd.read_csv(path, index_col=0, parse_dates=True)
+    frame = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP)
     target = pd.Timestamp(day)
     if target not in frame.index:
         raise ValueError("Correction must target an existing date")

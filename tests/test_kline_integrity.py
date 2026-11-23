@@ -34,6 +34,18 @@ class KlineIntegrityTest(unittest.TestCase):
         self.patch.start()
         self.addCleanup(self.patch.stop)
 
+    def test_csv_readers_keep_round_trip_floats_on_every_pandas_version(self):
+        # pandas 2.x's default parser reads this CMD-SILVER open as 23.84499931335449; 3.1+ only
+        # gets it right by default, so ROUND_TRIP must ask for it on older versions.
+        price = "23.844999313354492"
+        path = Path(self.tmp.name) / "X.csv"
+        path.write_text(f"Date,Open,High,Low,Close,Volume\n2021-11-05,{price},24.235000610351562,"
+                        f"23.834999084472656,24.152000427246094,21\n")
+        self.assertEqual(k.read_csv(path, index_col=0, parse_dates=True)["Open"].iloc[0], float(price))
+        self.assertEqual(pd.read_csv(path, index_col=0, **k.ROUND_TRIP)["Open"].iloc[0], float(price))
+        major_minor = tuple(int(part) for part in pd.__version__.split(".")[:2])
+        self.assertEqual(k.ROUND_TRIP, {} if major_minor >= (3, 1) else {"float_precision": "round_trip"})
+
     def test_bounds_and_positive_finite_prices(self):
         for values in [dict(Low=12), dict(High=9), dict(Open=0), dict(Close=-1), dict(High=float('inf'))]:
             self.assertIsNotNone(k.violation(frame(**values).iloc[0]))
