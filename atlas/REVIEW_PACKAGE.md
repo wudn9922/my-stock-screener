@@ -1589,3 +1589,6 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 ### Derived Q4 recompute + 減資彌補虧損 (fix/eps-q4-and-capital-reduction) — no independent review
 - Derived Q4 across a Q3→annual share-basis change = restated annual − Σ restated Q1..Q3 (8422.TW Q4 2025 0.242, `epsBasis.ts`, mirrored in `build_growth.recompute_derived_q4`); loss-offset 減資 from FinMind `TaiwanStockCapitalReductionReferencePrice` restated like a reverse split, cash 減資 never. FinMind field values not verified live (API blocked in sandbox).
+
+### 台股分割／面額變更 (fix/tw-split-events) — no independent review
+- FinMind `TaiwanStockSplitPrice` / `TaiwanStockParValueChange` per stock → `twSplits`; applied as dated split events (TS `epsBasis.ts`, Python `build_growth.py` via `tw_splits.py`); without an event a clean near-integer implied-share step is inferred (11 TW files on main, 5904.TWO included). Field values not verified live (API blocked in sandbox).

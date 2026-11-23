@@ -17,7 +17,7 @@ import { MetricCard } from '../ui/financials/MetricCard';
 import { QuarterStrip } from '../ui/financials/QuarterStrip';
 import { SpanControl } from '../ui/financials/SpanControl';
 import { EpsBasisToggle, readEpsBasis, writeEpsBasis } from '../ui/financials/EpsBasisToggle';
-import { hasEpsRestatement, restatedEpsLabel, type EpsDisplayBasis } from '../fundamentals/epsBasis';
+import { hasEpsRestatement, restatedEpsLabel, twSplitNote, type EpsDisplayBasis } from '../fundamentals/epsBasis';
 import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
@@ -307,6 +307,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
               {splitEvents.map((event) => `${formatDateTime(event.date, false)}（${splitText(event.ratio)}）`).join('、')}
             </p>
           )}
+          {twSplitNote(history) && <p>{twSplitNote(history)}</p>}
           {adrNote && <p>{adrNote}</p>}
           {!adrNote && (history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </FinancialNote>
