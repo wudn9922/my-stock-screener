@@ -1211,6 +1211,17 @@
 .fin-cell-value {
   display: block;
 }
+.fin-eps-grade {
+  display: inline-block;
+  margin-inline-start: 4px;
+  padding-inline: 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .fin-cell-yoy {
   display: block;
   margin-top: 1px;

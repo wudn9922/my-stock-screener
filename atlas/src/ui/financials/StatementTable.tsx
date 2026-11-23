@@ -113,6 +113,8 @@ export function StatementTable({ history, view, epsBasis = 'restated' }: { histo
                   {order.map((index) => {
                     const result = row.results[index]!;
                     const value = shown[index] ?? null;
+                    const epsField = series.values.epsDiluted[index] != null ? 'epsDiluted' : 'epsBasic';
+                    const grade = row.unit === 'eps' && value !== null ? series.epsQuality?.[index]?.[epsField] : undefined;
                     const derived = result.basis === 'derived' && value !== null;
                     const classes = [value !== null && value < 0 ? 'negative' : '', derived ? 'derived' : ''].filter(Boolean).join(' ');
                     const change = changeCellText(row.changes[index] ?? null);
@@ -122,7 +124,12 @@ export function StatementTable({ history, view, epsBasis = 'restated' }: { histo
                         className={classes || undefined}
                         title={value === null ? (result.reason ?? undefined) : derived ? `推算：${result.formula}` : adjustedTitle(result)}
                       >
-                        <span className="fin-cell-value">{value === null ? '—' : formatNumber(value, digits)}</span>
+                        <span className="fin-cell-value">
+                          {value === null ? '—' : formatNumber(value, digits)}
+                          {(grade === 'B' || grade === 'C' || grade === 'D') && (
+                            <span className="fin-eps-grade" title="低信心，不計入本益比河流與成長率">{grade}</span>
+                          )}
+                        </span>
                         {showYoy && (
                           <span className={`fin-cell-yoy ${change.tone}`} title={row.changes[index]?.reason ?? undefined}>
                             {change.text}
