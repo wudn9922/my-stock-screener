@@ -1,13 +1,13 @@
 name: Deploy Cloud Run (breakout alert)
 
 # 突破監控（Dockerfile.breakout）與 Discord 查詢（Dockerfile.discord-query）合併到 main 後自動建置並部署。
-# 更新服務映像及帳號儲存政策的管理員 ID；其他既有環境變數、secret、排程不變。
+# 更新服務映像及管理員 ID，並從 Actions secret RUN_TOKEN 設定突破監控服務的同名環境變數。
 # 用 Workload Identity Federation 登入 Google Cloud（不需要金鑰檔），一次性設定見 scripts/setup-cloud-run-deploy.sh。
 # 需要的 repository variables（Settings → Secrets and variables → Actions → Variables）：
 #   GCP_WIF_PROVIDER、GCP_DEPLOY_SA、GCP_PROJECT_ID、GCP_REGION
 #   CLOUD_RUN_BREAKOUT_SERVICE、CLOUD_RUN_BREAKOUT_IMAGE（不含 tag 的映像路徑）
 #   CLOUD_RUN_DISCORD_SERVICE、CLOUD_RUN_DISCORD_IMAGE（選用，沒設就不部署 Discord 查詢服務）
-# 未設定時會略過，不會失敗。
+# 缺少上述 variables 時會略過部署。突破監控部署另需設定 repository secret RUN_TOKEN。
 on:
   push:
     branches: [main]
@@ -98,13 +98,28 @@ jobs:
 
       - name: Deploy to Cloud Run
         if: steps.config.outputs.ready == 'true'
+        env:
+          RUN_TOKEN: ${{ matrix.service_var == 'CLOUD_RUN_BREAKOUT_SERVICE' && secrets.RUN_TOKEN || '' }}
         run: |
           set -euo pipefail
+          env_vars="ADMIN_LINE_USER_ID=${ADMIN_LINE_USER_ID}"
+          if [[ "${{ matrix.service_var }}" == "CLOUD_RUN_BREAKOUT_SERVICE" ]]; then
+            if [[ -z "${RUN_TOKEN//[[:space:]]/}" ]]; then
+              echo "::error::缺少 GitHub Actions secret RUN_TOKEN。請在 Settings → Secrets and variables → Actions 設定 RUN_TOKEN 後重新部署突破監控。"
+              exit 1
+            fi
+            # gcloud 的自訂分隔符須避開 token 內的字元（包括預設分隔符逗號）。
+            delimiter='|'
+            while [[ "${RUN_TOKEN}" == *"${delimiter}"* ]]; do
+              delimiter+='|'
+            done
+            env_vars="^${delimiter}^${env_vars}${delimiter}RUN_TOKEN=${RUN_TOKEN}"
+          fi
           gcloud run deploy "${SERVICE}" \
             --image "${IMAGE}:${GITHUB_SHA}" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --update-env-vars "ADMIN_LINE_USER_ID=${ADMIN_LINE_USER_ID}" \
+            --update-env-vars "${env_vars}" \
             --quiet
           url=$(gcloud run services describe "${SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${url}/health" || true)
