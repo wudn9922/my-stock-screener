@@ -10,6 +10,8 @@ GitHub Actions 的 `schedule` 不保證準時，實測常延遲 5～8 小時。
 兩種觸發同一天只會有一個真的執行（workflow 開頭有檢查，今天已經跑過或正在跑就略過）。
 手動在 Actions 頁面重跑時，勾選 `force` 可略過這個檢查。
 
+所有 GitHub Actions workflow 的分類與用途見 [docs/WORKFLOWS.md](docs/WORKFLOWS.md)。
+
 ### 1. 建立 GitHub token
 
 GitHub → Settings → Developer settings → Fine-grained personal access tokens：
@@ -93,6 +95,7 @@ Atlas 也整合參數控制台：`atlas/?page=console` 可管理原有均線參�
 清單的 Supabase 同步、每日歷史收集及突破監控啟用仍需部署資料表與服務；操作與未完成部署事項見 [整合說明](atlas/docs/UNIFIED_CONSOLE.md)。
 
 Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `atlas/`），提供畫圖、技術指標、財報與回測。
+詳細更新紀錄見 [atlas/docs/CHANGELOG.md](atlas/docs/CHANGELOG.md)。
 
 - 網址：<https://wudn9922.github.io/my-stock-screener/atlas/>
 - 指定個股與週期：`atlas/?symbol=<代號>&tf=<週期>`，例如 `atlas/?symbol=2330.TW&tf=1D`、`atlas/?symbol=%5EGSPC&tf=1W`
