@@ -61,7 +61,6 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 |---|---|---|---|---|---|
 | [`generated-squash.yml`](../.github/workflows/generated-squash.yml) | Squash generated snapshot | 維護 | cron `11 22 * * *`（每日 06:11，UTC 隔日）；手動 | 壓縮 `generated` 分支歷史並保留當前檔案樹。 | 是 |
 | [`generated-verify.yml`](../.github/workflows/generated-verify.yml) | Generated storage verification | 維護 | PR 至 `main`（無路徑篩選）；手動 | 驗證產出物分支的儲存規則、Pages 組裝內容與網址。 | 否 |
-| [`trim-history.yml`](../.github/workflows/trim-history.yml) | Trim Git History (disabled) | 維護 | 手動 | 拒絕修剪 Git 歷史，保留財務歷史與稽核紀錄。 | 是 |
 
 ## 一次性／手動回補
 
@@ -73,12 +72,6 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 | [`q4-8k-backfill.yml`](../.github/workflows/q4-8k-backfill.yml) | Q4 EPS from 8-K (manual) | 一次性／手動回補 | 手動 | 診斷或回測 SEC 8-K 盈餘解析，或補齊缺漏的美股第四季 EPS。 | 是 |
 | [`tw-stock-dividends.yml`](../.github/workflows/tw-stock-dividends.yml) | Taiwan stock dividends backfill | 一次性／手動回補 | 手動 | 從 FinMind 分批補齊台股股票股利及減資資料。 | 是 |
 
-### 刪除候選（待確認）
-
-- `trim-history.yml` 已標記停用，手動執行會直接拒絕修剪並失敗。
-
-後續若決定刪除，需另開 PR 一併檢查 `failure-notice-fallback.yml`、相關測試與 [通知文件](SYSTEM_FAILURE_NOTICES.md) 的引用。
-
 ## 共用 helper
 
 | 檔名 | 名稱 | 分類 | 觸發方式 | 用途 | 失敗通知 |
@@ -88,4 +81,4 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 
 ### 故障通知備援的上游
 
-Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Trim Git History (disabled)、Taiwan Chips、Full-Market Universe、TW Margin Temperature。
+Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Taiwan Chips、Full-Market Universe、TW Margin Temperature。

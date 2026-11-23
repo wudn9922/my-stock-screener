@@ -43,7 +43,6 @@ Embed 只含 workflow、觸發事件、失敗 job／step、run URL、台北時�
 | `schedule.yml` | 失敗／取消；部分失敗：Build theme rotation、Build US rates research、Build Japanese spreads and monthly yield bands |
 | `supabase-functions.yml` | 失敗／取消 |
 | `themes-tw.yml` | 失敗／取消 |
-| `trim-history.yml` | 失敗／取消 |
 | `tw-chips.yml` | 失敗／取消 |
 | `universe-full.yml` | 失敗／取消；部分失敗：Shallow checkout permanent K-line archive、Seed missing rolling bars from permanent archive、Refresh archive-only ETFs and indices through the existing Yahoo batch reader、Combine archive-only instruments with the accepted stock payload、Build breadth trading signals、Build market risk warnings |
 
