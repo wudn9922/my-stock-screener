@@ -1,0 +1,6 @@
+**
+!statement_sync/
+!statement_sync/**
+**/__pycache__
+**/*.pyc
+statement_sync/apps_script/**

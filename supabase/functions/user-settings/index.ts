@@ -1,4 +1,5 @@
 import { handleSinopac } from './sinopac.ts';
+import { handleStatement } from './statement.ts';
 import { createClient } from "@supabase/supabase-js";
 import { HoldingsError, handleHoldings } from "./holdings.ts";
 import { MexcError, handleMexc } from "./mexc.ts";
@@ -32,6 +33,7 @@ import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, p
  *   device.session.revoke                                 以 deviceToken 登出這台裝置
  *   push.subscribe / push.unsubscribe / push.status / push.test   手機通知（見 webPush.ts）
  *   push.notify                                           僅限 Cloud Run 提醒服務（service-role key，不用 idToken）
+ *   holdings.statement.status / link / apply / unlink     僅擁有者：Email 對帳單同步（見 statement.ts）
  *
  * idToken 也可以是 deviceToken（atlasdev. 開頭）；儲存授權仍在每次請求重新檢查。
  */
@@ -356,6 +358,19 @@ Deno.serve(async (request: Request) => {
       } catch (error) {
         const known = error instanceof HoldingsError;
         return new Response(JSON.stringify({ok:false,error:known ? error.message : '永豐同步暫時無法使用'}), {status:known ? error.status : 503,headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+      }
+    }
+
+    if (action.startsWith('holdings.statement.')) {
+      try {
+        const data = await handleStatement(supabase, lineUserId, adminId, body);
+        return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        // Trades and positions never reach the generic logger.
+        const known = error instanceof HoldingsError;
+        return new Response(JSON.stringify({ ok: false, error: known ? error.message : '對帳單同步暫時無法使用。' }), {
+          status: known ? error.status : 503, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+        });
       }
     }
 

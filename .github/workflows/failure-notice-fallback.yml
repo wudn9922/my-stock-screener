@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - Deploy read-only SinoPac sync
+      - Deploy statement sync
       - "Atlas Research Terminal"
       - "Recalibrate US breadth signals"
       - "Deploy Cloud Run (breakout alert)"

@@ -1,5 +1,7 @@
 import { getStorageContextKey } from '../auth/storage';
 import { SinopacPanel } from './SinopacPanel';
+import { STATEMENT_BROKERS, StatementPanel, applyText, type StatementStatus } from './StatementPanel';
+import { holdingsContextApi } from './contextApi';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { chartList } from '../app/listContext';
 import type { PageProps } from '../pages/pageProps';
@@ -92,6 +94,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     [draft, setDraft] = useState<HoldingAccount | null>(null),
     [creating, setCreating] = useState(false);
   const [method, setMethod] = useState('csv');
+  const [statementBroker, setStatementBroker] = useState('cathay');
+  const [statementStatus, setStatementStatus] = useState<StatementStatus | null>(null),
+    [statementRefresh, setStatementRefresh] = useState(0);
   const [brokerKey, setBrokerKey] = useState('mexc');
   const [marketKey, setMarketKey] = useState('tw'),
     [name, setName] = useState(''),
@@ -226,6 +231,18 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
     id: string | null;
   }>();
   const sinopacKey = getStorageContextKey() + ':' + selected?.account.id;
+  const statementOwner = access.isAdmin && access.storageMode === 'cloud';
+  useEffect(() => {
+    if (!statementOwner) return setStatementStatus(null);
+    let active = true;
+    const context = getStorageContextKey();
+    void holdingsContextApi<StatementStatus>(context, 'holdings.statement.status')
+      .then((value) => active && setStatementStatus(Array.isArray(value?.links) && Array.isArray(value.messages) ? value : null))
+      .catch(() => active && setStatementStatus(null));
+    return () => {
+      active = false;
+    };
+  }, [statementOwner, statementRefresh, access.userId]);
   // SinoPac sync is the owner's own service: only the server-verified administrator sees its panel
   // (the server refuses everyone else anyway). Others keep editing a legacy CSV SinoPac account.
   const sinopacAdmin = access.isAdmin;
@@ -469,11 +486,24 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <select aria-label="新增方式" value={method} onChange={(event) => setMethod(event.target.value)}>
               <option value="api">API 自動同步</option>
               <option value="csv">匯入 CSV</option>
+              {statementOwner && <option value="email">Email 對帳單</option>}
             </select>
           </label>
           <p className="holdings-muted">永豐美股請用匯入 CSV</p>
           <div className="holdings-fields">
-            {method === 'api' ? (
+            {method === 'email' ? (
+              <label>
+                券商
+                <select aria-label="對帳單券商" value={statementBroker} onChange={(event) => setStatementBroker(event.target.value)}>
+                  {STATEMENT_BROKERS.map((broker) => (
+                    <option key={broker.key} value={broker.key} disabled={!broker.markets.length}>
+                      {broker.label}
+                      {broker.markets.length ? '（美股）' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : method === 'api' ? (
               <label>
                 API 服務
                 <select
@@ -509,9 +539,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 autoComplete="off"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                required={method === 'csv'}
+                required={method === 'csv' || method === 'email'}
                 placeholder={
-                  method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'
+                  method === 'email' ? '例如：國泰美股' : method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'
                 }
               />
             </label>
@@ -528,6 +558,46 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             )}
             {sinopacAdmin && method === 'api' && brokerKey === 'sinopac' && (
               <p>由維護者設定永豐服務後，使用下方同步按鈕建立擁有者帳戶。</p>
+            )}
+            {method === 'email' && (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={!name.trim() || blocked || !statementStatus}
+                onClick={() => {
+                  const account: HoldingAccount = {
+                    id: crypto.randomUUID(),
+                    name: name.trim(),
+                    broker: 'cathay',
+                    kind: 'us-broker',
+                    currency: 'USD',
+                  };
+                  setBusy(true);
+                  setError('');
+                  void store
+                    .replace(account, [])
+                    .then(() =>
+                      holdingsContextApi<Parameters<typeof applyText>[0]>(getStorageContextKey(), 'holdings.statement.link', {
+                        accountId: account.id,
+                        broker: statementBroker,
+                        market: 'US',
+                      }),
+                    )
+                    .then(async (result) => {
+                      await store.reload();
+                      setSessionView(account.id);
+                      setCreating(false);
+                      setMessage('已建立並連結 Email 對帳單。' + applyText(result));
+                    })
+                    .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '建立未完成，請重新載入持股後重試。'))
+                    .finally(() => {
+                      setBusy(false);
+                      setStatementRefresh((n) => n + 1);
+                    });
+                }}
+              >
+                建立並連結
+              </button>
             )}
             {method === 'api' && brokerKey === 'mexc' && (
               <button
@@ -559,6 +629,12 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               取消
             </button>
           </div>
+          {method === 'email' && (
+            <p className="holdings-muted">
+              帳戶從空持股開始，之後每天讀 Gmail 裡的 PDF 對帳單加減買賣。已有持股請在建立後用「修正持股」補上期初持股。
+              {statementStatus === null && ' 對帳單同步服務尚未就緒，請由維護者完成設定。'}
+            </p>
+          )}
           {method === 'api' && brokerKey === 'mexc' && access.storageMode !== 'cloud' && (
             <p className="holdings-muted">自動讀取 MEXC 需要雲端儲存授權；目前仍可上傳或貼上持股。</p>
           )}
@@ -572,6 +648,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       )}
       {sinopacAdmin && creating && method === 'api' && brokerKey === 'sinopac' && (
         <SinopacPanel onCreated={() => setCreating(false)} />
+      )}
+      {statementOwner && statementStatus && selected && (
+        <StatementPanel
+          accountId={selected.account.id}
+          status={statementStatus}
+          onChanged={(text) => {
+            setMessage(text);
+            setStatementRefresh((n) => n + 1);
+          }}
+        />
       )}
       {sinopacAdmin && selected?.account.broker === 'sinopac' && (
         <SinopacPanel

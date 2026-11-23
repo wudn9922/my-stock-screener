@@ -1,0 +1,87 @@
+name: Deploy statement sync
+# Gmail Apps Script → this Cloud Run service → Supabase. Skipped (successfully) until the
+# repository variable STATEMENT_SYNC_ENABLED is 'true'; setup steps: statement_sync/README.md.
+on:
+  push:
+    branches: [main]
+    paths: ['statement_sync/**', 'Dockerfile.statement-sync*', '.github/workflows/statement-sync.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: statement-sync-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ENABLED: ${{ vars.STATEMENT_SYNC_ENABLED }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.STATEMENT_SYNC_SERVICE || 'statement-sync' }}
+      # Same Artifact Registry repository as the breakout service, image name statement-sync.
+      BREAKOUT_IMAGE: ${{ vars.CLOUD_RUN_BREAKOUT_IMAGE }}
+      RUNTIME_SA: ${{ vars.STATEMENT_RUNTIME_SA || vars.SINOPAC_RUNTIME_SA }}
+      OWNER: ${{ vars.ADMIN_LINE_USER_ID || 'Ua0037dbd5037b64fc76804c60520ad76' }}
+      SUPABASE_URL: ${{ vars.STATEMENT_SUPABASE_URL || vars.SINOPAC_SUPABASE_URL }}
+      SECRETS: ${{ vars.STATEMENT_SECRET_BINDINGS || 'STATEMENT_SHARED_SECRET=statement-shared-secret:latest,STATEMENT_PDF_PASSWORDS=statement-pdf-passwords:latest,SUPABASE_SERVICE_ROLE_KEY=sinopac-supabase:latest' }}
+    steps:
+      - name: Check configuration
+        id: config
+        shell: bash
+        run: |
+          if [ "${ENABLED}" != 'true' ]; then
+            echo '::notice::STATEMENT_SYNC_ENABLED is not true; skipping deployment.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          for field in WIF_PROVIDER DEPLOY_SA PROJECT_ID REGION SERVICE BREAKOUT_IMAGE RUNTIME_SA SUPABASE_URL; do
+            if [ -z "${!field}" ]; then echo "::error::Missing ${field}; see statement_sync/README.md"; exit 1; fi
+          done
+          if ! [[ "${OWNER}" =~ ^U[0-9a-f]{32}$ ]]; then echo '::error::ADMIN_LINE_USER_ID is malformed'; exit 1; fi
+          echo "image=${BREAKOUT_IMAGE%/*}/statement-sync" >> "$GITHUB_OUTPUT"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+      - uses: google-github-actions/auth@v2
+        if: steps.config.outputs.ready == 'true'
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.config.outputs.ready == 'true'
+      - name: Build and deploy
+        if: steps.config.outputs.ready == 'true'
+        shell: bash
+        env:
+          IMAGE: ${{ steps.config.outputs.image }}
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${IMAGE%%/*}" --quiet
+          docker build -f Dockerfile.statement-sync -t "${IMAGE}:${GITHUB_SHA}" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          # Public URL guarded by the X-Statement-Secret header (Apps Script cannot mint Cloud Run ID tokens).
+          gcloud run deploy "$SERVICE" --image "${IMAGE}:${GITHUB_SHA}" --project "$PROJECT_ID" --region "$REGION" \
+            --service-account "$RUNTIME_SA" --no-invoker-iam-check --min-instances 0 --max-instances 1 --concurrency 2 \
+            --timeout 60 --memory 512Mi --update-secrets "$SECRETS" \
+            --update-env-vars "STATEMENT_OWNER_ID=${OWNER},SUPABASE_URL=${SUPABASE_URL}" --quiet
+          url=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
+          echo "Statement sync deployed: ${url}/ingest"
+
+  notify-system-failure:
+    needs: ["deploy"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
