@@ -10,6 +10,11 @@ on:
       - 'docs/report/research/**'
       - 'tests/**'
       - 'atlas/scripts/**'
+      # Python modules with tests in tests/ that no other PR workflow runs in full
+      # (breakout_alert deploys to Cloud Run straight from main).
+      - 'breakout_alert/**'
+      - 'dify_report.py'
+      - 'sinopac_sync/**'
       - 'requirements.txt'
       - '.github/workflows/research-review.yml'
 permissions:

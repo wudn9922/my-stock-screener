@@ -13,9 +13,27 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import research_candles
 from research_candles import ASSETS, parse_ohlc, save_csv, read_csv, build_world_candles
 from research_io import SourceError, read
 from research_publish import stage, overlay
+
+_journal_dir = None
+_journal_patch = None
+
+
+def setUpModule():
+    # parse_ohlc records corrections and rejections through kline_integrity. Without this, a local run
+    # (CI sets KLINE_CORRECTIONS_LOG) appends these fixtures to the real docs/report/kline-corrections.json.
+    global _journal_dir, _journal_patch
+    _journal_dir = tempfile.TemporaryDirectory()
+    _journal_patch = patch.object(research_candles.kline, "LOG_PATH", Path(_journal_dir.name) / "kline-corrections.json")
+    _journal_patch.start()
+
+
+def tearDownModule():
+    _journal_patch.stop()
+    _journal_dir.cleanup()
 
 
 def payload(symbol="GC=F"):
