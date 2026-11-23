@@ -1,6 +1,6 @@
 # 再生輸出分支：保留政策、切換與回滾
 
-本流程的預期切換起點是：PR #154 已合併，尚未 seed、未設定 `GENERATED_BRANCH_MODE`、未切換 Pages；執行前必須由 owner 確認這些前置狀態。這份後續修改落實 owner 的保留政策：K 線與財報留 main，截圖只留最新版本，勝率每 20 個日曆天留快照。開關關閉時仍將產物提交 main；兩種模式都禁止清除 K 線 CSV、都會產生勝率快照。本次不刪除現有資料、不改寫 main、不執行正式切換、不建立遠端 generated、不合併 PR。`trim-history.yml` 在所有模式都維持停用，只有 read 權限並拒絕執行。
+本流程的預期切換起點是：PR #154 已合併，尚未 seed、未設定 `GENERATED_BRANCH_MODE`、未切換 Pages；執行前必須由 owner 確認這些前置狀態。這份後續修改落實 owner 的保留政策：K 線與財報留 main，截圖只留最新版本，勝率每 20 個日曆天留快照。開關關閉時仍將產物提交 main；兩種模式都禁止清除 K 線 CSV、都會產生勝率快照。本次不刪除現有資料、不改寫 main、不執行正式切換、不建立遠端 generated、不合併 PR。`trim-history.yml` 已刪除。`main` 的 Git 歷史是稽核紀錄，任何模式都不修剪、不 force-push，ref `95184ade` 必須保留。`generated-squash.yml` 只處理 `generated` 分支。
 
 ## 盤點與容量
 
@@ -117,7 +117,7 @@ git push origin rollback/generated-20261022
 
 `rollback-branch` 只建立本機新分支，不 push、不改 main，不帶入 generated relay，並用正常 parent 保留全部 main 歷史。PR 2 後不能只切 branch Pages source 就期待缺少的 HTML／Atlas 自動回來。回滾時不刪 generated，方便核對與再次切換。
 
-`trim-history.yml` 在任何模式都不恢復；絕不 force main，也不透過重建 main 來「回滾」。
+`trim-history.yml` 已刪除。`main` 的 Git 歷史是稽核紀錄，任何模式都不修剪、不 force-push，ref `95184ade` 必須保留。`generated-squash.yml` 只處理 `generated` 分支。回滾也不得重建 `main`。
 
 ## 驗證
 

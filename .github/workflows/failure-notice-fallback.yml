@@ -27,7 +27,6 @@ on:
       - "Daily Stock Screener"
       - "Deploy Supabase Edge Functions"
       - "Taiwan Theme Rotation"
-      - "Trim Git History (disabled)"
       - "Taiwan Chips"
       - "Full-Market Universe"
       - "TW Margin Temperature"
