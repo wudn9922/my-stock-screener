@@ -64,8 +64,10 @@ jobs:
           docker build -f Dockerfile.statement-sync -t "${IMAGE}:${GITHUB_SHA}" .
           docker push "${IMAGE}:${GITHUB_SHA}"
           # Public URL guarded by the X-Statement-Secret header (Apps Script cannot mint Cloud Run ID tokens).
+          # Turning off the invoker IAM check needs run.services.setIamPolicy, which the deploy identity
+          # does not hold: the owner runs it once (statement_sync/README.md) and later deploys keep it.
           gcloud run deploy "$SERVICE" --image "${IMAGE}:${GITHUB_SHA}" --project "$PROJECT_ID" --region "$REGION" \
-            --service-account "$RUNTIME_SA" --no-invoker-iam-check --min-instances 0 --max-instances 1 --concurrency 2 \
+            --service-account "$RUNTIME_SA" --min-instances 0 --max-instances 1 --concurrency 2 \
             --timeout 60 --memory 512Mi --update-secrets "$SECRETS" \
             --update-env-vars "STATEMENT_OWNER_ID=${OWNER},SUPABASE_URL=${SUPABASE_URL}" --quiet
           url=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')

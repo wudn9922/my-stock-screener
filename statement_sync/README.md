@@ -16,6 +16,7 @@
    - `statement-pdf-passwords`：PDF 開啟密碼，一行一個（不同券商密碼不同時各一行）。
    - 讓 Cloud Run 執行身分（沿用 `SINOPAC_RUNTIME_SA`，或另設 `STATEMENT_RUNTIME_SA`）可以讀這兩個 secret，以及既有的 `sinopac-supabase`。
 3. **GitHub repository variables**：設定 `STATEMENT_SYNC_ENABLED=true`，再手動執行一次「Deploy statement sync」workflow。輸出的網址就是服務位址。其餘沿用既有的 `GCP_*`、`CLOUD_RUN_BREAKOUT_IMAGE`、`SINOPAC_SUPABASE_URL`、`ADMIN_LINE_USER_ID`。
+   第一次部署後，擁有者在 Cloud Shell 執行一次 `gcloud run services update statement-sync --region us-central1 --no-invoker-iam-check`，讓 Apps Script 不需 Google 身分驗證即可呼叫（服務仍以 `X-Statement-Secret` 驗證）。部署帳號沒有修改存取權限的權限，之後的部署會保留這個設定。
 4. **Gmail Apps Script**：到 <https://script.google.com> 建新專案，貼上 [`apps_script/Code.gs`](apps_script/Code.gs)。在「專案設定 → 指令碼屬性」加入 `STATEMENT_URL`（上一步的網址）與 `STATEMENT_SECRET`（同 `statement-shared-secret`），執行一次 `syncStatements` 並授權，再執行一次 `installDailyTrigger`。
 5. **Atlas**：持股 → 新增帳戶 → 新增方式「Email 對帳單」→ 國泰證券 → 建立並連結。已收到的成交會立刻套用。
 
