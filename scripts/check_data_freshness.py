@@ -4,6 +4,8 @@ Only session dates and producer status are inspected. Never changes prices,
 archive contents, calculated metrics or the normal daily report delivery.
 """
 import argparse
+import csv
+import io
 import copy
 from datetime import date, datetime, timedelta, timezone
 import json
@@ -88,7 +90,7 @@ def evaluate(calendar, sources, now):
                 continue
             observed = iso_day(row.get('lastDate' if source == 'archive' else 'asOf'))
             status = row.get('update', {}).get('status') if isinstance(row.get('update'), dict) else None
-            if source == 'warnings' and status in ('retained', 'unavailable'):
+            if source == 'warnings' and status == 'unavailable':
                 issues[key] = f'{LABELS[source]} {market}：本次未更新（{status}），資料日 {observed or "未知"}'
                 continue
             if observed is None:
@@ -97,11 +99,52 @@ def evaluate(calendar, sources, now):
             # The 30-day left edge can undercount a long outage, but >=2 known
             # closed sessions still proves the requested >1-session threshold.
             lag = sum(session > observed for session in sessions)
+            # A retained file that already covers the latest closed session is
+            # current: a later rerun failing to refetch the same day is not stale.
+            if source == 'warnings' and status == 'retained' and lag >= 1:
+                issues[key] = f'{LABELS[source]} {market}：本次未更新（retained），資料日 {observed}，應至 {expected}'
+                continue
             if observed > expected:
                 issues[key] = f'{LABELS[source]} {market}：資料日晚於最近已收盤交易日 {expected}'
+            elif source == 'breakouts':
+                # Weekly Saturday producer: tolerate six completed sessions;
+                # seven or more means the weekly result missed its catch-up window.
+                if lag > 6:
+                    issues[key] = f'{LABELS[source]} {market}：資料日 {observed}，應至 {expected}，至少落後 {lag} 個交易日（每週更新一次）'
             elif lag > 1:
                 issues[key] = f'{LABELS[source]} {market}：資料日 {observed}，應至 {expected}，至少落後 {lag} 個交易日'
     return issues, checked
+
+
+def twii_volume_issue(calendar, raw_csv, now):
+    """Latest *completed* TW session only; absence cannot imply recovery."""
+    key = "volume/^TWII"
+    if not isinstance(raw_csv, str):
+        return {}, set()
+    try:
+        sessions = completed_sessions(calendar, "TW", now)
+        expected = sessions[-1].isoformat()
+        reader = csv.DictReader(io.StringIO(raw_csv))
+        if reader.fieldnames != ["Date", "Open", "High", "Low", "Close", "Volume"]:
+            return {}, set()
+        rows = list(reader)
+        if not rows or rows[-1]["Date"] != expected:
+            return {}, set()  # Delayed/unavailable archive cannot imply recovery.
+        by_date = {r["Date"]: r["Volume"] for r in rows}
+        # The most recently closed day gets one FULL trading-session grace.
+        # Still-zero volume on a previous session is a confirmed backlog.
+        aged = sorted(day for day, value in by_date.items()
+                     if "2026-11-05" <= day < expected and value == "0")
+        if aged:
+            return {key: f"^TWII {aged[0]} 成交量隔一個交易日仍為 0（封存尚未補回）"}, {key}
+        value = by_date.get(expected)
+        if value is None or not re.fullmatch(r"\d+", value):
+            return {}, set()
+        # Fresh same-session zero: intentionally no failure; prior stale
+        # problems can recover if all older inspected sessions are positive.
+        return {}, {key}
+    except (ValueError, KeyError, csv.Error):
+        return {}, set()
 
 
 def daily_report_issue(runs, now):
@@ -168,6 +211,20 @@ def github_json(repo, ref, path, token, opener=urllib.request.urlopen):
         return None
 
 
+def github_text(repo, ref, path, token, opener=urllib.request.urlopen):
+    """Bounded read of a dedicated archive CSV. API outage must not mark recovery."""
+    safe_path = urllib.parse.quote(path, safe="/")
+    url = f'https://api.github.com/repos/{repo}/contents/{safe_path}?ref={urllib.parse.quote(ref, safe="")}'
+    request = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}',
+                'Accept': 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28'})
+    try:
+        with opener(request, timeout=25) as response:
+            body = response.read(1024 * 1024 + 1)
+        return body.decode("utf-8") if len(body) <= 1024 * 1024 else None
+    except Exception:
+        return None
+
+
 def github_daily_runs(repo, token, now, opener=urllib.request.urlopen):
     target = (now.astimezone(ZoneInfo('Asia/Taipei')) - timedelta(hours=6)).date()
     start = datetime.combine(target, datetime.min.time(), ZoneInfo('Asia/Taipei')).astimezone(timezone.utc)
@@ -211,6 +268,14 @@ def main(argv=None):
     calendar = github_json(repo, ref, 'docs/report/market-calendar.json', token)
     sources = {name: github_json(repo, branch or ref, path, token) for name, (branch, path, _) in DATASETS.items()}
     issues, checked = evaluate(calendar, sources, now)
+    try:
+        expected_tw = completed_sessions(calendar, "TW", now)[-1]
+        twii_csv = github_text(repo, "kline-archive", f"tw/^TWII/{expected_tw.year}.csv", token)
+        volume_issues, volume_checked = twii_volume_issue(calendar, twii_csv, now)
+        issues.update(volume_issues)
+        checked.update(volume_checked)
+    except ValueError:
+        pass  # A broken calendar is already reported; never falsely resolve volume.
     report_issues, report_checked = daily_report_issue(github_daily_runs(repo, token, now), now)
     issues.update(report_issues)
     checked.update(report_checked)

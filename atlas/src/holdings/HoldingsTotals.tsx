@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { formatDateTime } from '../ui/format';
+import { formatDateTime, toneClass } from '../ui/format';
 import { formatAmount, type Holding, type HoldingValue, type FxRate } from './model';
 import { portfolioTotals, type PortfolioAmount, type FuturesTotalInput } from './portfolioTotals';
 export function HoldingsTotals({
@@ -34,7 +34,7 @@ export function HoldingsTotals({
       </div>
       <div>
         <dt>{value.missing ? '未實現盈虧（有報價部分）' : '未實現盈虧'}</dt>
-        <dd title={value.profit} className={value.profit.startsWith('-') ? 'mexc-futures-loss' : 'mexc-futures-profit'}>
+        <dd title={value.profit} className={toneClass(Number(value.profit))}>
           {formatAmount(value.profit)} {currency}{' '}
           <small title={value.percent ?? undefined}>（{value.percent === null ? '—' : formatAmount(value.percent) + '%'}）</small>
         </dd>

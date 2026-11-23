@@ -7,6 +7,11 @@ on:
       - 'scripts/kline_instruments.py'
       - 'scripts/archive_tpex_index.py'
       - 'scripts/official_tw_quotes.py'
+      - 'scripts/twii_volume.py'
+      - 'scripts/repair_twii_volume.py'
+      - 'scripts/check_data_freshness.py'
+      - 'tests/test_twii_volume.py'
+      - 'tests/test_data_freshness.py'
       - 'scripts/refresh_archive_instruments.py'
       - 'config/kline-archive-instruments.json'
       - 'scripts/build_universe_full.py'
@@ -38,6 +43,19 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_kline_archive*.py' -v
           python -m unittest discover -s tests -p 'test_universe_full.py' -v
+          python -m unittest discover -s tests -p 'test_twii_volume.py' -v
+          python -m unittest discover -s tests -p 'test_data_freshness.py' -v
+      - name: Probe live Yahoo TWII last 20 daily volumes (diagnostic; no artifact)
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          from scripts.repair_twii_volume import diagnose_yahoo
+          result = diagnose_yahoo()
+          print('Yahoo ^TWII diagnostic:', json.dumps(result, ensure_ascii=False))
+          if result['status'] != 'verified':
+              raise SystemExit('Yahoo unavailable; upstream failure not established')
+          PY
       - name: Detect initialized archive ref
         id: remote
         run: |

@@ -2,7 +2,19 @@
 // directly because of CORS). GET ?symbol=&interval=&range=&events=1 → Yahoo's raw chart JSON.
 // GET ?quotes=AAPL,2330.TW → { results: { SYMBOL: slim chart JSON }, errors: { SYMBOL: code } }
 // with the last month of daily rows per symbol (the site's once-a-minute live refresh).
-// No secrets, no database access. Atlas normalizes and validates the payload client-side.
+// Every request needs a signed-in Atlas user (X-Atlas-Token: LINE ID token or atlasdev. device token)
+// and passes the per-user / site-wide usage quota in access.ts. Atlas normalizes and validates the
+// payload client-side.
+import { createClient } from "@supabase/supabase-js";
+import { resolveLineUser } from "../_shared/deviceSession.ts";
+import { verifyLineIdTokenWith } from "../_shared/lineIdToken.ts";
+import { adminLineId, getStorageAccess } from "../_shared/storageAccess.ts";
+import {
+  ATLAS_TOKEN_HEADER,
+  consumeQuotaRpc,
+  createMarketChartGate,
+  type GateFailure,
+} from "./access.ts";
 import {
   buildYahooChartUrl,
   cacheControlFor,
@@ -35,6 +47,75 @@ const UPSTREAM_TIMEOUT_MS = 8000;
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
+const DATABASE_TIMEOUT_MS = 5000;
+
+/** Sign-in + quota gate, or null when the server configuration is incomplete (every request → 503). */
+function createGate() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  let adminId: string;
+  try {
+    adminId = adminLineId(Deno.env.get("ADMIN_LINE_USER_ID"));
+  } catch {
+    console.error("market-chart: ADMIN_LINE_USER_ID is invalid");
+    return null;
+  }
+  if (!url || !key) {
+    console.error("market-chart: Supabase server configuration is missing");
+    return null;
+  }
+  const database = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          signal: init?.signal ?? AbortSignal.timeout(DATABASE_TIMEOUT_MS),
+        }),
+    },
+  });
+  const channelId = Deno.env.get("LINE_LOGIN_CHANNEL_ID");
+  return createMarketChartGate({
+    resolveUser: (token) =>
+      resolveLineUser(
+        database,
+        token,
+        (idToken) => verifyLineIdTokenWith(idToken, { channelId }),
+      ),
+    getStorageMode: async (userId) =>
+      (await getStorageAccess(database, userId, adminId)).storageMode,
+    consumeQuota: (request) => consumeQuotaRpc(database, request),
+    adminId,
+  });
+}
+const gate = createGate();
+const GATE_UNAVAILABLE: GateFailure = {
+  ok: false,
+  status: 503,
+  body: {
+    ok: false,
+    code: "AUTH_UNAVAILABLE",
+    error: "登入驗證服務暫時無法使用，請稍後再試。",
+    retryAfterSeconds: 60,
+  },
+  retryAfterSeconds: 60,
+};
+
+function gateResponse(origin: string | null, failure: GateFailure): Response {
+  const headers: Record<string, string> = {
+    ...corsHeaders(origin, allowedOrigins),
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "private, no-store",
+  };
+  if (failure.retryAfterSeconds !== undefined) {
+    headers["Retry-After"] = String(failure.retryAfterSeconds);
+  }
+  return new Response(JSON.stringify(failure.body), {
+    status: failure.status,
+    headers,
+  });
+}
+
 function errorResponse(
   origin: string | null,
   status: number,
@@ -46,7 +127,7 @@ function errorResponse(
     headers: {
       ...corsHeaders(origin, allowedOrigins),
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
     },
   });
 }
@@ -201,7 +282,7 @@ async function quoteBatch(
       headers: {
         ...corsHeaders(origin, allowedOrigins),
         "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": `public, max-age=${QUOTE_CACHE_SECONDS}`,
+        "Cache-Control": `private, max-age=${QUOTE_CACHE_SECONDS}`,
       },
     },
   );
@@ -209,7 +290,7 @@ async function quoteBatch(
 
 Deno.serve(async (req: Request): Promise<Response> => {
   const origin = req.headers.get("Origin");
-  // Browsers on other sites get a plain 403; server-to-server callers (no Origin) are allowed.
+  // Browsers on other sites get a plain 403. Callers without an Origin still need a valid token below.
   if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
     return errorResponse(null, 403, "origin_not_allowed", "Origin not allowed");
   }
@@ -222,6 +303,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "GET") {
     return errorResponse(origin, 405, "method_not_allowed", "Use GET");
   }
+  const access = gate
+    ? await gate.check(req.headers.get(ATLAS_TOKEN_HEADER))
+    : GATE_UNAVAILABLE;
+  if (!access.ok) return gateResponse(origin, access);
 
   const params = new URL(req.url).searchParams;
   const quotes = params.get("quotes");
@@ -256,7 +341,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           "Cache-Control":
             request.interval === "1d" && misChannel(request.symbol) &&
               inMisSession(Date.now())
-              ? "public, max-age=15"
+              ? "private, max-age=15"
               : cacheControlFor(request.interval),
         },
       },

@@ -172,6 +172,8 @@ jobs:
         env:
           VITE_PUBLIC_BASE: /my-stock-screener/atlas/
           VITE_MARKET_PROXY_URL: ${{ vars.MARKET_PROXY_URL || 'https://bxhqpfeberqbtxymghyt.supabase.co/functions/v1/market-chart' }}
+          # Public VAPID key for 手機通知; empty hides the feature (see supabase/manual/web_push_subscriptions.sql).
+          VITE_WEB_PUSH_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY || 'BIfSt81i8Om2OQmBSenq6hN0Cfo17KHXd6V9h5Yea1qxhd1PEmwaRul7gW71cImylkXxZrHjWa4mY0jad4VKKeY' }}
         run: npm run build:pages
 
       # Opt-in only: apply supabase/manual/atlas_watchlists.sql and deploy user-settings first.

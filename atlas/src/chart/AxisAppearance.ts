@@ -5,7 +5,7 @@
  */
 export const AXIS_FONT_FAMILY =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans TC", Arial, sans-serif';
-export const AXIS_TEXT_COLOR = '#c3cad5';
+export const AXIS_TEXT_COLOR = '#8A94A3';
 export const AXIS_FONT_SIZE = 12;
 export const AXIS_FONT_SIZE_NARROW = 13;
 const NARROW_QUERY = '(max-width: 640px)';
@@ -22,3 +22,5 @@ function defaultMatches(query: string): boolean {
 export function compactAxisPrice(price: number): string {
   return price.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 }
+
+// The axis intentionally uses the narrower system face to preserve plot width at 390px.

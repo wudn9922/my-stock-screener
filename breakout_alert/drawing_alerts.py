@@ -14,7 +14,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote as url_quote
+from breakout_alert.atlas_links import atlas_chart_url
 
 
 # 總開關：改成 False 即停用畫線警示（均線提醒不受影響）
@@ -62,11 +62,6 @@ FALLBACK_KIND = "atlas_lines_state"
 # 避免畫線全部隱藏後又顯示時沿用很久以前的狀態。
 FALLBACK_MAX_AGE_DAYS = 3
 UPSERT_CHUNK_SIZE = 100
-
-CHART_LIFF_URL = (
-    "https://liff.line.me/"
-    "2010330411-6JhrotT9"
-)
 
 VALID_TIMEFRAMES = (
     "5m", "15m", "30m", "1H", "4H", "1D", "1W", "1M"
@@ -802,11 +797,8 @@ def format_neighbour(level, price):
 
 
 def build_chart_url(symbol, timeframe):
-    return (
-        f"{CHART_LIFF_URL}?page=chart"
-        f"&symbol={url_quote(symbol, safe='.-')}"
-        f"&tf={url_quote(timeframe, safe='')}"
-    )
+    # 直接開 Atlas 網頁圖表；<> 讓 Discord 不產生網頁預覽卡片
+    return f"<{atlas_chart_url(symbol, timeframe)}>"
 
 
 def format_alert_block(
@@ -846,6 +838,28 @@ def format_alert_block(
         f"下方 {format_neighbour(nearest_below, price)}\n"
         f"{build_chart_url(symbol, line.timeframe)}"
     )
+
+
+def push_alert(notifier, alert):
+    """Discord 成功後的手機通知（notifier 有啟用 Web Push 時）；失敗不影響畫線提醒。"""
+    push = getattr(notifier, "push_drawing_alert", None)
+    if not callable(push):
+        return
+    try:
+        push(
+            ticker=alert.plan.entry.ticker,
+            symbol=alert.plan.entry.symbol,
+            display_name=str(
+                getattr(alert.plan.quote, "display_name", "") or ""
+            ).strip(),
+            label=alert.line.label,
+            level=alert.line.level,
+            price=alert.plan.price,
+            direction=alert.direction,
+            timeframe=alert.line.timeframe
+        )
+    except Exception as exc:
+        print(f"⚠️ 畫線手機通知失敗：{type(exc).__name__}")
 
 
 def pack_alert_messages(blocks):
@@ -1408,6 +1422,7 @@ class DrawingAlertEngine:
                         f"{alert.line.level:,.2f}"
                         f"｜{alert.direction}"
                     )
+                    push_alert(self.notifier, alert)
 
             except Exception as exc:
                 summary["alert_failed"] = (

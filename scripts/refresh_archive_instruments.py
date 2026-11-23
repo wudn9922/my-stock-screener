@@ -87,8 +87,10 @@ def refresh(archive_dir, cache_dir, budget=300, now=None, net=None, selected=Non
         counts = {'selected': len(selected), 'seeded': seeded, 'appended': 0, 'charts': 0, 'unchanged': 0, 'failed': 0}
         print(f'Archive instruments: batch start selected={len(selected)} seeded={seeded}', flush=True)
         if not selected: return {**counts, 'warnings': warnings}
-        yahoo_symbols = sorted(s for s in selected if s != '^TWOII')
-        yahoo_ready = not yahoo_symbols or job.connect_yahoo()
+        # ^TWII Yahoo v7 quote may report zero even while historical v8 chart has
+        # valid daily shares. Never let a v7 index quote manufacture an archive 0.
+        yahoo_symbols = sorted(s for s in selected if s not in ('^TWOII', '^TWII'))
+        yahoo_ready = not (yahoo_symbols or '^TWII' in selected) or job.connect_yahoo()
         if not yahoo_ready: warnings.append('Yahoo unavailable; keep accepted cache and archive')
         quotes = job.quote_bars(yahoo_symbols, 'Archive ETFs/indices') if yahoo_symbols and yahoo_ready else {}
         ordered = sorted(selected, key=lambda s: (state['symbols'].get(s, {}).get('lastAttemptAt', ''), s))
@@ -100,7 +102,7 @@ def refresh(archive_dir, cache_dir, budget=300, now=None, net=None, selected=Non
             path = uc.bars_path(str(cache_dir), symbol)
             old = uc.read_bars(path)
             market = 'TW' if archive.market_of(symbol) == 'tw' else 'US'
-            bar = quotes.get(symbol)
+            bar = None if symbol == '^TWII' else quotes.get(symbol)
             try:
                 if symbol != '^TWOII' and not yahoo_ready:
                     counts['failed'] += 1
@@ -119,7 +121,10 @@ def refresh(archive_dir, cache_dir, budget=300, now=None, net=None, selected=Non
                     if action == 'append' and row and not integrity.violation(dict(zip(uc.PRICE_COLUMNS, row[1:]))):
                         frame = uc.append_row(old, row)
                 if frame is None:
-                    fresh = job.fetch_chart(symbol, bu.FULL_RANGE if old.empty else '1mo', completed_market=market)
+                    # Full 2-year ^TWII series supplies >=20 Yahoo/FMTQIK overlap
+                    # days if its chart volume itself needs official calibration.
+                    range_ = bu.FULL_RANGE if symbol == '^TWII' or old.empty else '1mo'
+                    fresh = job.fetch_chart(symbol, range_, completed_market=market)
                     counts['charts'] += 1
                     if fresh.empty:
                         raise ValueError('no data from source: no valid completed sessions')

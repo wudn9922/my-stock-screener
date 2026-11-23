@@ -1,3 +1,15 @@
+## 2026-11-20 Per-list notifications (均線／畫線)
+Primary self-review only. `atlas_alert_settings` + `alerts.settings.*`; breakout runner filters MA/drawing alerts by list once per run (absent = all lists, baselines never pruned by settings); UI in 我的 › 清單.
+Verification: pytest list_notifications/runner/watchlists, Vitest alert-settings/settings-handler/unified-lists, e2e-site unified-lists etc. on desktop/mobile Chromium; WebKit unavailable here.
+
+## 2026-11-20 Unified 清單 and chart-star 加入清單
+Primary self-review only; no independent sign-off. 我的 › 清單 shows groups, saved watchlists and chart favourites over the existing stores (no data migration); the chart star opens an optimistic multi-list picker; group joins reuse the ticker's single MA row or the ma-selector picks.
+Verification: lint, typecheck, `tests/unified-lists.test.ts`, `tests/ui-routes.test.ts` and the related e2e-site specs on desktop/mobile Chromium; WebKit could not be downloaded in this container.
+
+## 2026-11-10 Site review polish: 我的 account card, screener toolbar and CSV export
+Primary self-review only; no independent sign-off. Presentation-only CSS/markup for the 我的 account card and heading, pinned 台股/美股 chip labels, short phone search placeholder, tab-bar marker, search-row glyphs, Open Graph tags; new `screenerCsv` export (formula-injection guarded) with unit tests.
+Verification: lint, typecheck, Pages build, `tests/screener-csv.test.ts`, and the related e2e-site specs on desktop/mobile Chromium; `workspace-refinements.spec.ts:6` (header 124.3px vs 124) and the non-CI `site.spec.ts` landing tests fail identically on unmodified main in this container. WebKit not run locally.
+
 ## 2026-11-10 PR review: one shared MA row per normalized ticker
 Implementation: overwrite the grouped ID or reuse the dormant ID, convert group membership without deleting MAs, explicit parameter deletion, legacy ungrouped-first reads in Atlas/Python, and guarded cleanup/retry; 2408.TW/AGM/TSM were fixed separately by the maintainer, with no production SQL in this PR.
 Verification: code/test updates submitted for Atlas typecheck/lint/Vitest/build/Pages, Playwright site desktop/mobile Chromium (WebKit CI), and Python monitor/report checks; actual CI pass/fail is reported in the PR, not inferred from historical records.
@@ -1553,3 +1565,30 @@ revision; the same matrix and the full PR workflow are rerun on this layout foll
 完整回歸發現 world-btc.spec.ts 在 BTC 保存來源切換時捲動卡片，會遇到 DOM 替換而偶發 element detached。原文字、OHLC、日曆、畫布、週K與零錯誤斷言全部保留；先等待原有來源日期／保存標示，再於 10 秒內重試對同一 locator 的捲動，進入畫面後才等待延遲載入圖表的 OHLC。WorldPage 與行情程式未改。修正後三平台 BTC 回歸另行重跑，精確結果記在 PR。
 
 使用者要求繼續增加本益比選項。本次沿用原估值與篩選架構，新增可留白的上下限及快捷倍數；舊條件、導覽與網址全部保留。具體規則、資料缺漏處理及測試見 docs/SCREENER_PE_FILTER.md。市場檔只載入一次且涵蓋畫面外股票，來源失敗不會回傳未篩選結果；自選策略保留失敗前的比較基準。離線收集器只適配既有估值 JSON，未變更任何後端 API、SQL、權限、workflow 或市場資料檔。採主要工程師自我審查，沒有獨立簽核；實際測試數字記錄在 PR body。
+
+
+## Atlas phone redesign — step 1 (tokens / shell)
+Independent Claude visual sign-off and actual 390px compiled screenshots are pending; no independent approval is claimed.
+No layout assertions were changed. Lint, build and responsive/browser checks remain to be confirmed by CI/reviewer before merge.
+
+### Claude review 6857550965 — requested changes
+Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px without weakening the navigation test; synchronized five reference files and handoff; added numeric-role font rules for watchlist/market/stock/account; removed residual blue focus, brand gradient, old swatches and login splash colors. Price axis reverted to its proportional system face to protect chart plot width. Still requires independent main-vs-branch axis pixel measurement, 390px US-convention screenshot and WebKit verification.
+
+### Claude CI review 6867292969
+- Fixed actual mobile viewport regression: 52px phone top bar, 64px bottom bar, 44px header actions. Preserves compact futures fifth-card viewport; `mexc.spec.ts:661` stays unchanged.
+- Spec-driven E2E updates: candle pixel RGB detection now matches `#FF5A5F` / `#2BC8A8`; phone watchlist heading expectation now matches the visible `自選` title. Handoff step 1 synchronized.
+- Claude locally verified targeted compact and nav cases; this push has not independently rerun CI or WebKit. `workspace-refinements.spec.ts:6` reported as a pre-existing main failure by reviewer, not altered.
+
+### Chart volume readouts (feat/chart-volume) — no independent review
+- 量比(同時間) chip + ^TWII live-bar volume rebuilt from same-source 5m bars only when earlier sessions match the daily unit (`IntradayVolume.ts`); otherwise 「今日量：盤中來源未提供」. No Edge change.
+- Verified: lint, build, related Vitest, `e2e-site/same-time-volume|live-quotes|market-calendar|research-modules` on mobile-chromium. WebKit not installable locally (download blocked); CI covers it.
+
+### EPS on today's share basis (fix/eps-share-basis) — no independent review
+- 還原 EPS (配股 + implied-share-confirmed splits, `epsBasis.ts`) is now the displayed EPS (cards, charts, table, peers, TW header P/E via `restatedPe.ts`); 公告 toggle keeps reported values; growth.json restates the official TW sources too.
+- Verified: lint, build, related Vitest + Python unittest, `e2e-site/financials|financials-finmind|pe-river|eps-share-basis|stock-views|site|workspace-refinements|pr-a-extended-quotes` on mobile-chromium. WebKit not installable locally; CI covers it.
+
+### Derived Q4 recompute + 減資彌補虧損 (fix/eps-q4-and-capital-reduction) — no independent review
+- Derived Q4 across a Q3→annual share-basis change = restated annual − Σ restated Q1..Q3 (8422.TW Q4 2025 0.242, `epsBasis.ts`, mirrored in `build_growth.recompute_derived_q4`); loss-offset 減資 from FinMind `TaiwanStockCapitalReductionReferencePrice` restated like a reverse split, cash 減資 never. FinMind field values not verified live (API blocked in sandbox).
+
+### 台股分割／面額變更 (fix/tw-split-events) — no independent review
+- FinMind `TaiwanStockSplitPrice` / `TaiwanStockParValueChange` per stock → `twSplits`; applied as dated split events (TS `epsBasis.ts`, Python `build_growth.py` via `tw_splits.py`); without an event a clean near-integer implied-share step is inferred (11 TW files on main, 5904.TWO included). Field values not verified live (API blocked in sandbox).

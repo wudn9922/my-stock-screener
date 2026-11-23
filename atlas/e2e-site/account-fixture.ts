@@ -27,12 +27,21 @@ export async function installLineAccount(page: Page, userId = DEVICE_USER_ID, to
 export function accessEnvelope(userId = DEVICE_USER_ID, storageMode: TestStorageMode = 'device', isAdmin = false, revision = 'test-1') {
   return { ok: true, data: { userId, storageMode, isAdmin, revision } };
 }
-export async function mockDeviceAccount(page: Page) {
+/** `isAdmin`: the server-verified administrator (sees owner-only tools such as SinoPac sync). */
+export async function mockDeviceAccount(page: Page, isAdmin = false, storageMode: TestStorageMode = 'device') {
   await installLineAccount(page);
   await page.route('**/functions/v1/user-settings', route => {
     const body = route.request().postDataJSON() as { action?: string };
     return body.action === 'access.get'
-      ? route.fulfill({ json: accessEnvelope() })
+      ? route.fulfill({ json: accessEnvelope(DEVICE_USER_ID, storageMode, isAdmin) })
       : route.fulfill({ status: 403, json: { ok: false, error: 'Device account must not request cloud personal data' } });
   });
+}
+
+/**
+ * Signed in with LINE but without a storage grant (storage_mode none): market-chart answers (it needs a
+ * login), while storage stays exactly as for a guest. For specs that need market data, not an account.
+ */
+export function mockMarketLogin(page: Page) {
+  return mockDeviceAccount(page, false, 'none');
 }

@@ -13,11 +13,11 @@ on:
       - "Official Fundamentals (TW / US)"
       - "Deploy assembled Pages"
       - "Squash generated snapshot"
-      - "🔄 GitHub Actions 永久續命腳本"
       - "Official TW archive repair"
       - "Permanent K-line Backfill"
       - "Permanent K-line five-year expansion"
       - "MA Recommendations"
+      - "Taiwan stock dividends backfill"
       - "Market trading calendar"
       - "IPO and extended quotes"
       - "Q4 EPS from 8-K (manual)"
@@ -29,6 +29,7 @@ on:
       - "Trim Git History (disabled)"
       - "Taiwan Chips"
       - "Full-Market Universe"
+      - "TW Margin Temperature"
     types: [completed]
 permissions:
   contents: read

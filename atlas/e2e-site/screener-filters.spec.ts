@@ -22,6 +22,8 @@ test('temporary filters reset across groups and markets, start from the URL on f
   await sheet.getByRole('textbox', { name: '自訂20日平均成交量下限（張）' }).fill('1000');
   await sheet.getByRole('button', { name: /^套用/ }).click();
   await expect(chips).toBeVisible();
+  // Phone and tablet show one market's chips at a time; the 台股｜美股 switch brings up the US row.
+  if (page.viewportSize()!.width < 1100) await page.getByRole('group', { name: '市場', exact: true }).getByRole('button', { name: '美股', exact: true }).click();
   await page.getByRole('button', { name: '美股全市場篩選', exact: true }).click();
   await expect(chips).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get('f')).toBeNull();
@@ -56,6 +58,8 @@ test('temporary filters reset across groups and markets, start from the URL on f
   await expect(chips).toBeVisible();
   expect(new URL(page.url()).searchParams.get('f')).toBe('vol:1000000');
   // Within the screener, switching group still resets the temporary conditions.
+  // Phone and tablet show one market's chips at a time; the 台股｜美股 switch brings up the US row.
+  if (page.viewportSize()!.width < 1100) await page.getByRole('group', { name: '市場', exact: true }).getByRole('button', { name: '美股', exact: true }).click();
   await page.getByRole('button', { name: '美股全市場篩選', exact: true }).click();
   await expect(chips).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get('f')).toBeNull();

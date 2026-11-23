@@ -4,9 +4,9 @@ on:
     inputs:
       mode:
         type: choice
-        options: [backfill, remove-placeholders, restore]
+        options: [backfill, remove-placeholders, restore, twii-volume]
         default: backfill
-        description: 'Official missing days, scoped 2026-10-23 removal, or exact restoration'
+        description: 'Missing days, 2026-10-23 removal/restore, or ^TWII zero-volume repair'
       apply:
         type: boolean
         default: false
@@ -57,17 +57,25 @@ jobs:
           REPAIR_MODE: ${{ inputs.mode }}
           REPAIR_APPLY: ${{ inputs.apply }}
         run: |
-          report_dir=docs/research-verification
-          backup="$report_dir/removed-placeholders-20261023.json"
-          if [ "$REPAIR_MODE" = restore ]; then
-            mkdir -p "$report_dir"
-            cp .cache/restore-input/removed-placeholders-20261023.json "$backup"
-          fi
-          args=(--archive-dir .cache/kline-archive --mode "$REPAIR_MODE"
-            --report "$report_dir/official-archive-repair.json" --backup "$backup")
-          if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
-          python -u scripts/repair_kline_archive.py "${args[@]}"
           mkdir -p .cache/repair-output
+          if [ "$REPAIR_MODE" = twii-volume ]; then
+            # Logs only; no docs/research-verification JSON for this data fix.
+            args=(--archive-dir .cache/kline-archive
+              --backup .cache/repair-output/twii-volume-backup.json)
+            if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
+            python -u scripts/repair_twii_volume.py "${args[@]}" | tee .cache/repair-output/twii-volume.log
+          else
+            report_dir=docs/research-verification
+            backup="$report_dir/removed-placeholders-20261023.json"
+            if [ "$REPAIR_MODE" = restore ]; then
+              mkdir -p "$report_dir"
+              cp .cache/restore-input/removed-placeholders-20261023.json "$backup"
+            fi
+            args=(--archive-dir .cache/kline-archive --mode "$REPAIR_MODE"
+              --report "$report_dir/official-archive-repair.json" --backup "$backup")
+            if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
+            python -u scripts/repair_kline_archive.py "${args[@]}"
+          fi
           if [ "$REPAIR_APPLY" = true ]; then
             git -C .cache/kline-archive rev-parse HEAD > .cache/repair-output/base-commit
             git -C .cache/kline-archive diff --binary > .cache/repair-output/repair.patch

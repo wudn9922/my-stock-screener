@@ -1,6 +1,6 @@
 """Offline, exchange-calendar-shaped fixtures. No production workflows or APIs."""
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import importlib.util
 import os
 from pathlib import Path
@@ -42,21 +42,56 @@ class SourceDateTest(unittest.TestCase):
 
     def test_three_completed_session_lag_alerts_each_market_source(self):
         issues, _ = health.evaluate(calendar(), sources('2026-11-03'), clock('2026-11-06T08:00:00+00:00'))
-        self.assertEqual(len(issues), 9)
+        self.assertEqual(len(issues), 7)
+        self.assertNotIn('breakouts/TW', issues)
+        self.assertNotIn('breakouts/US', issues)
         self.assertIn('3 個交易日', issues['archive/TW'])
         self.assertIn('2 個交易日', issues['archive/US'])
 
-    def test_warning_retained_and_unavailable_alert_even_with_a_fresh_asof(self):
-        for status in ('retained', 'unavailable'):
-            data = sources()
-            data['warnings']['markets']['us']['update'] = {'status': status, 'reason': 'must not copy arbitrary source text'}
-            issues, _ = health.evaluate(calendar(), data, clock())
-            self.assertEqual(set(issues), {'warnings/US'})
-            self.assertIn(status, issues['warnings/US'])
-            self.assertNotIn('arbitrary', str(issues))
+    def test_weekly_breakouts_allow_five_sessions_but_alert_after_six(self):
+        cal = calendar()
+        for market, suffix in [('TW', 'T05:30:00+00:00'), ('US', 'T21:00:00+00:00')]:
+            sessions = cal['markets'][market]['sessions']
+            day = datetime(2026, 11, 10)
+            while day.date() <= datetime(2026, 11, 20).date():
+                if day.weekday() < 5:
+                    key = day.date().isoformat()
+                    sessions[key] = {'close': int(clock(key + suffix).timestamp())}
+                day += timedelta(days=1)
+        now = clock('2026-11-20T23:00:00+00:00')
+        data = sources('2026-11-20')
+        data['breakouts']['markets']['tw']['asOf'] = '2026-11-13'
+        data['breakouts']['markets']['us']['asOf'] = '2026-11-13'
+        issues, _ = health.evaluate(cal, data, now)
+        self.assertNotIn('breakouts/TW', issues)
+        self.assertNotIn('breakouts/US', issues)
+        data['breakouts']['markets']['tw']['asOf'] = '2026-11-09'
+        data['breakouts']['markets']['us']['asOf'] = '2026-11-09'
+        issues, _ = health.evaluate(cal, data, now)
+        self.assertEqual(set(issues), {'breakouts/TW', 'breakouts/US'})
+        self.assertIn('每週更新一次', issues['breakouts/TW'])
+
+    def test_warning_unavailable_always_alerts_but_current_retained_does_not(self):
+        data = sources()
+        data['warnings']['markets']['us']['update'] = {'status': 'unavailable', 'reason': 'must not copy arbitrary source text'}
+        issues, _ = health.evaluate(calendar(), data, clock())
+        self.assertEqual(set(issues), {'warnings/US'})
+        self.assertIn('unavailable', issues['warnings/US'])
+        self.assertNotIn('arbitrary', str(issues))
+        # Retained data that already covers the latest closed session is current.
+        data = sources()
+        data['warnings']['markets']['us']['update'] = {'status': 'retained', 'reason': 'must not copy arbitrary source text'}
+        self.assertEqual(health.evaluate(calendar(), data, clock())[0], {})
+        # Retained data one session behind alerts, stricter than the normal one-session grace.
+        data = sources('2026-11-04')
+        data['warnings']['markets']['us']['update'] = {'status': 'retained', 'reason': 'must not copy arbitrary source text'}
+        issues, _ = health.evaluate(calendar(), data, clock())
+        self.assertEqual(set(issues), {'warnings/US'})
+        self.assertIn('retained', issues['warnings/US'])
+        self.assertNotIn('arbitrary', str(issues))
         data['warnings']['markets']['us'].pop('asOf')
         issues, _ = health.evaluate(calendar(), data, clock())
-        self.assertIn('unavailable', issues['warnings/US'])
+        self.assertIn('缺少有效資料日', issues['warnings/US'])
 
     def test_weekends_holidays_and_new_york_early_close_use_published_timestamps(self):
         cal = calendar()
@@ -86,6 +121,64 @@ class SourceDateTest(unittest.TestCase):
         issues, checked = health.evaluate(cal, sources(), clock())
         self.assertEqual(set(issues), {'calendar/TW','calendar/US'})
         self.assertEqual(checked, set(issues))
+
+
+
+class TWIIVolumeWatchdogTest(unittest.TestCase):
+    def test_latest_zero_gets_one_trading_day_grace_then_notifies_and_recovers(self):
+        zero = ("Date,Open,High,Low,Close,Volume\n"
+                "2026-11-04,1.0000,2.0000,1.0000,2.0000,4161800\n"
+                "2026-11-05,1.0000,2.0000,1.0000,2.0000,0\n")
+        issues, checked = health.twii_volume_issue(calendar(), zero, clock())
+        self.assertEqual(issues, {})  # 11/05 only just closed
+        self.assertEqual(checked, {"volume/^TWII"})
+        # 11/06 has completed; even though its volume is positive, 11/05
+        # still being zero proves the previous day was not recovered.
+        next_day = zero + "2026-11-06,1.0000,2.0000,1.0000,2.0000,6000000\n"
+        issues, checked = health.twii_volume_issue(
+            calendar(), next_day, clock("2026-11-06T08:00:00+00:00"))
+        self.assertEqual(set(issues), {"volume/^TWII"})
+        self.assertIn("2026-11-05", issues["volume/^TWII"])
+        state, events = health.plan(None, issues, checked, clock("2026-11-06T08:00:00+00:00"))
+        self.assertEqual([e["kind"] for e in events], ["failure"])
+        positive = next_day.replace("2.0000,0\n", "2.0000,4239400\n")
+        issues, checked = health.twii_volume_issue(
+            calendar(), positive, clock("2026-11-06T08:00:00+00:00"))
+        self.assertEqual(issues, {})
+        self.assertEqual(checked, {"volume/^TWII"})
+        _, events = health.plan(state, issues, checked, clock("2026-11-06T08:00:00+00:00"))
+        self.assertEqual([e["kind"] for e in events], ["recovered"])
+
+    def test_weekend_does_not_count_as_extra_session(self):
+        first = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-05,1,2,1,2,4000000\n"
+                 "2026-11-06,1,2,1,2,0\n")
+        friday = clock("2026-11-06T08:00:00+00:00")
+        self.assertEqual(health.twii_volume_issue(calendar(), first, friday)[0], {})
+        self.assertEqual(health.twii_volume_issue(
+            calendar(), first, clock("2026-11-08T08:00:00+00:00"))[0], {})
+        monday = first + "2026-11-09,1,2,1,2,0\n"
+        issues, _ = health.twii_volume_issue(
+            calendar(), monday, clock("2026-11-09T08:00:00+00:00"))
+        self.assertIn("2026-11-06", issues["volume/^TWII"])
+
+    def test_older_unrepaired_zero_does_not_silently_recover_after_ten_days(self):
+        older = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-05,1,2,1,2,0\n"
+                 "2026-11-06,1,2,1,2,6000000\n"
+                 "2026-11-09,1,2,1,2,7000000\n")
+        issues, checked = health.twii_volume_issue(
+            calendar(), older, clock("2026-11-09T08:00:00+00:00"))
+        self.assertIn("2026-11-05", issues["volume/^TWII"])
+        self.assertEqual(checked, {"volume/^TWII"})
+
+    def test_old_session_or_unavailable_archive_never_signals_false_recovery(self):
+        prior = ("Date,Open,High,Low,Close,Volume\n"
+                 "2026-11-04,1.0000,2.0000,1.0000,2.0000,0\n")
+        for data in (prior, None, "<html>invalid</html>"):
+            self.assertEqual(health.twii_volume_issue(calendar(), data, clock()), ({}, set()))
+        self.assertEqual(health.twii_volume_issue(
+            calendar(), prior, clock("2026-11-06T08:00:00+00:00")), ({}, set()))
 
 
 class DedupeRecoveryTest(unittest.TestCase):
@@ -152,10 +245,11 @@ class DedupeRecoveryTest(unittest.TestCase):
             env = {'GITHUB_REPOSITORY': 'example/repository', 'GH_TOKEN': 'PRIVATE-TEST-TOKEN',
                    'GENERATED_BRANCH_MODE': '1', 'GITHUB_OUTPUT': str(root / 'output')}
             with patch.dict(os.environ, env), patch.object(health, 'github_json', side_effect=fetch), \
+                 patch.object(health, 'github_text', return_value=None), \
                  patch.object(health, 'github_daily_runs', return_value=[{'conclusion': 'success'}]):
                 self.assertEqual(health.main(args), 0)
                 first = health.read_json(root / 'events.json')
-                self.assertEqual(len(first), 9)
+                self.assertEqual(len(first), 7)
                 self.assertFalse((root / 'state.json').exists())
                 self.assertEqual(health.main(args), 0)
                 self.assertEqual(health.read_json(root / 'events.json'), first)

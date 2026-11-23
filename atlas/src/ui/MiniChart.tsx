@@ -15,12 +15,15 @@ import { getDailyBarResult, getLegacyDailyResult, getWatchlistDailyResult } from
 import { LIVE_INTERVAL_MS, liveQuotes, mergeDailyBars, sameBars, type LiveDaily } from '../market-data/LiveQuotes';
 import { mergeArchiveDaily } from '../market-data/KlineArchive';
 import { sitePreferences, upDownColors } from '../app/sitePreferences';
+import { AXIS_FONT_FAMILY } from '../chart/AxisAppearance';
 import type { Bar } from '../market-data/MarketDataProvider';
 import { sma } from '../indicators/MovingAverage';
 import { indicatorColors } from '../indicators/IndicatorRegistry';
 import './mini-chart-controls.css';
 import { miniChartStart } from './miniChartRange';
 import { usePageActive } from '../app/pageActivity';
+import { isMarketLoginRequired, isMarketQuotaError } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from './MarketLogin';
 
 const VISIBLE_BARS = 130;
 const NO_MAS: readonly number[] = [];
@@ -104,6 +107,8 @@ export function MiniChart({
   const paintRef = useRef<((next: Bar[]) => void) | null>(null);
   const drawnRef = useRef<Bar[] | null>(null);
   const [status, setStatus] = useState<MiniChartStatus>('idle');
+  // Why an error has no chart: signed out (login prompt) or the function's quota text.
+  const [blocked, setBlocked] = useState<{ login: true } | { message: string } | null>(null);
   const colors = useSyncExternalStore(sitePreferences.subscribe, () => sitePreferences.get().colors);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
@@ -127,7 +132,7 @@ export function MiniChart({
     let live = true;
     recentRef.current = null; barsRef.current = null; archivedThrough.current = undefined;
     splitPending.current = false; setSourceNote('');
-    setBars(null);
+    setBars(null); setBlocked(null);
     setStatus('loading');
     statusRef.current?.('loading', null);
     // Long configured MAs need historical warm-up; the visible chart still starts at six months.
@@ -144,8 +149,9 @@ export function MiniChart({
         setStatus(next.length ? 'ready' : 'error');
         statusRef.current?.(next.length ? 'ready' : 'error', next);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!live) return;
+        setBlocked(isMarketLoginRequired(error) ? { login: true } : isMarketQuotaError(error) ? { message: error.message } : null);
         setStatus('error');
         statusRef.current?.('error', null);
       });
@@ -176,12 +182,12 @@ export function MiniChart({
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#7d8696',
+        textColor: '#8A94A3',
         fontSize: 10,
-        fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+        fontFamily: AXIS_FONT_FAMILY,
         attributionLogo: interactive,
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: '#1b212b' } },
+      grid: { vertLines: { visible: false }, horzLines: { color: '#1E232B' } },
       crosshair: { mode: interactive ? CrosshairMode.Normal : CrosshairMode.Hidden },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.1, bottom: showVolume ? 0.25 : 0.08 } },
       timeScale: { borderVisible: false, rightOffset: 2, fixLeftEdge: true, fixRightEdge: true },
@@ -190,7 +196,10 @@ export function MiniChart({
       localization: { locale: 'zh-TW' },
     });
     chartRef.current = chart;
+    // Index levels in the thousands read better without cents on the axis; the card shows the exact value.
+    const lastClose = (barsRef.current ?? bars).at(-1)?.close ?? 0;
     const candles = chart.addSeries(CandlestickSeries, {
+      ...(lastClose >= 1000 ? { priceFormat: { type: 'price' as const, precision: 0, minMove: 1 } } : {}),
       upColor: up,
       downColor: down,
       borderVisible: false,
@@ -277,7 +286,7 @@ export function MiniChart({
     scale.setVisibleLogicalRange({ from, to: from + count - 1 });
   };
   return (
-    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height }} data-status={status} title={sourceNote}>
+    <div ref={ref} className={`mini-chart${interactive ? ' mini-chart-interactive' : ''}`} style={{ height: `var(--mini-chart-height, ${height}px)` }} data-status={status} title={sourceNote}>
       {interactive && <div className="mini-chart-controls" role="group" aria-label={`${symbol} 圖表縮放`}>
         <span>日 K{showVolume ? ' · 成交量' : ''}</span>
         <button type="button" aria-label="縮小圖表" title="縮小（顯示更多 K 線）" disabled={status !== 'ready'} onClick={() => zoom(1.5)}>−</button>
@@ -290,8 +299,10 @@ export function MiniChart({
       </div>}
       {status === 'ready' ? (
         <div ref={hostRef} className="mini-chart-canvas" aria-hidden="true" />
+      ) : status === 'error' && blocked && 'login' in blocked ? (
+        <div className="mini-chart-login"><MarketLoginPrompt compact /></div>
       ) : status === 'error' ? (
-        <span className="mini-chart-empty">暫無圖表資料</span>
+        <span className="mini-chart-empty">{blocked && 'message' in blocked ? blocked.message : '暫無圖表資料'}</span>
       ) : (
         <span className="skeleton mini-chart-skeleton" aria-hidden="true" />
       )}

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { isCompactConsole } from './console-nav';
 import { mockSite } from './mocks';
 
 for (const short of [false, true]) test(`screener data health follows the virtual list without overlap${short ? ' on a short 390px phone' : ''}`, async ({ page }) => {
@@ -10,6 +11,12 @@ for (const short of [false, true]) test(`screener data health follows the virtua
   expect(await list.evaluate(el => el.scrollHeight)).toBeGreaterThan(await list.evaluate(el => el.clientHeight));
   await list.evaluate(el => { el.scrollTop = 2000; });
   await expect.poll(() => list.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  if (isCompactConsole(page)) {
+    // Phones and tablets show data health under 我的 › 資料狀態, so nothing follows the list here any more.
+    await expect(page.locator('.data-health')).toHaveCount(0);
+    expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    return;
+  }
   const health = page.locator('.data-health'); const summary = health.locator(':scope > summary');
   await summary.scrollIntoViewIfNeeded(); await expect(summary).toBeVisible();
   const separation = await page.evaluate(() => ({

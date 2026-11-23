@@ -1,10 +1,14 @@
 import type { FinancialHistory, PeriodKind, RawField } from './FinancialHistory';
+import { hasEpsRestatement, restatedEpsLabel, type EpsDisplayBasis } from './epsBasis';
 import {
   GROSS_NOT_APPLICABLE,
   GROSS_NOT_SEPARATE,
   contextOf,
   costOfRevenue,
   eps,
+  epsAdjusted,
+  epsReported,
+  comparableValues,
   freeCashFlow,
   grossProfit,
   netIncome,
@@ -58,6 +62,8 @@ export const STATEMENT_ROWS: Record<StatementId, StatementRowDef[]> = {
     rawRow('taxProvision', '所得稅'),
     { id: 'netIncome', label: '淨利', unit: 'money', compute: netIncome },
     { id: 'eps', label: 'EPS', unit: 'eps', compute: eps },
+    // The other EPS basis (公告 under 還原 and the reverse); listed only when some period differs (statementRows).
+    { id: 'epsAdjusted', label: '公告 EPS', unit: 'eps', compute: epsReported },
   ],
   balance: [
     rawRow('totalAssets', '總資產'),
@@ -93,11 +99,31 @@ export interface StatementRow {
 
 const STRUCTURAL_REASONS = [GROSS_NOT_APPLICABLE, GROSS_NOT_SEPARATE];
 
+/**
+ * EPS rows for the display basis: under 還原 the EPS row is the restated figure (「還原 EPS（依配股追溯調整）」) and
+ * a 「公告 EPS」 row follows; under 公告 the reverse. Without any restatement only the plain EPS row.
+ */
+function epsRowDef(def: StatementRowDef, history: FinancialHistory, basis: EpsDisplayBasis, restating: boolean): StatementRowDef {
+  if (!restating) return def;
+  const restatedLabel = restatedEpsLabel(history);
+  if (def.id === 'eps') return { ...def, label: basis === 'restated' ? restatedLabel : '公告 EPS' };
+  return basis === 'restated' ? def : { ...def, label: restatedLabel, compute: epsAdjusted };
+}
+
 /** Rows of one statement for every period of the given kind (the table shows all of them). */
-export function statementRows(history: FinancialHistory, kind: PeriodKind, statement: StatementId): StatementRow[] {
-  const ctx = contextOf(history, kind);
+export function statementRows(
+  history: FinancialHistory,
+  kind: PeriodKind,
+  statement: StatementId,
+  epsBasis: EpsDisplayBasis = 'restated',
+): StatementRow[] {
+  const ctx = contextOf(history, kind, epsBasis);
   const ends = ctx.series.end;
-  return STATEMENT_ROWS[statement].map((def): StatementRow => {
+  const restating = statement === 'income' && hasEpsRestatement(history);
+  const defs = STATEMENT_ROWS[statement]
+    .filter((def) => def.id !== 'epsAdjusted' || restating)
+    .map((def) => (def.id === 'eps' || def.id === 'epsAdjusted' ? epsRowDef(def, history, epsBasis, restating) : def));
+  return defs.map((def): StatementRow => {
     const results = ends.map((_, index): MetricResult => {
       if (def.compute) return def.compute(ctx, index);
       return { value: null, basis: 'reported', formula: def.label, inputs: [], notes: [], reason: NOT_PROVIDED };
@@ -112,7 +138,7 @@ export function statementRows(history: FinancialHistory, kind: PeriodKind, state
       unit: def.unit,
       values,
       results,
-      changes: values.map((_, index) => yoy(values, ends, index, def.unit)),
+      changes: comparableValues(results).map((_, index, comparable) => yoy(comparable, ends, index, def.unit)),
       absent: def.compute === null || absent,
       note: def.compute === null ? NOT_PROVIDED : absent ? (structural ?? NOT_PROVIDED) : null,
       derived: results.some((result) => result.basis === 'derived' && result.value !== null),

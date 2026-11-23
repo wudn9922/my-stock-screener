@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockSite, buildReport } from "./mocks";
-import { mockDeviceAccount, accountPreference } from "./account-fixture";
+import { mockDeviceAccount, accountPreference, mockMarketLogin } from "./account-fixture";
 import { createWatchlist, visitWatchlist } from "../src/watchlists/model";
 
 test("welcome is visible before the app bundle and the normal launch opens watchlists", async ({
@@ -25,7 +25,7 @@ test("welcome is visible before the app bundle and the normal launch opens watch
       await page
         .locator("#atlas-welcome")
         .evaluate((element) => getComputedStyle(element).backgroundColor),
-    ).toBe("rgb(11, 14, 19)");
+    ).toBe("rgb(14, 16, 20)");
   } finally {
     release();
   }
@@ -114,11 +114,12 @@ test("compact home reserves at least 80% of main viewport for quotes; tickers le
   });
   expect(geometry.proportion).toBeGreaterThanOrEqual(0.8);
   expect(geometry.height).toBeGreaterThanOrEqual(44);
-  expect(geometry.height).toBeLessThanOrEqual(52);
+  expect(geometry.height).toBeLessThanOrEqual(await page.locator('.site-tabbar').isVisible() ? 89 : 52);
   expect(geometry.ticker).toBeGreaterThan(geometry.name);
   expect(geometry.overflow).toBe(0);
   for (const button of await board
     .locator(".wb-toolbar button, .wb-list-toolbar button, select")
+    .filter({ visible: true })
     .all())
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: testInfo.outputPath("compact-watchlist.png") });
@@ -138,6 +139,7 @@ test("compact home reserves at least 80% of main viewport for quotes; tickers le
 test("quote failures name a useful public cause without exposing the response body", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page, { failingSymbols: ["AAPL"] });
   await page.route("**/report/trending-stocks.json", (route) =>
     route.fulfill({

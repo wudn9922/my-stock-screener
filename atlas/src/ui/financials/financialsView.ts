@@ -24,7 +24,9 @@ import {
   type MetricResult,
   type MetricUnit,
   type PeriodLabel,
+  comparableValues,
 } from '../../fundamentals/financialMetrics';
+import { restatedEpsLabel, type EpsDisplayBasis } from '../../fundamentals/epsBasis';
 import { toneClass } from '../format';
 
 /**
@@ -57,6 +59,8 @@ export function windowIndices(count: number, span: number): number[] {
 export interface MetricView {
   id: MetricId;
   label: string;
+  /** Chart title: the label, or 「還原 EPS（依配股追溯調整）」 when the EPS shown are restated. */
+  title: string;
   unit: MetricUnit;
   results: MetricResult[];
   values: (number | null)[];
@@ -75,13 +79,23 @@ export interface MetricView {
 
 export interface FinancialsView {
   kind: PeriodKind;
+  /** EPS display basis the view was built with. */
+  epsBasis: EpsDisplayBasis;
   labels: PeriodLabel[];
   metrics: Record<MetricId, MetricView>;
 }
 
-/** `span` is the number of periods drawn (defaults to CHART_PERIODS); the full series stays in every value array. */
-export function buildView(history: FinancialHistory, kind: PeriodKind, span: number = CHART_PERIODS[kind]): FinancialsView {
-  const ctx = contextOf(history, kind);
+/**
+ * `span` is the number of periods drawn (defaults to CHART_PERIODS); the full series stays in every value array.
+ * `epsBasis`: EPS on today's share basis (還原, default) or as reported (公告); YoY and CAGR compare restated EPS either way.
+ */
+export function buildView(
+  history: FinancialHistory,
+  kind: PeriodKind,
+  span: number = CHART_PERIODS[kind],
+  epsBasis: EpsDisplayBasis = 'restated',
+): FinancialsView {
+  const ctx = contextOf(history, kind, epsBasis);
   const labels = periodLabels(history, kind);
   const ends = ctx.series.end;
   const count = ends.length;
@@ -99,12 +113,14 @@ export function buildView(history: FinancialHistory, kind: PeriodKind, span: num
           latestIndex = i;
           break;
         }
-      const changes = values.map((_, index) => yoy(values, ends, index, def.unit));
+      const comparable = comparableValues(results);
+      const changes = comparable.map((_, index) => yoy(comparable, ends, index, def.unit));
       // CAGR only where growth means something; ratios and the sign-flipping non-operating line get an average.
       const ratio = def.unit === 'pct' || def.unit === 'times' || id === 'nonOperatingIncome';
       metrics[id] = {
         id,
         label: def.label,
+        title: id === 'eps' && results.some((item) => item.basis === 'restated') ? restatedEpsLabel(history) : def.label,
         unit: def.unit,
         results,
         values,
@@ -112,11 +128,11 @@ export function buildView(history: FinancialHistory, kind: PeriodKind, span: num
         window,
         latestIndex,
         yoy: latestIndex === null ? null : changes[latestIndex]!,
-        cagr: ratio ? null : windowCagr(values, ends, window, kind === 'quarterly' ? quarters : undefined),
+        cagr: ratio ? null : windowCagr(comparable, ends, window, kind === 'quarterly' ? quarters : undefined),
         average: ratio ? windowAverage(values, window) : null,
       };
     }
-  return { kind, labels, metrics };
+  return { kind, epsBasis, labels, metrics };
 }
 
 // ------------------------------------------------------------------ key metrics (first screen)

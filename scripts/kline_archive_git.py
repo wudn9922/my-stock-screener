@@ -74,6 +74,11 @@ def publish(path, payload=None, summary=None, sleep=time.sleep, create_only=Fals
     if payload:
         with archive.timed("publish.apply_operations"):
             archive.apply_operations(path, payload, rebuild_manifest=False)
+        # The normal import remains append-only. Only the audited ^TWII path
+        # may repair prior zero volumes from matching raw Yahoo v8 Chart data.
+        from repair_twii_volume import recent_yahoo_backfill
+        with archive.timed("publish.twii_v8_backfill"):
+            recent_yahoo_backfill(path, base)
     archive.verify(path, base, summary, refresh_manifest=bool(payload))
     with archive.timed("publish.stage"):
         git(path, "add", "-A", "--", ".")

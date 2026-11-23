@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ChartCandlestick, LayoutDashboard, ListFilter, Search, Settings, Star, UserRound, X } from 'lucide-react';
+import { takeConsoleListScroll } from './consoleListScroll';
+import { ChartCandlestick, LayoutDashboard, ListFilter, Plus, Search, Settings, Star, UserRound, X } from 'lucide-react';
 import { useRoute } from './useRoute';
 import type { Page, Route } from './routes';
 import { SCREENER_HOSTING } from './HostingMode';
@@ -15,6 +16,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
 import './siteNav.css';
 import { DataHealthPanel } from '../ui/DataHealthPanel';
 import { StorageNotice } from '../auth/StorageNotice';
+import { MarketQuotaNotice } from '../ui/MarketLogin';
 import { StorageModeNotice } from '../ui/StorageAdminPanel';
 import { LegacyImportCard } from '../ui/LegacyImportCard';
 import { RouteBoundary } from './RouteBoundary';
@@ -28,6 +30,7 @@ import {
 } from './routeMemory';
 import { chartListFor, listPosition, listState, rememberChartList, type ChartListContext, type ChartListItem } from './listContext';
 import { ListNavBar } from '../ui/ListNavBar';
+import { requestWatchlistActions, watchlistActionsRequest } from './watchlistActionsRequest';
 
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
@@ -53,13 +56,13 @@ const NAV: { page: NavPage; label: string; icon: typeof Star }[] = [
   { page: 'console', label: '我的', icon: UserRound },
 ];
 const PAGE_TITLES: Record<Page, string> = {
-  markets: '大盤',
+  markets: '市場',
   world: '世界指數',
   themes: '題材輪動',
   screener: '選股',
   chart: '圖表',
   financials: '財報分析',
-  watchlist: '自選清單',
+  watchlist: '自選',
   console: '我的',
 };
 const RATES_TITLE = '美債與利率';
@@ -131,6 +134,9 @@ export function Site() {
   const localSymbols = useMemo(() => [...reportSymbols(report), ...WORLD_ASSETS.map(asset => ({ symbol: asset.symbol, name: `${asset.ticker} ${asset.name}` }))], [report]);
 
   useEffect(() => applyColorConvention(preferences.colors), [preferences.colors]);
+  useEffect(() => {
+    if (route.page !== 'watchlist') watchlistActionsRequest.consume();
+  }, [route.page]);
   // A navigation that names a symbol becomes one chart request (URL syncs never repeat it).
   useEffect(() => {
     if (route.page !== 'chart' || !route.symbol) return;
@@ -155,12 +161,32 @@ export function Site() {
   }, []);
   const section = scrollSection(route);
   const identity = scrollIdentity(route);
+  // 我的 sub-views open at the top; going back to the 我的 list puts its scroll back.
+  const consoleListScroll = useRef(0);
   useLayoutEffect(() => {
     const previous = scrolled.current;
     scrolled.current = { page: route.page, section, identity };
     if (previous && previous.page === route.page && previous.section === section) return;
+    const inConsole = previous?.page === 'console' && route.page === 'console';
+    // Read the list's scroll from the last scroll event: the shorter sub-view may already have clamped scrollTop.
+    if (inConsole && previous.section === '')
+      consoleListScroll.current = takeConsoleListScroll() ?? pageScrolls.current.get('console')?.top ?? 0;
     const saved = previous && previous.page !== route.page && isKeptPage(route.page) ? pageScrolls.current.get(route.page) : undefined;
-    document.getElementById('main')?.scrollTo?.({ top: saved?.identity === identity ? saved.top : 0 });
+    const restoreList = inConsole && section === '';
+    const top = restoreList ? consoleListScroll.current : saved?.identity === identity ? saved.top : 0;
+    const main = document.getElementById('main');
+    main?.scrollTo?.({ top });
+    if (!restoreList || !main) return;
+    // Content below the rows (the footer) can mount a few frames later, so the list may be briefly too short and the
+    // browser clamps the scroll; keep applying it for a few frames until it holds.
+    let frame = 0;
+    let tries = 0;
+    const settle = () => {
+      if (Math.abs(main.scrollTop - top) > 1) main.scrollTo?.({ top });
+      if (Math.abs(main.scrollTop - top) > 1 && ++tries < 12) frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
   }, [route.page, section, identity]);
   useEffect(() => {
     const titles =
@@ -203,6 +229,7 @@ export function Site() {
       navigate(next, { ...options, state: next.page === 'chart' || next.page === 'financials' ? listState(window.history.state) : null }),
     [navigate],
   );
+  const manageLists = useCallback(() => navigate({ page: 'console', view: 'lists' }), [navigate]);
   const onSearchSelect = useCallback(
     (result: SearchResult) => openChart({ symbol: result.symbol, name: result.name }),
     [openChart],
@@ -250,6 +277,13 @@ export function Site() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [position, stepList]);
+  // Phone/tablet chart header 返回: the previous in-app page when this chart was opened inside Atlas (a history
+  // entry Atlas pushed); a deep link or reload has no such entry, so it opens 自選 instead of leaving the site.
+  const initialHistoryLength = useRef(window.history.length);
+  const chartBack = useCallback(() => {
+    if (navSource === 'app' && window.history.length > initialHistoryLength.current) window.history.back();
+    else navigate(navDestination(routeMemory.current, 'watchlist'));
+  }, [navSource, navigate]);
   const listNav = position && chartList ? <ListNavBar name={chartList.name} position={position} onStep={stepList} /> : null;
 
   /**
@@ -297,13 +331,15 @@ export function Site() {
       case 'themes': return <ThemesPage {...pageProps} theme={shown.theme} market={shown.market} view={shown.v} />;
       case 'screener': return <ScreenerPage {...pageProps} group={shown.group} f={shown.f} />;
       case 'watchlist': return <ConsolePage {...pageProps} section="lists" list={shown.list} />;
-      case 'console': return <ConsolePage {...pageProps} section="settings" />;
+      case 'console':
+        return <ConsolePage {...pageProps} section="settings" view={shown.page === 'console' ? shown.view : undefined} />;
       default: return null;
     }
   };
 
   return (
-    <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}>
+    <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}
+      data-console-view={mobile && route.page === 'console' ? route.view : undefined}>
       <header className="site-topbar">
         <a
           className="site-brand"
@@ -329,6 +365,9 @@ export function Site() {
           </div>
         )}
         <div className="site-topbar-end">
+          {mobile && route.page === 'watchlist' && <button type="button" className="icon-button site-watchlist-add" aria-label="新增清單" title="新增清單" onClick={requestWatchlistActions}>
+            <Plus size={21} aria-hidden="true" />
+          </button>}
           {mobile && <button type="button" className="icon-button site-mobile-search" aria-label="搜尋股票" title="搜尋股票" onClick={() => setSearchOpen(true)}>
             <Search size={21} aria-hidden="true" />
           </button>}
@@ -358,9 +397,12 @@ export function Site() {
       </nav>
       <main className="site-main" id="main">
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
-        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' ? 'full' : 'alerts'} />}</div>
+        <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' && !(mobile && route.view) ? 'full' : 'alerts'} />}<MarketQuotaNotice /></div>
         {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
-          <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />}
+          <div className="market-head">
+            {reportDate && <span className="market-head-date">資料日 {formatDateTime(reportDate, false)}</span>}
+            <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />
+          </div>}
         {KEPT_PAGES.filter((page) => visited.current.has(page)).map((page) => {
           const shown = routeMemory.current.pages[page];
           return shown && (
@@ -393,6 +435,8 @@ export function Site() {
                 onOpenFinancials={openFinancials}
                 view={stockView}
                 onViewChange={setStockView}
+                onBack={chartBack}
+                onManageLists={manageLists}
                 reportSymbols={localSymbols}
               />
               </Suspense>
@@ -401,9 +445,10 @@ export function Site() {
         )}
         <div className="site-data-footer">
           <div id="site-page-notes" />
-          {route.page === 'console' && <LegacyImportCard />}
-          <StorageModeNotice />
-          <DataHealthPanel report={reportState} />
+          {route.page === 'console' && !(mobile && route.view) && <LegacyImportCard />}
+          {/* Phones and tablets keep the storage mode and data health under 我的 › 資料狀態, not under every page. */}
+          {!mobile && <StorageModeNotice />}
+          {!mobile && <DataHealthPanel report={reportState} />}
         </div>
       </main>
       <nav className="site-tabbar" aria-label="主要頁面">
@@ -415,7 +460,7 @@ export function Site() {
             aria-current={navPageOf(route.page) === page ? 'page' : undefined}
             onClick={() => go(page)}
           >
-            <Icon size={21} aria-hidden="true" />
+            <Icon size={22} aria-hidden="true" />
             <span>{label}</span>
           </button>
         ))}

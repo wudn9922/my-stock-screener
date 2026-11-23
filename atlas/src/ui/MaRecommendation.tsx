@@ -7,9 +7,13 @@ import {
   MA_RANGE_KEYS,
   MA_RANGE_LABELS,
   fetchMaRecommendation,
+  maMetaParts,
+  hasComparableMaWindow,
+  maReferenceDescription,
   maSelectorLink,
   recommendedPeriods,
   v2Periods,
+  type MaRecommendation as MaRecommendationData,
   type MaRecommendationLoadResult,
   type MaRecommendationRange,
   type MaRecommendationV2,
@@ -86,6 +90,43 @@ const scoreText = (score: number | null) => (score === null ? '' : `（${Math.ro
 const scoreOf = (range: MaRecommendationRange) => range.candidates.find((c) => c.period === range.final)?.score ?? null;
 const percent = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(1)}%`);
 const beats = (rank: { pct: number } | null | undefined) => (rank ? `贏過 ${Math.round(rank.pct)}%` : '');
+
+/** VERSION 3 range notes: a caution when no MA in the range worked as a boundary, and why a held pick differs from the new best. */
+export function MaRangeNotes({ range }: { range: MaRecommendationRange }) {
+  const heldNote = range.held && range.computedFinal !== range.final;
+  if (!range.unsuitable && !heldNote) return null;
+  return <>
+    {range.unsuitable && <p className="ws-ma-reco-note ws-ma-reco-caution" role="note">反手回測為負，此區間均線僅供參考</p>}
+    {heldNote && <p className="ws-ma-reco-note ws-ma-reco-held">沿用上次（本次試算 MA{range.computedFinal}，差距未達換線門檻）</p>}
+  </>;
+}
+
+/** VERSION 3 backtest settings (cost, reference pool, adjusted prices); renders nothing when none is present. */
+export function MaMetaLine({ data }: { data: MaRecommendationData }) {
+  const parts = maMetaParts(data);
+  return parts.length ? <p className="ws-ma-reco-status ws-ma-reco-meta">{parts.join(' · ')}</p> : null;
+}
+
+/** Keep the price basis visible when users apply selector periods to the chart. */
+export function MaPriceBasisNote({ adjusted }: { adjusted: boolean }) {
+  return <p className="ws-ma-reco-status ws-ma-price-basis" role="note">
+    {adjusted ? '選線使用已還原股利價格；' : '選線資料未標示已還原股利；'}圖表均線使用拆股調整、未還原股利的價格，除息附近可能不同。套用的是 SMA 週期。
+  </p>;
+}
+
+/** A legacy return stays available; its drawdown/trades must not be mixed with corrected windows. */
+export function MaBacktestMetrics({ range, comparable }: { range: MaRecommendationRange; comparable: boolean }) {
+  const final = range.candidates.find((candidate) => candidate.period === range.final);
+  const trades = final?.sarTrades;
+  return <>
+    {percent(final?.sarReturn ?? null)}
+    {range.windowYears ? <small>近 {range.windowYears} 年</small> : null}
+    {comparable && <>
+      <small>最大回撤 {percent(final?.sarDrawdown ?? null)}</small>
+      <small>交易 {trades !== null && trades !== undefined && Number.isInteger(trades) && trades >= 0 ? trades : '—'} 次</small>
+    </>}
+  </>;
+}
 
 /** One toggle button per candidate period (shared by the current and the experimental v2 tables). */
 function CandidateButton({ period, star, score, extra, applied, onToggle }: {
@@ -240,11 +281,12 @@ function DailyMaRecommendation({
         : `SMA ${period} 已鎖定，請先解鎖後再取消套用。`);
   };
   const link = maSelectorLink(symbol);
+  const comparable = data ? hasComparableMaWindow(data) : false;
   const ranges = data ? MA_RANGE_KEYS.map((key) => data.ranges.find((range) => range.key === key)!) : [];
   return (
     <div className="ws-ma-reco" data-testid="ma-recommendation" aria-busy={!result}>
       <dl className="ws-volatility-values">
-        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每月更新）。括號內為結構分數。">
+        <div title="ma-selector 依日線選出「最能分出多空」的 SMA：短期 15–33、中期 34–45、長期 46–110（每檔每 3 個月更新一次）。括號內為結構分數。">
           <dt>建議均線</dt>
           <dd>
             {data
@@ -260,6 +302,8 @@ function DailyMaRecommendation({
             ? `日線至 ${result.data.asof}${result.data.limited ? ' · 資料不足 3.5 年，中長期僅供參考' : ''}`
             : result.message}
       </p>
+      {data && <MaMetaLine data={data} />}
+      {data && <MaPriceBasisNote adjusted={data.adjusted} />}
       {savedStock && <p className="ws-ma-reco-status">個股均線（所有清單共用）：{parameterMAs(savedStock).join(' / ')}</p>}
       {parameterError && <p role="status">{parameterError}</p>}
       <button type="button" className="ghost-button" disabled={!applied.length && !savedStock}
@@ -276,6 +320,9 @@ function DailyMaRecommendation({
               {missing.length ? '套用全部建議' : timeframe === '1D' ? '建議已套用' : '切到日線查看'}
             </button>
           </div>
+          <p className="ws-ma-reco-status" role="note">{comparable
+            ? '跨區間持倉以起點前一日收盤重新計價，並按逐日市值計算回撤；報酬與交易次數採同一觀察窗。'
+            : '舊版回測視窗：保留報酬供參考；與新版視窗不可直接比較，暫不顯示回撤與交易次數。'}</p>
           <table className="ws-ma-reco-table">
             <thead>
               <tr>
@@ -286,7 +333,6 @@ function DailyMaRecommendation({
             </thead>
             <tbody>
               {ranges.map((range) => {
-                const final = range.candidates.find((c) => c.period === range.final);
                 return (
                   <tr key={range.key}>
                     <th scope="row">
@@ -304,10 +350,10 @@ function DailyMaRecommendation({
                             applied={applied} onToggle={toggle} />
                         ))}
                       </div>
+                      <MaRangeNotes range={range} />
                     </td>
                     <td>
-                      {percent(final?.sarReturn ?? null)}
-                      {range.windowYears ? <small>近 {range.windowYears} 年</small> : null}
+                      <MaBacktestMetrics range={range} comparable={comparable} />
                     </td>
                   </tr>
                 );
@@ -316,10 +362,10 @@ function DailyMaRecommendation({
           </table>
           {data.v2 && <MaRecommendationV2 v2={data.v2} applied={applied} onToggle={toggle} onApply={apply} />}
           <HelpDisclosure label="建議均線與分數說明">
-            {ranges.map((range) => `${MA_RANGE_LABELS[range.key]} ${range.min}–${range.max}`).join('、')}（每月更新），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 83 檔基準的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
+            {ranges.map((range) => `${MA_RANGE_LABELS[range.key]} ${range.min}–${range.max}`).join('、')}（每檔每 3 個月更新一次），括號內為結構分數。分數＝結構分數（0–100）：突破、二日、回測、雜訊、糾結等指標相對 {maReferenceDescription(data)}的百分位加權，越高越能分出多空。候選＝與最高分相差 ≤15 分；建議＝多空反手報酬距最佳
             ≤5 個百分點者中分數最高，所以★不一定是分數最高的那條。反手報酬為歷史模擬，不代表未來績效。股票適合度{' '}
             {data.suitability.short === null ? '—' : `${Math.round(data.suitability.short)} / 100`}。
-            「贏過 X%」＝這檔的區間最高分（平滑後）在 83 檔基準股票各自的區間最高分中贏過幾 %；「2年」＝同一個短期公式在近 2 年的分數，短期與中期可以用同一把尺比較。兩者只是參考，不影響選線。
+            「贏過 X%」＝這檔的區間最高分（平滑後）在 {maReferenceDescription(data)}各自的區間最高分中贏過幾 %；「2年」＝同一個短期公式在近 2 年的分數，短期與中期可以用同一把尺比較。兩者只是參考，不影響選線。
           </HelpDisclosure>
         </>
       )}

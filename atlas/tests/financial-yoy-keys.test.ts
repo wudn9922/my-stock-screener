@@ -238,7 +238,7 @@ describe('gross profit', () => {
 
 describe('statement tables', () => {
   it('lists the three statements with the requested lines', () => {
-    expect(STATEMENT_ROWS.income.map((row) => row.label)).toEqual(['營收', '營業成本', '毛利', '營業利益', '業外損益', '稅前淨利', '所得稅', '淨利', 'EPS']);
+    expect(STATEMENT_ROWS.income.map((row) => row.label)).toEqual(['營收', '營業成本', '毛利', '營業利益', '業外損益', '稅前淨利', '所得稅', '淨利', 'EPS', '公告 EPS']);
     expect(STATEMENT_ROWS.balance.map((row) => row.label)).toEqual(['總資產', '權益', '總負債', '現金']);
     expect(STATEMENT_ROWS.cashflow.map((row) => row.label)).toEqual(['營業現金流', '資本支出', '自由現金流', '股利', '庫藏股']);
   });

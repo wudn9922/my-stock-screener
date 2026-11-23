@@ -16,6 +16,8 @@ export interface PeFigures {
   fiscalYear: number | null;
   source: string | null;
   asOf: string | null;
+  /** Set when restatedPe.ts recomputed a figure from restated EPS (配股 / splits): what was changed, for the help text. */
+  epsNote?: string | null;
 }
 
 export async function getPeFigures(symbol: string, price: number | null | undefined, source = getValuation): Promise<PeFigures> {

@@ -118,6 +118,7 @@ class _PostgresFixture(unittest.TestCase):
         # Real-PostgreSQL parse/apply guard (PL/pgSQL bodies are only compiled on a real server).
         cls.run_sql((MIGRATION.parent / 'atlas_holdings.sql').read_text())
         cls.run_sql((MIGRATION.parent / 'device_sessions.sql').read_text())
+        cls.run_sql((MIGRATION.parent / 'web_push_subscriptions.sql').read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -140,7 +141,7 @@ class _PostgresFixture(unittest.TestCase):
 
     def setUp(self):
         self.run_sql('truncate atlas_private.line_login_handoffs;')
-        self.run_sql('truncate public.atlas_holdings, public.atlas_holding_accounts, atlas_private.device_sessions;')
+        self.run_sql('truncate public.atlas_holdings, public.atlas_holding_accounts, atlas_private.device_sessions, atlas_private.web_push_subscriptions;')
         self.run_sql(
             "truncate public.atlas_storage_access, public.index_configs, "
             + ", ".join("public." + table for table in TABLES)
@@ -151,6 +152,69 @@ class _PostgresFixture(unittest.TestCase):
         return self.run_sql(
             f"insert into public.atlas_storage_access(line_user_id,storage_mode,updated_by) values ('{user}','{mode}','{OWNER}') on conflict(line_user_id) do update set storage_mode=excluded.storage_mode,updated_by=excluded.updated_by;"
         )
+
+class WebPushSqlTests(_PostgresFixture):
+    P256DH = "B" + "A" * 86
+    AUTH = "A" * 22
+
+    def push(self, operation, account=USER, payload=None, role="service_role", success=True):
+        body = json.dumps(payload or {}).replace("'", "''")
+        result = self.run_sql(
+            f"set role {role}; select public.atlas_web_push('{operation}', '{account}', '{body}'::jsonb);",
+            success=success,
+        )
+        # psql prints the SET command tag first; the function result is the last line.
+        return result.splitlines()[-1] if success else result
+
+    def subscribe(self, endpoint, account=USER, limit=10):
+        return json.loads(self.push("subscribe", account, {
+            "endpoint": endpoint, "p256dh": self.P256DH, "auth": self.AUTH, "label": "iPhone", "limit": limit,
+        }))
+
+    def test_browsers_cannot_reach_the_table_or_function(self):
+        for role in ("anon", "authenticated"):
+            self.assertIn("permission denied", self.push("list", role=role, success=False))
+            self.assertIn("permission denied", self.run_sql(
+                f"set role {role}; select count(*) from atlas_private.web_push_subscriptions;", success=False))
+        self.assertEqual(self.run_sql(
+            "select relrowsecurity from pg_class where oid = 'atlas_private.web_push_subscriptions'::regclass;"), "t")
+
+    def test_cap_keeps_newest_devices_and_reassigns_a_reused_endpoint(self):
+        for index in range(12):
+            result = self.subscribe(f"https://fcm.googleapis.com/fcm/send/{index}")
+        self.assertEqual(result["count"], 10)
+        listed = json.loads(self.push("list", payload={"endpoint": "https://fcm.googleapis.com/fcm/send/11"}))
+        self.assertEqual(len(listed), 10)
+        self.assertNotIn("endpoint", listed[0])
+        self.assertEqual([row["current"] for row in listed].count(True), 1)
+        self.assertEqual(listed[0]["host"], "fcm.googleapis.com")
+        # The same browser logged in to another LINE account now belongs to that account only.
+        self.subscribe("https://fcm.googleapis.com/fcm/send/11", account=OTHER)
+        self.assertEqual(len(json.loads(self.push("targets"))), 9)
+        self.assertEqual(len(json.loads(self.push("targets", account=OTHER))), 1)
+
+    def test_report_marks_success_deletes_gone_and_drops_repeated_failures(self):
+        ok = self.subscribe("https://web.push.apple.com/ok")["id"]
+        gone = self.subscribe("https://web.push.apple.com/gone")["id"]
+        failing = self.subscribe("https://web.push.apple.com/failing")["id"]
+        foreign = self.subscribe("https://web.push.apple.com/foreign", account=OTHER)["id"]
+        self.push("report", payload={"ok": [ok], "gone": [gone, foreign], "failed": [failing]})
+        rows = {row["id"]: row for row in json.loads(self.push("list"))}
+        self.assertEqual(set(rows), {ok, failing})
+        self.assertIsNotNone(rows[ok]["last_success_at"])
+        self.assertEqual(rows[failing]["failure_count"], 1)
+        self.assertEqual(len(json.loads(self.push("targets", account=OTHER))), 1)
+        for _ in range(19):
+            self.push("report", payload={"failed": [failing]})
+        self.assertEqual([row["id"] for row in json.loads(self.push("list"))], [ok])
+        removed = json.loads(self.push("unsubscribe", payload={"id": ok}))
+        self.assertEqual(removed["removed"], 1)
+
+    def test_rejects_non_https_endpoints_and_malformed_keys(self):
+        self.push("subscribe", payload={"endpoint": "http://fcm.googleapis.com/x", "p256dh": self.P256DH, "auth": self.AUTH}, success=False)
+        self.push("subscribe", payload={"endpoint": "https://fcm.googleapis.com/x", "p256dh": "bad", "auth": self.AUTH}, success=False)
+        self.push("list", account="not-a-line-id", success=False)
+
 
 class AccountStorageSqlTests(_PostgresFixture):
     def test_owner_default_and_explicit_modes(self):

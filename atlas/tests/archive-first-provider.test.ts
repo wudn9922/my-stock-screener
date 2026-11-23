@@ -5,6 +5,10 @@ import { KlineArchive } from '../src/market-data/KlineArchive';
 import { EdgeYahooProvider } from '../src/market-data/EdgeYahooProvider';
 import { aggregateBars } from '../src/market-data/StaticSeriesProvider';
 import { getMarketProfile, type BarResult, type MarketDataProvider } from '../src/market-data/MarketDataProvider';
+import { marketProxyAccess, staticTokenSource } from '../src/market-data/marketProxyAccess';
+
+// These suites exercise a signed-in session; tests/market-proxy-access.test.ts covers the signed-out gate.
+marketProxyAccess.useTokenSource(staticTokenSource('test-token'));
 
 const body = 'Date,Open,High,Low,Close,Volume\n2026-01-02,100,102,99,101,1000\n2026-01-05,101,104,100,103,2000\n';
 const make = () => {

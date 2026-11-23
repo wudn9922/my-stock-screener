@@ -1,6 +1,6 @@
 import type { GroupItem } from '../report/schema';
 import type { FinancialHistory, PeriodKind } from './FinancialHistory';
-import { METRICS, contextOf, metricSeries, yoy, type MetricId } from './financialMetrics';
+import { METRICS, comparableValues, contextOf, metricSeries, yoy, type MetricId } from './financialMetrics';
 
 /** An industry match is required; a shared broad sector alone is not a peer match. */
 export function industryPeers(symbol: string, items: readonly GroupItem[]): GroupItem[] {
@@ -30,7 +30,8 @@ export function peerFigures(history: FinancialHistory, kind: PeriodKind) {
     figures: PEER_COLUMNS.map(({ id, growth }) => {
       if (index < 0) return { value: null, reason: `沒有${kind === 'quarterly' ? '季度' : '年度'}資料` };
       if (!growth) return METRICS[id].compute(ctx, index);
-      const values = metricSeries(ctx, id).map((entry) => entry.value);
+      // EPS growth on today's share basis (a 配股 or split between the two periods is not growth).
+      const values = comparableValues(metricSeries(ctx, id));
       const result = yoy(values, ctx.series.end, index, METRICS[id].unit);
       return { value: result.value, reason: result.label ?? result.reason };
     }),

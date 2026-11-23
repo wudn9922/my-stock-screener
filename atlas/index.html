@@ -2,19 +2,26 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bxhqpfeberqbtxymghyt.supabase.co https://api.line.me https://api-data.line.me https://liff.line.me https://access.line.me https://*.line-scdn.net https://raw.githubusercontent.com __ATLAS_MARKET_PROXY_ORIGIN__; img-src 'self' data: https://*.line-scdn.net; font-src 'self' data:; frame-src 'self' line: https://liff.line.me https://*.line.me; object-src 'none'; base-uri 'self'" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Atlas" />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="theme-color" content="#11151b" />
+    <meta name="theme-color" content="#0E1014" />
     <meta name="description" content="Atlas 股市報告：每日大盤多空、世界指數、選股清單與技術分析圖表" />
+    <!-- Link previews (LINE, Messenger and similar read Open Graph). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Atlas" />
+    <meta property="og:title" content="Atlas 股市報告" />
+    <meta property="og:description" content="每日大盤多空、世界指數、選股清單與技術分析圖表" />
+    <meta property="og:locale" content="zh_TW" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <link rel="icon" href="%BASE_URL%icon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%icon-192.png" />
     <title>Atlas 股市報告</title>
     <style>
-      body{margin:0;background:#0b0e13}
-      .atlas-welcome{box-sizing:border-box;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;background:#0b0e13;color:#edf0f7;font:16px system-ui,sans-serif;text-align:center}.atlas-welcome svg{width:64px;height:64px;color:#8bb8ff}.atlas-welcome h1{font-size:32px;letter-spacing:3px;margin:0}.atlas-welcome p{color:#a3adbd;max-width:30em;margin:0;line-height:1.7}.atlas-welcome button{min-height:44px;padding:8px 24px;border:1px solid #5b7393;border-radius:10px;background:#172334;color:#edf0f7;font:inherit}.atlas-welcome progress{width:120px;height:3px;accent-color:#8bb8ff}
+      body{margin:0;background:#0E1014}
+      .atlas-welcome{box-sizing:border-box;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;background:#0E1014;color:#EEF1F5;font:16px system-ui,sans-serif;text-align:center}.atlas-welcome svg{width:64px;height:64px;color:#F5B544}.atlas-welcome h1{font-size:32px;letter-spacing:3px;margin:0}.atlas-welcome p{color:#A4ADBA;max-width:30em;margin:0;line-height:1.7}.atlas-welcome button{min-height:44px;padding:8px 24px;border:1px solid #2A303A;border-radius:10px;background:#161A20;color:#edf0f7;font:inherit}.atlas-welcome progress{width:120px;height:3px;accent-color:#F5B544}
     </style>
   </head>
   <body>

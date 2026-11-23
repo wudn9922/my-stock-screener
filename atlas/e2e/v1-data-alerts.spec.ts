@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { openPanel, setProvider } from './site-helpers';
+import { openPanel, openStockMenu, setProvider } from './site-helpers';
 import type { AlertDefinition } from '../src/storage/schema';
 import type { Bar, BarResult, Timeframe } from '../src/market-data/MarketDataProvider';
 
@@ -288,6 +288,7 @@ test('expired Yahoo bars remain visible with a stale label when refresh fails', 
 
   await page.clock.fastForward(60_001);
   offline = true;
+  await openStockMenu(page);
   await page
     .locator('.ws-header')
     .getByRole('button', { name: '重新整理行情', exact: true })

@@ -19,6 +19,7 @@ import {
   SESSION_CLOSE_SOURCE_QUALIFIER,
 } from './MarketProfile';
 import { MarketDataUnavailableError } from './ProviderErrors';
+import { isMarketQuotaError } from './marketProxyAccess';
 import { isQuarantinedBar, usableBarResult } from './KlineIntegrity';
 
 export const MARKET_CACHE_DATABASE = storageName('atlas-market-cache');
@@ -298,7 +299,8 @@ function isAbortError(error: unknown): boolean {
 }
 
 function isUnavailable(error: unknown): boolean {
-  if (error instanceof MarketDataUnavailableError) return true;
+  // A quota refusal keeps showing the last cached copy; signed out never does (the login prompt shows).
+  if (error instanceof MarketDataUnavailableError || isMarketQuotaError(error)) return true;
   if (error instanceof TypeError) {
     return /fetch|network|offline|connection|load failed/i.test(error.message);
   }

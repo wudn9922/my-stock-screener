@@ -87,10 +87,18 @@ class World:
         self.state_rows = {}
         self.messages = []
         self.closed = []
+        from breakout_alert.list_notifications import DEFAULT_SETTINGS
+        self.notification_settings = DEFAULT_SETTINGS
         world = self
 
         class Store:
-            def get_monitor_configs(self):
+            user_stocks = ()
+            watchlist_rows = ()
+
+            def get_list_notification_settings(self):
+                return world.notification_settings
+
+            def get_monitor_configs(self, notification_settings=None):
                 return list(world.configs)
 
             def prune_orphan_states(self, configs):
@@ -192,7 +200,7 @@ class RunnerTest(unittest.TestCase):
         from breakout_alert.account_permissions import CloudStorageDenied
 
         world = World([self.ma_config()], [])
-        def denied(_store):
+        def denied(_store, notification_settings=None):
             raise CloudStorageDenied("not cloud-authorized")
         world.patches["SupabaseStore"].get_monitor_configs = denied
         self.patch(world)
@@ -228,6 +236,31 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(world.quote_calls, [["2330.TW"]])
         self.assertEqual(world.engine_calls, [["2330.TW"]])
         self.assertEqual(world.pruned_drawing_states, [])
+
+    def test_custom_list_settings_filter_ma_and_drawings_but_keep_pruning(self):
+        from breakout_alert.list_notifications import parse_settings
+
+        group_b = dict(self.ma_config("2317.TW"), group_id="tw_g2", raw_group_id="tw_g2")
+        world = World(
+            [dict(self.ma_config(), raw_group_id="tw_g1"), group_b],
+            [
+                {"ticker": "2330.TW", "drawings": [horizontal("2330.TW", "a", 100)]},
+                {"ticker": "2317.TW", "drawings": [horizontal("2317.TW", "b", 100)]},
+            ],
+        )
+        world.notification_settings = parse_settings({"version": 1, "mode": "custom", "lists": {
+            "group:tw_g1": {"ma": True, "drawing": False},
+            "group:tw_g2": {"ma": False, "drawing": True},
+        }})
+        world.patches["SupabaseStore"].user_stocks = [
+            {"ticker": "2330", "group_id": "tw_g1"}, {"ticker": "2317.TW", "group_id": "tw_g2"},
+        ]
+        self.patch(world)
+        runner.main()
+        self.assertEqual(world.engine_calls, [["2330.TW"]])
+        self.assertEqual(sorted(world.state_rows), ["2317.TW"])
+        # Baselines of disabled lists are not pruned.
+        self.assertEqual(world.pruned_drawing_states, [{"2330.TW", "2317.TW"}])
 
     def test_only_drawings_still_runs(self):
         world = World([], [{"ticker": "2317.TW", "drawings": [horizontal("2317.TW", "a", 100)]}])

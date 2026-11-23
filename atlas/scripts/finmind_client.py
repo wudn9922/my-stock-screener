@@ -104,7 +104,9 @@ class Http:
 
 
 def request_url(dataset, code, start_date):
-    return API_URL + "?" + urllib.parse.urlencode({"dataset": dataset, "data_id": code, "start_date": start_date})
+    """code None / "": no data_id, i.e. every stock (datasets of FinMind's "Free" tier without data_id)."""
+    params = {"dataset": dataset, "data_id": code, "start_date": start_date} if code else {"dataset": dataset, "start_date": start_date}
+    return API_URL + "?" + urllib.parse.urlencode(params)
 
 
 def request_interval(token):
@@ -141,7 +143,7 @@ def fetch_rows(http, dataset, code, start_date, token, sleep, log, counter):
                 problem = str(error)
         if attempt < RETRIES:
             used_up = limit_used(counter)
-            log(f"FinMind {dataset} {code}: {problem}" + ("" if used_up else f"; retrying in {RETRY_WAIT:.0f}s"))
+            log(f"FinMind {dataset} {code or '(all stocks)'}: {problem}" + ("" if used_up else f"; retrying in {RETRY_WAIT:.0f}s"))
             if not used_up:
                 sleep(RETRY_WAIT)
     raise FinMindError(f"{problem} (after {RETRIES + 1} attempts)", transient=True)

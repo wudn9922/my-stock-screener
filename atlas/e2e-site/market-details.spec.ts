@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from "./mocks";
+import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
 const at = Date.parse("2026-11-03T16:02:00Z") / 1000;
 
 test("ANT and Claude find the IPO record, open details and never open a fictitious stock chart", async ({
@@ -34,6 +36,7 @@ test("ANT and Claude find the IPO record, open details and never open a fictitio
 test("stock volume view compares completed 5m sessions, while extended quotes keep regular close separate", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.addInitScript((now) => {
     Date.now = () => now;
@@ -115,6 +118,7 @@ test("stock volume view compares completed 5m sessions, while extended quotes ke
 test("missing extended coverage and missing intraday history explain the cause", async ({
   page,
 }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route("https://edge.test/functions/v1/market-chart**", (route) =>
     new URL(route.request().url()).searchParams.get("interval") === "5m"
@@ -128,6 +132,7 @@ test("missing extended coverage and missing intraday history explain the cause",
   await expect(page.getByTestId("active-symbol")).toHaveText("NVDA");
   await expect(page.getByTestId("ohlc-header")).toContainText("O ");
   await expect(page.locator(".chart-loading")).toHaveCount(0);
+  await openStockMenu(page);
   await page.getByTestId("source-info-toggle").click();
   await expect(
     page.getByRole("region", { name: "行情資料說明" }),
@@ -138,6 +143,7 @@ test("missing extended coverage and missing intraday history explain the cause",
       .getByRole("link", { name: "查看官方盤前頁面" }),
   ).toHaveAttribute("href", /nasdaq.com.*nvda\/pre-market/);
   await page.getByTestId("source-info-toggle").click();
+  await closeStockMenu(page);
   await page.getByRole("button", { name: "價量", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "前一交易日同時間量比" }),

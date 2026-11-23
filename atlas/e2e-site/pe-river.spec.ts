@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { mockMarketLogin } from './account-fixture';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
@@ -47,6 +48,9 @@ async function openCard(section: Locator) {
 /** Element screenshots would include the sticky header and tab bar on top of the card. */
 const unstick = (page: Page) => page.addStyleTag({ content: '.fin-head{position:static!important}.bottom-nav,nav[aria-label]{display:none!important}' });
 
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
+
 test('US stock: annual-only river with five labelled multiples, percentile, basis block, no horizontal scroll', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -56,11 +60,11 @@ test('US stock: annual-only river with five labelled multiples, percentile, basi
   await expect(card(page)).toHaveAttribute('data-state', 'ok');
   await expect(card(page).locator('h2')).toHaveText('本益比河流圖');
   // Folded head: the current multiple and its percentile in one line (before the chart mounts).
-  await expect(card(page).locator('.fin-fold-summary')).toContainText(/目前本益比 [\d.]+x · 歷史第 \d+ 百分位/);
+  await expect(card(page).locator('.fin-fold-summary')).toContainText(/目前本益比 [\d.]+x · 自身歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-big-unit')).toHaveText('目前本益比');
   await expect(card(page).locator('.fin-period')).toContainText('年度');
   await expect(card(page).locator('.fin-period')).not.toContainText('TTM');
-  await expect(card(page).locator('.fin-chip').first()).toContainText(/歷史第 \d+ 百分位/);
+  await expect(card(page).locator('.fin-chip').first()).toContainText(/自身歷史第 \d+ 百分位/);
   await expect(card(page).locator('.fin-chip').nth(1)).toContainText(/相對歷史中位數（[\d.]+x）(溢價|折價)/);
   await expect(card(page).locator('.pe-river-legend li')).toHaveCount(5);
   await expect(card(page).locator('.pe-river-chart canvas').first()).toBeVisible();
@@ -87,7 +91,7 @@ test('US stock: annual-only river with five labelled multiples, percentile, basi
   }
   await unstick(page);
   await card(page).scrollIntoViewIfNeeded();
-  await card(page).screenshot({ path: info.outputPath(`pe-river-aapl-${info.project.name}.png`) });
+  if (process.env.ATLAS_PE_SCREENSHOTS === '1') await card(page).screenshot({ path: info.outputPath(`pe-river-aapl-${info.project.name}.png`) });
   expect(errors).toEqual([]);
 });
 
@@ -100,7 +104,7 @@ test('NVDA (split-adjusted file): river is drawn and split-adjustment is stated'
   await expect(card(page).locator('.pe-river-basis')).toContainText('已還原分割');
   await unstick(page);
   await card(page).scrollIntoViewIfNeeded();
-  await card(page).screenshot({ path: info.outputPath(`pe-river-nvda-${info.project.name}.png`) });
+  if (process.env.ATLAS_PE_SCREENSHOTS === '1') await card(page).screenshot({ path: info.outputPath(`pe-river-nvda-${info.project.name}.png`) });
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
@@ -113,7 +117,7 @@ test('Taiwan 2330: current P/E uses the latest trailing-four-quarter EPS', async
   await expect(card(page).locator('.pe-river-basis')).toContainText('TTM');
   await unstick(page);
   await card(page).scrollIntoViewIfNeeded();
-  await card(page).screenshot({ path: info.outputPath(`pe-river-2330-${info.project.name}.png`) });
+  if (process.env.ATLAS_PE_SCREENSHOTS === '1') await card(page).screenshot({ path: info.outputPath(`pe-river-2330-${info.project.name}.png`) });
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 });
 
@@ -126,7 +130,7 @@ test('Taiwan synthetic file without EPS shows the empty state, not a chart', asy
   await expect(card(page)).toContainText('歷史本益比不代表未來');
   await expect(card(page).locator('canvas')).toHaveCount(0);
   await unstick(page);
-  await card(page).screenshot({ path: info.outputPath(`pe-river-1312-${info.project.name}.png`) });
+  if (process.env.ATLAS_PE_SCREENSHOTS === '1') await card(page).screenshot({ path: info.outputPath(`pe-river-1312-${info.project.name}.png`) });
   // The rest of the page is unaffected.
   await expect(page.locator('.fin-card[data-group="growth"]')).toBeVisible();
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FinancialHistory, PeriodSource } from '../../fundamentals/FinancialHistory';
-import { yoy, type MetricGroupId, type MetricId, type MetricInput, type MetricUnit } from '../../fundamentals/financialMetrics';
+import { type MetricGroupId, type MetricId, type MetricInput, type MetricUnit } from '../../fundamentals/financialMetrics';
 import { formatDateTime } from '../format';
 import { BarChart } from './BarChart';
 import { FoldCard } from './FoldCard';
@@ -44,6 +44,7 @@ const BASIS_TEXT: Record<string, string> = {
   approx: '近似值',
   'statutory-tax': '法定稅率',
   ttm: '近 4 季（TTM）',
+  restated: '還原（追溯調整）',
 };
 
 function inputText(input: MetricInput, currency: string, scale: MoneyScale) {
@@ -92,7 +93,9 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
   const ariaLabels = data.values.map((_value, index) => {
     const value = data.values[index] ?? null;
     const change = growthMetric ? `，${yoyText(data.changes[index] ?? null, data.unit).text}` : '';
-    return `${view.labels[index]!.long} ${data.label} ${value === null ? '無資料' : `${formatValue(value, data.unit, scale)} ${unit}`}${change}`;
+    const reported = data.results[index]?.reported;
+    const original = reported !== undefined && reported !== null && reported !== value ? `（公告 ${formatNumber(reported, 2)}）` : '';
+    return `${view.labels[index]!.long} ${data.title} ${value === null ? '無資料' : `${formatValue(value, data.unit, scale)} ${unit}`}${original}${change}`;
   });
   const oiText = oiFieldText(latest ?? undefined);
   // Same scale and decimals as the chart labels, so the headline matches its bar.
@@ -126,7 +129,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
         )}
         {oiText && <p className="fin-sub">{oiText}</p>}
         <p className="fin-chart-title">
-          {data.label}（{unit}）
+          {data.title}（{unit}）
         </p>
         {growthMetric && (
           <p className="fin-legend">
@@ -154,7 +157,7 @@ export function MetricCard({ group, history, view, metric, onMetric, note, defau
             labelMode={quarterly ? 'extremes' : 'all'}
             selected={selected}
             onSelect={(index) => setSelected({ key: resetKey, index })}
-            title={`${data.label}直條圖`}
+            title={`${data.title}直條圖`}
             overlay={overlay}
             initialVisibleCount={data.window.length}
             periodLabels={view.labels.map((label) => label.long)}
@@ -195,8 +198,8 @@ function Detail({
   const data = view.metrics[metric];
   const result = data.results[period]!;
   const label = view.labels[period]!;
-  const change = yoy(data.values, history[view.kind].end, period, data.unit);
-  const changeChip = yoyText(change, data.unit);
+  // Same comparison as the bars' YoY line (EPS: restated values, whatever basis is shown).
+  const changeChip = yoyText(data.changes[period] ?? null, data.unit);
   const valueScale = data.unit === 'money' ? moneyScale([result.value]) : scale;
   return (
     <div className="fin-detail" aria-live="polite">
@@ -210,6 +213,9 @@ function Detail({
           {formatValue(result.value, data.unit, valueScale)} {result.value === null ? '' : unitText(data.unit, history.currency, valueScale)}
         </b>
         {result.value !== null && data.unit === 'money' && <small>= {formatExact(result.value, data.unit)} {history.currency}</small>}
+        {result.reported !== undefined && result.reported !== null && result.reported !== result.value && (
+          <small className="fin-reported" data-testid="fin-reported-eps">公告 {formatExact(result.reported, 'eps')}</small>
+        )}
         <span className={`fin-chip ${changeChip.tone}`}>{changeChip.text}</span>
       </div>
       <FinancialNote label="公式與計算說明">

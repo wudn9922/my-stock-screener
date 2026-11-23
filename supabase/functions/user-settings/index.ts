@@ -4,7 +4,9 @@ import { HoldingsError, handleHoldings } from "./holdings.ts";
 import { MexcError, handleMexc } from "./mexc.ts";
 import { LineHandoffError, lineLoginHandoff } from "../_shared/lineLoginHandoff.ts";
 import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.ts";
+import { ALERT_SETTINGS_DEFAULT, validateAlertSettings } from "./alertSettings.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
+import { WebPushError, handlePushAction, handlePushNotify, type PushDeps } from "./webPush.ts";
 import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
 
 /**
@@ -23,10 +25,13 @@ import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, p
  *   stocks.save   { id?, ticker, groupId, mas: number[] }  有 id 為修改，否則新增（同代號同分組則覆蓋均線）
  *                 groupId：tw_g1…us_g4 或 custom_<groups.id>
  *   stocks.delete { id }
+ *   alerts.settings.get / alerts.settings.save { settings }  每份清單的均線／畫線通知（atlas_alert_settings）
  *   admin.index.list                                      僅管理員（回傳目前已設定的大盤均線）
  *   admin.index.save { ticker, name, mas: number[] }      僅管理員
  *   device.session.create                                 以 LINE ID Token 記住這台裝置（回傳 deviceToken）
  *   device.session.revoke                                 以 deviceToken 登出這台裝置
+ *   push.subscribe / push.unsubscribe / push.status / push.test   手機通知（見 webPush.ts）
+ *   push.notify                                           僅限 Cloud Run 提醒服務（service-role key，不用 idToken）
  *
  * idToken 也可以是 deviceToken（atlasdev. 開頭）；儲存授權仍在每次請求重新檢查。
  */
@@ -251,6 +256,31 @@ Deno.serve(async (request: Request) => {
       return new Response(JSON.stringify({ ok: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
 
+    // Phone notifications: errors stay inside this branch with their own generic messages.
+    const pushResponse = (run: () => Promise<unknown>) => run().then(
+      (data) => ({ status: 200, body: { ok: true, data } }),
+      (error) => {
+        const known = error instanceof WebPushError || error instanceof StorageAccessError || error instanceof DeviceSessionError;
+        if (!known) console.error("Web push action failed", error instanceof Error ? error.name : "unknown");
+        return {
+          status: known ? error.status : 503,
+          body: { ok: false, error: known ? error.message : "手機通知暫時無法使用，請稍後再試。", code: error instanceof WebPushError ? error.code : error instanceof StorageAccessError ? error.code : "service" },
+        };
+      },
+    ).then((result) => new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } }));
+    const pushDeps = (db: PushDeps["db"]): PushDeps => ({ db, env: (name) => Deno.env.get(name), fetch: (input, init) => fetch(input, init) });
+
+    // The breakout_alert service authenticates with the service-role key it already holds; no LINE token.
+    if (action === "push.notify") {
+      return pushResponse(async () => {
+        const url = Deno.env.get("SUPABASE_URL"), secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!url || !secret) throw new WebPushError(503, "手機通知服務尚未就緒。");
+        const database = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+        const adminId = adminLineId(Deno.env.get("ADMIN_LINE_USER_ID"));
+        return handlePushNotify(request, body, pushDeps(database), (userId) => requireCloudStorage(database, userId, adminId));
+      });
+    }
+
     const idToken = String(
       body.idToken ?? "",
     ).trim();
@@ -314,6 +344,10 @@ Deno.serve(async (request: Request) => {
     // This gate also covers legacy clients and reads of former cloud data after revocation.
     // It is intentionally checked on every request, not cached at login.
     await requireCloudStorage(supabase, lineUserId, adminId);
+
+    if (action.startsWith("push.")) {
+      return pushResponse(() => handlePushAction(action, lineUserId, body, pushDeps(supabase)));
+    }
 
     if (action.startsWith('holdings.sinopac.')) {
       try {
@@ -379,6 +413,29 @@ Deno.serve(async (request: Request) => {
 
       return !!data;
     };
+
+    // Per-list 均線／畫線 notification choices; absent row = every list notifies (today's behaviour).
+    if (action === "alerts.settings.get" || action === "alerts.settings.save") {
+      const tableError = (error: { code?: string }) => {
+        if (error.code === "42P01" || error.code === "PGRST205") throw new HttpError(503, "通知設定資料表尚未部署，請先套用 atlas_alert_settings.sql");
+        throw error;
+      };
+      if (action === "alerts.settings.get") {
+        const { data, error } = await supabase.from("atlas_alert_settings").select("settings,updated_at")
+          .eq("line_user_id", lineUserId).maybeSingle();
+        if (error) tableError(error);
+        let settings: unknown = ALERT_SETTINGS_DEFAULT;
+        try { if (data?.settings) settings = validateAlertSettings(data.settings); } catch { settings = ALERT_SETTINGS_DEFAULT; }
+        return jsonResponse({ ok: true, data: { settings, updated_at: data?.updated_at ?? null } });
+      }
+      let settings: ReturnType<typeof validateAlertSettings>;
+      try { settings = validateAlertSettings(body.settings); }
+      catch (error) { throw new HttpError(400, error instanceof Error ? error.message : "通知設定格式不正確"); }
+      const { data, error } = await supabase.from("atlas_alert_settings")
+        .upsert({ line_user_id: lineUserId, settings }, { onConflict: "line_user_id" }).select("settings,updated_at").maybeSingle();
+      if (error) tableError(error);
+      return jsonResponse({ ok: true, data });
+    }
 
     if (action.startsWith("watchlists.")) {
       const dbError = (error: { code?: string; message?: string }) => {

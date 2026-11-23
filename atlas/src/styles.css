@@ -4,30 +4,30 @@
  */
 :root {
   color-scheme: dark;
-  --bg: #0b0e13;
-  --surface: #11151b;
-  --surface-2: #161b23;
-  --surface-3: #1d232d;
-  --border: #232a35;
-  --border-strong: #303846;
-  --text: #e3e7ee;
-  --text-2: #a9b1bf;
-  --text-3: #7f8898;
-  --accent: #3d8bfd;
-  --accent-text: #79adff;
-  --accent-soft: rgba(61, 139, 253, 0.14);
+  --bg: #0E1014;
+  --surface: #161A20;
+  --surface-2: #1E232B;
+  --surface-3: #2A303A;
+  --border: #1E232B;
+  --border-strong: #2A303A;
+  --text: #EEF1F5;
+  --text-2: #A4ADBA;
+  --text-3: #8A94A3;
+  --accent: #F5B544;
+  --accent-text: #F5B544;
+  --accent-soft: rgba(245, 181, 68, 0.14);
   --warn: #e0a43a;
-  --up: #f23645;
-  --down: #22ab94;
-  --up-text: #ff5c68;
-  --down-text: #2fc2a8;
-  --up-soft: rgba(242, 54, 69, 0.14);
-  --down-soft: rgba(34, 171, 148, 0.14);
+  --up: #FF5A5F;
+  --down: #2BC8A8;
+  --up-text: #FF5A5F;
+  --down-text: #2BC8A8;
+  --up-soft: rgba(255, 90, 95, 0.14);
+  --down-soft: rgba(43, 200, 168, 0.14);
   --radius: 12px;
   --radius-sm: 8px;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Noto Sans TC',
     'Microsoft JhengHei', 'Heiti TC', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-num: var(--font-ui);
+  --font-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
   --rail: 76px;
   --topbar: 56px;
   --tabbar: 58px;
@@ -48,12 +48,12 @@
 }
 /* 綠漲紅跌 (US convention). The default is 紅漲綠跌. */
 :root[data-colors='us'] {
-  --up: #22ab94;
-  --down: #f23645;
-  --up-text: #2fc2a8;
-  --down-text: #ff5c68;
-  --up-soft: rgba(34, 171, 148, 0.14);
-  --down-soft: rgba(242, 54, 69, 0.14);
+  --up: #2BC8A8;
+  --down: #FF5A5F;
+  --up-text: #2BC8A8;
+  --down-text: #FF5A5F;
+  --up-soft: rgba(43, 200, 168, 0.14);
+  --down-soft: rgba(255, 90, 95, 0.14);
 }
 * {
   box-sizing: border-box;
@@ -185,10 +185,10 @@ h3 {
 .primary-button {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #fff;
+  color: #14110A;
 }
 .primary-button:hover:not(:disabled) {
-  background: #5598ff;
+  background: #F5B544;
 }
 .ghost-button {
   border: 1px solid var(--border-strong);
@@ -296,9 +296,9 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: linear-gradient(135deg, #3d8bfd 0%, #6a5cf6 100%);
-  box-shadow: 0 4px 14px rgba(61, 139, 253, 0.25);
+  color: #14110A;
+  background: #F5B544;
+  box-shadow: none;
 }
 .site-brand b {
   font-size: 17px;
@@ -538,6 +538,9 @@ h3 {
   font-size: 14px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .result-text small {
   color: var(--text-2);
@@ -721,10 +724,10 @@ h3 {
   width: 18px;
   height: 12px;
   border-radius: 3px;
-  background: linear-gradient(90deg, #f23645 50%, #22ab94 50%);
+  background: linear-gradient(90deg, #FF5A5F 50%, #2BC8A8 50%);
 }
 .swatch.us {
-  background: linear-gradient(90deg, #22ab94 50%, #f23645 50%);
+  background: linear-gradient(90deg, #2BC8A8 50%, #FF5A5F 50%);
 }
 .dialog-facts {
   margin: 0 0 12px;
@@ -1081,8 +1084,17 @@ h3 {
   border-radius: 2px;
 }
 .ma-chip em {
+  font-family: var(--font-num);
   font-style: normal;
   font-weight: 600;
+}
+.ma-chip-prefix,
+.index-card-sign,
+.change-sign {
+  font-style: normal;
+}
+.ma-chip-prefix {
+  display: none;
 }
 .card-chevron {
   color: var(--text-3);
@@ -1413,11 +1425,19 @@ h3 {
 .chip-row::-webkit-scrollbar {
   display: none;
 }
+/* Pinned while the row scrolls (the active chip is centred), so the market name is never cut off. */
 .chip-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   font-size: 12px;
   color: var(--text-3);
   width: 34px;
   flex-shrink: 0;
+  background: var(--bg);
 }
 .chip {
   display: inline-flex;
@@ -1455,7 +1475,7 @@ h3 {
 .chip-kind {
   font-size: 10px;
   color: var(--accent-text);
-  border: 1px solid rgba(61, 139, 253, 0.4);
+  border: 1px solid rgba(245, 181, 68, 0.4);
   border-radius: 4px;
   padding: 0 4px;
 }
@@ -1705,9 +1725,22 @@ h3 {
     font-size: 11px;
     font-weight: 600;
     transition: color 0.15s;
+    position: relative;
   }
   .site-tabbar button.active {
     color: var(--accent-text);
+  }
+  /* A marker on the bar's top edge, so the current tab reads without relying on colour alone. */
+  .site-tabbar button.active::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    width: 28px;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: var(--accent);
+    transform: translateX(-50%);
   }
   .search-sheet-backdrop {
     align-items: stretch;
@@ -1731,6 +1764,41 @@ h3 {
   }
 }
 @media (max-width: 767px) {
+  :root {
+    --topbar: 52px;
+    --tabbar: 64px;
+  }
+  /* Phone shell: 52px header preserves chart and compact-card viewport height. */
+  .site-topbar {
+    padding: var(--safe-top) calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+    gap: 4px;
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  .site-brand { display: none; }
+  .site-page-title {
+    padding: 0;
+    border: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .site-topbar-end { gap: 4px; }
+  .site-topbar-end > .icon-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .site-tabbar {
+    background: #12151A;
+    border-top: 1px solid var(--border-strong);
+  }
+  .site-tabbar button { gap: 4px; font-size: 12px; }
+  .site-tabbar button svg { width: 22px; height: 22px; }
+  /* The reference marks the active item by amber icon and label, not a top stripe. */
+  .site-tabbar button.active::before { display: none; }
   .page {
     padding: 14px 16px 20px;
   }
@@ -1797,49 +1865,6 @@ h3 {
   .data-table tbody tr:hover th {
     background: var(--surface-2);
   }
-  .screener-page {
-    padding-bottom: 10px;
-  }
-  .screener-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'id quote'
-      'mas quote';
-    grid-template-rows: 34px 22px;
-    row-gap: 0;
-    padding: 4px 12px;
-    align-content: center;
-  }
-  .row-id {
-    grid-area: id;
-    flex-direction: row;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .row-mas {
-    grid-area: mas;
-  }
-  .ma-pill {
-    font-size: 11px;
-    padding: 1px 5px;
-  }
-  .row-pe,
-  .row-chevron {
-    display: none;
-  }
-  .row-quote {
-    grid-area: quote;
-  }
-  .screener-tools .result-count,
-  .screener-head {
-    display: none;
-  }
-  .sort-field select {
-    max-width: 128px;
-  }
-  .chip-row-label {
-    width: 28px;
-  }
   .page-foot {
     flex-direction: column;
   }
@@ -1864,4 +1889,824 @@ h3 {
 }
 .legend-more {
   margin: -6px 10px 10px;
+}
+
+/* Quote, percentage, ticker and date typography; no CJK web-font download. */
+.num, .report-date, .row-id b, .row-quote, .row-pe, .change-pill,
+.ma-pill, .chip-count, .chip-unmatched,
+.index-score b, .index-value, .index-change, .tile-value,
+.asset-list-row b, .asset-list-row strong, time {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numeric-role typography shared across page families; preserve Chinese labels. */
+.site :is(time, output, data, [data-numeric], [data-ticker], [data-price], [data-percent],
+  .wb-name b, .wb-quote, .wb-change, .wb-extended, .wb-live-time,
+  .index-card-quote, .ma-chip em, .index-score, .count-pill,
+  .ws-symbol-text b, .ws-quote, .ws-extended-line, .ws-valuation dd,
+  .ws-volatility-values dd, .ohlc-header, .stock-chart-quote, .stock-chart-date,
+  .fin-quarter-change, .watchlist-counts, .status-counts,
+  .console-page .saved-member-list time,
+  .fin-big, .fin-metric .fin-period, .fin-chart-window, .fin-key-value, .fin-key-period, .fin-inputs dd,
+  .fin-detail-head b, .fin-detail-value b, .fin-detail-value small, .fin-range button, .fin-quarter-period,
+  .fin-quarter-value, .fin-tile-value, .fin-table thead th b, .fin-table thead th small, .fin-cell-value, .fin-cell-yoy,
+  .fin-peers tbody th > button.text-button, .fin-peers tbody th small, .fin-peers tbody td:not(:last-child), .pe-river-legend span, .pe-river-legend b,
+  figure.chip-spark figcaption > span:first-child, figure.chip-spark figcaption > span:last-child,
+  .breadth-pct, .breadth-row-foot, .breadth-axis, .breadth-chart-axis, .breadth-trade-plan dd, .breadth-seg tbody td,
+  .bo-method-index, .bo-win, .bo-metrics dd, .bo-ratio, .bo-row-foot b, .bo-history-table tbody th,
+  .bo-history-table td, .mt-data-table td:nth-child(-n + 4), .mt-gauge-head b,
+  .mt-gauge-ticks span:first-child, .mt-gauge-ticks span:last-child, .mt-plot-foot span:first-child,
+  .mt-plot-foot span:last-child, .mt-history svg text:not(:first-of-type), .mw-score > b, .mw-values dd, .mw-latest,
+  .mw-tools select) {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+/* :has() rules stay outside the list above: an engine without :has() drops every selector in a list that contains one. */
+.site .bo-table-wrap td:has(> small),
+.site .fin-title:has(.fin-currency) > b {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+/* Chinese labels inside those number elements keep the UI font. */
+.site :is(.fin-key-period small, .bo-win small, .bo-ratio span, .breadth-row-foot > span, .mw-score > b > small,
+  .mw-latest small, .mw-summary-count small) {
+  font-family: var(--font-ui);
+}
+
+/* -- Markets (phone and tablet, 1099px and below): full index cards, then the secondary cards in one column.
+   The markets-main / markets-side wrappers add no box here so the existing cards can be ordered in one flow. */
+@media (max-width: 1099px) {
+  .markets-page {
+    max-width: 1040px;
+    padding-top: 0;
+  }
+  .markets-page > .page-head {
+    display: none;
+  }
+  .markets-page .market-tabs {
+    flex: none;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+  .markets-page .market-tabs button {
+    position: relative;
+    flex: none;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 14px;
+    gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 18px;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .markets-page .market-tabs button.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .markets-page .market-tabs button .flag {
+    display: none;
+  }
+  /* The pill is 36px tall; the pseudo-element keeps a 44px touch target. */
+  .markets-page .market-tabs button::before {
+    content: '';
+    position: absolute;
+    inset: -4px -2px;
+  }
+  .markets-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .markets-layout > .markets-main,
+  .markets-layout > .markets-side {
+    display: contents;
+  }
+  /* Order: index cards, 多頭末期警示, 融資餘額溫度, 突破, 市場寬度, LINE 摘要, 資料來源. */
+  .markets-main > .section-bar {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .markets-main > .index-grid,
+  .markets-main > .muted-text { order: 1; }
+  .markets-layout .market-warning-card { order: 2; }
+  .markets-layout .margin-temperature-card { order: 3; }
+  .markets-layout .breakout-card { order: 4; }
+  .markets-layout .breadth-card { order: 5; }
+  .markets-layout .line-card { order: 6; }
+  .markets-layout .help-disclosure { order: 7; }
+  .markets-layout .card {
+    margin: 0;
+    border-radius: 16px;
+  }
+  .markets-page .index-grid {
+    gap: 10px;
+  }
+  .markets-page .index-card {
+    gap: 10px;
+    padding: 16px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--surface);
+  }
+  .markets-page .index-card:hover {
+    background: var(--surface);
+  }
+  /* Row 1: name and symbol, trend tag. Row 2: value and change (the head wrapper adds no box). */
+  .markets-page .index-card .index-card-link:not(.index-card-foot) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .markets-page .index-card-head {
+    display: contents;
+  }
+  .markets-page .index-card-name {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 6px;
+  }
+  .markets-page .index-card-name b {
+    min-width: 0;
+    overflow: visible;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: normal;
+  }
+  .markets-page .index-card-name small {
+    font-family: var(--font-num);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-3);
+  }
+  .markets-page .index-card .index-card-link:not(.index-card-foot) > .trend-badge {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+    padding: 2px 10px;
+    border: 0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  /* Any trend other than bull / bear (neutral, unknown) uses the accent tag. */
+  .markets-page .index-card .trend-badge.trend-neutral,
+  .markets-page .index-card .trend-badge.trend-unknown {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .markets-page .index-card .trend-badge.trend-bull {
+    background: var(--up-soft);
+    color: var(--up);
+  }
+  .markets-page .index-card .trend-badge.trend-bear {
+    background: var(--down-soft);
+    color: var(--down);
+  }
+  .markets-page .index-card-quote {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+  .markets-page .index-card-quote b {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  .markets-page .index-card-quote .index-card-change {
+    justify-self: end;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .markets-page .index-card-quote.up .index-card-change::before { content: '▲ '; }
+  .markets-page .index-card-quote.down .index-card-change::before { content: '▼ '; }
+  .markets-page .index-card-quote .index-card-sign {
+    display: none;
+  }
+  .markets-page .index-card-quote small.index-card-live {
+    grid-column: 2;
+    justify-self: end;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  /* Candles get about 150px above a 26px time axis; the zoom row hangs directly under it (44px reserved). */
+  .markets-page .index-card .mini-chart {
+    --mini-chart-height: 176px;
+    margin-bottom: 44px;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .markets-page .index-card .mini-chart-interactive .mini-chart-canvas {
+    top: 0;
+  }
+  /* The page footer carries the TradingView attribution (ChartAttribution); the logo would cover candles here. */
+  .markets-page .index-card #tv-attr-logo {
+    display: none;
+  }
+  .markets-page .index-card .mini-chart-controls {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 44px;
+    gap: 4px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .markets-page .index-card .mini-chart-controls button {
+    min-width: 44px;
+    height: 44px;
+    padding: 0 8px;
+    border: 6px solid transparent;
+    border-radius: 16px;
+    background: var(--surface-2);
+    background-clip: padding-box;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+  .markets-page .index-card .mini-chart-controls output {
+    min-width: 0;
+    color: var(--text-2);
+    font-family: var(--font-num);
+  }
+  /* MA distances: three equal cells; the score line sits under them. */
+  .markets-page .index-card > .index-card-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
+  }
+  .markets-page .ma-legend {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .markets-page .ma-legend > .muted-text {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .markets-page .ma-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .markets-page .ma-chip:nth-child(n + 4),
+  .markets-page .ma-chip i {
+    display: none;
+  }
+  .markets-page .ma-chip-prefix {
+    display: inline;
+  }
+  .markets-page .ma-chip-label {
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .markets-page .ma-chip em {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .markets-page .index-score {
+    justify-content: flex-end;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .markets-layout {
+    gap: 12px;
+  }
+  .markets-page .index-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+/* -- Screener (phone and tablet, 1099px and below): 資料日 and the 台股｜美股 switch, one market's chips,
+   search / 篩選 / 排序, a four-column list that fills the screen, and the list actions docked above the tab bar. */
+@media (max-width: 1099px) {
+  .site[data-page='screener'] {
+    /* Dock: 12px padding, 48px buttons, 12px padding and its 1px top border. */
+    --screener-dock: 73px;
+  }
+  .screener-page {
+    padding-top: 14px;
+    padding-bottom: 16px;
+    /* A transform would make the page the dock's containing block while it animates in; fade only. */
+    animation-name: fade-in;
+  }
+  .site[data-page='screener'] .site-data-footer {
+    margin-bottom: calc(16px + var(--screener-dock));
+  }
+  .screener-page > .page-head {
+    display: none;
+  }
+  /* The head, chips, toolbar and list fill the screen down to the dock, so the virtual list ends right above it;
+     選股結果變化 and the page footer follow below. */
+  .screener-body {
+    flex: none;
+    gap: 8px;
+    min-height: calc(100dvh - var(--safe-top) - var(--topbar) - var(--tabbar) - var(--safe-bottom) - var(--screener-dock) - 14px);
+  }
+  .screener-page > .screener-changes {
+    margin-top: 16px;
+  }
+  .screener-market-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+  }
+  .screener-page .screener-market-switch {
+    display: flex;
+  }
+  .screener-page .screener-market-switch > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+  }
+
+  /* Edge-to-edge chip and chart rows use negative margins; WebKit measured 3px of page overflow at 320px
+     that Chromium does not. Clip (not hide) so sticky heads and the fixed dock keep working. */
+  .screener-page {
+    overflow-x: clip;
+  }
+  /* Group chips: the selected market's row scrolls sideways edge to edge. */
+  .screener-page .group-chips {
+    margin: 0 calc(-1 * var(--screener-gutter, 16px));
+  }
+  .screener-page .chip-row {
+    gap: 8px;
+    padding: 2px var(--screener-gutter, 16px) 0;
+    scroll-padding-inline: var(--screener-gutter, 16px);
+  }
+  .screener-page .chip-row.is-other-market,
+  .screener-page .chip-row-label,
+  .screener-page .chip .lucide,
+  .screener-page .chip-kind {
+    display: none;
+  }
+  .screener-page .chip {
+    position: relative;
+    gap: 4px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: none;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  /* 40px chip, 44px touch target. */
+  .screener-page .chip::before {
+    content: '';
+    position: absolute;
+    inset: -2px 0;
+  }
+  .screener-page .chip.active {
+    border-color: var(--accent);
+    background: none;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .screener-page .chip .chip-count {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-3);
+  }
+  .screener-page .chip.active .chip-count {
+    color: inherit;
+  }
+
+  /* Search, 篩選 and 排序: 44px, radius 12, on --surface. */
+  .screener-page .screener-tools {
+    gap: 8px;
+  }
+  .screener-page .filter-field,
+  .screener-page .filter-open-button,
+  .screener-page .sort-field {
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .screener-page .filter-field {
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--text-3);
+  }
+  .screener-page .filter-field:focus-within {
+    border-color: var(--accent);
+  }
+  .screener-page .filter-field input {
+    min-height: 40px;
+    color: var(--text);
+    font-size: 16px;
+  }
+  .screener-page .filter-open-button,
+  .screener-page .sort-field {
+    gap: 6px;
+    padding: 0 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 400;
+  }
+  .screener-page .filter-open-button.active,
+  .screener-page .sort-field.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .screener-page .filter-badge {
+    color: #14110A;
+  }
+  .screener-page .sort-field {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .screener-page .sort-face {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .screener-page .sort-field select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-width: none;
+    opacity: 0;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .screener-page .sort-field:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .screener-tools .result-count,
+  .screener-meta.is-in-head {
+    display: none;
+  }
+
+  /* Column header and rows share one grid. */
+  .screener-page .screener-head,
+  .screener-page .screener-row {
+    grid-template-columns: minmax(0, 1fr) 84px 52px 84px;
+    gap: 10px;
+  }
+  .screener-page .screener-head {
+    align-items: end;
+    height: 32px;
+    margin: 0 0 -8px;
+    padding: 0 0 6px;
+    border-bottom: 1px solid var(--border-strong);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .screener-page .screener-head .head-ma {
+    text-align: center;
+  }
+  .screener-page .screener-list {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 240px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .screener-page .screener-row {
+    height: 64px;
+    padding: 0;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .screener-more {
+    margin: -4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-3);
+    text-align: center;
+  }
+  .screener-page .screener-charts {
+    margin: 0 calc(-1 * var(--screener-gutter, 16px));
+    padding: 0 var(--screener-gutter, 16px);
+  }
+
+  /* Column 1: ticker (+ status / earnings badges), name, an observation-date note when it differs. */
+  .screener-page .row-id {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 2px;
+  }
+  .screener-page .row-id > b,
+  .screener-page .row-id > .row-sym,
+  .screener-page .row-id > .earn-badge {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .screener-page .row-id > .earn-badge {
+    justify-self: start;
+    max-width: 100%;
+  }
+  .screener-page .row-id b {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .screener-page .row-id > small {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--text-2);
+  }
+  .screener-page .row-id > small.row-observation-date {
+    font-size: 10px;
+    line-height: 1.1;
+    color: var(--text-3);
+  }
+
+  /* Column 2: distance to the first MA as a centred bar, or up to two metric pills when a filter adds them. */
+  .screener-page .row-mas {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    overflow: hidden;
+  }
+  .screener-page .row-mas.has-metrics {
+    flex-wrap: nowrap;
+    align-content: normal;
+    max-height: none;
+  }
+  .screener-page .row-mas > .metric-pill {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 1px 5px;
+  }
+  .row-ma-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+  .ma-bar-track {
+    position: relative;
+    width: 84px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-2);
+  }
+  .ma-bar-track::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: var(--text-3);
+  }
+  .ma-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+  .row-ma-bar.up .ma-bar-fill {
+    left: 50%;
+    border-radius: 0 3px 3px 0;
+    background: var(--up);
+  }
+  .row-ma-bar.down .ma-bar-fill {
+    right: 50%;
+    border-radius: 3px 0 0 3px;
+    background: var(--down);
+  }
+  .ma-bar-value {
+    font: 400 12px/1.2 var(--font-num);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-2);
+  }
+  .row-ma-bar.up .ma-bar-value { color: var(--up); }
+  .row-ma-bar.down .ma-bar-value { color: var(--down); }
+  /* The note goes into the row's title; search reads it from the data. */
+  .screener-page .row-mas > .row-note {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  /* Column 3: P/E. Column 4: close, then ▲/▼ and the unsigned change. */
+  .screener-page .row-pe {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .screener-page .row-pe small {
+    display: none;
+  }
+  .screener-page .row-pe .pe-loss {
+    color: inherit;
+    font: 400 12px/1.4 var(--font-ui);
+  }
+  .screener-page .row-quote b {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .screener-page .row-quote .change-pill {
+    min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .screener-page .row-quote.up .change-pill::before { content: '▲ '; }
+  .screener-page .row-quote.down .change-pill::before { content: '▼ '; }
+  .screener-page .change-sign {
+    display: none;
+  }
+
+  /* Dock above the tab bar: 連續看圖, 存成清單, CSV (and the list name form while saving). */
+  .screener-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tabbar) + var(--safe-bottom));
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px calc(16px + var(--safe-right)) 12px calc(16px + var(--safe-left));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .screener-dock-actions,
+  .screener-dock > .save-watchlist,
+  .screener-dock > [role='alert'] {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .screener-dock-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .screener-dock-actions > button {
+    flex: none;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: none;
+    color: var(--text);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .screener-dock .screener-dock-charts {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 0;
+    background: var(--accent);
+    color: #14110A;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .screener-dock .screener-dock-csv {
+    font-family: var(--font-num);
+    font-size: 13px;
+  }
+  .screener-dock > .save-watchlist {
+    flex-wrap: nowrap;
+    padding: 0;
+  }
+  .screener-dock > .save-watchlist input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .screener-dock > .save-watchlist .primary-button {
+    flex: none;
+    min-height: 44px;
+  }
+  .screener-dock > [role='alert'] {
+    font-size: 12px;
+    color: var(--down);
+  }
+}
+/* Phone: the MA list goes into the row's title and accessible label (still read by assistive technology). */
+@media (max-width: 767px) {
+  .screener-page .row-mas > .ma-pill {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+/* Tablet: wider columns; the bar keeps the left of column 2 and the three MA values stack beside it. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .screener-page {
+    --screener-gutter: 24px;
+  }
+  .screener-page .screener-head,
+  .screener-page .screener-row {
+    grid-template-columns: minmax(0, 1fr) 240px 72px 110px;
+  }
+  .screener-page .screener-head .head-ma {
+    text-align: left;
+  }
+  .screener-page .row-mas {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    grid-auto-flow: row dense;
+    align-content: center;
+    justify-items: start;
+    column-gap: 12px;
+    row-gap: 1px;
+  }
+  .screener-page .row-mas > .row-ma-bar {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: center;
+  }
+  .screener-page .row-mas > .metric-pill {
+    grid-column: 1;
+  }
+  .screener-page .row-mas > .ma-pill {
+    grid-column: 2;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .screener-page .row-ma-bar .ma-bar-value {
+    display: none;
+  }
+  .screener-page .row-ma-bar .ma-bar-track {
+    width: 120px;
+  }
+  .screener-page .row-mas > .ma-pill.up { color: var(--up); }
+  .screener-page .row-mas > .ma-pill.down { color: var(--down); }
 }

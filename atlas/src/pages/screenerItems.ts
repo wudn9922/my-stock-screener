@@ -183,7 +183,7 @@ export function metricPill(
       const bench = m.rsBench === '^TWII' ? '加權指數' : (m.rsBench ?? '大盤');
       return {
         text: m.rsRank !== null ? `RS ${m.rsRank}` : `RS3M ${formatPercent(m.rs63, 0)}`,
-        title: `相對強弱百分位 ${m.rsRank ?? '—'}（1–99）· 相對${bench}：1個月 ${formatPercent(m.rs21, 1)}、3個月 ${formatPercent(m.rs63, 1)}`,
+        title: `RS 百分位 ${m.rsRank ?? '—'}（1–99；3／6／9／12 個月相對報酬加權 40/20/20/20 的市場排名）· 相對${bench}：1個月 ${formatPercent(m.rs21, 1)}、3個月 ${formatPercent(m.rs63, 1)}`,
         tone: m.rs63 === null ? 'flat' : toneClass(m.rs63),
       };
     }
@@ -315,4 +315,17 @@ function growthDetail(record: GrowthRecord, eps: boolean): string {
     `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}`,
     `來源：季度 ${originText(origin)}、年度 ${originText(record.originY)}`,
   ].join('；');
+}
+
+// ---------------------------------------------------------------- row note
+
+/**
+ * A daily-report note that only repeats the close and the MA distances a row already shows: `現價:<n>`, then
+ * optional `距MA<n>:<±n>%` segments behind `|`. Numbers end at a fixed delimiter, so the match cannot backtrack badly.
+ */
+const REDUNDANT_ROW_NOTE = /^現價[:：][+-]?\d[\d,]*(?:\.\d+)?(?:\s*\|\s*距MA\d+[:：][+-]?\d[\d,]*(?:\.\d+)?%)*$/;
+
+/** True when the row can leave its note out because the note only repeats numbers the row shows. Search still reads it. */
+export function isRedundantRowNote(note: string | undefined | null): boolean {
+  return REDUNDANT_ROW_NOTE.test(note?.trim() ?? '');
 }

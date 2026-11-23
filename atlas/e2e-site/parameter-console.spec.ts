@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openConsoleSection } from './console-nav';
 import { buildReport, mockSite } from './mocks';
 import { accessEnvelope } from './account-fixture';
 import type { SavedWatchlist } from '../src/watchlists/model';
@@ -144,7 +145,7 @@ test('list creation, monitoring changes and renaming sync automatically; deletio
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '刪除清單', exact: true }).click();
   await expect.poll(() => cloud.lists.size).toBe(0);
-  await expect(page.getByText('還沒有條件清單', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '自選行情' }).getByRole('status')).toContainText('還沒有自選清單');
 });
 
 test('each rule-list member can save permanent ungrouped parameters that survive removal of the list', async ({ page }) => {
@@ -169,14 +170,14 @@ test('each rule-list member can save permanent ungrouped parameters that survive
   await expect(page.getByRole('button', { name: `設定 ${ticker} 個股均線（所有清單共用）` })).toContainText('13 / 34 / 89');
   page.once('dialog', (confirmation) => confirmation.accept());
   await page.getByRole('button', { name: '刪除清單', exact: true }).click();
-  await expect(page.getByText('還沒有條件清單', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '自選行情' }).getByRole('status')).toContainText('還沒有自選清單');
   expect(cloud.stocks.some((stock) => stock.ticker === ticker && stock.group_id === 'ungrouped')).toBe(true);
 });
 
 test('existing parameter stocks support search, group filters, a five-row scroll area and modal edit/delete', async ({ page }) => {
   const cloud = await mockConsole(page);
   await page.goto('./?page=console');
-  await page.getByRole('button', { name: '均線參數', exact: true }).click();
+  await openConsoleSection(page, 'parameters');
   const table = page.getByRole('table', { name: '個人股票參數' });
   await expect(table.locator('tbody tr')).toHaveCount(9);
   const viewport = page.getByRole('region', { name: '已有參數股票清單' });

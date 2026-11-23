@@ -16,6 +16,8 @@ import { KeyMetrics } from '../ui/financials/KeyMetrics';
 import { MetricCard } from '../ui/financials/MetricCard';
 import { QuarterStrip } from '../ui/financials/QuarterStrip';
 import { SpanControl } from '../ui/financials/SpanControl';
+import { EpsBasisToggle, readEpsBasis, writeEpsBasis } from '../ui/financials/EpsBasisToggle';
+import { hasEpsRestatement, restatedEpsLabel, twSplitNote, type EpsDisplayBasis } from '../fundamentals/epsBasis';
 import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
@@ -100,6 +102,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
   const [directoryName, setDirectoryName] = useState<{ symbol: string; name: string } | null>(null);
   const [metricOf, setMetricOf] = useState<Partial<Record<MetricGroupId, MetricId>>>({});
   const [spans, setSpans] = useState<Record<PeriodKind, number>>({ annual: CHART_PERIODS.annual, quarterly: CHART_PERIODS.quarterly });
+  const [epsBasisChoice, setEpsBasisChoice] = useState<EpsDisplayBasis>(readEpsBasis);
   const localSymbols = useMemo(() => reportSymbols(report.status === 'ok' ? report.report : null), [report]);
 
   useEffect(() => {
@@ -172,10 +175,19 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
     return { ...history, annual };
   }, [history]);
   const span = spans[effectiveKind];
-  const annualView = useMemo(() => (displayHistory ? buildView(displayHistory, 'annual') : null), [displayHistory]);
-  const quarterlyView = useMemo(() => (displayHistory && showQuarterly ? buildView(displayHistory, 'quarterly') : null), [displayHistory, showQuarterly]);
+  // 公告／還原: offered only when a 配股 or split changes some period's EPS; otherwise both are the same figures.
+  const restating = useMemo(() => (displayHistory ? hasEpsRestatement(displayHistory) : false), [displayHistory]);
+  const epsBasis: EpsDisplayBasis = restating ? epsBasisChoice : 'restated';
+  const annualView = useMemo(() => (displayHistory ? buildView(displayHistory, 'annual', undefined, epsBasis) : null), [displayHistory, epsBasis]);
+  const quarterlyView = useMemo(
+    () => (displayHistory && showQuarterly ? buildView(displayHistory, 'quarterly', undefined, epsBasis) : null),
+    [displayHistory, showQuarterly, epsBasis],
+  );
   // The chart range applies to the period type on screen; the summary tiles keep the default annual window.
-  const view = useMemo(() => (displayHistory ? buildView(displayHistory, effectiveKind, span) : null), [displayHistory, effectiveKind, span]);
+  const view = useMemo(
+    () => (displayHistory ? buildView(displayHistory, effectiveKind, span, epsBasis) : null),
+    [displayHistory, effectiveKind, span, epsBasis],
+  );
 
   useEffect(() => {
     if (showQuarterly || p !== 'q') return;
@@ -252,8 +264,18 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
     body = (
       <>
         {showQuarterly && quarterlyView && <QuarterStrip history={displayHistory} quarterly={quarterlyView} />}
+        {restating && (
+          <EpsBasisToggle
+            basis={epsBasis}
+            label={restatedEpsLabel(displayHistory)}
+            onBasis={(next) => {
+              setEpsBasisChoice(next);
+              writeEpsBasis(next);
+            }}
+          />
+        )}
         {mode === 'table' ? (
-          <StatementTable history={displayHistory} view={view} />
+          <StatementTable history={displayHistory} view={view} epsBasis={epsBasis} />
         ) : (
           <>
             <SpanControl
@@ -285,6 +307,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
               {splitEvents.map((event) => `${formatDateTime(event.date, false)}（${splitText(event.ratio)}）`).join('、')}
             </p>
           )}
+          {twSplitNote(history) && <p>{twSplitNote(history)}</p>}
           {adrNote && <p>{adrNote}</p>}
           {!adrNote && (history.foreignReporter || issues.includes('foreign-filer')) && <p>外國發行人：EPS 為每普通股，非每 ADR。</p>}
         </FinancialNote>

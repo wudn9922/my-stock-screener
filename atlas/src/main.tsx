@@ -1,3 +1,4 @@
+import './app/zodCsp';
 import { createRoot } from 'react-dom/client';
 import { AccessBoundary } from './auth/AccessBoundary';
 import { applyColorConvention } from './app/sitePreferences';
@@ -7,8 +8,12 @@ import { retireScreenerWorker } from './auth/retireWorker';
 import { DEFAULT_LIFF_ID, hasLineLoginCallback, needsLineIdentityBeforeRouting, startLineIdentity } from './cloud/lineIdentity';
 import { completeRememberAfterRedirect } from './cloud/deviceSession';
 import { PUBLIC_BASE } from './app/HostingMode';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles.css';
 import { prepareIncomingLineHandoff } from './cloud/lineLoginHandoff';
+import { startPushNavigation } from './push/pushConfig';
 // Packaged native builds use their bundled assets, independent of PWA shell updates.
 if (
   'serviceWorker' in navigator &&
@@ -69,6 +74,8 @@ async function render() {
     accessState.allowGuestWhileLoading();
     await retireScreenerWorker(new URL(import.meta.env.BASE_URL, location.origin).href);
   }
+  // Notification taps route an already open Atlas window to the alert's chart (push-only worker, no caching).
+  startPushNavigation();
   // The chart workspace loads its axis font itself; the landing page renders immediately.
   createRoot(document.getElementById('root')!).render(<AccessBoundary />);
 }

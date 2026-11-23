@@ -38,10 +38,16 @@ def valid_run_url(value):
         return False
 
 
+# Discord's edge rejects the default Python-urllib agent (HTTP 403), which silently
+# pushed every notice to the LINE fallback. Discord documents this agent format.
+USER_AGENT = 'DiscordBot (https://github.com/wudn9922/my-stock-screener, 1.0)'
+
+
 def post(url, payload, headers, opener):
     try:
         request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode(),
-                                         headers={'Content-Type': 'application/json', **headers}, method='POST')
+                                         headers={'Content-Type': 'application/json', 'User-Agent': USER_AGENT, **headers},
+                                         method='POST')
         with opener.open(request, timeout=10) as response:
             return 200 <= response.status < 300
     except Exception:
@@ -102,7 +108,7 @@ def summaries(needs):
 def notify(env, opener=None, now=None):
     opener = opener or urllib.request.build_opener(NoRedirect())
     now = now or datetime.now(timezone.utc)
-    webhook, line_token, line_user, github_token = (env.get(k, '') for k in (
+    webhook, line_token, line_user, github_token = (env.get(k, '').strip() for k in (
         'NOTICE_DISCORD_WEBHOOK', 'NOTICE_LINE_TOKEN', 'NOTICE_LINE_USER', 'NOTICE_GITHUB_TOKEN'))
     hidden = (webhook, line_token, line_user, github_token)
     run_url = env.get('NOTICE_RUN_URL', '')

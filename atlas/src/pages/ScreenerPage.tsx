@@ -1,6 +1,7 @@
 import { PageFooterNote } from '../ui/PageFooterNote';
+import { screenerCsv, screenerCsvName } from './screenerCsv';
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
-import { ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowDownUp, ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
@@ -21,6 +22,7 @@ import {
   STATUS_VIEW_LABELS,
   filterAndSortItems,
   gateForPill,
+  isRedundantRowNote,
   itemsForView,
   metricPill,
   resultCountText,
@@ -81,6 +83,7 @@ import { watchlistStore } from '../watchlists/store';
 import '../ui/research.css';
 import { StockChartList } from '../ui/StockChartList';
 import { useStockParameters } from '../cloud/useStockParameters';
+import { useCompactLayout } from '../ui/useCompactLayout';
 
 const ROW_HEIGHT = 64;
 const OVERSCAN = 8;
@@ -96,12 +99,15 @@ function GroupChips({
   universeCounts,
   trendingGroup,
   onChange,
+  compactMarket,
 }: {
   groups: readonly ReportGroup[];
   active: string;
   universeCounts: Partial<Record<UniverseMarketKey, number>>;
   trendingGroup: ReportGroup;
   onChange: (key: string) => void;
+  /** Phone and tablet: only this market's row is shown (the 台股｜美股 switch picks it). */
+  compactMarket?: UniverseMarketKey;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -113,7 +119,7 @@ function GroupChips({
         const list = groups.filter((group) => group.market === market);
         const universeKey = UNIVERSE_GROUP_KEYS[market];
         return (
-          <div key={market} className="chip-row">
+          <div key={market} className={compactMarket && compactMarket !== market ? 'chip-row is-other-market' : 'chip-row'}>
             <span className="chip-row-label">{market === 'TW' ? '台股' : '美股'}</span>
             <button
               type="button"
@@ -163,6 +169,30 @@ function GroupChips({
   );
 }
 
+/** Full-scale distance for the bars: the largest first-MA distance in the list, never below ±5%. */
+function maBarScale(items: readonly GroupItem[]) {
+  let scale = 5;
+  for (const item of items) {
+    const period = item.maList[0];
+    const distance = period === undefined ? null : maDistance(item.close, maValue(item.maValues, period));
+    if (distance !== null && Number.isFinite(distance)) scale = Math.max(scale, Math.abs(distance));
+  }
+  return scale;
+}
+
+/** Distance to the row's first MA as a centred bar: right (up) for above, left (down) for below, full at ±scale%. */
+function MaBar({ distance, scale = 20 }: { distance: number | null; scale?: number }) {
+  const width = distance === null ? 0 : (Math.min(Math.abs(distance), scale) / scale) * 50;
+  return (
+    <span className={`row-ma-bar ${toneClass(distance)}`} aria-hidden="true">
+      <span className="ma-bar-track">
+        <span className="ma-bar-fill" style={{ width: `${width}%` }} />
+      </span>
+      <span className="ma-bar-value">{formatPercent(distance, 1)}</span>
+    </span>
+  );
+}
+
 function Row({
   item,
   pe,
@@ -173,6 +203,8 @@ function Row({
   top,
   onOpen,
   marketDate,
+  compact = false,
+  barScale,
 }: {
   item: GroupItem;
   pe: PeFigures | undefined;
@@ -184,6 +216,9 @@ function Row({
   top: number;
   onOpen: () => void;
   marketDate?: string | null;
+  /** Phone and tablet grid: distance bar, P/E column, ▲/▼ change; the MA list and the note move into the title. */
+  compact?: boolean;
+  barScale?: number;
 }) {
   const tone = toneClass(item.changePct);
   const status = itemStatusOf(item);
@@ -192,10 +227,26 @@ function Row({
     const pill = metricPill(item, key, growth, filters.turn, gateForPill(filters, key), fixedMAs);
     return pill ? [{ key, pill }] : [];
   });
+  // A failed row has no close, so its MA distances would only read "—".
+  const distances = (status === 'failed' ? [] : item.maList).slice(0, 3).map((period) => ({
+    period,
+    distance: maDistance(item.close, maValue(item.maValues, period)),
+  }));
+  const note = item.note && !isRedundantRowNote(item.note) ? item.note : '';
+  const change = formatPercent(item.changePct);
+  const changeSign = /^[+-]/.test(change) ? change[0] : '';
+  const shownPills = compact ? metricPills.slice(0, 2) : metricPills;
+  const hasPe = !!pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss);
+  const compactTitle = compact
+    ? [distances.length ? `距 ${distances.map(({ period, distance }) => `MA${period} ${formatPercent(distance, 1)}`).join('、')}` : '', note]
+      .filter(Boolean)
+      .join(' · ')
+    : '';
   return (
     <a
       className={status === 'matched' ? 'screener-row' : `screener-row is-${status}`}
       style={{ transform: `translateY(${top}px)` }}
+      title={compactTitle || undefined}
       href={serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' })}
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -222,25 +273,23 @@ function Row({
           </small>
         )}
       </span>
-      <span className={metricPills.length ? 'row-mas has-metrics' : 'row-mas'}>
-        {metricPills.map(({ key, pill }) => (
+      <span className={shownPills.length ? 'row-mas has-metrics' : 'row-mas'}>
+        {shownPills.map(({ key, pill }) => (
           <span key={key} className={`metric-pill ${pill.tone}`} title={pill.title}>
             {pill.text}
           </span>
         ))}
-        {/* A failed row has no close, so its MA pills would only read "—". */}
-        {(status === 'failed' ? [] : item.maList).slice(0, 3).map((period) => {
-          const distance = maDistance(item.close, maValue(item.maValues, period));
-          return (
-            <span key={period} className={`ma-pill ${toneClass(distance)}`} title={`收盤相對 MA${period} 的乖離`}>
-              MA{period} {distance === null ? '—' : formatPercent(distance, 1)}
-            </span>
-          );
-        })}
-        {item.note && <span className="row-note">{item.note}</span>}
+        {compact && !shownPills.length && <MaBar distance={distances[0]?.distance ?? null} scale={barScale} />}
+        {distances.map(({ period, distance }) => (
+          <span key={period} className={`ma-pill ${toneClass(distance)}`} title={`收盤相對 MA${period} 的乖離`}>
+            MA{period} {distance === null ? '—' : formatPercent(distance, 1)}
+          </span>
+        ))}
+        {/* Repeats the close and MA pills, so it is hidden; search still reads the note. */}
+        {note && <span className="row-note">{note}</span>}
       </span>
       <span className="row-pe" title={pe?.reason ?? (pe ? `本益比 ${formatRatio(pe.pe)} · TTM ${formatRatio(pe.peTtm)}` : '')}>
-        {pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss) ? (
+        {hasPe && pe ? (
           <>
             <small>本益比</small>
             {pe.peTtmLoss || (pe.peTtm === null && pe.pe === null) ? (
@@ -249,13 +298,17 @@ function Row({
               formatRatio(pe.peTtm ?? pe.pe)
             )}
           </>
+        ) : compact ? (
+          <span className="row-pe-none">—</span>
         ) : null}
       </span>
       <span className={`row-quote ${tone}`}>
         <b>{formatPrice(item.close)}</b>
-        <span className="change-pill">{formatPercent(item.changePct)}</span>
+        {/* Phone and tablet draw ▲/▼ before the unsigned value; the signed text stays on wider screens. */}
+        <span className="change-pill"><i className="change-sign">{changeSign}</i>{changeSign ? change.slice(1) : change}</span>
       </span>
-      <ChevronRight size={16} className="row-chevron" aria-hidden="true" />
+      {/* The whole row is the link; phones and tablets drop the chevron column. */}
+      {!compact && <ChevronRight size={16} className="row-chevron" aria-hidden="true" />}
     </a>
   );
 }
@@ -420,6 +473,9 @@ function ScreenerView({
   const [pe, setPe] = useState<Record<string, PeFigures>>({});
   const listRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const compact = useCompactLayout();
+  // The 台股｜美股 switch returns to the group last shown in that market.
+  const lastGroupOf = useRef<Partial<Record<UniverseMarketKey, string>>>({});
 
   const groupItems = group?.items ?? EMPTY_GROUP_ITEMS;
   const groupDates = useMemo(() => [...new Set(groupItems.flatMap(item =>
@@ -450,6 +506,7 @@ function ScreenerView({
     () => filterAndSortItems(filtered, query, activeSort, { growth, asOf: observationDate, fixedMAs }),
     [filtered, query, activeSort, growth, observationDate, fixedMAs],
   );
+  const barScale = useMemo(() => maBarScale(items), [items]);
   const countFor = useCallback(
     (draft: FilterState) => filterAndSortItems(applyFilters(viewItems, draft, context), query, 'default').length,
     [viewItems, context, query],
@@ -515,6 +572,11 @@ function ScreenerView({
   // Previous/next on the chart walks the whole result as displayed (filtered and sorted), not only rendered rows.
   const groupName = group?.name ?? '';
   const chartListContext = useMemo(() => chartList(groupName, items), [groupName, items]);
+  const shownKey = group?.key;
+  const shownMarket = group?.market;
+  useEffect(() => {
+    if (shownKey && shownMarket) lastGroupOf.current[shownMarket] = shownKey;
+  }, [shownKey, shownMarket]);
   if (!group)
     return (
       <div className="page-state empty" role="status">
@@ -537,18 +599,72 @@ function ScreenerView({
   const groupPending = universePending || (isTrending && !trendingData);
   const appliedCount = chips.filter((chip) => !chip.unavailable).length;
   const latestReportDay = [report.reportDate, universeData?.reportDate, sourceMarketData?.asOf].filter((date): date is string => !!date).sort().at(-1);
+  // The stock list's data day(s): the same text as the date line under the toolbar.
+  const groupDateText = groupDates.length
+    ? `${formatDateTime(groupDates[0]!, false)}${groupDates.length > 1 ? ` ～ ${formatDateTime(groupDates.at(-1)!, false)}` : ''}`
+    : null;
+  const headDate = universeMarketData?.asOf ? formatDateTime(universeMarketData.asOf, false) : (groupDateText ?? formatDateTime(report.reportDate, false));
+  const switchMarket = (next: UniverseMarketKey) => {
+    if (next === market) return;
+    changeGroup(lastGroupOf.current[next] ?? groups.find((g) => g.market === next)?.key ?? UNIVERSE_GROUP_KEYS[next]);
+  };
+  // The list actions (存成自選清單, 匯出 CSV, 連續看圖) sit in a toolbar row on wide screens and in the dock on phones and tablets.
+  const toggleSaving = () => {
+    setSavingList((previous) => !previous);
+    setListName(group.name);
+  };
+  // Public market rows exactly as listed (filters, search and sort applied); nothing personal.
+  const exportCsv = () => {
+    const url = URL.createObjectURL(new Blob([screenerCsv(items)], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = screenerCsvName(group.key, observationDate);
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  const csvTitle = '下載目前列表（已套用篩選與排序）';
+  const showChartToggle = !groupPending && (items.length > 0 || charts);
+  const saveForm = savingList && <form className="save-watchlist" onSubmit={(event) => {
+    event.preventDefault();
+    try {
+      const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200],
+        ...(isTrending ? { kind: 'manual', symbols: groupItems.map(item => item.symbol) } : {}) });
+      watchlistStore().save(list); navigate({ page: 'watchlist', list: list.id });
+    } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
+  }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>;
+  const changes = !isTrending && <ScreenerChanges market={market} group={group.key} filters={filters} query={query} view={activeView} openChart={openChart} />;
+  // The header names one MA only when every shown row measures against that same period.
+  const groupFirstMa = group.maList[0];
+  const firstMa = groupFirstMa !== undefined && items.every(item => !item.maList.length || item.maList[0] === groupFirstMa) ? groupFirstMa : undefined;
+  // Rows below the list's visible area (phone and tablet show the count under the list, like the reference).
+  const remaining = items.length - Math.min(items.length, Math.floor((scroll.top + scroll.height) / ROW_HEIGHT));
 
   return (
+    <>
     <div className="screener-body">
-      <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} trendingGroup={trendingGroup} onChange={changeGroup} />
-      {!isTrending && <ScreenerChanges market={market} group={group.key} filters={filters} query={query} view={activeView} openChart={openChart} />}
+      {compact && (
+        <div className="screener-market-head">
+          <span className="screener-head-date">資料日 {headDate}</span>
+          <div className="screener-market-switch" role="group" aria-label="市場">
+            {MARKETS.map((key) => (
+              <button key={key} type="button" className={key === market ? 'active' : ''} aria-pressed={key === market} onClick={() => switchMarket(key)}>
+                {key === 'TW' ? '台股' : '美股'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} trendingGroup={trendingGroup} onChange={changeGroup}
+        compactMarket={compact ? market : undefined} />
+      {!compact && changes}
       <div className="screener-tools">
         <label className="filter-field">
-          <Search size={15} aria-hidden="true" />
+          <Search size={compact ? 18 : 15} aria-hidden="true" />
           <input
             type="search"
             aria-label="在群組內篩選"
-            placeholder={`在「${group.name}」中篩選`}
+            // The phone toolbar leaves this field about six characters wide; the long form was cut mid-word.
+            placeholder={window.matchMedia('(max-width: 767px)').matches ? '代號／名稱' : `在「${group.name}」中篩選`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -563,12 +679,19 @@ function ScreenerView({
           disabled={groupPending}
           onClick={() => setSheetOpen(true)}
         >
-          <SlidersHorizontal size={15} aria-hidden="true" />
+          <SlidersHorizontal size={compact ? 18 : 15} aria-hidden="true" />
           <span className="filter-open-label">篩選</span>
           {chips.length > 0 && <span className="filter-badge">{chips.length}</span>}
         </button>
-        <label className="sort-field">
+        <label className={compact && activeSort !== 'default' ? 'sort-field active' : 'sort-field'}>
           <span className="sr-only">排序</span>
+          {/* Phone and tablet show a 排序 button; the native select stays on top of it, transparent, and opens the picker. */}
+          {compact && (
+            <span className="sort-face" aria-hidden="true">
+              <ArrowDownUp size={18} />
+              排序
+            </span>
+          )}
           <select aria-label="排序" value={activeSort} onChange={(event) => setSort(event.target.value as SortMode)}>
             {sortModes.map((mode) => (
               <option key={mode} value={mode}>
@@ -579,19 +702,13 @@ function ScreenerView({
         </label>
         <span className="result-count">{filters.pe && peFigures === undefined ? '本益比載入中…' : filters.pe && peFigures === null ? '本益比資料無法取得' : filters.per && peRiver === undefined ? '河流分位載入中…' : filters.per && peRiver === null ? '河流分位資料無法取得' : resultCountText(items, viewItems.length, activeView, hasUnmatched)}</span>
       </div>
-      <div className="save-watchlist">
-        <button type="button" className="ghost-button" disabled={groupPending} onClick={() => { setSavingList((previous) => !previous); setListName(group.name); }}>存成自選清單</button>
+      {!compact && <div className="save-watchlist">
+        <button type="button" className="ghost-button" disabled={groupPending} onClick={toggleSaving}>存成自選清單</button>
         <button type="button" className="text-button" onClick={() => navigate({ page: 'watchlist' })}>開啟自選清單</button>
-        {savingList && <form className="save-watchlist" onSubmit={(event) => {
-          event.preventDefault();
-          try {
-            const list = createWatchlist({ name: listName, market, group: group.key, filters: serializeFilters(filters), maList: group.maList.length ? group.maList.slice(0, 4) : [20, 50, 200],
-              ...(isTrending ? { kind: 'manual', symbols: groupItems.map(item => item.symbol) } : {}) });
-            watchlistStore().save(list); navigate({ page: 'watchlist', list: list.id });
-          } catch (error) { setSaveError(error instanceof Error ? error.message : '清單儲存失敗'); }
-        }}><input aria-label="自選清單名稱" value={listName} onChange={(event) => setListName(event.target.value)} maxLength={40} required /><button type="submit" className="primary-button">儲存並追蹤清單</button></form>}
+        <button type="button" className="text-button" disabled={groupPending || !items.length} title={csvTitle} onClick={exportCsv}>匯出 CSV</button>
+        {saveForm}
         {saveError && <span role="alert">{saveError}</span>}
-      </div>
+      </div>}
       {isTrending && trendingData && <div className="screener-meta line-trending-meta" aria-label="LINE 熱門資料時間">
         <p>抓取時間 {formatDateTime(trendingData.fetchedAt)} · LINE 推播時間 {formatDateTime(trendingData.sentAt)}</p>
         {trendingStocksStale(trendingData, latestReportDay) && <p className="screener-date-notice" role="status">
@@ -649,11 +766,9 @@ function ScreenerView({
           {universeMarketData.benchmark === '^TWII' ? '加權指數' : universeMarketData.benchmark} · {universeMarketData.universe}
         </p>
       )}
-      {!universeMarketData && groupDates.length > 0 && (
-        <p className="screener-meta">
-          資料日 {formatDateTime(groupDates[0]!, false)}
-          {groupDates.length > 1 ? ` ～ ${formatDateTime(groupDates.at(-1)!, false)}` : ''}
-        </p>
+      {/* Phone and tablet show this date in the page head instead. */}
+      {!universeMarketData && groupDateText && (
+        <p className={compact ? 'screener-meta is-in-head' : 'screener-meta'}>資料日 {groupDateText}</p>
       )}
       {observationDate && groupItems.some(item => item.asOf !== observationDate) && (
         <p className="screener-date-notice" role="status">
@@ -671,17 +786,26 @@ function ScreenerView({
           名單範圍說明{noteOpen && <span>{universeMarketData.note}</span>}
         </button>
       )}
-      {!groupPending && (items.length > 0 || charts) && <button type="button" className="ghost-button screener-chart-toggle"
+      {!compact && showChartToggle && <button type="button" className="ghost-button screener-chart-toggle"
         aria-pressed={charts} onClick={() => setCharts(value => !value)}>
         {charts ? '返回股票清單' : `連續看全部股票圖表（${items.length} 檔）`}
       </button>}
-      {!charts && <div className="screener-head" aria-hidden="true">
-        <span>代號／名稱</span>
-        <span>{pills.length ? '指標・均線乖離' : '均線乖離・備註'}</span>
-        <span className="num">本益比 TTM</span>
-        <span className="num">收盤／漲跌</span>
-        <span />
-      </div>}
+      {!charts && (compact ? (
+        <div className="screener-head" aria-hidden="true">
+          <span>代號／名稱</span>
+          <span className="head-ma">{pills.length ? '指標' : firstMa ? `距 MA${firstMa}` : '均線乖離'}</span>
+          <span className="num">本益比</span>
+          <span className="num">收盤／漲跌</span>
+        </div>
+      ) : (
+        <div className="screener-head" aria-hidden="true">
+          <span>代號／名稱</span>
+          <span>{pills.length ? '指標・均線乖離' : '均線乖離・備註'}</span>
+          <span className="num">本益比 TTM</span>
+          <span className="num">收盤／漲跌</span>
+          <span />
+        </div>
+      ))}
       {isTrending && !trendingData ? (
         <PageState kind={trending ? 'empty' : 'loading'} title={trending?.status === 'error' ? trending.message : '載入 LINE 熱門美股…'}
           onRetry={trending ? retryTrending : undefined} />
@@ -702,6 +826,7 @@ function ScreenerView({
             openChart={options => openChart({ ...options, tf: '1D', maList: items.find(item => item.symbol === options.symbol)?.maList, list: chartListContext })} />
         </div>
       ) : (
+        <>
         <div className="screener-list card" ref={listRef} onScroll={onScroll} role="list" aria-label={`${group.name}股票清單`}>
           {items.length ? (
             <div className="screener-rows" style={{ height: items.length * ROW_HEIGHT }}>
@@ -716,6 +841,8 @@ function ScreenerView({
                     filters={filters}
                     fixedMAs={fixedMAs}
                     top={(start + offset) * ROW_HEIGHT}
+                    compact={compact}
+                    barScale={barScale}
                     onOpen={() => openChart({ symbol: item.symbol, name: item.name, tf: '1D', maList: item.maList, list: chartListContext })}
                   />
                 </div>
@@ -739,6 +866,30 @@ function ScreenerView({
             </div>
           )}
         </div>
+        {compact && remaining > 0 && (
+          <p className="screener-more">往下還有 <span className="num">{remaining.toLocaleString('en-US')}</span> 檔</p>
+        )}
+        </>
+      )}
+      {compact && (
+        <div className="screener-dock">
+          {saveForm}
+          {saveError && <span role="alert">{saveError}</span>}
+          <div className="screener-dock-actions">
+            {showChartToggle && (
+              <button type="button" className="screener-chart-toggle screener-dock-charts" aria-pressed={charts} onClick={() => setCharts(value => !value)}>
+                {charts ? '返回股票清單' : `連續看圖 · ${items.length} 檔`}
+              </button>
+            )}
+            {/* Reads 存成清單 like the reference; the accessible name stays 存成自選清單 as on wide screens. */}
+            <button type="button" className="screener-dock-save" aria-label="存成自選清單" disabled={groupPending} onClick={toggleSaving}>
+              存成清單
+            </button>
+            <button type="button" className="screener-dock-csv" aria-label="匯出 CSV" disabled={groupPending || !items.length} title={csvTitle} onClick={exportCsv}>
+              CSV
+            </button>
+          </div>
+        </div>
       )}
       <FilterSheet
         open={sheetOpen}
@@ -757,9 +908,17 @@ function ScreenerView({
           setFilters(next);
           closeSheet();
         }}
+        onPreset={(preset) => {
+          setFilters(preset.filters);
+          setSort(preset.sort);
+          closeSheet();
+        }}
         onClose={closeSheet}
       />
     </div>
+    {/* Phone and tablet: below the list (which fills the screen above the dock), before the page footer. */}
+    {compact && changes}
+    </>
   );
 }
 

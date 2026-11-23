@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { MarketWarnings } from '../report/schema';
 import { loadMarketWarnings, weeklySample, type WarningsResult } from '../report/marketWarnings';
 import { TimeChart, type ChartLine } from './rates/TimeChart';
 import type { TimeBand } from './rates/TimeBands';
 import { ResearchNote } from './research/Common';
+import { useCompactLayout } from './useCompactLayout';
 import './marketWarnings.css';
 
 const ratio = (value: number | null | undefined) => value == null ? '資料不足' : `${(value * 100).toFixed(1)}%`;
@@ -19,6 +20,10 @@ function WarningBody({ data, market, report }: { data: MarketWarnings; market: '
   const params = data.params, cfg = params.markets[market];
   const [selected, setSelected] = useState(cfg.indices[0]!);
   const [window, setWindow] = useState<5 | 10 | 20 | 60>(params.defaultWindow);
+  // Phone and tablet show the card as a one-line summary; the full detail opens on tap.
+  const compact = useCompactLayout();
+  const [open, setOpen] = useState(false);
+  const detailId = useId();
   const index = report.indices[selected]!, latest = report.latest;
   const grey = (symbol: string): TimeBand[] => {
     const rows = report.indices[symbol]!.series, first = rows[0]!.date, last = rows.at(-1)!.date;
@@ -45,8 +50,14 @@ function WarningBody({ data, market, report }: { data: MarketWarnings; market: '
     { label: '突破家數背離', value: latest.breadth_divergence, na: false },
   ];
   const unknown = lights.filter(light => !light.na && light.value === null).length;
+  const observed = lights.filter(light => !light.na).length;
   return <>
+    <button type="button" className="mw-summary" aria-expanded={open} aria-controls={!compact || open ? detailId : undefined} onClick={() => setOpen(value => !value)}>
+      <span className="mw-summary-text"><b>多頭末期警示</b><small>{observed} 項觀察 · {unknown} 項資料不足</small></span>
+      <span className="mw-summary-count"><b>{latest.warning_level}</b><small> 項亮燈</small></span>
+    </button>
     {report.update?.status === 'retained' && <p className="mw-update-note" role="status">本市場未更新，保留 {report.asOf} 的已發布資料。原因：{report.update.reason}</p>}
+    {(!compact || open) && <div className="mw-detail" id={detailId}>
     <div className="mw-score"><b>{latest.warning_level} <small>項亮燈</small></b><span>{unknown ? `${unknown} 項資料不足` : latest.warning_level ? '風險升高' : '目前未亮燈'}</span><time>{report.asOf}</time></div>
     <p className="mw-purpose">不是買賣訊號；回測顯示無法預測修正時點，但亮燈後下一次修正較深的比例較高</p>
     <ul className="mw-lights">{lights.map(light => <li key={light.label} data-state={light.na || light.value === null ? 'na' : light.value ? 'warning' : 'off'}>
@@ -87,6 +98,7 @@ function WarningBody({ data, market, report }: { data: MarketWarnings; market: '
       <details><summary>完整門檻設定</summary><pre>{JSON.stringify(params, null, 2)}</pre></details>
       <p>資料日 {report.asOf} · 計算時間 {report.update?.generatedAt ?? data.generatedAt} · 有效 {report.evaluated}／{report.universeCount} 檔 · 名單日 {report.listingAsOf}</p>
     </ResearchNote>
+    </div>}
   </>;
 }
 export function MarketWarningCard({ market }: { market: 'tw' | 'us' }) {
@@ -99,7 +111,8 @@ export function MarketWarningCard({ market }: { market: 'tw' | 'us' }) {
   }, [retry]);
   const result = loaded?.retry === retry ? loaded.result : undefined;
   const report = result?.data?.markets[market];
-  return <section className="card market-warning-card" aria-label="多頭末期警示"><h2>多頭末期警示 <small>{market === 'tw' ? '台股' : '美股'}</small></h2>
+  const ready = !!result?.data && !!report && 'asOf' in report;
+  return <section className="card market-warning-card" aria-label="多頭末期警示" data-ready={ready ? '' : undefined}><h2>多頭末期警示 <small>{market === 'tw' ? '台股' : '美股'}</small></h2>
     {result?.data && report ? 'asOf' in report ? <WarningBody key={market} data={result.data} market={market} report={report} /> : <div role="status">
       <p className="mw-update-note">本市場未更新：{report.update.reason}。尚無可保留的已發布資料。</p>
       <button type="button" onClick={() => setRetry(value => value + 1)}>重試警示資料</button>

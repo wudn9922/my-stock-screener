@@ -6,6 +6,7 @@ import {
   type HoldingQuote,
   type HoldingValue,
 } from './model';
+import { holdingChartTarget } from './chartTarget';
 import { formatHoldingPrice } from './displayFormat';
 import { formatDateTime, toneClass } from '../ui/format';
 function Signed({ value, percent = false }: { value: string | null; percent?: boolean }) {
@@ -38,6 +39,7 @@ export function HoldingPosition({
   onOpen: () => void;
   onHide: () => void;
 }) {
+  const chartable = holdingChartTarget(holding) !== null;
   const quantity =
     holding.market === 'TW'
       ? decimalText(new Money(holding.quantity).div(1000)) + ' 張'
@@ -50,7 +52,8 @@ export function HoldingPosition({
             <button
               type="button"
               className="text-button holdings-symbol"
-              disabled={holding.market === 'CRYPTO' && holding.symbol !== 'BTC/USDT'}
+              disabled={!chartable}
+              title={chartable ? '開啟圖表' : 'Atlas 暫無此標的圖表'}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();

@@ -45,24 +45,41 @@ const segmentSchema = z.object({
   ma60: ratioSchema,
 });
 
+const HISTORY_COUNT_FIELDS = ['ma20Above', 'ma20Total', 'ma60Above', 'ma60Total'] as const;
+type HistoryCountField = (typeof HISTORY_COUNT_FIELDS)[number];
+const historyCount = (value: unknown): number | null => {
+  const count = finiteOrNull(value);
+  return count !== null && Number.isInteger(count) && count >= 0 ? count : null;
+};
+
 const historySchema = z
   .object({
     dates: z.unknown().optional(),
     ma20Pct: z.unknown().optional(),
     ma60Pct: z.unknown().optional(),
+    ma20Above: z.unknown().optional(),
+    ma20Total: z.unknown().optional(),
+    ma60Above: z.unknown().optional(),
+    ma60Total: z.unknown().optional(),
   })
   .optional()
   .transform((value): BreadthHistory => {
-    const raw: { dates?: unknown; ma20Pct?: unknown; ma60Pct?: unknown } = value ?? {};
+    const raw: { dates?: unknown; ma20Pct?: unknown; ma60Pct?: unknown } & Partial<Record<HistoryCountField, unknown>> = value ?? {};
     const dates = Array.isArray(raw.dates) ? raw.dates : [];
     const ma20 = Array.isArray(raw.ma20Pct) ? raw.ma20Pct : [];
     const ma60 = Array.isArray(raw.ma60Pct) ? raw.ma60Pct : [];
     const out: BreadthHistory = { dates: [], ma20Pct: [], ma60Pct: [] };
+    for (const field of HISTORY_COUNT_FIELDS) {
+      if (Array.isArray(raw[field])) out[field] = [];
+    }
     dates.forEach((day, index) => {
       if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
       out.dates.push(day);
       out.ma20Pct.push(finiteOrNull(ma20[index]));
       out.ma60Pct.push(finiteOrNull(ma60[index]));
+      for (const field of HISTORY_COUNT_FIELDS) {
+        if (out[field]) out[field]!.push(historyCount((raw[field] as unknown[])[index]));
+      }
     });
     return out;
   });
@@ -122,6 +139,11 @@ export interface BreadthSegment {
   ma60: BreadthRatio;
 }
 export interface BreadthHistory {
+  /** Optional for reports generated before historical counts were exposed. Null means unavailable. */
+  ma20Above?: (number | null)[];
+  ma20Total?: (number | null)[];
+  ma60Above?: (number | null)[];
+  ma60Total?: (number | null)[];
   dates: string[];
   ma20Pct: (number | null)[];
   ma60Pct: (number | null)[];

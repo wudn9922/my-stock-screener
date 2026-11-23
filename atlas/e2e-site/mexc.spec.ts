@@ -603,6 +603,8 @@ test('automatic synchronization keeps the selected account when server order cha
     .getByRole('group', { name: '自選檢視' })
     .getByRole('button', { name: '持股', exact: true })
     .click();
+  // 全部帳號 is the default now; pick the MEXC account explicitly (the account this test follows).
+  await panel(page).getByRole('combobox', { name: '持股帳戶' }).selectOption(mexcId);
   await expect(mexc(page)).toContainText('已連線');
   const spotReads = () => f.upstream.filter((c) => new URL(c.url).pathname === '/api/v3/account').length;
   const count = spotReads();
@@ -613,9 +615,8 @@ test('automatic synchronization keeps the selected account when server order cha
   expect(f.bodies.filter((body) => body.apiSecret)).toHaveLength(1);
   page.once('dialog', (dialog) => dialog.accept());
   await panel(page).getByRole('button', { name: '刪除帳戶', exact: true }).click();
-  await expect(panel(page).getByRole('combobox', { name: '持股帳戶' })).toHaveValue(
-    '22222222-2222-4222-8222-222222222222',
-  );
+  // The deleted account was being viewed, so the view falls back to 全部帳號 (the other account still listed).
+  await expect(panel(page).getByRole('combobox', { name: '持股帳戶' })).toHaveValue('all');
   await expect(panel(page).getByRole('region', { name: '持股總計' })).not.toContainText('總計尚未完整');
   expect(f.connections.size).toBe(0);
 });

@@ -203,6 +203,10 @@ def build_market(frames, universe_label, segment_of=None):
         "ma20Pct": [_pct(a, t) for a, t in zip(history_tally["ma20Above"], history_tally["ma20Total"])],
         "ma60Pct": [_pct(a, t) for a, t in zip(history_tally["ma60Above"], history_tally["ma60Total"])],
     }
+    for period in MA_PERIODS:
+        for suffix in ("Above", "Total"):
+            field = f"ma{period}{suffix}"
+            history[field] = [int(value) for value in history_tally[field]]
     return {
         "asOf": as_of.strftime("%Y-%m-%d"),
         "universe": universe_label,

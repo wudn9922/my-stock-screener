@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { mockSite, buildReport, yahooChart, NO_LIVE_QUOTES } from './mocks';
 import { searchSymbol } from '../e2e/site-helpers';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
+import { openListActions } from './archive-fixture';
 
 async function candlePixels(page: Page) {
   return page.getByTestId('chart').evaluate(host => {
@@ -12,8 +13,8 @@ async function candlePixels(page: Page) {
       const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, Math.floor(canvas.height * 0.7)).data;
       let count = 0;
       for (let i = 0; i < data.length; i += 16) {
-        if (data[i + 3]! > 200 && ((data[i] === 242 && data[i + 1] === 54 && data[i + 2] === 69)
-          || (data[i] === 34 && data[i + 1] === 171 && data[i + 2] === 148))) count++;
+        if (data[i + 3]! > 200 && ((data[i] === 255 && data[i + 1] === 90 && data[i + 2] === 95)
+          || (data[i] === 43 && data[i + 1] === 200 && data[i + 2] === 168))) count++;
       }
       return sum + count;
     }, 0);
@@ -21,6 +22,7 @@ async function candlePixels(page: Page) {
 }
 
 test('switching from a manually scaled low-price stock to a high-price stock shows its candles', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('https://edge.test/functions/v1/market-chart**', route => {
     const url = new URL(route.request().url()), symbol = url.searchParams.get('symbol')!;
@@ -48,6 +50,7 @@ test('switching from a manually scaled low-price stock to a high-price stock sho
 
 const board = (page: Page) => page.getByRole('region', { name: '自選行情' });
 async function createManual(page: Page, name: string, symbol: string) {
+  await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill(name);
   await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');
@@ -112,6 +115,7 @@ test('all stocks have a continuous chart view with automatic paging and disposab
 });
 
 test('financials uses the same stock tab sizing and identity-first order as the three chart views', async ({ page }) => {
+  await mockMarketLogin(page); // market-chart needs a LINE login
   await mockSite(page);
   await page.route('**/report/financials/*.json', route => route.fulfill({ contentType: 'application/json',
     body: readFileSync(new URL('../tests/fixtures/financials/us-full.json', import.meta.url), 'utf8') }));

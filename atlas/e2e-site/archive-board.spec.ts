@@ -2,7 +2,7 @@ import { archiveIndexFixture } from '../tests/fixtures/archive-index';
 import { expect, test } from '@playwright/test';
 import { clock, archives, manualList } from './archive-fixture';
 import { dailyBars, mockSite } from './mocks';
-import { mockDeviceAccount } from './account-fixture';
+import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 
 test('C3 a 47-symbol board reads six-month archives with no five-year request and unchanged daily changes',async({page},info)=>{
   await page.clock.install({time:clock});await mockDeviceAccount(page);await mockSite(page);
@@ -27,7 +27,7 @@ test('C3 a 47-symbol board reads six-month archives with no five-year request an
 });
 
 for (const failure of ['missing-file','network'] as const) test(`C3 ${failure} archive falls back to the existing Yahoo history`,async({page})=>{
-  await page.clock.install({time:clock});await mockSite(page);
+  await page.clock.install({time:clock});await mockMarketLogin(page);await mockSite(page);
   await archives(page,['AAPL']);
   await page.route('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/us/AAPL/*.csv',route=>failure==='network'?route.abort('failed'):route.fulfill({status:404}));
   await page.route('**/report/trending-stocks.json',route=>route.fulfill({json:{version:1,source:'line',fetchedAt:'2026-10-09T08:00:00Z',sentAt:'2026-10-09T08:00:00Z',symbols:['AAPL']}}));

@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { mockMarketLogin } from './account-fixture';
 import { mockSite, yahooChart } from './mocks';
+import { openStockMenu, closeStockMenu } from '../e2e/site-helpers';
+
+// market-chart needs a LINE login; these tests are about the market data it returns.
+test.beforeEach(({ page }) => mockMarketLogin(page));
 
 for (const phase of ['open', 'closed'] as const) test(`A2 ${phase}: header, source and board show the same regular-session status`, async ({ page }, info) => {
   const now = phase === 'open' ? '2026-11-04T16:00:00Z' : '2026-11-04T22:00:00Z';
@@ -21,10 +26,12 @@ for (const phase of ['open', 'closed'] as const) test(`A2 ${phase}: header, sour
   await page.goto('./?page=chart&symbol=AAPL');
   const expected = phase === 'open' ? /^延遲報價 · 更新於 00:00:\d{2}$/ : '已收盤 · 最後成交 11/05 05:00';
   await expect(page.getByTestId('live-time')).toHaveText(expected);
+  await openStockMenu(page);
   await page.getByTestId('source-info-toggle').click();
   const source = page.locator('.data-source');
   await expect(source).toContainText(phase === 'open' ? '延遲報價 · 更新於 00:00:' : expected as string);
   await page.getByTestId('source-info-toggle').click();
+  await closeStockMenu(page);
   await page.screenshot({ path: info.outputPath(`a2-${phase}-header.png`) });
   await page.goto('./?page=watchlist');
   await expect(page.getByTestId('board-live-time')).toHaveText(expected);

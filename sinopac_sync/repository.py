@@ -22,6 +22,9 @@ class Repository:
             )
             if not r.ok:
                 raise SyncError("service")
+            # Void RPCs (atlas_sinopac_finish) answer 204 No Content.
+            if r.status_code == 204 or not r.content:
+                return None
             return r.json()
         except SyncError:
             raise

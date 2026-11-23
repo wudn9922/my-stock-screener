@@ -5,6 +5,7 @@ import {
   Activity,
   BellRing,
   ChevronDown,
+  ChevronLeft,
   Download,
   Upload,
   Undo2,
@@ -29,6 +30,8 @@ import {
   FlaskConical,
   RefreshCw,
   Search,
+  Share,
+  Star,
 } from 'lucide-react';
 import { getChartStore, initializeChartStore } from './chartStore';
 import { canPersist } from '../auth/storage';
@@ -72,10 +75,15 @@ import { closedBars } from '../market-data/MarketDataProvider';
 import { evaluateAlerts } from '../alerts/AlertEngine';
 import type { StrategyResult } from '../strategy';
 import { errorLog, reportError } from '../errors/UserErrors';
-import { SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
+import { PUBLIC_BASE, SCREENER_HOSTING, STATIC_HOSTING } from './HostingMode';
+import { serializeRoute } from './routes';
 import { parseLaunchParams } from './LaunchParams';
 import { legacyVolumeEnabled } from '../storage/schema';
-import { getMarketProfile } from '../market-data/MarketProfile';
+import { getMarketProfile, isIndexSymbol } from '../market-data/MarketProfile';
+import { sameTimeVolume } from '../market-data/SameTimeVolume';
+import { intradayIndexVolume, todayVolumeMissing, withIntradayIndexVolume } from '../market-data/IntradayVolume';
+import { useIntradayVolumeBars } from '../ui/useIntradayVolumeBars';
+import { SameTimeVolumeChip } from '../ui/SameTimeVolumeChip';
 import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
 import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
@@ -99,6 +107,13 @@ import { marketVolumeUnit } from '../ui/format';
 import { worldAssetFor } from '../market-data/worldAssets';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/workspace.css';
+import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
+import { MarketLoginPrompt } from '../ui/MarketLogin';
+import { ListPicker } from '../ui/ListPicker';
+import { symbolInAnyList } from '../lists/unifiedLists';
+import { watchlistStore } from '../watchlists/store';
+import { loadFinancials } from '../fundamentals/FinancialHistory';
+import { restatePeFigures } from '../fundamentals/restatedPe';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
@@ -186,6 +201,10 @@ export interface ChartWorkspaceProps {
   view?: StockView;
   onViewChange?: (view: StockView) => void;
   onShowPeChart?: () => void;
+  /** Phone/tablet header back button: returns to the page the chart was opened from. */
+  onBack?: () => void;
+  /** Opens 我的 › 清單 from the 加入清單 sheet. */
+  onManageLists?: () => void;
 }
 
 export function App({
@@ -198,6 +217,8 @@ export function App({
   view = 'chart',
   onViewChange,
   onShowPeChart,
+  onManageLists,
+  onBack,
 }: ChartWorkspaceProps = {}) {
   const store = getChartStore();
   const mobile = useSyncExternalStore(subscribeMobile, () => mobileMedia.matches);
@@ -209,6 +230,10 @@ export function App({
     tf = s.preferences.timeframe;
   const providerId = state.app.provider as ProviderId;
   const parameters = useStockParameters(state.ready && providerId !== 'demo' && !symbol.startsWith('^'));
+  const savedListStore = watchlistStore();
+  const { document: savedLists } = useSyncExternalStore(savedListStore.subscribe, savedListStore.getSnapshot);
+  const [listPickerOpen, setListPickerOpen] = useState(false);
+  const closeListPicker = useCallback(() => setListPickerOpen(false), []);
   const parameter = stockParameterRows(parameters.stocks, symbol)[0];
   const parameterKey = parameter ? `${parameter.id}:${parameterMAs(parameter).join(',')}` : '';
   useEffect(() => {
@@ -231,6 +256,8 @@ export function App({
     [selected, setSelected] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [dataError, setDataError] = useState(''),
+    // Signed out (or the token was refused) and this chart has no static data: show the LINE login.
+    [loginRequired, setLoginRequired] = useState(false),
     [notice, setNotice] = useState(''),
     [result, setResult] = useState<BarResult | null>(null),
     // The data a backtest runs on: set by loads and manual refreshes, not by the live minute refresh
@@ -361,6 +388,7 @@ export function App({
   };
   const tablet = mobile && window.innerWidth >= 768;
   const modal = active && ((!!sheet && !tablet) || help || drawingPickerOpen || quickEditing);
+  const inertBackground = modal || (active && listPickerOpen);
   const errors = useSyncExternalStore(errorLog.subscribe, errorLog.getSnapshot);
   const alertSession = useRef('');
   useDialogFocus(modal, drawingPickerOpen ? 'drawing-tool-picker' : undefined);
@@ -368,11 +396,21 @@ export function App({
   const hostRef = useRef<HTMLDivElement>(null),
     headerRef = useRef<HTMLDivElement>(null),
     legendRef = useRef<HTMLDivElement>(null),
-    sourceRef = useRef<HTMLDivElement>(null),
     timeframesRef = useRef<HTMLDivElement>(null),
     engine = useRef<ChartEngine | null>(null),
     importRef = useRef<HTMLInputElement>(null),
     drawingLauncherRef = useRef<HTMLButtonElement>(null);
+  // The engine writes the data source into one element for its lifetime; the desktop header and the phone 更多 menu
+  // both mount this same node, so switching layouts (iPad rotation) never leaves it writing to a detached copy.
+  const [sourceLabel] = useState(() => {
+    const element = document.createElement('div');
+    element.className = 'data-source';
+    element.dataset.testid = 'source-label';
+    return element;
+  });
+  const mountSourceLabel = useCallback((slot: HTMLDivElement | null) => {
+    if (slot && sourceLabel.parentNode !== slot) slot.appendChild(sourceLabel);
+  }, [sourceLabel]);
   const closeDrawingPicker = useCallback(() => {
     setDrawingPickerOpen(false);
     requestAnimationFrame(() => drawingLauncherRef.current?.focus({ preventScroll: true }));
@@ -422,11 +460,11 @@ export function App({
     void initializeChartStore(store);
   }, []);
   useEffect(() => {
-    if (!state.ready || !hostRef.current || !headerRef.current || !sourceRef.current) return;
+    if (!state.ready || !hostRef.current || !headerRef.current) return;
     const chart = new ChartEngine(
       hostRef.current,
       headerRef.current,
-      sourceRef.current,
+      sourceLabel,
       {
         defaults: (type) => store.getSnapshot().app.drawingDefaults[type] ?? {},
         commit: (symbol, drawings, label, timeframe) => store.commitDrawings(symbol, drawings, label, timeframe),
@@ -452,7 +490,7 @@ export function App({
       chart.destroy();
       engine.current = null;
     };
-  }, [state.ready]);
+  }, [state.ready, sourceLabel]);
   const colorConvention = preferences.colors;
   const appliedColors = useRef(colorConvention);
   useEffect(() => {
@@ -475,6 +513,7 @@ export function App({
     setResult(null);
     setLoadedResult(null);
     setDataError('');
+    setLoginRequired(false);
     setEventsStatus(
       STATIC_HOSTING && providerId === 'yahoo' ? '公司事件：需要後端' : '公司事件：載入中…',
     );
@@ -546,13 +585,14 @@ export function App({
             );
             if (events.status === 'available') chart.setCorporateEvents(events.events);
           })
-          .catch(() => {
-            if (live) setEventsStatus('公司事件：來源暫時無法使用');
+          .catch((error: unknown) => {
+            if (live) setEventsStatus(isMarketLoginRequired(error) ? '公司事件：登入 LINE 後可查看' : '公司事件：來源暫時無法使用');
           });
       })
       .catch((e) => {
         if (live) {
-          setDataError(reportError('market', e));
+          if (isMarketLoginRequired(e)) setLoginRequired(true);
+          else setDataError(reportError('market', e));
           setLoading(false);
         }
       });
@@ -580,6 +620,14 @@ export function App({
   const liveKey = `${symbol}:${tf}:${providerId}`;
   const liveState = useRef({ result, tool, selected });
   liveState.current = { result, tool, selected };
+  // Volume readouts: one cached 5m series per chart (see useIntradayVolumeBars).
+  const volumeBars = useIntradayVolumeBars(symbol, tf, providers[providerId], result,
+    state.ready && providerId === 'market' && isLiveSymbol(symbol) && !worldAssetFor(symbol));
+  const sameTime = useMemo(() => volumeBars ? sameTimeVolume(volumeBars, symbol) : null, [volumeBars, symbol]);
+  const indexVolume = useMemo(() => tf === '1D' && result && isIndexSymbol(symbol)
+    ? intradayIndexVolume(result.bars, volumeBars, symbol) : null, [tf, result, volumeBars, symbol]);
+  const indexVolumeRef = useRef(indexVolume);
+  indexVolumeRef.current = indexVolume;
   const liveChart = state.ready && providerId === 'market' && !!result
     && (result.archive || result.source.startsWith(EDGE_YAHOO_SOURCE) || getMarketProfile(symbol).market === 'TW') && isLiveSymbol(symbol);
   useEffect(() => {
@@ -591,7 +639,7 @@ export function App({
         current = liveState.current.result;
       if (!live || !chart || !current) return;
       try {
-        next = usableBarResult(next, symbol, tf);
+        next = withIntradayIndexVolume(usableBarResult(next, symbol, tf), tf === '1D' ? indexVolumeRef.current : null, symbol);
       } catch {
         return;
       }
@@ -677,6 +725,15 @@ export function App({
       clearInterval(timer);
     };
   }, [liveChart, symbol, tf, providerId]);
+  // A verified intraday index volume reaches the loaded daily bar too (live updates patch it in apply).
+  useEffect(() => {
+    const current = liveState.current.result, chart = engine.current;
+    if (tf !== '1D' || !current || !chart || indexVolume?.status !== 'ok') return;
+    const next = withIntradayIndexVolume(current, indexVolume, symbol);
+    if (next === current || !chart.patchBars(next)) return;
+    liveState.current.result = next;
+    setResult(next);
+  }, [indexVolume, symbol, tf]);
   const headerQuote =
     quote && quote.symbol === symbol && quote.provider === providerId
       ? quote.quote
@@ -689,9 +746,16 @@ export function App({
   useEffect(() => {
     if (!state.ready || providerId === 'demo') return;
     let live = true;
-    void getPeFigures(symbol, headerPrice).then((figures) => {
-      if (live) setPe({ symbol, figures });
-    });
+    void getPeFigures(symbol, headerPrice)
+      .then(async (figures) => {
+        // Taiwan: EPS printed before a later 配股 / split are put on today's share basis (financials file).
+        if (getMarketProfile(symbol).market !== 'TW') return figures;
+        const financials = await loadFinancials(symbol).catch(() => null);
+        return restatePeFigures(figures, financials?.status === 'ok' ? financials.data : null, headerPrice, new Date().toISOString().slice(0, 10));
+      })
+      .then((figures) => {
+        if (live) setPe({ symbol, figures });
+      });
     return () => {
       live = false;
     };
@@ -1038,7 +1102,7 @@ export function App({
           if (live) evaluateCurrentAlerts(data);
         })
         .catch((error) => {
-          if (live && !abort.signal.aborted) reportError('market', error);
+          if (live && !abort.signal.aborted && !isMarketLoginRequired(error)) reportError('market', error);
         })
         .finally(() => {
           pending = false;
@@ -1171,17 +1235,217 @@ export function App({
   const showLegacyVolume =
     legacyVolumeFor(symbol, s.preferences, tf) && !activeIndicators.some((i) => i.type === 'Volume');
   const changeTone = toneClass(headerQuote?.change);
-  const inWatchlist = state.app.watchlist.includes(symbol);
+  // The star opens 加入清單 and is filled when this symbol is in any list (favourites, watchlists or a group).
+  const inAnyList = symbolInAnyList(symbol, { favorites: state.app.watchlist, watchlists: savedLists.lists, stocks: parameters.stocks });
+  const starProps = {
+    'aria-label': inAnyList ? `已在清單中，管理 ${symbol} 的清單` : `加入清單：${symbol}`,
+    title: inAnyList ? '已在清單中（點選管理）' : '加入清單',
+    'aria-haspopup': 'dialog' as const,
+    'aria-expanded': listPickerOpen,
+    'data-testid': 'list-star',
+    disabled: !state.ready,
+    onClick: () => setListPickerOpen(true),
+  };
   const peTitle = (label: string, value: number | null) =>
     value !== null
       ? `${label}${peFigures?.source ? ` · ${peFigures.source}` : ''}${peFigures?.asOf ? ` · ${peFigures.asOf}` : ''}`
       : `${label}：${peFigures?.reason ?? '暫無資料'}`;
+  const ticker = asset?.ticker ?? symbol;
+  const compactTicker = ticker.startsWith(displayTicker(symbol)) ? displayTicker(symbol) : ticker;
+  const dataStateLabel = providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲';
+  const dataStateBadge = <span className={`demo-badge ${providerId}`} data-testid="chart-data-state">{dataStateLabel}</span>;
+  const chartStatus = (idle: boolean) => (
+    <div className={`chart-status ${idle ? 'chart-status-idle' : 'ws-more-status'}`}>
+      <span aria-hidden="true" />
+      <span className="status-counts">
+        畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
+        <span className="status-divider">/</span>
+        <span
+          className={`save-state ${state.storageError || cloud === 'error' ? 'danger-text' : ''}`}
+          data-testid="save-state"
+          title={cloudTitles[cloud]}
+        >
+          {!canPersist() ? '僅本次瀏覽暫存' : state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
+        </span>
+      </span>
+    </div>
+  );
+  const shareStock = async () => {
+    // Only the canonical stock route: no list context, account or session identifiers.
+    const url = `${window.location.origin}${PUBLIC_BASE}${serializeRoute({ page: 'chart', symbol, tf })}`;
+    const title = `${ticker}${companyName ? ` ${companyName}` : ''} · Atlas`;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, url });
+      } catch (error) {
+        if ((error as Error | undefined)?.name !== 'AbortError') setNotice('無法開啟分享，請從網址列複製連結。');
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('已複製個股連結');
+    } catch {
+      setNotice('無法複製連結，請從網址列複製。');
+    }
+  };
+  // Phone and tablet (≤1099px): one title row, the price row and the K線｜財務｜價量｜研究 tabs; everything the
+  // desktop header shows beside them opens from the 更多 (⋯) menu.
+  const compactLiveStatus = !asset && headerQuote ? quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined) : null;
+  // The data-state word already leads the line, so it shows the short form (「更新於 12:20:31」, 「11/13 收盤」);
+  // the full status stays in the document for assistive tech.
+  const compactLiveShort = compactLiveStatus
+    ?.replace(/^(即時|延遲|模擬)報價 · /, '')
+    .replace(/^已收盤 · 最後成交 (\d{2}\/\d{2}) \d{2}:\d{2}$/, '$1 收盤');
+  const compactHeader = (
+    <header className="ws-header ws-header-compact" inert={inertBackground} aria-hidden={inertBackground}>
+      <div className="ws-title-row">
+        {onBack && (
+          <button type="button" className="icon-button ws-back" aria-label="返回" title="返回" onClick={onBack}>
+            <ChevronLeft size={22} aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="ws-symbol"
+          aria-label={`切換股票（目前 ${ticker}）`}
+          title="搜尋並切換股票"
+          onClick={() => onOpenSearch?.()}
+        >
+          <span className="ws-symbol-text">
+            {/* The exchange suffix (.TW) is in the market badge; it stays in the text for search and assistive tech. */}
+            <b data-testid="active-symbol">{compactTicker}{ticker.slice(compactTicker.length) && <span className="ws-ticker-suffix">{ticker.slice(compactTicker.length)}</span>}</b>
+            <span className="ws-symbol-name">{companyName ?? marketLabel}</span>
+            <span className="ws-market-tag">{marketLabel}</span>
+          </span>
+          {onOpenSearch && <Search size={15} className="ws-symbol-icon" aria-hidden="true" />}
+        </button>
+        <div className="ws-header-actions">
+          <button type="button" className={`icon-button ws-list-star ${inAnyList ? 'active' : ''}`} {...starProps}>
+            <Star size={22} fill={inAnyList ? 'currentColor' : 'none'} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+          <IconButton label="分享個股連結" onClick={() => void shareStock()}>
+            <Share size={21} strokeWidth={1.8} aria-hidden="true" />
+          </IconButton>
+          <StockStatsMenu label="更多" triggerLabel="更多操作" testId="stock-more-toggle" className="ws-more-menu" trigger={<MoreHorizontal size={22} aria-hidden="true" />}>
+            {(open, close) => (
+              <div className="ws-more-list">
+                {providerId === 'demo' && (
+                  <button
+                    className="demo-switch ws-more-item"
+                    type="button"
+                    title="改用真實的延遲行情；你的設定仍保留在這台裝置。"
+                    onClick={() => { close(); store.updateApp({ provider: SCREENER_HOSTING ? 'market' : 'snapshot' }); }}
+                  >
+                    模擬資料 · 改用真實行情
+                  </button>
+                )}
+                {SCREENER_HOSTING ? (
+                  <button className="ws-more-item" type="button" aria-label={`更新 ${symbol} K 線`}
+                    title="只重新抓取目前股票的最新可用 K 線；Yahoo 仍為延遲行情。"
+                    disabled={loading || refreshing || !state.ready}
+                    onClick={() => void refreshCurrentStock()}>
+                    <RefreshCw size={18} aria-hidden="true" />{refreshing ? '更新中…' : '更新 K 線'}
+                  </button>
+                ) : (
+                  <button className="ws-more-item" type="button" onClick={() => setReloadToken((n) => n + 1)}>
+                    <RefreshCw size={18} aria-hidden="true" />重新整理行情
+                  </button>
+                )}
+                {!isIndex && providerId !== 'demo' && (
+                  <>
+                    {!stockViews && (
+                      <StockStatsMenu inline label="價量" testId="volume-analysis-toggle">
+                        <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
+                      </StockStatsMenu>
+                    )}
+                    <StockStatsMenu inline label="建議均線" testId="ma-recommendation-toggle">
+                      {(maOpen) => <><MaRecommendation active={open && maOpen} store={store} symbol={symbol} timeframe={tf} indicators={s.indicators} savedStock={parameter} parameterError={parameters.error} onNotice={setNotice} />
+                        <p className="stock-view-hint">套用後關閉選單即可在圖上看到均線。</p>
+                        {!stockViews && <Suspense fallback={<p>載入官方公告…</p>}><StockResearch key={`official-${symbol}`} symbol={symbol} mode="official" /></Suspense>}</>}
+                    </StockStatsMenu>
+                    <StockVolatility inline symbol={symbol} provider={providers[providerId]} reloadToken={reloadToken} />
+                  </>
+                )}
+                <StockStatsMenu inline label="行情資料說明" testId="source-info-toggle" trigger="資料說明">
+                  {(sourceOpen) => <div className="source-details">
+                    <div ref={mountSourceLabel} className="data-source-slot" />
+                    {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
+                    {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
+                    <div className="events-source">{eventsStatus}</div>
+                    {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open && sourceOpen} />}
+                  </div>}
+                </StockStatsMenu>
+                <button className="ws-more-item" type="button" onClick={() => { close(); void chartFocus.enter(); }}>
+                  <Expand size={18} aria-hidden="true" />全螢幕圖表
+                </button>
+                <button className="ws-more-item" type="button" onClick={() => { close(); setSheet(rightTab); }}>
+                  <PanelRightOpen size={18} aria-hidden="true" />更多面板
+                </button>
+                {chartStatus(false)}
+              </div>
+            )}
+          </StockStatsMenu>
+        </div>
+      </div>
+      <section className="ws-price-row" aria-label="報價">
+        <div className="ws-price-block">
+          <div className={`ws-quote ${changeTone}`} aria-live="polite" data-testid="header-quote">
+            <b>{headerQuote ? formatPrice(headerQuote.price, asset?.precision) : '—'}</b>
+            <span>
+              {headerQuote ? `${headerQuote.change > 0 ? '▲ ' : headerQuote.change < 0 ? '▼ ' : ''}${formatPrice(Math.abs(headerQuote.change))} (${formatPercent(headerQuote.changePercent)})` : ''}
+            </span>
+            <small className={asset ? 'ws-quote-unit' : 'ws-quote-unit sr-only'}>{asset?.unit ?? market.currency}</small>
+          </div>
+          <div className="ws-price-meta">
+            <span className="ws-meta-item">{dataStateBadge}報價</span>
+            {compactLiveStatus !== null && (
+              <span className="ws-meta-item">
+                <small className="ws-live-time sr-only" data-testid="live-time">{compactLiveStatus}</small>
+                <span className="ws-live-short" aria-hidden="true">{compactLiveShort}</span>
+              </span>
+            )}
+            {!isIndex && providerId !== 'demo' && (
+              <span className="ws-meta-item ws-stock-statistics">
+                <dl className="ws-valuation" data-testid="valuation">
+                  <div>
+                    <dt>本益比</dt>
+                    <dd className={peFigures?.peLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.pe, !!peFigures?.peLoss)}</dd>
+                  </div>
+                  <div>
+                    <dt>TTM</dt>
+                    <dd className={peFigures?.peTtmLoss ? 'pe-loss' : undefined}>{formatPe(peFigures?.peTtm, !!peFigures?.peTtmLoss)}</dd>
+                  </div>
+                </dl>
+                <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={14} />}>
+                  <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
+                  <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+                  {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
+                  {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
+                </StockStatsMenu>
+              </span>
+            )}
+          </div>
+          {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuoteLine symbol={symbol} quote={headerQuote} expanded={extendedOpen} onToggle={() => setExtendedDetails({ symbol, open: !extendedOpen })} />}
+        </div>
+      </section>
+      {!isIndex && providerId !== 'demo' && onOpenFinancials && (
+        <div className="ws-stock-controls stock-page-controls">
+          <StockTabs
+            active={stockView}
+            tabs={stockViews ? undefined : ['chart', 'financials']}
+            onSelect={(tab) => (tab === 'financials' ? onOpenFinancials(symbol, tf) : onViewChange?.(tab))}
+          />
+        </div>
+      )}
+    </header>
+  );
   return (
     <div
       ref={chartFocus.containerRef}
       className={`app-shell ${tablet && sheet ? 'tablet-context-open' : ''} ${chartFocus.isFocused ? 'chart-focus' : ''} ${stockView !== 'chart' ? 'stock-view-open' : ''}`}
     >
-      <header className="ws-header" inert={modal} aria-hidden={modal}>
+      {mobile ? compactHeader : <header className="ws-header" inert={inertBackground} aria-hidden={inertBackground}>
         <button
           type="button"
           className="ws-symbol"
@@ -1224,6 +1488,7 @@ export function App({
             <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={13} />}>
               <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+              {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
           </div>
@@ -1270,14 +1535,9 @@ export function App({
               模擬資料 · 改用真實行情
             </button>
           )}
-          <IconButton
-            label={inWatchlist ? '已加入圖表收藏' : '加入圖表收藏'}
-            active={inWatchlist}
-            disabled={inWatchlist}
-            onClick={() => store.updateApp({ watchlist: [...state.app.watchlist, symbol] })}
-          >
-            <span className="star-glyph" aria-hidden="true">{inWatchlist ? '★' : '☆'}</span>
-          </IconButton>
+          <button type="button" className={`icon-button ws-list-star ${inAnyList ? 'active' : ''}`} {...starProps}>
+            <span className="star-glyph" aria-hidden="true">{inAnyList ? '★' : '☆'}</span>
+          </button>
           {SCREENER_HOSTING ? (
             <button className="ghost-button ws-refresh-button" type="button" aria-label={`更新 ${symbol} K 線`}
               title="只重新抓取目前股票的最新可用 K 線；Yahoo 仍為延遲行情。"
@@ -1292,20 +1552,23 @@ export function App({
           )}
           <StockStatsMenu label="行情資料說明" testId="source-info-toggle" trigger={<Info size={16} />}>
             {open => <div className="source-details">
-              <div ref={sourceRef} className="data-source" data-testid="source-label" />
+              <div ref={mountSourceLabel} className="data-source-slot" />
               {STATIC_HOSTING && <p className="static-hosting-note">{staticHostingText}</p>}
               {providerId === 'demo' && <p className="demo-data-note">{demoDataText}</p>}
               <div className="events-source">{eventsStatus}</div>
               {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active={open} />}
+              <button type="button" className="ghost-button ws-share-link" onClick={() => void shareStock()}>
+                <Share size={16} strokeWidth={1.8} aria-hidden="true" />分享個股連結
+              </button>
             </div>}
           </StockStatsMenu>
         </div>
-      </header>
+      </header>}
       {extendedOpen && market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <section id="extended-quote-details" className="ws-extended-details" role="region" aria-label="盤前盤後報價">
         <ExtendedQuotes key={symbol} symbol={symbol} quote={headerQuote} active />
       </section>}
       {stockViews && visitedViews.has('volume') && (
-        <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={modal} aria-hidden={modal}>
+        <section className="stock-view" aria-label="價量" hidden={stockView !== 'volume'} inert={inertBackground} aria-hidden={inertBackground}>
           <div className="stock-view-card">
             <h2>價量分析</h2>
             <Suspense fallback={<p>載入價量分析…</p>}><StockResearch key={`volume-${symbol}`} symbol={symbol} provider={providers[providerId]} mode="volume" /></Suspense>
@@ -1313,7 +1576,7 @@ export function App({
         </section>
       )}
       {stockViews && visitedViews.has('research') && (
-        <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={modal} aria-hidden={modal}>
+        <section className="stock-view" aria-label="研究" hidden={stockView !== 'research'} inert={inertBackground} aria-hidden={inertBackground}>
           <div className="stock-view-card">
             <Suspense fallback={<p>載入相對大盤比較…</p>}><RelativeStrengthPanel key={symbol} symbol={symbol} /></Suspense>
           </div>
@@ -1330,7 +1593,7 @@ export function App({
           )}
         </section>
       )}
-      <div className="chart-toolbar" inert={modal} aria-hidden={modal}>
+      <div className="chart-toolbar" inert={inertBackground} aria-hidden={inertBackground}>
         <div className="timeframe-buttons" ref={timeframesRef} role="group" aria-label="K 線週期">
           {timeframes
             .filter((t) => availableTimeframes.includes(t))
@@ -1415,7 +1678,7 @@ export function App({
           )}
         </div>
       </div>
-      <div className="workspace" inert={modal} aria-hidden={modal}>
+      <div className="workspace" inert={inertBackground} aria-hidden={inertBackground}>
         <main className="main-workspace">
           {result?.archive?.status === 'unavailable' && <p className="archive-availability" role="status" data-testid="archive-availability">
             即時報價暫時無法取得，顯示至 {result.archive.lastDate} 收盤
@@ -1423,15 +1686,20 @@ export function App({
           <div className="chart-workspace">
             <div className="chart-stage">
               <div className="chart-overlay" role="group" aria-label={`${symbol} 圖例`}>
-                <div className="chart-heading">
-                  <b>{displayTicker(symbol)}</b>
-                  <span>· {tf} · {marketLabel}</span>
-                  <span className={`demo-badge ${providerId}`} data-testid="chart-data-state">
-                    {providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲'}
-                  </span>
-                </div>
+                {!mobile && (
+                  <div className="chart-heading">
+                    <b>{displayTicker(symbol)}</b>
+                    <span>· {tf} · {marketLabel}</span>
+                    {dataStateBadge}
+                  </div>
+                )}
                 <div ref={headerRef} className="ohlc-header" data-testid="ohlc-header" />
                 <div className="indicator-chips" ref={legendRef}>
+                  {/* First, so the narrow mobile legend row shows it without scrolling. */}
+                  {(showLegacyVolume || activeIndicators.some((i) => i.type === 'Volume' && i.visible)) && (
+                    <SameTimeVolumeChip symbol={symbol} ratio={sameTime} indexVolume={indexVolume}
+                      indexVolumeMissing={todayVolumeMissing(result, symbol)} />
+                  )}
                   {chartIndicators.map((i) => {
                     const repeatedPeriod =
                       i.type !== 'Volume' &&
@@ -1482,6 +1750,15 @@ export function App({
                   載入圖表…
                 </div>
               )}
+              {loginRequired && !dataError && (
+                <div className="chart-loading error market-login-overlay">
+                  <MarketLoginPrompt />
+                  {!['1D', '1W', '1M'].includes(tf) && <button className="ghost-button" type="button"
+                    onClick={() => store.updateSymbol(symbol, s => ({ ...s, preferences: { ...s.preferences, timeframe: '1D' } }))}>
+                    改看日 K
+                  </button>}
+                </div>
+              )}
               {dataError && (
                 <div className="chart-loading error">
                   <b>行情資料暫時無法取得</b>
@@ -1511,20 +1788,7 @@ export function App({
               {drawingControls && !modal && <DrawingQuickMenu point={drawingMenuPoint} bounds={drawingMenuBounds} host={hostRef}>{drawingControls}</DrawingQuickMenu>}
             </div>
           </div>
-          <div className="chart-status chart-status-idle">
-            <span aria-hidden="true" />
-            <span className="status-counts">
-              畫線 {activeDrawings.length} 條 <span className="status-divider">/</span> 指標 {activeIndicators.length} 個
-              <span className="status-divider">/</span>
-              <span
-                className={`save-state ${state.storageError || cloud === 'error' ? 'danger-text' : ''}`}
-                data-testid="save-state"
-                title={cloudTitles[cloud]}
-              >
-                {!canPersist() ? '僅本次瀏覽暫存' : state.storageError ? '儲存失敗' : state.saving ? '儲存中…' : cloudLabels[cloud]}
-              </span>
-            </span>
-          </div>
+          {!mobile && chartStatus(true)}
         </main>
         {right && !mobile && (
           <aside className="details-panel" aria-label={panelNames[rightTab]}>
@@ -1676,6 +1940,7 @@ export function App({
           </div>
         </div>
       )}
+      {active && listPickerOpen && <ListPicker key={symbol} symbol={symbol} appStore={store} onClose={closeListPicker} onManage={onManageLists} />}
       {active && quickEditing && selectedDrawing && <ConsoleDialog title="修改畫線" onClose={() => setQuickEditing(false)}>
         <button type="button" autoFocus className="ghost-button" style={{ minHeight: 44 }} onClick={() => setQuickEditing(false)}>取消</button>
         <DrawingSettings store={store} drawing={selectedDrawing} onCancelGesture={() => engine.current?.controller?.cancel()} onSaved={() => setQuickEditing(false)} />

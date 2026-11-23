@@ -24,6 +24,7 @@ from breakout_alert.account_permissions import is_public_report_owner, storage_m
 # 全域核心參數
 # =========================================================================
 # 僅供每日 LINE 報告 tw_all 清單；行情下載與 CSV 更新不設成交股數門檻。
+# tw_all 另需 MA20 上彎，並依 RS 百分位排序（見 _market_scan_report 的 latent_rules）。
 TW_MIN_VOLUME = 1_000_000
 
 HTTP_HEADERS = {
@@ -2157,8 +2158,18 @@ def _scan_analysis_frames(tickers):
     return frames
 
 
-def scan_market(tickers, report_min_volume=0):
-    # report_min_volume 只篩報告名單；所有 tickers 的 CSV 都會先下載更新。
+def scan_market(tickers, report_min_volume=0, **report_options):
+    # report_min_volume／report_options 只篩報告名單；所有 tickers 的 CSV 都會先下載更新。
+    return _market_scan_report(
+        tickers,
+        collect_market_frames(tickers),
+        report_min_volume,
+        **report_options
+    )
+
+
+def collect_market_frames(tickers):
+    """下載／更新所有 tickers 的 CSV（不設成交股數門檻），回傳報告分析用的日 K（_scan_analysis_frames）。"""
     os.makedirs(
         DATA_DIR,
         exist_ok=True
@@ -2480,16 +2491,31 @@ def scan_market(tickers, report_min_volume=0):
                 )
 
     # -----------------------------------------------------------------
-    # 全部 CSV 更新後才篩選報告清單：台股最新日 K 至少 100 萬股；美股不限。
-    # 這裡的台股成交股數門檻只影響每日 LINE 報告 tw_all，不影響行情收集。
+    # 全部 CSV 更新後才篩選報告清單（_market_scan_report）：台股 tw_all 最新日 K 至少 100 萬股、
+    # MA20 上彎並依 RS 百分位排序；美股不限量、依成交量排序。這些條件只影響每日 LINE 報告，不影響行情收集。
     # -----------------------------------------------------------------
-    analysis_frames = _scan_analysis_frames(tickers)
-    return _market_scan_report(tickers, analysis_frames, report_min_volume)
+    return _scan_analysis_frames(tickers)
 
 
-def _market_scan_report(tickers, analysis_frames, report_min_volume=0):
-    """Evaluate already collected histories; no downloads, cache writes or messages."""
+def _market_scan_report(
+    tickers,
+    analysis_frames,
+    report_min_volume=0,
+    latent_rules=False,
+    rs_rank_of=None
+):
+    """
+    Evaluate already collected histories; no downloads, cache writes or messages.
+
+    共同條件：收盤在 MA20 的 −2%～+1%、最新日 K 成交量 ≥ report_min_volume；預設依成交量由大到小排序。
+    latent_rules=True（只給台股 tw_all「全市場潛伏」）：另需 MA20 上彎（5 根斜率 > 0，與
+    report_metrics 的 ma20Slope5 同定義），並依 RS 百分位由高到低排序（rs_rank_of(ticker) 取得；
+    沒有百分位的排最後，同百分位依成交量由大到小）。
+    """
+    from report_metrics import ma20_slope5
+
     matched_list = []
+    rs_ranks = {}
     for ticker in tickers:
         try:
             df = analysis_frames.get(ticker)
@@ -2536,6 +2562,14 @@ def _market_scan_report(tickers, analysis_frames, report_min_volume=0):
             ):
                 continue
 
+            if latent_rules:
+                slope = ma20_slope5(
+                    df["Close"].to_numpy(dtype=float)
+                )
+
+                if slope is None or slope <= 0:
+                    continue
+
             diff_pct = (
                 (price / ma20) - 1
             ) * 100
@@ -2573,6 +2607,12 @@ def _market_scan_report(tickers, analysis_frames, report_min_volume=0):
                 }
             )
 
+            if latent_rules:
+                rs_ranks[ticker] = _rs_rank_or_none(
+                    rs_rank_of,
+                    ticker
+                )
+
         except Exception as exc:
             print(
                 f"⚠️ {ticker} "
@@ -2581,12 +2621,61 @@ def _market_scan_report(tickers, analysis_frames, report_min_volume=0):
                 f"{exc}"
             )
 
-    matched_list.sort(
-        key=lambda item: item["volume"],
-        reverse=True
-    )
+    if latent_rules:
+        matched_list.sort(
+            key=lambda item: (
+                rs_ranks[item["ticker"]] is None,
+                -(rs_ranks[item["ticker"]] or 0),
+                -item["volume"]
+            )
+        )
+    else:
+        matched_list.sort(
+            key=lambda item: item["volume"],
+            reverse=True
+        )
 
     return matched_list
+
+
+def _rs_rank_or_none(rs_rank_of, ticker):
+    """rs_rank_of(ticker) 的 RS 百分位（1–99）；沒有函式、例外或非數值時為 None。"""
+    if rs_rank_of is None:
+        return None
+
+    try:
+        value = rs_rank_of(ticker)
+    except Exception as exc:
+        print(
+            f"⚠️ {ticker} RS 百分位取得失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    value = safe_float(value, None)
+
+    if value is None or not math.isfinite(value):
+        return None
+
+    return value
+
+
+def report_rs_rank_of(metrics_lookup):
+    """
+    tw_all 排序用的 RS 百分位：與報告群組、選股頁相同的 metrics_lookup（build_report_universe）的 rsRank；
+    沒有 lookup（指標產生失敗）時一律 None（清單改依成交量排序）。不另外下載任何資料。
+    """
+    def rank(ticker):
+        if metrics_lookup is None:
+            return None
+
+        metrics = metrics_lookup(ticker) or {}
+        return metrics.get("rsRank")
+
+    return rank
 
 
 def backfill_short_csvs(
@@ -7893,9 +7982,10 @@ def main():
 
     tw_tickers = get_tw_tickers()
 
-    tw_all = scan_market(
-        tw_tickers,
-        report_min_volume=TW_MIN_VOLUME
+    # 先下載並更新所有台股 CSV（不設成交股數門檻）；tw_all 清單要等 RS 百分位算好後
+    # 才篩選與排序（見下方「選股篩選器」），所以這裡只取回日 K，不另外下載任何資料
+    tw_frames = collect_market_frames(
+        tw_tickers
     )
 
     # -----------------------------------------------------------------
@@ -7965,6 +8055,45 @@ def main():
         sector_charts,
         sector_summary
     ) = process_sector_weekly_charts()
+
+    # -----------------------------------------------------------------
+    # 選股篩選器：全市場 universe 與群組指標（report_metrics.py）
+    # 失敗時報告照舊產生，只是沒有 metrics 與 universe.json，tw_all 改依成交量排序。
+    # 要在 tw_all 篩選前建立：RS 百分位（metrics_lookup 的 rsRank）用於 tw_all 排序，
+    # 指標只讀已更新的 CSV 與 INDEX_HISTORY_CACHE 的 ^TWII，不增加下載
+    # （^TWII 已由 process_index_charts 放進快取；美股基準 SPY 仍只下載這一次）。
+    # -----------------------------------------------------------------
+    report_universes = None
+    metrics_lookup = None
+
+    try:
+        (
+            report_universes,
+            metrics_lookup
+        ) = build_report_universe(
+            tw_tickers,
+            us_tickers
+        )
+    except Exception as exc:
+        print(
+            "❌ 選股篩選器指標產生失敗："
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    # -----------------------------------------------------------------
+    # 台股 tw_all（全市場潛伏）：收盤在 MA20 −2%～+1%、最新日 K 至少 100 萬股、
+    # MA20 上彎，依 RS 百分位由高到低排序（沒有百分位的排最後，同百分位依成交量）。
+    # 低量與非上彎的股票照常下載、保留在全部資料，只是不進這份報告清單。
+    # -----------------------------------------------------------------
+    tw_all = _market_scan_report(
+        tw_tickers,
+        tw_frames,
+        TW_MIN_VOLUME,
+        latent_rules=True,
+        rs_rank_of=report_rs_rank_of(
+            metrics_lookup
+        )
+    )
 
     # -----------------------------------------------------------------
     # 建立固定分類
@@ -8258,27 +8387,6 @@ def main():
         access_token,
         line_push_user_id
     )
-
-    # -----------------------------------------------------------------
-    # 選股篩選器：全市場 universe 與群組指標（report_metrics.py）
-    # 失敗時報告照舊產生，只是沒有 metrics 與 universe.json
-    # -----------------------------------------------------------------
-    report_universes = None
-    metrics_lookup = None
-
-    try:
-        (
-            report_universes,
-            metrics_lookup
-        ) = build_report_universe(
-            tw_tickers,
-            us_tickers
-        )
-    except Exception as exc:
-        print(
-            "❌ 選股篩選器指標產生失敗："
-            f"{type(exc).__name__}: {exc}"
-        )
 
     # -----------------------------------------------------------------
     # Atlas 報告 JSON（docs/report/latest.json）

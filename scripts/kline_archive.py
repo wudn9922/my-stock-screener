@@ -31,6 +31,7 @@ import universe_cache as uc
 import market_sessions as sessions
 
 BRANCH = "kline-archive"
+OFFICIAL_TWII_VOLUME_REASON = "kline-archive/official-twii-volume"
 FIELDS = ["Date", "Open", "High", "Low", "Close", "Volume"]
 LOG = "docs/report/kline-corrections.json"
 CONFLICTS = "state/conflicts.json"
@@ -1235,6 +1236,51 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
     for record in log["events"]:
         if str(record.get("reason", "")).startswith("kline-archive/adjustment-year:"):
             validate_adjustment_audit(record)
+        if record.get("reason") == OFFICIAL_TWII_VOLUME_REASON:
+            evidence = record.get("officialBasis") or {}
+            dates = record.get("dates")
+            sources = record.get("volumeSources")
+            if sources is None:
+                # Legacy PR #264 FMTQIK-only audit events stay valid and immutable.
+                sources = {day: "fmtqik" for day in dates or []}
+            yahoo = record.get("yahooV8", {})
+            official_days = [day for day in sources if sources[day] == "fmtqik"]
+            yahoo_days = [day for day in sources if sources[day] == "yahoo-v8"]
+            if (record.get("symbol") != "^TWII" or record.get("status") != "corrected"
+                    or not re.fullmatch(r"tw/\^TWII/20\d\d\.csv", record.get("new", {}).get("path", ""))
+                    or not isinstance(dates, list) or not dates
+                    or sorted(set(dates)) != dates
+                    or any(day < "2026-11-05" for day in dates)
+                    or any(day[:4] != record["new"]["path"].split("/")[-1][:4] for day in dates)
+                    or record.get("date") != dates[0]
+                    or record["new"].get("rowsChanged") != len(dates)
+                    or not isinstance(sources, dict) or set(sources) != set(dates)
+                    or any(v not in ("fmtqik", "yahoo-v8") for v in sources.values())
+                    or not isinstance(yahoo, dict) or set(yahoo) != set(yahoo_days)
+                    or record.get("mode") not in (None, "daily")
+                    or not re.fullmatch("[a-f0-9]{64}", record.get("old", {}).get("sha256", ""))
+                    or not re.fullmatch("[a-f0-9]{64}", record["new"].get("sha256", ""))):
+                raise ValueError("Invalid official TWII volume audit")
+            if official_days and (
+                    evidence.get("reason") != "stable"
+                    or type(evidence.get("overlap")) is not int or evidence["overlap"] < 20
+                    or not isinstance(evidence.get("ratio"), (float, int))
+                    or not 0 < evidence["ratio"] < 1
+                    or not isinstance(evidence.get("medianRelativeDeviation"), (float, int))
+                    or not isinstance(evidence.get("p90RelativeDeviation"), (float, int))
+                    or evidence["medianRelativeDeviation"] > 0.06
+                    or evidence["p90RelativeDeviation"] > 0.15):
+                raise ValueError("Invalid FMTQIK TWII volume audit")
+            for day, witness in yahoo.items():
+                if (not isinstance(witness, dict) or set(witness) != {"volume", "close"}
+                        or type(witness["volume"]) is not int or witness["volume"] <= 0):
+                    raise ValueError("Invalid Yahoo v8 TWII volume witness")
+                try:
+                    close = Decimal(str(witness["close"]))
+                    if not close.is_finite() or close <= 0:
+                        raise ValueError("Invalid Yahoo v8 TWII close")
+                except (ValueError, InvalidOperation, TypeError) as exc:
+                    raise ValueError("Invalid Yahoo v8 TWII close") from exc
     old_tree, old_last, changed, file_audit, removals = {}, {}, {}, {}, {}
     if base:
         for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us", "global").split("\0"):
@@ -1262,7 +1308,8 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                 changed.setdefault(name.split("/")[1], []).append(name)
         for e in audit:
             if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
-                    or (e["status"] == "corrected" and str(e.get("reason", "")).startswith("kline-archive/adjustment-year:"))):
+                    or (e["status"] == "corrected" and (str(e.get("reason", "")).startswith("kline-archive/adjustment-year:")
+                         or e.get("reason") == OFFICIAL_TWII_VOLUME_REASON))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
             elif e["status"] == "removed" and (e.get("reason") == CLOSED_SESSION_REASON
                     or e.get("reason") == VERIFIED_PLACEHOLDER_REASON and e.get('date') == VERIFIED_PLACEHOLDER_DAY
@@ -1294,6 +1341,40 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                 continue
             old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
             old = {r[0]: r for r in old_rows}
+            # The official repair exception never licenses arbitrary history changes:
+            # dates/OHLC are byte-identical and ONLY 0/empty TWII volumes become positive.
+            official_edges = [e for e in file_audit.get(name, [])
+                if e.get("reason") == OFFICIAL_TWII_VOLUME_REASON
+                and e["old"]["sha256"] == old_hash and e["new"]["sha256"] == current[name]["sha256"]]
+            if official_edges:
+                if len(official_edges) != 1 or not re.fullmatch(r"tw/\^TWII/20\d\d\.csv", name):
+                    raise ValueError("Invalid scoped official TWII correction transition")
+                edge = official_edges[0]
+                before_by_day, after_by_day = old, {r[0]: r for r in rows}
+                if not before_by_day.keys() <= after_by_day.keys():
+                    raise ValueError("Official TWII volume repair cannot delete days")
+                added = after_by_day.keys() - before_by_day.keys()
+                if added and (edge.get("mode") != "daily"
+                              or any(day <= max(before_by_day) for day in added)):
+                    raise ValueError("Only daily TWII repair may accompany new appended days")
+                modified = []
+                for day, before in before_by_day.items():
+                    after = after_by_day[day]
+                    if before == after:
+                        continue
+                    if (day < "2026-11-05" or before[:5] != after[:5]
+                            or before[5] not in ("", "0") or not after[5].isdigit() or int(after[5]) <= 0):
+                        raise ValueError("Official TWII repair touched nonzero volume or OHLC")
+                    modified.append(day)
+                    witness = edge.get("yahooV8", {}).get(day)
+                    if witness is not None:
+                        original_close = Decimal(before[4])
+                        if (int(after[5]) != witness["volume"] or original_close <= 0
+                                or abs(Decimal(str(witness["close"])) / original_close - 1)
+                                > Decimal("0.005")):
+                            raise ValueError("Yahoo v8 source evidence disagrees with archive")
+                if sorted(modified) != edge["dates"]:
+                    raise ValueError("Official TWII audit dates do not match modified rows")
             missing = old.keys() - {r[0] for r in rows}
             # Only an audited closed-session removal of exactly this file transition may drop
             # a date, and only a flat zero-volume bar repeating the previous close.

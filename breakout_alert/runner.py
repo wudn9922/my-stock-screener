@@ -21,6 +21,12 @@ from breakout_alert.supabase_store import (
     SupabaseStore,
 )
 from breakout_alert.account_permissions import CloudStorageDenied
+from breakout_alert.web_push import with_web_push
+from breakout_alert.list_notifications import (
+    drawing_allowed_tickers,
+    filter_drawing_watchlist,
+    filter_ma_configs,
+)
 
 
 def print_market_decision(decision):
@@ -376,11 +382,16 @@ def main():
     market_data_provider = (
         MarketDataProvider()
     )
-    notifier = DiscordNotifier()
+    # 手機通知（Web Push）與 Discord 並行；未設定時即為原本的 DiscordNotifier
+    notifier = with_web_push(DiscordNotifier(), getattr(store, "user_id", None))
 
     try:
         try:
-            monitor_configs = store.get_monitor_configs()
+            # 清單通知設定每次執行只讀一次；讀不到時沿用「所有清單都通知」
+            notification_settings = store.get_list_notification_settings()
+            monitor_configs = store.get_monitor_configs(
+                notification_settings=notification_settings
+            )
         except CloudStorageDenied:
             print("ℹ️ 此帳號未啟用雲端儲存，略過私人監控與狀態寫入。")
             return
@@ -396,9 +407,15 @@ def main():
                 f"{type(exc).__name__}: {exc}"
             )
 
+        # 孤兒清理用完整設定（關閉通知不刪基準）；提醒只用已啟用的清單，每檔一次
+        alert_configs = filter_ma_configs(
+            monitor_configs,
+            notification_settings
+        )
+
         due_configs = [
             config
-            for config in monitor_configs
+            for config in alert_configs
             if config["market"]
             in due_decisions
         ]
@@ -422,6 +439,22 @@ def main():
             store,
             drawing_watchlist
         )
+
+        drawing_watchlist = filter_drawing_watchlist(
+            drawing_watchlist,
+            drawing_allowed_tickers(
+                notification_settings,
+                getattr(store, "user_stocks", ()),
+                getattr(store, "watchlist_rows", ())
+            )
+        )
+
+        if not notification_settings.all_lists:
+            print(
+                "🔔 清單通知：自訂（"
+                f"均線 {len(due_configs)} 筆、畫線 "
+                f"{len(drawing_watchlist.entries) if drawing_watchlist else 0} 檔）"
+            )
 
         drawing_configs = (
             get_due_drawing_configs(

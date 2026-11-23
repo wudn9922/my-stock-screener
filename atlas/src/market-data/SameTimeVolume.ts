@@ -1,5 +1,6 @@
 import type { BarResult } from "./MarketDataProvider";
 import { getMarketProfile, sessionDate } from "./MarketProfile";
+import { worldAssetFor } from "./worldAssets";
 
 export type SameTimeVolume =
   | { status: "unavailable"; reason: string }
@@ -26,7 +27,8 @@ export function sameTimeVolume(
   });
   if (result.dataState === "simulated")
     return no("模擬資料無法計算真實同期量比");
-  if (/^\^|=|^CRYPTO-|-USDT?$/.test(symbol))
+  // Indices use their exchange session too; one without a volume series fails the zero check below.
+  if (/=|^CRYPTO-|-USDT?$/.test(symbol) || worldAssetFor(symbol))
     return no("此商品不支援股票交易時段同期量比");
   const profile = getMarketProfile(symbol),
     step = 300;
@@ -84,6 +86,9 @@ export function sameTimeVolume(
   }
   if (previousVolume <= 0)
     return no("前一交易日同時間成交量為零，無法計算量比");
+  // An index always trades; zero means its source publishes no intraday volume today.
+  if (currentVolume <= 0 && symbol.startsWith("^"))
+    return no("此指數今日分時資料沒有成交量");
   const cutoffMinute = profile.sessionOpenMinutes + end + 5;
   return {
     status: "ok",

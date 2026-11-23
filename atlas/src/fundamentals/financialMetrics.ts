@@ -1,5 +1,6 @@
 import { growth, margin } from './FinancialCalculations';
-import type { FinancialHistory, FinancialSeries, PeriodKind, RawField } from './FinancialHistory';
+import type { FinancialHistory, FinancialSeries, PeriodKind, RawField, StockDividendEvent } from './FinancialHistory';
+import { DERIVED_Q4_REPORTED_NOTE, MIXED_Q4_REASON, RESTATED_EPS_HELP, adjustmentText, epsAdjustments, restatedEps, type EpsAdjustment, type EpsDisplayBasis } from './epsBasis';
 
 /**
  * Derived statement metrics for the financials page. This is the only place the formulas live
@@ -14,7 +15,7 @@ export type MetricUnit = 'money' | 'eps' | 'pct' | 'times';
  * cost) · basic: basic EPS because diluted is missing · approx: an average had only one end point ·
  * statutory-tax: NOPAT used the statutory rate · ttm: sum of the latest four consecutive quarters.
  */
-export type Basis = 'reported' | 'derived' | 'basic' | 'approx' | 'statutory-tax' | 'ttm';
+export type Basis = 'reported' | 'derived' | 'basic' | 'approx' | 'statutory-tax' | 'ttm' | 'restated';
 
 export interface MetricInput {
   label: string;
@@ -35,6 +36,10 @@ export interface MetricResult {
   abnormal?: boolean;
   /** Which operating income line an OI-based metric used. */
   oiField?: 'operatingIncomeReported' | 'operatingIncome';
+  /** EPS only: the value on today's share basis (追溯調整); year-over-year and CAGR compare these. */
+  comparable?: number | null;
+  /** EPS only, when `value` is the restated figure: the reported (公告) EPS behind it. */
+  reported?: number | null;
 }
 
 export interface MetricContext {
@@ -43,6 +48,12 @@ export interface MetricContext {
   market: 'US' | 'TW';
   /** Bank / insurer statement format: no gross profit concept, so gross profit is not applicable. */
   financialSector: boolean;
+  /** Taiwan 配股 events of the file; null when it has none recorded. */
+  stockDividends?: readonly StockDividendEvent[] | null;
+  /** Per period: what puts the EPS on today's share basis (epsBasis.ts); absent → EPS as reported only. */
+  epsAdjustments?: readonly (EpsAdjustment | null)[];
+  /** Which EPS `eps` shows: restated (default) or reported (公告). Year-over-year always compares restated values. */
+  epsBasis?: EpsDisplayBasis;
 }
 /**
  * Financial-sector format, as the builder flags it: the recent periods have no gross profit (or revenue with
@@ -51,11 +62,14 @@ export interface MetricContext {
 export function isFinancialSector(history: FinancialHistory): boolean {
   return history.quality.issues.includes('financial-sector-format');
 }
-export const contextOf = (history: FinancialHistory, kind: PeriodKind): MetricContext => ({
+export const contextOf = (history: FinancialHistory, kind: PeriodKind, epsBasis: EpsDisplayBasis = 'restated'): MetricContext => ({
   kind,
   series: history[kind],
   market: history.market,
   financialSector: isFinancialSector(history),
+  stockDividends: history.market === 'TW' ? history.stockDividends : null,
+  epsAdjustments: epsAdjustments(history, kind),
+  epsBasis,
 });
 
 export const FIELD_LABELS: Record<RawField, string> = {
@@ -249,6 +263,8 @@ function result(
     ...(extra.reason ? { reason: extra.reason } : {}),
     ...(extra.abnormal ? { abnormal: true } : {}),
     ...(extra.oiField ? { oiField: extra.oiField } : {}),
+    ...(extra.comparable !== undefined ? { comparable: extra.comparable } : {}),
+    ...(extra.reported !== undefined ? { reported: extra.reported } : {}),
   };
 }
 const missing = (formula: string, inputs: MetricInput[], reason: string, extra: Partial<MetricResult> = {}) =>
@@ -345,8 +361,60 @@ export function operatingIncome(ctx: MetricContext, index: number): MetricResult
   });
 }
 
-/** EPS: diluted, else basic (already split-adjusted by the builder). */
+/**
+ * EPS (diluted, else basic). By default on today's share basis (還原 EPS: reported ÷ the factor of the later 配股 and
+ * splits, epsBasis.ts) with the reported figure in `reported`, the inputs and the notes; with epsBasis 'reported' the
+ * 公告 EPS. `comparable` is always the restated value (year over year and CAGR). Without dividend data (Taiwan file
+ * lacking the block) the reported EPS is shown and nothing is compared.
+ */
 export function eps(ctx: MetricContext, index: number): MetricResult {
+  const reported = reportedEps(ctx, index);
+  const adjustments = ctx.epsAdjustments;
+  if (reported.value === null || adjustments === undefined) return reported;
+  const adjustment = adjustments[index] ?? null;
+  if (adjustment === null) return { ...reported, comparable: null, notes: [...reported.notes, '缺配股資料，EPS 未追溯調整，不計算年增率'] };
+  const restated = restatedEps(reported.value, adjustment);
+  if (adjustment.mixedQ4) {
+    if (ctx.epsBasis === 'reported') return { ...reported, comparable: null, notes: [...reported.notes, MIXED_Q4_REASON] };
+    return missing('公告 EPS ÷ 股數調整係數', [input('公告 EPS', reported.value, 'eps')], MIXED_Q4_REASON, { comparable: null, reported: reported.value });
+  }
+  const derived = adjustment.derivedQ4;
+  if (derived) {
+    const [year, ...quarters] = derived.parts;
+    const formula = `還原全年 EPS ${year!.restated} − 還原前三季 (${quarters.map((part) => part.restated).join(' + ')}) = ${derived.restated}`;
+    const detail = `公告第四季 EPS ${reported.value} 為全年 EPS ${year!.reported} 減前三季 ${quarters.map((part) => part.reported).join(' + ')} 推算，跨越股數變動${derived.events ? `（${derived.events}）` : ''}`;
+    if (ctx.epsBasis === 'reported')
+      return { ...reported, comparable: derived.restated, notes: [...reported.notes, DERIVED_Q4_REPORTED_NOTE, `還原 EPS ${derived.restated}：${formula}`] };
+    return result(
+      derived.restated,
+      '還原全年 EPS − 還原前三季 EPS',
+      derived.parts.map((part) => input(part.label === '全年' ? '還原全年 EPS' : `還原 ${part.label} EPS`, part.restated, 'eps')),
+      {
+        basis: 'restated',
+        notes: [...reported.notes, `${detail}；改以各期換算成目前股數後推算：${formula}`, RESTATED_EPS_HELP],
+        comparable: derived.restated,
+        reported: reported.value,
+      },
+    );
+  }
+  if (adjustment.factor === 1) return { ...reported, comparable: restated };
+  const detail = `係數 ${adjustment.factor}：${adjustmentText(adjustment)}`;
+  if (ctx.epsBasis === 'reported')
+    return { ...reported, comparable: restated, notes: [...reported.notes, `還原 EPS ${restated}（${detail}）；年增率與 CAGR 以還原 EPS 計算`] };
+  return result(restated, `${reported.formula} ÷ 股數調整係數`, [input('公告 EPS', reported.value, 'eps'), input('調整係數', adjustment.factor, 'times')], {
+    basis: 'restated',
+    notes: [...reported.notes, `公告 EPS ${reported.value} ÷ ${detail}`, RESTATED_EPS_HELP],
+    comparable: restated,
+    reported: reported.value,
+  });
+}
+
+/** The reported (公告) EPS, diluted else basic, whatever the display basis. */
+export function epsReported(ctx: MetricContext, index: number): MetricResult {
+  return reportedEps(ctx, index);
+}
+
+function reportedEps(ctx: MetricContext, index: number): MetricResult {
   const diluted = at(ctx, 'epsDiluted', index);
   if (diluted !== null) return result(diluted, '稀釋 EPS', [input(FIELD_LABELS.epsDiluted, diluted, 'eps')]);
   const basic = at(ctx, 'epsBasic', index);
@@ -357,6 +425,23 @@ export function eps(ctx: MetricContext, index: number): MetricResult {
     });
   return missing('稀釋 EPS', [], '缺 EPS');
 }
+
+/**
+ * 還原 EPS whatever the display basis (the statement table's second EPS row under 公告): reported EPS ÷ the factor
+ * of the later 配股 and confirmed splits. Never overwrites the reported EPS; null (with the reason) when the dividend
+ * data is missing.
+ */
+export function epsAdjusted(ctx: MetricContext, index: number): MetricResult {
+  const reported = reportedEps(ctx, index);
+  if (reported.value === null) return missing('公告 EPS ÷ 股數調整係數', [], '缺 EPS');
+  if (!ctx.epsAdjustments?.[index])
+    return missing('公告 EPS ÷ 股數調整係數', [input('公告 EPS', reported.value, 'eps')], '缺配股資料，不推算還原 EPS');
+  return eps({ ...ctx, epsBasis: 'restated' }, index);
+}
+
+/** Values a year-over-year / CAGR comparison should use: restated where the metric has them. */
+export const comparableValues = (results: readonly MetricResult[]): (number | null)[] =>
+  results.map((item) => (item.comparable !== undefined ? item.comparable : item.value));
 
 // ------------------------------------------------------------------ margins
 

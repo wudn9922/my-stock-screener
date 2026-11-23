@@ -23,6 +23,15 @@ export interface SearchResult {
   kind: 'stock' | 'index' | 'recent' | 'direct' | 'ipo';
 }
 
+/** An IPO filing without a proposed ticker carries only an internal id. */
+const unlistedIpo = (result: SearchResult) => result.kind === 'ipo' && !result.ipo?.symbol;
+/** Numeric (Taiwan) codes share their first digits, so those rows use the first character of the name. */
+function resultGlyph(result: SearchResult) {
+  const ticker = displayTicker(result.symbol).replace('^', '');
+  const initial = [...result.name.trim()][0];
+  return (/^\d/.test(ticker) || unlistedIpo(result)) && initial ? initial.toUpperCase() : ticker.slice(0, 2);
+}
+
 function exchangeBadge(exchange: string, market: 'TW' | 'US') {
   const value = exchange.toUpperCase();
   if (market === 'TW') return value === 'TPEX' || value === 'OTC' ? '上櫃' : value === 'TWSE' ? '上市' : '台股';
@@ -248,11 +257,11 @@ export function SymbolSearch({
                 onClick={() => choose(result)}
               >
                 <span className="result-icon" aria-hidden="true">
-                  {result.kind === 'recent' ? <Clock size={15} /> : result.kind === 'direct' ? <ArrowUpRight size={15} /> : displayTicker(result.symbol).replace('^', '').slice(0, 2)}
+                  {result.kind === 'recent' ? <Clock size={15} /> : result.kind === 'direct' ? <ArrowUpRight size={15} /> : resultGlyph(result)}
                 </span>
                 <span className="result-text">
-                  <b>{displayTicker(result.symbol)}</b>
-                  <small>{result.name}</small>
+                  <b>{unlistedIpo(result) ? result.name : displayTicker(result.symbol)}</b>
+                  <small>{unlistedIpo(result) ? '代號未定' : result.name}</small>
                 </span>
                 <span className="result-badge">{result.badge}</span>
               </li>
