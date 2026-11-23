@@ -153,6 +153,33 @@ describe('folded section summaries', () => {
 });
 
 describe('statement table cells', () => {
+  it.each(['annual', 'quarterly'] as const)('labels only low-confidence %s EPS values in the table', (kind) => {
+    const rows = [
+      { end: '2018-12-31', epsDiluted: 1.01 },
+      { end: '2019-12-31', epsDiluted: 1.02, epsBasic: 2.02 },
+      { end: '2020-12-31', epsDiluted: 1.03 },
+      { end: '2021-12-31', epsDiluted: 1.04 },
+      { end: '2022-12-31', epsDiluted: 1.05 },
+      { end: '2023-12-31', epsBasic: 1.06 },
+      { end: '2024-12-31', epsDiluted: 1.07 },
+      { end: '2025-12-31' },
+    ];
+    const data = kind === 'annual' ? history(rows) : history([], rows);
+    const props = { history: data, view: buildView(data, kind) };
+    expect(renderToStaticMarkup(createElement(StatementTable, props))).not.toContain('fin-eps-grade');
+
+    data[kind].epsQuality = [
+      null, { epsDiluted: 'A', epsBasic: 'B' }, { epsDiluted: 'Y' }, { epsDiluted: 'B' },
+      { epsDiluted: 'C' }, { epsBasic: 'D', epsDiluted: 'A' }, { epsBasic: 'C' }, { epsDiluted: 'D' },
+    ];
+    const html = renderToStaticMarkup(createElement(StatementTable, props));
+    const badge = '<span class="fin-eps-grade" title="低信心，不計入本益比河流與成長率">';
+    expect(html.split('class="fin-eps-grade"')).toHaveLength(4);
+    expect(html).toContain(`1.04${badge}B</span>`);
+    expect(html).toContain(`1.05${badge}C</span>`);
+    expect(html).toContain(`1.06${badge}D</span>`);
+  });
+
   it('each cell carries its value and the year-over-year change under it; there is no per-row switch', () => {
     const data = history(
       [

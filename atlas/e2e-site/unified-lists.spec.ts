@@ -135,3 +135,51 @@ test('我的 › 清單 manages groups, watchlists and favourites in one place; 
   await group.getByRole('button', { name: '刪除清單' }).click();
   await expect(manager.locator('.list-card').filter({ hasText: '短線' })).toHaveCount(0);
 });
+
+test('清單 notifications: 所有清單都通知 by default, then MA / drawing per list with rollback on a failed save', async ({ page }, testInfo) => {
+  await mockSite(page);
+  await installLineAccount(page);
+  const saves: unknown[] = [];
+  const state = { fail: false, stored: null as unknown };
+  await page.route('**/functions/v1/chart-drawings', route => route.fulfill({ json: { ok: true, records: [] } }));
+  await page.route('**/functions/v1/user-settings', async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(undefined, 'cloud') });
+    if (body.action === 'alerts.settings.get') return route.fulfill({ json: { ok: true, data: { settings: state.stored ?? { version: 1, mode: 'all', lists: {} } } } });
+    if (body.action === 'alerts.settings.save') {
+      saves.push(body.settings);
+      if (state.fail) return route.fulfill({ status: 503, json: { ok: false, error: '測試寫入失敗' } });
+      state.stored = body.settings;
+      return route.fulfill({ json: { ok: true, data: { settings: body.settings } } });
+    }
+    const data = body.action === 'groups.list' ? [{ id: 7, name: '波段', ma1: 5, ma2: 10, ma3: 20, ma4: 60 }]
+      : body.action === 'stocks.list' ? [{ id: 1, ticker: '2330.TW', group_id: 'custom_7', ma1: 20, ma2: 60, ma3: 0, ma4: 0 }] : [];
+    return route.fulfill({ json: { ok: true, data } });
+  });
+  await page.goto('./?page=console&view=lists');
+  const notify = page.getByRole('region', { name: '清單通知' });
+  const all = notify.getByRole('switch', { name: '所有清單都通知' });
+  await expect(all).toBeChecked();
+  const card = page.locator('.list-card').filter({ hasText: '波段' });
+  await card.locator('summary').click();
+  const flags = card.getByRole('group', { name: '波段 的通知' });
+  await expect(flags.getByRole('checkbox', { name: '均線突破／跌破' })).toBeDisabled();
+  await expect(flags.getByRole('checkbox', { name: '均線突破／跌破' })).toBeChecked();
+
+  await all.uncheck();
+  await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0]).toMatchObject({ version: 1, mode: 'custom', lists: { 'group:custom_7': { ma: true, drawing: true }, 'group:tw_g1': { ma: true, drawing: true } } });
+  await flags.getByRole('checkbox', { name: '均線突破／跌破' }).uncheck();
+  await expect.poll(() => saves.length).toBe(2);
+  expect((saves[1] as { lists: Record<string, unknown> }).lists['group:custom_7']).toEqual({ ma: false, drawing: true });
+  if (SHOTS && testInfo.project.name === 'mobile-chromium') {
+    await notify.evaluate(element => element.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: `${SHOTS}/list-notifications-390.png` });
+  }
+
+  state.fail = true;
+  await flags.getByRole('checkbox', { name: '畫線突破／跌破' }).uncheck();
+  await expect(notify.getByRole('alert')).toContainText('通知設定未儲存');
+  await expect(flags.getByRole('checkbox', { name: '畫線突破／跌破' })).toBeChecked();
+  await expect(flags.getByRole('checkbox', { name: '均線突破／跌破' })).not.toBeChecked();
+});

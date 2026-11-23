@@ -112,6 +112,8 @@ import { MarketLoginPrompt } from '../ui/MarketLogin';
 import { ListPicker } from '../ui/ListPicker';
 import { symbolInAnyList } from '../lists/unifiedLists';
 import { watchlistStore } from '../watchlists/store';
+import { loadFinancials } from '../fundamentals/FinancialHistory';
+import { restatePeFigures } from '../fundamentals/restatedPe';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
@@ -744,9 +746,16 @@ export function App({
   useEffect(() => {
     if (!state.ready || providerId === 'demo') return;
     let live = true;
-    void getPeFigures(symbol, headerPrice).then((figures) => {
-      if (live) setPe({ symbol, figures });
-    });
+    void getPeFigures(symbol, headerPrice)
+      .then(async (figures) => {
+        // Taiwan: EPS printed before a later 配股 / split are put on today's share basis (financials file).
+        if (getMarketProfile(symbol).market !== 'TW') return figures;
+        const financials = await loadFinancials(symbol).catch(() => null);
+        return restatePeFigures(figures, financials?.status === 'ok' ? financials.data : null, headerPrice, new Date().toISOString().slice(0, 10));
+      })
+      .then((figures) => {
+        if (live) setPe({ symbol, figures });
+      });
     return () => {
       live = false;
     };
@@ -1411,6 +1420,7 @@ export function App({
                 <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={14} />}>
                   <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
                   <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+                  {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
                   {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
                 </StockStatsMenu>
               </span>
@@ -1478,6 +1488,7 @@ export function App({
             <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={13} />}>
               <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
               <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+              {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
           </div>

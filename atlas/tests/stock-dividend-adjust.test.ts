@@ -51,10 +51,14 @@ describe('dividendFactor', () => {
 });
 
 describe('metrics', () => {
-  it('keeps the reported EPS and adds the restated one; YoY uses the restated values', () => {
+  it('shows the restated EPS (reported kept alongside); 公告 shows the reported one; YoY uses the restated values', () => {
     const history = file({ events: [A, B] });
     const ctx = contextOf(history, 'annual');
-    expect(eps(ctx, 0).value).toBe(6);
+    expect(eps(ctx, 0).value).toBe(4.5455);
+    expect(eps(ctx, 0).reported).toBe(6);
+    expect(eps(ctx, 0).basis).toBe('restated');
+    expect(eps(contextOf(history, 'annual', 'reported'), 0).value).toBe(6);
+    expect(eps(contextOf(history, 'annual', 'reported'), 0).comparable).toBe(4.5455);
     expect(eps(ctx, 0).comparable).toBe(4.5455);
     expect(epsAdjusted(ctx, 0).value).toBe(4.5455);
     expect(epsAdjusted(ctx, 0).notes.join()).toContain('配股 1 元');

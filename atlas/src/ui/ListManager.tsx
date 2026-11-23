@@ -8,6 +8,7 @@ import { parameterTickerKey, stockParameterMap } from '../cloud/stockParameters'
 import { createList, deleteList, renameList, setListMembership, useUnifiedLists } from '../lists/listActions';
 import { DEFAULT_LIST_MAS, listAvailability, type UnifiedList } from '../lists/unifiedLists';
 import { FixedStockParameters } from './FixedStockParameters';
+import { ALERT_KIND_LABELS, canNotify, listAlertFlags, useAlertSettings, withAllLists, withListAlert, type AlertKind, type AlertSettings } from '../lists/alertSettings';
 import { HelpDisclosure } from './HelpDisclosure';
 import { displayTicker } from './format';
 import './listPicker.css';
@@ -24,6 +25,10 @@ export function ListManager({ openChart, navigate }: { openChart: (options: Open
     void initializeChartStore(chartStore);
   }, [chartStore]);
   const data = useUnifiedLists(true, chartStore);
+  const alerts = useAlertSettings(data.cloud);
+  const notify: NotifyProps | null = data.cloud && alerts.loaded
+    ? { settings: alerts.settings, onChange: (list, kind, value) => void alerts.save(withListAlert(alerts.settings, data.lists, list, kind, value)) }
+    : null;
   const fixed = stockParameterMap(data.stocks);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -77,10 +82,30 @@ export function ListManager({ openChart, navigate }: { openChart: (options: Open
       {data.error && <p role="alert" className="console-message">分組暫時無法載入：{data.error}</p>}
       {error && <p role="alert" className="console-message">{error}</p>}
       {message && <p role="status" className="console-message">{message}</p>}
+      <section className="list-notify console-card" aria-label="清單通知">
+        <h3>通知</h3>
+        {data.cloud ? (
+          <>
+            <label className="list-notify-all">
+              <input type="checkbox" role="switch" checked={alerts.settings.mode === 'all'} disabled={!alerts.loaded}
+                onChange={(event) => void alerts.save(withAllLists(alerts.settings, data.lists, event.target.checked))} />
+              所有清單都通知
+            </label>
+            <p className="muted">
+              {alerts.settings.mode === 'all'
+                ? '分組的均線與所有畫線突破／跌破都會通知（自選清單的均線依各自的監控開關）。關閉後可在每份清單選擇均線、畫線或兩者。'
+                : '只通知下方各清單勾選的類型；同一檔股票在多份清單時，任一清單開啟就通知，每次只送一則。Discord 與手機通知都適用。'}
+            </p>
+            {alerts.error && <p role="alert" className="console-message">{alerts.error}</p>}
+          </>
+        ) : (
+          <p className="muted">伺服器通知需登入並允許雲端保存；目前的清單只在這台裝置使用，不會送出通知。</p>
+        )}
+      </section>
       {data.loading && <p role="status" className="muted">載入清單…</p>}
       <ul className="list-manager-lists">
         {data.lists.map((list) => (
-          <ListCard key={list.key} list={list} busy={busy} fixed={fixed} run={run} openChart={openChart} navigate={navigate} onEditMas={setEditing} />
+          <ListCard key={list.key} list={list} busy={busy} fixed={fixed} run={run} openChart={openChart} navigate={navigate} onEditMas={setEditing} notify={notify} />
         ))}
       </ul>
       <HelpDisclosure label="清單與分組說明">
@@ -102,7 +127,10 @@ export function ListManager({ openChart, navigate }: { openChart: (options: Open
   );
 }
 
-function ListCard({ list, busy, fixed, run, openChart, navigate, onEditMas }: {
+type NotifyProps = { settings: AlertSettings; onChange: (list: UnifiedList, kind: AlertKind, value: boolean) => void };
+
+function ListCard({ list, busy, fixed, run, openChart, navigate, onEditMas, notify }: {
+  notify: NotifyProps | null;
   list: UnifiedList;
   busy: boolean;
   fixed: Record<string, number[]>;
@@ -168,6 +196,21 @@ function ListCard({ list, busy, fixed, run, openChart, navigate, onEditMas }: {
           ) : (
             <p className="muted">{list.kind === 'rules' ? '尚未開啟過此條件清單，到「自選」查看入選結果。' : '還沒有股票；在個股圖表按星號，或在上方輸入代號加入。'}</p>
           )}
+          {notify && canNotify(list) && (() => {
+            const flags = listAlertFlags(notify.settings, list);
+            const locked = notify.settings.mode === 'all';
+            return (
+              <fieldset className="list-card-notify" aria-label={`${list.name} 的通知`}>
+                <legend>通知{locked ? '（所有清單都通知）' : ''}</legend>
+                {(['ma', 'drawing'] as const).map((kind) => (
+                  <label key={kind}>
+                    <input type="checkbox" checked={flags[kind]} disabled={locked} onChange={(event) => notify.onChange(list, kind, event.target.checked)} />
+                    {ALERT_KIND_LABELS[kind]}
+                  </label>
+                ))}
+              </fieldset>
+            );
+          })()}
           <div className="list-card-actions">
             {list.watchlistId && (
               <button type="button" className="ghost-button" onClick={() => navigate({ page: 'watchlist', list: list.watchlistId })}>在自選查看</button>

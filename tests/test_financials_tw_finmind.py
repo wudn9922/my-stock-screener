@@ -346,10 +346,19 @@ class MergeTest(unittest.TestCase):
         src = dict(zip(document["quarterly"]["end"], document["quarterly"]["src"]))
         self.assertEqual(src["2025-12-31"], "finmind")
         self.assertEqual(src["2026-03-31"], "yahoo")                              # newer than the official periods
-        self.assertEqual(document["split"], {"adjusted": True, "events": [["2025-06-01", 10.0]]})
+        # split events kept; the Yahoo-era "adjusted" flag is not carried over: FinMind EPS are never split-adjusted
+        self.assertEqual(document["split"], {"adjusted": False, "events": [["2025-06-01", 10.0]]})
+        self.assertNotIn("split-adjusted", document["quality"]["issues"])
         self.assertEqual(document["checkedAt"], TODAY.isoformat())                # content changed: today
         self.assertIn("q4-derived", document["quality"]["issues"])
         self.assertIn("eps-annual-summed", document["quality"]["issues"])
+
+    def test_split_adjusted_flag_is_not_carried_over_files_with_finmind_periods(self):
+        finmind, yahoo = [{"src": "finmind"}, {"src": "yahoo"}], [{"src": "yahoo"}]
+        self.assertFalse(fin.split_adjusted(False, True, finmind))      # 8422.TW: Yahoo-era flag, FinMind EPS
+        self.assertTrue(fin.split_adjusted(False, True, yahoo))         # a Yahoo-only file keeps its adjustment
+        self.assertTrue(fin.split_adjusted(True, False, finmind))       # adjusted by this run
+        self.assertFalse(fin.split_adjusted(False, False, yahoo))
 
     def test_same_content_again_is_unchanged_and_keeps_the_checked_day(self):
         self.write_yahoo_file()

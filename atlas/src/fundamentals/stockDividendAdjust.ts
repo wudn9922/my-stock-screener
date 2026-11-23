@@ -1,4 +1,4 @@
-import type { StockDividendEvent } from './FinancialHistory';
+import type { CapitalReductionEvent, StockDividendEvent } from './FinancialHistory';
 
 /**
  * 追溯調整 EPS（含配股）. A Taiwan stock dividend (盈餘／資本公積轉增資) of D NT$ per share (par 10) adds D/10 new
@@ -6,7 +6,9 @@ import type { StockDividendEvent } from './FinancialHistory';
  * restated EPS = reported EPS ÷ Π(1 + D/10) over every stock dividend whose ex-rights date is after the report
  * was due (period end + delay; earlier ones are already in the reported figure). Mirror of
  * atlas/scripts/tw_stock_dividends.py. Events null (no data) → no factor: the caller shows null, never a guess.
- * Not handled: capital reductions (減資) and cash capital increases.
+ * Capital reductions to offset losses (減資彌補虧損, `reductionFactor`) cancel shares without returning cash, so like a
+ * reverse split they are restated the same way: factor × (new shares ÷ old shares). Cash capital reductions (現金減資,
+ * cash returned) and cash capital increases are not restated (IAS 33: like a buyback / an issue at fair value).
  */
 export const PAR_VALUE = 10;
 
@@ -26,11 +28,17 @@ export interface DividendFactor {
 
 /**
  * Factor of the period ending `end`; `asOf` (YYYY-MM-DD) restricts to events up to that day, i.e. the share basis
- * an unadjusted price of that day is on. Null when `events` is null.
+ * an unadjusted price of that day is on. `annual`: an annual period, whose report is always due after 90 days.
+ * Null when `events` is null.
  */
-export function dividendFactor(end: string, events: readonly StockDividendEvent[] | null, asOf?: string): DividendFactor | null {
+export function dividendFactor(
+  end: string,
+  events: readonly StockDividendEvent[] | null,
+  asOf?: string,
+  annual = false,
+): DividendFactor | null {
   if (events === null) return null;
-  const due = parse(end) + reportDelayDays(end) * DAY_MS;
+  const due = parse(end) + (annual ? 90 : reportDelayDays(end)) * DAY_MS;
   const limit = asOf === undefined ? Infinity : parse(asOf);
   const applied = events.filter((event) => {
     const ex = parse(event.exDate);
@@ -40,16 +48,57 @@ export function dividendFactor(end: string, events: readonly StockDividendEvent[
   return { factor: Math.round(factor * 1e6) / 1e6, events: applied };
 }
 
+/** A loss-offset reduction with a usable ratio (0 < new ÷ old < 1): the only reductions that restate EPS. */
+export const restatesEps = (event: CapitalReductionEvent): boolean =>
+  event.kind === 'loss' && event.ratio !== null && event.ratio > 0 && event.ratio < 1;
+
+export interface ReductionFactor {
+  /** Π (new shares ÷ old shares) of the applied reductions (< 1: restated EPS = reported ÷ factor is larger). */
+  factor: number;
+  events: CapitalReductionEvent[];
+}
+
+/**
+ * Capital reduction factor of the period ending `end`: every loss-offset reduction (restatesEps) whose resumption
+ * date is after the report was due (same due dates as dividendFactor) and, with `asOf`, not after that day.
+ */
+export function reductionFactor(
+  end: string,
+  events: readonly CapitalReductionEvent[] | null | undefined,
+  asOf?: string,
+  annual = false,
+): ReductionFactor {
+  const due = parse(end) + (annual ? 90 : reportDelayDays(end)) * DAY_MS;
+  const limit = asOf === undefined ? Infinity : parse(asOf);
+  const applied = (events ?? []).filter((event) => restatesEps(event) && parse(event.date) > due && parse(event.date) <= limit);
+  const factor = applied.reduce((product, event) => product * event.ratio!, 1);
+  return { factor: Math.round(factor * 1e6) / 1e6, events: applied };
+}
+
 /** Reported EPS ÷ factor (4 decimals); null when the EPS or the dividend data is missing. */
-export function adjustEps(eps: number | null, end: string, events: readonly StockDividendEvent[] | null, asOf?: string): number | null {
-  const info = dividendFactor(end, events, asOf);
+export function adjustEps(
+  eps: number | null,
+  end: string,
+  events: readonly StockDividendEvent[] | null,
+  asOf?: string,
+  annual = false,
+  reductions?: readonly CapitalReductionEvent[] | null,
+): number | null {
+  const info = dividendFactor(end, events, asOf, annual);
   if (eps === null || info === null) return null;
-  return Math.round((eps / info.factor) * 1e4) / 1e4 + 0;
+  const reduction = reductionFactor(end, reductions, asOf, annual);
+  return Math.round((eps / (info.factor * reduction.factor)) * 1e4) / 1e4 + 0;
 }
 
 /** 「配股 0.5 元（除權 2025-08-20）」 lines of the applied events, for tooltips. */
 export function eventText(events: readonly StockDividendEvent[]): string {
   return events.map((event) => `配股 ${event.perShare} 元（除權 ${event.exDate}）`).join('、');
+}
+
+const ratioText = (ratio: number) => String(Math.round(ratio * 1e4) / 1e4);
+/** 「減資彌補虧損（每股換發 0.5 股，恢復買賣 2025-06-02）」 lines of the applied reductions. */
+export function reductionText(events: readonly CapitalReductionEvent[]): string {
+  return events.map((event) => `減資彌補虧損（每股換發 ${ratioText(event.ratio!)} 股，恢復買賣 ${event.date}）`).join('、');
 }
 
 export const ADJUSTED_EPS_HELP = '追溯調整：依之後的配股（盈餘／資本公積轉增資）調整股數，讓前後期可比較';

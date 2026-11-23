@@ -55,6 +55,20 @@ class Factor(unittest.TestCase):
         self.assertEqual(value, 4.5455)
         self.assertEqual(len(info["events"]), 2)
 
+    def test_annual_period_is_due_after_90_days(self):
+        # a June fiscal year end would be a 60-day quarter; as an annual period its report is due after 90 days
+        events = [{"exDate": "2025-09-15", "perShare": 1.0}]
+        self.assertEqual(div.factor("2025-06-30", events)["factor"], 1.1)            # Q2 due 2025-08-29
+        self.assertEqual(div.factor("2025-06-30", events, annual=True)["factor"], 1.0)  # annual due 2025-09-28
+
+    def test_2755_restated_quarters(self):
+        events = [{"exDate": "2023-07-04", "perShare": 3.7}, {"exDate": "2025-09-04", "perShare": 1.973802},
+                  {"exDate": "2026-07-16", "perShare": 2.464591}]
+        for end, eps, restated in (("2024-06-30", 1.47, 0.985), ("2025-06-30", 1.78, 1.193),
+                                   ("2025-09-30", 1.80, 1.444), ("2026-03-31", 1.65, 1.324), ("2026-06-30", 1.58, 1.58)):
+            self.assertAlmostEqual(div.adjust(eps, end, events)[0], restated, places=3)
+        self.assertAlmostEqual(div.adjust(6.44, "2025-12-31", events, annual=True)[0], 5.1666, places=4)
+
     def test_as_of(self):
         self.assertAlmostEqual(div.factor("2024-12-31", div.parse_events(ROWS), as_of="2025-12-01")["factor"], 1.1)
 
@@ -78,6 +92,9 @@ class Builder(unittest.TestCase):
             json.dump(doc, open(path, "w"))
             class Http:
                 def get(self, url, headers):
+                    if "TaiwanStockCapitalReductionReferencePrice" in url or "TaiwanStockSplitPrice" in url \
+                            or "TaiwanStockParValueChange" in url:
+                        return 200, json.dumps({"msg": "success", "status": 200, "data": []}).encode()
                     assert "TaiwanStockDividend" in url and "data_id=1773" in url
                     return 200, json.dumps({"msg": "success", "status": 200, "data": ROWS}).encode()
             args = SimpleNamespace(report_dir=tmp, out_dir=out, budget=60, limit=None, tickers=None)
@@ -102,6 +119,28 @@ class Builder(unittest.TestCase):
         plain = document()
         _, _, y = growth.financials_blocks(plain, date(2026, 3, 1))
         self.assertEqual(y["eps"][0], 10.0)
+
+    def test_official_taiwan_periods_are_restated_with_the_file_events(self):
+        events = div.parse_events(ROWS)[:1]   # ex 2025-08-20, +10% shares
+        periods = [
+            {"end": "2024-06-30", "day": date(2024, 6, 30), "fy": 2024, "fq": 2, "epsD": None, "epsB": 1.1,
+             "rev": 100, "shares": 100.0, "src": "mops", "derived": False, "kind": "normal"},
+            {"end": "2025-06-30", "day": date(2025, 6, 30), "fy": 2025, "fq": 2, "epsD": None, "epsB": 1.0,
+             "rev": 100, "shares": 110.0, "src": "mops", "derived": False, "kind": "normal"},
+        ]
+        growth.restate_periods(periods, events)
+        # 2024 Q2 was reported before the ex date: 1.1 ÷ 1.1 = 1.0 on 110 shares; 2025 Q2 (due 08-29) already new basis
+        self.assertEqual((periods[0]["epsB"], round(periods[0]["shares"], 6)), (1.0, 110.0))
+        self.assertEqual(periods[1]["epsB"], 1.0)
+        import build_fundamentals_tw as tw
+        today = date(2026, 6, 1)
+        store = {"fetch": {}, "data": {"1773": {tw.season_key(2025, 1): [100, 1.1, 110, 0], tw.season_key(2026, 1): [100, 1.0, 110, 0]}}}
+        document_ = tw.dump_store(store, tw.target_seasons(today))
+        plain = tw.growth_candidates(document_, {"1773": "1773.TW"}, today)["1773.TW"][1]
+        restated = tw.growth_candidates(document_, {"1773": "1773.TW"}, today, {"1773.TW": events})["1773.TW"][1]
+        self.assertEqual((plain["eps"], restated["eps"]), ([-9.1], [0.0]))
+        self.assertEqual(growth.dividend_events([("1773.TW", {"stockDividends": {"events": events}}), ("AAPL", {})]),
+                         {"1773.TW": events})
 
 
 if __name__ == "__main__":

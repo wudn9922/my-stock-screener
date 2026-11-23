@@ -6,6 +6,7 @@ import { watchlistId, watchlistVersion } from '../../supabase/functions/user-set
 import * as storageAccess from '../../supabase/functions/_shared/storageAccess';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
+import * as alertSettings from '../../supabase/functions/user-settings/alertSettings';
 
 type Row = Record<string, unknown>;
 /** Exercise the deployed handler's validation and ownership predicates with an offline database. */
@@ -97,6 +98,7 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
     createClient: () => ({ from }),
     watchlistId,
     watchlistVersion,
+    ...alertSettings,
     ...storageAccess,
     ...lineHandoff,
     ...deviceSession,
@@ -117,6 +119,36 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
   };
   return { rows, request };
 }
+
+describe('user-settings per-list notification settings', () => {
+  const owner = storageAccess.DEFAULT_ADMIN_LINE_ID;
+  const other = { line_user_id: 'U11111111111111111111111111111111', settings: { version: 1, mode: 'custom', lists: {} } };
+  it('defaults to every list notifying and stores only the verified account row', async () => {
+    const fixture = handlerFixture([other], 1, true, 'atlas_alert_settings');
+    const initial = await fixture.request({ action: 'alerts.settings.get' });
+    expect(initial.body.data.settings).toEqual({ version: 1, mode: 'all', lists: {} });
+    const settings = { version: 1, mode: 'custom', lists: {
+      'group:tw_g1': { ma: true, drawing: false },
+      'watchlist:D93F0AA6-C873-4F97-8CF9-45A7B55B6439': { drawing: true },
+    } };
+    const saved = await fixture.request({ action: 'alerts.settings.save', settings, line_user_id: other.line_user_id });
+    expect(saved.status).toBe(200);
+    expect(fixture.rows.find((row) => row.line_user_id === owner)?.settings).toEqual({ version: 1, mode: 'custom', lists: {
+      'group:tw_g1': { ma: true, drawing: false },
+      'watchlist:d93f0aa6-c873-4f97-8cf9-45a7b55b6439': { ma: false, drawing: true },
+    } });
+    expect(fixture.rows.find((row) => row.line_user_id === other.line_user_id)).toEqual(other);
+    expect((await fixture.request({ action: 'alerts.settings.get' })).body.data.settings.mode).toBe('custom');
+  });
+  it('rejects malformed settings and reads a corrupt stored row as every list notifying', async () => {
+    const fixture = handlerFixture([{ line_user_id: owner, settings: { version: 9 } }], 1, true, 'atlas_alert_settings');
+    for (const settings of [null, { version: 1, mode: 'some' }, { version: 1, mode: 'custom', lists: { 'group:ungrouped': { ma: true } } },
+      { version: 1, mode: 'custom', lists: { 'group:tw_g1': { ma: 'yes' } } }]) {
+      expect((await fixture.request({ action: 'alerts.settings.save', settings })).status).toBe(400);
+    }
+    expect((await fixture.request({ action: 'alerts.settings.get' })).body.data.settings).toEqual({ version: 1, mode: 'all', lists: {} });
+  });
+});
 
 describe('user-settings stock parameters', () => {
   it('treats an already deleted watchlist as absent while retaining version-conflict protection', async () => {
