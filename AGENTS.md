@@ -11,3 +11,14 @@ These rules apply to every directory in this repository. Directory-level AGENTS.
 - **REVIEW_PACKAGE.md:** at most 3 lines per PR.
 - **Docs and ADRs:** update them only when the architecture changes, not for routine fixes.
 - **PR description:** short — what changed, why, how it was tested, and any deploy steps. No long reports.
+
+## Done means green CI
+
+- **A task is done only when every CI check on the PR's latest commit is green.** Local runs stay limited to related tests (above), but always read the PR's CI result after pushing. If a check fails, find the root cause and fix it before reporting the work as done; never report done while CI is still running or red.
+- **Shared modules have more callers than the touched tests.** When a runtime module gains or changes an import or export, update every test fixture that loads it. For example, `atlas/tests` loads Supabase functions with `runInNewContext` and injects their imports by hand, so a new import must be added to each fixture that loads that function.
+- **Dependency versions must install everywhere they run.** When changing `requirements.txt` or any other version constraint, check every `python-version` in `.github/workflows/*.yml` and every Dockerfile base image. A lower bound may not exceed what any of those environments can install.
+
+## Before committing
+
+- Run `git status` and make sure tests did not modify `docs/report/kline-corrections.json` or other files under `data/` and `docs/report/`. Revert such changes; never commit them.
+- Never rewrite published history: no rebase, amend or force-push on a shared branch.
