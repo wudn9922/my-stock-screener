@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { DeviceSessionError, resolveLineUser } from "../_shared/deviceSession.ts";
-import { StorageAccessError, adminLineId, parseStorageUserId, requireCloudStorage } from "../_shared/storageAccess.ts";
+import { StorageAccessError, adminLineId, requireCloudStorage } from "../_shared/storageAccess.ts";
+import { LineIdTokenError, verifyLineIdTokenWith } from "../_shared/lineIdToken.ts";
 
 /**
  * 圖表畫線的雲端儲存（LINE 使用者各自一份，先向 LINE 驗證 LIFF ID Token，再用 service role 存取）。
@@ -46,56 +47,8 @@ function jsonResponse(
   );
 }
 
-async function verifyLineIdToken(idToken: string) {
-  const channelId = Deno.env.get(
-    "LINE_LOGIN_CHANNEL_ID",
-  );
-
-  if (!channelId) {
-    throw new Error(
-      "LINE_LOGIN_CHANNEL_ID is not configured",
-    );
-  }
-
-  const formData = new URLSearchParams();
-
-  formData.set("id_token", idToken);
-  formData.set("client_id", channelId);
-
-  const response = await fetch(
-    "https://api.line.me/oauth2/v2.1/verify",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
-      body: formData.toString(),
-    },
-  );
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error(
-      "LINE ID Token verification failed",
-      result,
-    );
-
-    throw new Error("Invalid LINE ID Token");
-  }
-
-  const lineUserId = String(
-    result.sub ?? "",
-  ).trim();
-
-  try {
-    parseStorageUserId(lineUserId);
-  } catch {
-    throw new Error("Invalid LINE User ID");
-  }
-
-  return lineUserId;
+function verifyLineIdToken(idToken: string) {
+  return verifyLineIdTokenWith(idToken, { channelId: Deno.env.get("LINE_LOGIN_CHANNEL_ID"), fetcher: fetch });
 }
 
 Deno.serve(async (request: Request) => {
@@ -403,24 +356,18 @@ Deno.serve(async (request: Request) => {
     if (error instanceof StorageAccessError) {
       return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
     }
+    if (error instanceof LineIdTokenError) {
+      return jsonResponse({ ok: false, error: error.legacyMessage }, error.status);
+    }
     if (error instanceof DeviceSessionError) {
       return jsonResponse({ ok: false, error: error.message, code: "device_session" }, error.status);
     }
     console.error(error);
 
-    const message = error instanceof Error ? error.message : "";
-
-    // LINE token 無效或過期回 401，前端據此提示重新開啟；其他錯誤不回傳內部細節
-    if (message.startsWith("Invalid LINE")) {
-      return jsonResponse({ ok: false, error: message }, 401);
-    }
-
     return jsonResponse(
       {
         ok: false,
-        error: message === "LINE_LOGIN_CHANNEL_ID is not configured"
-          ? message
-          : "Server error",
+        error: "Server error",
       },
       500,
     );

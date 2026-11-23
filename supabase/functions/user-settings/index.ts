@@ -8,7 +8,8 @@ import { validateWatchlist, watchlistId, watchlistVersion } from "./watchlists.t
 import { ALERT_SETTINGS_DEFAULT, validateAlertSettings } from "./alertSettings.ts";
 import { DeviceSessionError, createDeviceSession, resolveLineUser, revokeDeviceSession } from "../_shared/deviceSession.ts";
 import { WebPushError, handlePushAction, handlePushNotify, type PushDeps } from "./webPush.ts";
-import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, parseStorageUserId, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
+import { StorageAccessError, adminLineId, getStorageAccess, listStorageGrants, requireCloudStorage, saveStorageGrant } from "../_shared/storageAccess.ts";
+import { LineIdTokenError, verifyLineIdTokenWith } from "../_shared/lineIdToken.ts";
 
 /**
  * 自選股設定頁（my-stock-backend/index.html）的讀寫入口。
@@ -105,56 +106,8 @@ function jsonResponse(
   );
 }
 
-async function verifyLineIdToken(idToken: string) {
-  const channelId = Deno.env.get(
-    "LINE_LOGIN_CHANNEL_ID",
-  );
-
-  if (!channelId) {
-    throw new Error(
-      "LINE_LOGIN_CHANNEL_ID is not configured",
-    );
-  }
-
-  const formData = new URLSearchParams();
-
-  formData.set("id_token", idToken);
-  formData.set("client_id", channelId);
-
-  const response = await fetch(
-    "https://api.line.me/oauth2/v2.1/verify",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
-      body: formData.toString(),
-    },
-  );
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error(
-      "LINE ID Token verification failed",
-      result,
-    );
-
-    throw new HttpError(401, "Invalid LINE ID Token");
-  }
-
-  const lineUserId = String(
-    result.sub ?? "",
-  ).trim();
-
-  try {
-    parseStorageUserId(lineUserId);
-  } catch {
-    throw new HttpError(401, "Invalid LINE User ID");
-  }
-
-  return lineUserId;
+function verifyLineIdToken(idToken: string) {
+  return verifyLineIdTokenWith(idToken, { channelId: Deno.env.get("LINE_LOGIN_CHANNEL_ID"), fetcher: fetch });
 }
 
 function parseId(value: unknown) {
@@ -758,6 +711,9 @@ Deno.serve(async (request: Request) => {
     if (error instanceof StorageAccessError) {
       return jsonResponse({ ok: false, error: error.message, code: error.code }, error.status);
     }
+    if (error instanceof LineIdTokenError) {
+      return jsonResponse({ ok: false, error: error.legacyMessage }, error.status);
+    }
     if (error instanceof DeviceSessionError) {
       return jsonResponse({ ok: false, error: error.message, code: "device_session" }, error.status);
     }
@@ -771,8 +727,6 @@ Deno.serve(async (request: Request) => {
     console.error(error);
 
     // 資料庫錯誤只回傳通用訊息，細節留在函式記錄
-    const message = error instanceof Error ? error.message : "";
-
     if (
       error && typeof error === "object" && "code" in error &&
       (error as { code?: string }).code === "23505"
@@ -786,9 +740,7 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(
       {
         ok: false,
-        error: message === "LINE_LOGIN_CHANNEL_ID is not configured"
-          ? message
-          : "Server error",
+        error: "Server error",
       },
       500,
     );
