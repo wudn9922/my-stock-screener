@@ -198,7 +198,7 @@ def usable_frame(frame, symbol=None, log_path=None):
 
 
 def read_csv(path, **kwargs):
-    kwargs.setdefault("float_precision", "round_trip")
+    # The pandas 3.1+ C parser uses round-trip float conversion by default.
     frame = pd.read_csv(path, **kwargs)
     frame.attrs["symbol"] = Path(path).stem
     return usable_frame(frame, Path(path).stem)
@@ -328,7 +328,7 @@ def write_csv(path, frame, *, symbol=None, source_url=None, fetched_at=None, log
     symbol = symbol or path.stem
     accepted = accept_frame(frame[FIELDS], symbol, source_url=source_url,
                             fetched_at=fetched_at, log_path=log_path, **kwargs)
-    retained = pd.read_csv(path, index_col=0, parse_dates=True, float_precision="round_trip") if path.exists() else pd.DataFrame(columns=FIELDS)
+    retained = pd.read_csv(path, index_col=0, parse_dates=True) if path.exists() else pd.DataFrame(columns=FIELDS)
     for day, row in accepted.iterrows():
         if day in retained.index:
             old, new = bar_values(retained.loc[day]), bar_values(row)
@@ -374,7 +374,7 @@ def _write_preserving_lines(path, updates):
 def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None):
     if violation(values):
         raise ValueError("Refusing an invalid replacement")
-    frame = pd.read_csv(path, index_col=0, parse_dates=True, float_precision="round_trip")
+    frame = pd.read_csv(path, index_col=0, parse_dates=True)
     target = pd.Timestamp(day)
     if target not in frame.index:
         raise ValueError("Correction must target an existing date")

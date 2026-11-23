@@ -35,7 +35,7 @@ def local_frames(data_dir):
         for symbol in symbols:
             frame = load_daily_bars(data_dir / f'{symbol}.csv', PRICE_COLUMNS)
             if frame is not None:
-                frame = frame[frame.index.dayofweek < 5]
+                frame = frame[frame.index.day_of_week < 5]
                 if not frame.empty:
                     frames[symbol] = frame
         out[market] = frames
