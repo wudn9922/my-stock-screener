@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from datetime import date
 from types import SimpleNamespace
 
@@ -172,37 +173,74 @@ class Detector(unittest.TestCase):
         self.assertEqual(len(splits.infer_splits(points(poya()), [date(2026, 6, 1)])), 1)
 
 
+PAR_ALL = ({"date": "2026-08-10", "stock_id": "5904", "stock_name": "寶雅", "before_close": 720, "after_ref_close": 72},
+           PAR_8070)
+
+
 class Builder(unittest.TestCase):
-    def test_two_requests_per_stock_with_data_id(self):
+    def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        out = os.path.join(tmp.name, "financials")
-        os.makedirs(out)
-        with open(os.path.join(out, "5904.TWO.json"), "w", encoding="utf-8") as file:
-            json.dump(poya() | {"capitalReductions": {"checked": "2026-11-22", "events": []}}, file)
+        self.root = tmp.name
+        self.out = os.path.join(tmp.name, "financials")
+        os.makedirs(self.out)
+        for code in ("5904.TWO", "8070.TW"):
+            with open(os.path.join(self.out, code + ".json"), "w", encoding="utf-8") as file:
+                json.dump(poya() | {"capitalReductions": {"checked": "2026-11-22", "events": []},
+                                    "stockDividends": {"checked": "2026-11-22", "events": []}}, file)
+
+    def run_builder(self, answer):
+        """answer(dataset, data_id) → (status, rows); returns the requested URLs."""
         urls = []
 
         class Http:
             def get(self, url, headers):
                 urls.append(url)
-                rows = []
-                if splits.DATASET_PAR in url:
-                    rows = [{"date": "2026-08-10", "stock_id": "5904", "stock_name": "寶雅", "before_close": 720,
-                             "after_ref_close": 72}, dict(PAR_8070)]
-                return 200, json.dumps({"msg": "success", "status": 200, "data": rows}).encode()
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+                status, rows = answer(query["dataset"][0], query.get("data_id", [None])[0])
+                return status, json.dumps({"msg": "success" if status == 200 else "refused", "status": status,
+                                           "data": rows}).encode()
 
-        args = SimpleNamespace(report_dir=tmp.name, out_dir=out, budget=600, limit=None, tickers=None)
+        args = SimpleNamespace(report_dir=self.root, out_dir=self.out, budget=600, limit=None, tickers=None)
         rc = builder.run(args, http=Http(), sleep=lambda *_: None, log=lambda *_: None, today=date(2026, 11, 23))
         self.assertEqual(rc, 0)
-        for dataset in splits.DATASETS:
-            self.assertEqual(sum(dataset in url and "data_id=5904" in url for url in urls), 1)
-        with open(os.path.join(out, "5904.TWO.json"), encoding="utf-8") as file:
-            document = json.load(file)
-        block = document["twSplits"]
+        return urls
+
+    def document(self, code):
+        with open(os.path.join(self.out, code + ".json"), encoding="utf-8") as file:
+            return json.load(file)
+
+    def test_two_all_market_requests_cover_every_stock(self):
+        def answer(dataset, data_id):
+            self.assertIsNone(data_id)
+            return 200, list(PAR_ALL) if dataset == splits.DATASET_PAR else [{"date": "2015-01-05", "stock_id": "9999"}]
+
+        urls = self.run_builder(answer)
+        self.assertEqual(len(urls), 2)
+        block = self.document("5904.TWO")["twSplits"]
         self.assertEqual((block["source"], block["checked"]), (splits.SOURCE, "2026-11-23"))
         self.assertEqual([(e["date"], e["ratio"], e["kind"]) for e in block["events"]], [("2026-08-10", 10.0, "par")])
-        self.assertFalse(builder.due(document, date(2026, 11, 24), "twSplits"))
-        self.assertTrue(builder.due(document, date(2026, 12, 23), "twSplits"))
+        self.assertEqual([e["date"] for e in self.document("8070.TW")["twSplits"]["events"]], ["2020-08-17"])
+        self.assertFalse(builder.due(self.document("5904.TWO"), date(2026, 11, 24), "twSplits"))
+        self.assertTrue(builder.due(self.document("5904.TWO"), date(2026, 12, 23), "twSplits"))
+
+    def test_no_par_answer_skips_every_twsplits_block(self):
+        urls = self.run_builder(lambda dataset, data_id: (400, []))
+        self.assertEqual(len(urls), 1)
+        self.assertNotIn("twSplits", self.document("5904.TWO"))
+
+    def test_empty_split_answer_falls_back_to_one_split_request_per_stock(self):
+        def answer(dataset, data_id):
+            if dataset == splits.DATASET_PAR:
+                self.assertIsNone(data_id)
+                return 200, list(PAR_ALL)
+            return 200, []
+
+        urls = self.run_builder(answer)
+        per_stock = [url for url in urls if "data_id=" in url]
+        self.assertEqual(len(per_stock), 2)
+        self.assertTrue(all(splits.DATASET_SPLIT in url for url in per_stock))
+        self.assertEqual([e["kind"] for e in self.document("5904.TWO")["twSplits"]["events"]], ["par"])
 
 
 if __name__ == "__main__":
