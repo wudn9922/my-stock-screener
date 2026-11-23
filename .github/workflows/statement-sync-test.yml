@@ -1,0 +1,40 @@
+name: Statement sync tests
+on:
+  pull_request:
+    paths:
+      - 'statement_sync/**'
+      - 'tests/test_statement_*.py'
+      - 'tests/fixtures/statement/**'
+      - 'supabase/manual/atlas_statement_sync.sql'
+      - 'supabase/tests/test_statement_sync_sql.py'
+      - 'supabase/functions/user-settings/statement.ts'
+      - 'Dockerfile.statement-sync*'
+      - '.github/workflows/statement-sync*.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: statement_sync/requirements.txt
+      - run: pip install -r statement_sync/requirements.txt pypdf==6.17.0 reportlab==5.0.1
+      - run: python -m unittest discover -s tests -p 'test_statement_*.py' -v
+      # The runner image ships PostgreSQL 16 binaries; the suite builds its own throwaway cluster.
+      - run: ATLAS_PG_BIN=/usr/lib/postgresql/16/bin python supabase/tests/test_statement_sync_sql.py -v
+      - run: docker build -f Dockerfile.statement-sync -t statement-sync-test:local .
+  edge-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --config supabase/functions/user-settings/deno.json supabase/functions/user-settings/statement.ts
