@@ -16,7 +16,8 @@ the API itself is not reachable from the build sandbox, so the exact answers are
   TaiwanStockParValueChange (變更面額恢復買賣參考價, "Free", 2020-01-01 ~): date (恢復買賣日), stock_id, stock_name,
     before_close (停止買賣前收盤價格), after_ref_close (恢復買賣參考價), after_ref_max, after_ref_min, after_ref_open.
     Docs sample: 8070 長華 2020-08-17 190 → 19 (par 10 → 1), 6531 愛普 2021-10-18 750 → 375 (10 → 5).
-Both are fetched per stock (data_id); rows of another stock_id are ignored in case the server ignores data_id.
+Both are fetched once for the whole market (TaiwanStockParValueChange refuses data_id) and grouped by stock_id;
+rows of another stock_id are ignored by the parsers.
 
 Rules (documented, tolerant):
   - ratio = new shares ÷ old shares = price before ÷ price after (a par change from 10 to 1 gives 10 shares per old
@@ -48,6 +49,7 @@ from datetime import date, timedelta
 DATASET_SPLIT = "TaiwanStockSplitPrice"
 DATASET_PAR = "TaiwanStockParValueChange"
 DATASETS = (DATASET_SPLIT, DATASET_PAR)
+PAR_START_DATE = "2020-01-01"
 SOURCE = "FinMind TaiwanStockSplitPrice + TaiwanStockParValueChange"
 RULE = ("股票分割／反分割／面額變更：比例 = 新股數 ÷ 舊股數 = 分割（停止買賣）前價格 ÷ 分割後（恢復買賣）參考價，"
         "差距 1% 內取整數或其倒數；比例 ≥ 1.5 或 ≤ 1/1.5 才調整。期別 EPS 只在其隱含股數（淨利 ÷ EPS）證實仍為分割前股數時"

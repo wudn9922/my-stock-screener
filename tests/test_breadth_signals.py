@@ -40,7 +40,7 @@ def test_sma_uses_each_stock_own_bars_and_skips_weekend_rows():
     close = pd.DataFrame({"A": np.linspace(10, 20, 40)}, idx)
     vol = pd.DataFrame(1.0, index=idx, columns=["A"])
     h = core.breadth_history(close, vol, periods=(20,))
-    assert (h.index.dayofweek < 5).all()
+    assert (h.index.day_of_week < 5).all()
     assert h["pct20"].dropna().eq(100.0).all()
 
 

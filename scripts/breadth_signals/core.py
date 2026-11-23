@@ -22,7 +22,7 @@ def non_trading_dates(close: pd.DataFrame, volume: pd.DataFrame) -> pd.DatetimeI
     unknown = (present & (volume.isna() | (volume < 0))).sum(axis=1)
     reference = counts.rolling(20, min_periods=1).quantile(0.25)
     closed = (counts >= 2) & (counts >= reference * 0.5) & (active == 0) & (unknown == 0)
-    closed |= close.index.dayofweek >= 5
+    closed |= close.index.day_of_week >= 5
     return close.index[closed.to_numpy()]
 
 

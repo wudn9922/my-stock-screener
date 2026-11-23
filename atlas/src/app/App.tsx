@@ -106,6 +106,7 @@ import type { ChartRequest } from './chartRequest';
 import { marketVolumeUnit } from '../ui/format';
 import { worldAssetFor } from '../market-data/worldAssets';
 import type { LocalSymbol } from '../ui/SymbolSearch';
+import '../ui/stockHeader.css';
 import '../ui/workspace.css';
 import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
 import { MarketLoginPrompt } from '../ui/MarketLogin';

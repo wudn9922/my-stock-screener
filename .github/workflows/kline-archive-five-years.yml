@@ -41,7 +41,7 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
       - name: Resume five complete years plus this year, without editing archive files
         env:
@@ -91,7 +91,7 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - run: pip install --quiet pandas
       - uses: actions/download-artifact@v4
         with:

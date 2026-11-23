@@ -81,7 +81,7 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
           
       - name: Install dependencies
         if: steps.guard.outputs.skip != 'true'

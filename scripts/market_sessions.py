@@ -169,7 +169,7 @@ def classify_closures(stats, primary=None, known=(), min_symbols=2, *, trading=(
             records[date] = dict(known[date])
             continue
         reasons = []
-        if pd.Timestamp(day).dayofweek >= 5:
+        if pd.Timestamp(day).day_of_week >= 5:
             reasons.append('weekend')
         if is_session is False:
             reasons.append('exchange-calendar-closed')
@@ -350,6 +350,6 @@ def market_prices(frames, primary=None, known=(), *, market=None, official=None)
         view.attrs[CLOSURE_EVIDENCE] = {day:row for day,row in evidence.items() if row.get('calendarSession') is True}
         view.attrs[PROJECTED] = 'official-closures-v1'
         view.attrs[REMOVED_WEEKENDS] = tuple(sorted(set(frame.attrs.get(REMOVED_WEEKENDS,())) |
-            set(frame.index[frame.index.dayofweek >= 5].strftime('%Y-%m-%d'))))
+            set(frame.index[frame.index.day_of_week >= 5].strftime('%Y-%m-%d'))))
         projected[symbol] = view
     return {s: f for s, f in projected.items() if f is not None and not f.empty}, excluded

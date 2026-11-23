@@ -34,7 +34,7 @@ jobs:
           ref: main
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - run: pip install --quiet pandas
       - name: Create-only orphan branch; never overwrite an existing ref
         env:
@@ -59,7 +59,7 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
       - uses: actions/cache/restore@v4
         with:
@@ -103,7 +103,7 @@ jobs:
           ref: main
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - run: pip install --quiet pandas
       - uses: actions/checkout@v4
         with:

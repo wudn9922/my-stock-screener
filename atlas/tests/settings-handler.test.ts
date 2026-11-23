@@ -6,6 +6,7 @@ import { watchlistId, watchlistVersion } from '../../supabase/functions/user-set
 import * as storageAccess from '../../supabase/functions/_shared/storageAccess';
 import * as lineHandoff from '../../supabase/functions/_shared/lineLoginHandoff';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
+import * as lineIdToken from '../../supabase/functions/_shared/lineIdToken';
 import * as alertSettings from '../../supabase/functions/user-settings/alertSettings';
 
 type Row = Record<string, unknown>;
@@ -102,6 +103,7 @@ function handlerFixture(seed: Row[] = [], count = seed.length, enabled = true, t
     ...storageAccess,
     ...lineHandoff,
     ...deviceSession,
+    ...lineIdToken,
     Request,
     Response,
     URLSearchParams,

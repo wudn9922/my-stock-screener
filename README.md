@@ -10,6 +10,8 @@ GitHub Actions 的 `schedule` 不保證準時，實測常延遲 5～8 小時。
 兩種觸發同一天只會有一個真的執行（workflow 開頭有檢查，今天已經跑過或正在跑就略過）。
 手動在 Actions 頁面重跑時，勾選 `force` 可略過這個檢查。
 
+所有 GitHub Actions workflow 的分類與用途見 [docs/WORKFLOWS.md](docs/WORKFLOWS.md)。
+
 ### 1. 建立 GitHub token
 
 GitHub → Settings → Developer settings → Fine-grained personal access tokens：
@@ -48,6 +50,8 @@ gcloud scheduler jobs create http daily-stock-screener \
 ## 環境變數
 
 見 `.env.example`。
+
+Cloud Scheduler 呼叫突破監控 `/run` 時，需在 HTTP headers 加上 `X-Run-Token`，值與 `RUN_TOKEN` 相同。
 
 ## 系統故障與資料未更新通知
 
@@ -91,6 +95,7 @@ Atlas 也整合參數控制台：`atlas/?page=console` 可管理原有均線參�
 清單的 Supabase 同步、每日歷史收集及突破監控啟用仍需部署資料表與服務；操作與未完成部署事項見 [整合說明](atlas/docs/UNIFIED_CONSOLE.md)。
 
 Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `atlas/`），提供畫圖、技術指標、財報與回測。
+詳細更新紀錄見 [atlas/docs/CHANGELOG.md](atlas/docs/CHANGELOG.md)。
 
 - 網址：<https://wudn9922.github.io/my-stock-screener/atlas/>
 - 指定個股與週期：`atlas/?symbol=<代號>&tf=<週期>`，例如 `atlas/?symbol=2330.TW&tf=1D`、`atlas/?symbol=%5EGSPC&tf=1W`
@@ -116,7 +121,7 @@ Atlas 是內嵌在每日報告裡的研究工具（Vite/React，原始碼在 `at
 
 ### 建議均線、LINE 熱門美股與單檔 K 線更新
 
-- 建議均線涵蓋台美股全市場（約 7,200 檔），由 `MA Recommendations` 在每月 2 日台灣時間約 10:17 分批重算：每月重算三分之一（依月份輪流），每檔每 3 個月更新一次；還沒有建議的新股每次另外最多補 1,500 檔。保留手動執行入口（可指定分批或 all）；失敗的股票沿用上次成功結果。
+- 建議均線涵蓋台美股全市場（約 7,200 檔），由 `MA Recommendations` 在每月 2 日台灣時間約 15:17 分批重算：每月重算三分之一（依月份輪流），每檔每 3 個月更新一次；還沒有建議的新股每次另外最多補 1,500 檔。保留手動執行入口（可指定分批或 all）；失敗的股票沿用上次成功結果。
 - 「選股」頁的美股列在「全市場」旁新增「LINE 熱門」群組，顯示 LINE 財經報告使用的最多五檔熱門美股，預設保持 LINE 排序。列資料來自美股全市場名單，沿用欄位、排序、篩選及 K 線入口；不在全市場名單中的代號保留為未符合列。可將目前代號與篩選存為手動自選清單。清單在 LINE 推播成功後寫入 `docs/report/trending-stocks.json`，經 daily owner 發佈；抓取失敗保留上次清單與原始時間，抓取日（台北時區）早於最新報告日即顯示舊資料提示，並列出抓取及推播時間；缺漏或格式無效時，群組保留並顯示「LINE 熱門美股清單尚未產生」。合併後需等下一次每日報告成功執行才會產生首份清單。
 - 個股圖表右上方「更新 K 線」只重抓目前股票與所選週期，略過本機／HTTP 快取。週 K、月 K 會同時讀取該股票日 K 以校驗當期資料，不會更新其他股票或觸發全市場掃描。更新保留畫線、指標及視圖；失敗保留原圖，切換股票／週期時取消舊更新。
 - 更新取得的是來源當下提供的最新資料；Yahoo 仍是延遲行情，官方靜態指數仍是每日收盤資料，並非交易所即時串流。

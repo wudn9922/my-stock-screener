@@ -71,7 +71,7 @@ def load_bars(root, market, symbol):
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     df = pd.concat(frames).sort_index()
     df = df[~df.index.duplicated(keep="last")]
-    return df[df.index.dayofweek < 5].astype(float)
+    return df[df.index.day_of_week < 5].astype(float)
 
 
 def stock_events(bars, calendar, market, methods):

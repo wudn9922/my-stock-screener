@@ -496,7 +496,7 @@ def clean_ohlcv_dataframe(df):
     # Yahoo occasionally serves a placeholder bar dated on a weekend (2026-09-20: a Sunday bar for 591 Taiwan
     # stocks, with the limit-up / limit-down prices as High / Low). None of the markets here trades on weekends.
     result = result[
-        result.index.dayofweek < 5
+        result.index.day_of_week < 5
     ]
 
     return kline.usable_frame(result)
