@@ -5,6 +5,7 @@ import * as policy from '../../../supabase/functions/_shared/storageAccess';
 import * as watchlists from '../../../supabase/functions/user-settings/watchlists';
 import * as lineHandoff from '../../../supabase/functions/_shared/lineLoginHandoff';
 import * as deviceSession from '../../../supabase/functions/_shared/deviceSession';
+import * as lineIdToken from '../../../supabase/functions/_shared/lineIdToken';
 import * as holdings from '../../../supabase/functions/user-settings/holdings';
 import * as mexc from '../../../supabase/functions/user-settings/mexc';
 import type {
@@ -417,6 +418,7 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
       ...watchlists,
       ...lineHandoff,
       ...deviceSession,
+      ...lineIdToken,
       ...holdings,
       ...mexc,
       handleMexc: (
