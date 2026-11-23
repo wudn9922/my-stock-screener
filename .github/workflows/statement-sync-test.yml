@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'statement_sync/**'
+      - 'atlas/public/symbols/taiwan.json'
       - 'tests/test_statement_*.py'
       - 'tests/fixtures/statement/**'
       - 'supabase/manual/atlas_statement_sync.sql'

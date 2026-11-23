@@ -66,7 +66,7 @@ describe('e-mail statement sync bridge', () => {
   it('links a matching account and applies stored trades at once', async () => {
     const { db, tables, rpc } = fakeDb(accounts);
     const result = await handle(db, owner, owner, { action: 'holdings.statement.link', accountId: us, broker: 'cathay', market: 'US' });
-    expect(result).toEqual({ status: 'ok', applied: 2 });
+    expect(result).toEqual({ status: 'ok', applied: 2, snapshots: 0, missingCost: 0 });
     expect(tables.atlas_statement_links).toEqual([{ line_user_id: owner, account_id: us, broker: 'cathay', market: 'US' }]);
     expect(rpc).toHaveBeenLastCalledWith('atlas_statement_apply', { owner_id: owner, broker_code: 'cathay', market_code: 'US' });
   });
@@ -77,6 +77,10 @@ describe('e-mail statement sync bridge', () => {
       .rejects.toMatchObject({ status: 400 });
     await expect(handle(db, owner, owner, { action: 'holdings.statement.link', accountId: us, broker: 'kgi', market: 'US' }))
       .rejects.toMatchObject({ status: 400 });
+    // 永豐 reports cover Taiwan stocks only.
+    await expect(handle(db, owner, owner, { action: 'holdings.statement.link', accountId: us, broker: 'sinopac', market: 'US' }))
+      .rejects.toMatchObject({ status: 400 });
+    await handle(db, owner, owner, { action: 'holdings.statement.link', accountId: tw, broker: 'sinopac', market: 'TW' });
     await handle(db, owner, owner, { action: 'holdings.statement.link', accountId: us, broker: 'cathay', market: 'US' });
     const other = '20000000-0000-4000-8000-000000000003';
     const second = fakeDb([...accounts, { id: other, kind: 'us-broker' }]);
@@ -104,7 +108,7 @@ describe('e-mail statement sync bridge', () => {
     expect(status.unlinkedPending).toBe(1);
     expect((status.messages as Row[])[0]).toMatchObject({ reportDate: '2026-11-19', status: 'ok', trades: 2 });
     expect(await handle(db, owner, owner, { action: 'holdings.statement.apply', accountId: us }))
-      .toEqual({ status: 'oversell', applied: 0, symbol: 'UHS', tradeDate: '2026-11-19' });
+      .toEqual({ status: 'oversell', applied: 0, snapshots: 0, missingCost: 0, symbol: 'UHS', tradeDate: '2026-11-19' });
     expect(await handle(db, owner, owner, { action: 'holdings.statement.unlink', accountId: us })).toEqual({ unlinked: true });
     expect(tables.atlas_statement_links).toEqual([]);
   });

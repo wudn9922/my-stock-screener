@@ -1,22 +1,22 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
 
-test('owner creates a Cathay US account linked to e-mail statements and sees its log', async ({ page }, info) => {
+async function ownerSite(page: Page, applyResult: Record<string, unknown>) {
   await mockSite(page);
   await installLineAccount(page, OWNER_USER_ID);
   let doc = { version: 1, accounts: [] as { account: { id: string }; holdings: unknown[]; revision: number }[] };
   const links: { accountId: string; broker: string; market: string; pending: number }[] = [];
-  const calls: string[] = [];
+  const calls: { action: string; broker?: string; market?: string; account?: { kind: string; currency: string } }[] = [];
   await page.route('**/functions/v1/user-settings', (route) => {
     const body = route.request().postDataJSON();
-    calls.push(body.action);
+    calls.push(body);
     if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(OWNER_USER_ID, 'cloud', true) });
     if (body.action === 'holdings.replaceAccount')
       doc = { version: 1, accounts: [{ account: body.account, holdings: body.holdings, revision: 1 }] };
     if (body.action === 'holdings.statement.link') {
       links.push({ accountId: body.accountId, broker: body.broker, market: body.market, pending: 0 });
-      return route.fulfill({ json: { ok: true, data: { status: 'ok', applied: 2 } } });
+      return route.fulfill({ json: { ok: true, data: applyResult } });
     }
     if (body.action === 'holdings.statement.status')
       return route.fulfill({ json: { ok: true, data: { links, unlinkedPending: 0, messages: [
@@ -30,22 +30,40 @@ test('owner creates a Cathay US account linked to e-mail statements and sees its
   await page.getByRole('button', { name: '新增帳戶', exact: true }).click();
   const form = page.getByRole('form', { name: '新增持股帳戶' });
   await form.getByRole('combobox', { name: '新增方式' }).selectOption('email');
-  await expect(form.getByRole('combobox', { name: '對帳單券商' }).getByRole('option', { name: /永豐/ })).toHaveAttribute('disabled', '');
+  return { form, calls, panel: page.getByRole('region', { name: 'Email 對帳單同步' }) };
+}
+
+test('owner creates a Cathay US account linked to e-mail statements and sees its log', async ({ page }, info) => {
+  const { form, calls, panel } = await ownerSite(page, { status: 'ok', applied: 2 });
+  await expect(form.getByRole('combobox', { name: '對帳單券商' }).getByRole('option', { name: /凱基/ })).toHaveAttribute('disabled', '');
   await form.getByRole('textbox', { name: '帳戶名稱' }).fill('國泰美股');
   await form.getByRole('button', { name: '建立並連結' }).click();
-  const panel = page.getByRole('region', { name: 'Email 對帳單同步' });
   await expect(panel).toContainText('國泰證券 美股');
   await expect(page.getByText('已建立並連結 Email 對帳單。已套用 2 筆成交。')).toBeVisible();
   await expect(panel.getByRole('list', { name: '最近處理的對帳單' })).toContainText('2026/11/19');
   await expect(panel).toContainText('PDF 密碼不正確');
   // Manual corrections stay available on a synced account.
   await expect(page.getByRole('button', { name: '修正持股', exact: true })).toBeEnabled();
-  expect(calls.indexOf('holdings.replaceAccount')).toBeLessThan(calls.indexOf('holdings.statement.link'));
+  const actions = calls.map((c) => c.action);
+  expect(actions.indexOf('holdings.replaceAccount')).toBeLessThan(actions.indexOf('holdings.statement.link'));
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   if (info.project.name === 'mobile-chromium') {
     await panel.scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('statement-sync-390.png') });
   }
+});
+
+test('owner links a SinoPac Taiwan account that stays editable', async ({ page }) => {
+  const { form, calls, panel } = await ownerSite(page, { status: 'ok', applied: 1, snapshots: 1, missingCost: 1 });
+  await form.getByRole('combobox', { name: '對帳單券商' }).selectOption('sinopac');
+  await form.getByRole('textbox', { name: '帳戶名稱' }).fill('永豐台股');
+  await form.getByRole('button', { name: '建立並連結' }).click();
+  await expect(panel).toContainText('永豐證券 台股');
+  await expect(page.getByText(/已套用 1 筆成交。有 1 檔庫存沒有成本資料/)).toBeVisible();
+  expect(calls.find((c) => c.action === 'holdings.replaceAccount')?.account).toMatchObject({ kind: 'tw-broker', currency: 'TWD' });
+  expect(calls.find((c) => c.action === 'holdings.statement.link')).toMatchObject({ broker: 'sinopac', market: 'TW' });
+  // Not the read-only SinoPac API account: costs can be filled in by hand.
+  await expect(page.getByRole('button', { name: '修正持股', exact: true })).toBeEnabled();
 });
 
 test('non-owners never see the e-mail option', async ({ page }) => {

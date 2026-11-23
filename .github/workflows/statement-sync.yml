@@ -4,7 +4,7 @@ name: Deploy statement sync
 on:
   push:
     branches: [main]
-    paths: ['statement_sync/**', 'Dockerfile.statement-sync*', '.github/workflows/statement-sync.yml']
+    paths: ['statement_sync/**', 'atlas/public/symbols/taiwan.json', 'Dockerfile.statement-sync*', '.github/workflows/statement-sync.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -4,5 +4,7 @@ COPY statement_sync/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 # Context is allowlisted by Dockerfile.statement-sync.dockerignore.
 COPY statement_sync /app/statement_sync
+# Taiwan ticker → Yahoo symbol (.TW / .TWO) directory for 永豐 reports.
+COPY atlas/public/symbols/taiwan.json /app/atlas/public/symbols/taiwan.json
 ENV PYTHONUNBUFFERED=1
 CMD ["sh", "-c", "exec gunicorn --bind :${PORT:-8080} --workers 1 --threads 2 --timeout 60 --log-level critical statement_sync.app:app"]

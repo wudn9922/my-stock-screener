@@ -6,7 +6,8 @@ import { HoldingsError } from './holdings.ts';
  * processing log, apply stored trades now, or unlink. Trades arrive through the statement-sync
  * Cloud Run service; nothing here touches PDFs, passwords or Gmail.
  */
-export const STATEMENT_BROKERS = ['cathay'] as const;
+/** Broker → the market its supported e-mail report covers (國泰複委託日報告 = US, 永豐當日成交回報 = TW). */
+export const STATEMENT_BROKERS: Record<string, 'TW' | 'US'> = { cathay: 'US', sinopac: 'TW' };
 const KIND = { TW: 'tw-broker', US: 'us-broker' } as const;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const missingTable = (error: { code?: string } | null) => error?.code === '42P01' || error?.code === 'PGRST205' || error?.code === 'PGRST202';
@@ -32,6 +33,7 @@ async function apply(db: Db, owner: string, link: Link) {
   const { data, error } = await db.rpc('atlas_statement_apply', { owner_id: owner, broker_code: link.broker, market_code: link.market });
   if (error) throw missingTable(error) ? unavailable() : new HoldingsError(503, '對帳單同步暫時無法使用。');
   return { status: String(data?.status ?? 'service'), applied: Number(data?.applied ?? 0),
+    snapshots: Number(data?.snapshots ?? 0), missingCost: Number(data?.missingCost ?? 0),
     ...(data?.symbol ? { symbol: String(data.symbol), tradeDate: String(data.tradeDate ?? '') } : {}) };
 }
 
@@ -63,8 +65,9 @@ export async function handleStatement(db: Db, owner: string, adminId: string | n
   const accountId = typeof body.accountId === 'string' && uuid.test(body.accountId) ? body.accountId.toLowerCase() : null;
   if (!accountId) throw invalid();
   if (action === 'holdings.statement.link') {
-    const broker = body.broker, market = body.market;
-    if (!STATEMENT_BROKERS.includes(broker as typeof STATEMENT_BROKERS[number]) || (market !== 'TW' && market !== 'US')) throw invalid();
+    const broker = body.broker;
+    const market = typeof broker === 'string' && Object.hasOwn(STATEMENT_BROKERS, broker) ? STATEMENT_BROKERS[broker]! : null;
+    if (!market || body.market !== market) throw invalid();
     const known = await accounts(db, owner);
     const account = known.find((a) => a.id === accountId);
     if (!account || account.kind !== KIND[market]) throw new HoldingsError(400, '請先建立相同市場的持股帳戶。');

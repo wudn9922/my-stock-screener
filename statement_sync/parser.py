@@ -8,6 +8,9 @@ nothing is written. Positions, prices and names never appear in errors or logs.
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import io
+import json
+import os
+from pathlib import Path
 import re
 import statistics
 
@@ -43,10 +46,13 @@ class Statement:
     report_date: str
     account_hint: str
     trades: tuple
+    # Full long position list printed by the broker after the day's trades: {"market", "positions": {symbol: qty}}.
+    snapshot: dict | None = None
 
 
-BROKER_MARKS = (("cathay", ("國泰綜合證券", "Cathay Securities")), ("sinopac", ("永豐金證券", "SinoPac")), ("kgi", ("凱基證券", "KGI")))
-SENDER_DOMAINS = {"cathaysec.com.tw": "cathay", "sinopac.com": "sinopac", "kgi.com": "kgi", "kgi.com.tw": "kgi"}
+BROKER_MARKS = (("cathay", ("國泰綜合證券", "Cathay Securities")), ("sinopac", ("永豐金", "SinoPac", "sinotrade")), ("kgi", ("凱基證券", "KGI")))
+SENDER_DOMAINS = {"cathaysec.com.tw": "cathay", "sinopac.com": "sinopac", "sinotrade.com.tw": "sinopac",
+                  "kgi.com": "kgi", "kgi.com.tw": "kgi"}
 NUMBER = re.compile(r"^[\d,]+\.\d+$")
 TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,9}$")
 SIDES = {"買進": "buy", "買入": "buy", "賣出": "sell"}
@@ -172,7 +178,118 @@ def parse_cathay(pages):
     return Statement("cathay", report_date, hint[1] if hint else "", tuple(trades))
 
 
-PARSERS = {"cathay": parse_cathay}
+INTEGER = re.compile(r"^[\d,]+(\.\d+)?$")
+TW_SIDES = {"現買": "buy", "現賣": "sell"}
+TW_UNSUPPORTED = ("資買", "資賣", "券買", "券賣", "資券")
+_CATALOG = None
+
+
+def tw_catalog():
+    """Ticker → Yahoo symbol from the site's official TWSE/TPEx directory (stocks and ETFs)."""
+    global _CATALOG
+    if _CATALOG is None:
+        path = Path(os.environ.get("STATEMENT_TW_CATALOG") or Path(__file__).resolve().parents[1] / "atlas/public/symbols/taiwan.json")
+        entries = json.loads(path.read_text())["entries"]
+        _CATALOG = {e["ticker"]: e["symbol"] for e in entries if re.fullmatch(r"\d{4,6}[A-Z]?\.(TW|TWO)", e.get("symbol", ""))}
+    return _CATALOG
+
+
+def tw_symbol(code):
+    if code in tw_catalog():
+        return tw_catalog()[code]
+    if re.fullmatch(r"0[1-9]\d{4}", code):  # TWSE-listed warrant
+        return code + ".TW"
+    if re.fullmatch(r"7\d{5}", code):  # TPEx warrant
+        return code + ".TWO"
+    raise StatementError("unrecognized", "symbol")
+
+
+def _bands(words, anchors, stop, default):
+    middles = [(a["top"] + a["bottom"]) / 2 for a in anchors]
+    gaps = [b - a for a, b in zip(middles, middles[1:])]
+    half = (statistics.median(gaps) if gaps else default) / 2
+    for index, anchor in enumerate(anchors):
+        low, high = middles[index] - half, min(middles[index] + half, stop)
+        yield anchor, sorted((w for w in words if w is not anchor and low <= (w["top"] + w["bottom"]) / 2 < high), key=lambda w: w["x0"])
+
+
+def _sinopac_trade(anchor, row, report_date):
+    texts = [w["text"] for w in row]
+    if any(t.startswith(TW_UNSUPPORTED) for t in texts):
+        raise StatementError("unsupported", "margin")
+    side_word = next((w for w in row if w["text"] in TW_SIDES), None)
+    code = next((m[1] for t in texts for m in [re.search(r"\((\d{4,6}[A-Z]?)\)", t)] if m), None)
+    order = next((w["text"] for w in row if w["x0"] > anchor["x1"] and not INTEGER.match(w["text"])), None)
+    seq = next((w["text"] for w in reversed(row) if w["x1"] < anchor["x0"] and re.fullmatch(r"\d{1,4}", w["text"])), "")
+    if not (side_word and code and order):
+        raise StatementError("unrecognized", "row")
+    numbers = [_number(w["text"]) for w in row if w["x0"] > side_word["x1"] and INTEGER.match(w["text"])]
+    if len(numbers) != 8:
+        raise StatementError("unrecognized", "row")
+    quantity, price, loan, net, fee, tax, interest, lending = numbers
+    side = TW_SIDES[side_word["text"]]
+    gross = (quantity * price).quantize(Decimal("1"))
+    expected = gross + fee + tax if side == "buy" else gross - fee - tax
+    if quantity <= 0 or quantity != quantity.to_integral_value() or loan or interest or lending or not _close(expected, net, Decimal("1")):
+        raise StatementError("unrecognized", "arithmetic")
+    return Trade(key=f"{report_date}:{order}:{seq}", trade_date=report_date, market="TW", symbol=tw_symbol(code),
+                 side=side, quantity=quantity, price=price, amount=net, currency="TWD"), gross
+
+
+def parse_sinopac(pages):
+    text = "\n".join(page[0] for page in pages)
+    compact = re.sub(r"\s+", "", text)
+    if "預估收付" not in compact and "庫存明細" not in compact:
+        raise StatementError("not-statement")
+    if "幣別" in compact and not re.search(r"幣別[:：]台幣", compact):
+        raise StatementError("unsupported", "currency")
+    inventory_date = re.search(r"庫存明細到(\d{4})/(\d{2})/(\d{2})", compact)
+    hint = re.search(r"證券帳號\s*[:：]\s*([0-9A-Z*][0-9A-Z*\-]{4,20})", text)
+    trades, totals, positions, dates = [], {"buy": Decimal(0), "sell": Decimal(0)}, {}, set()
+    for _, words, width in pages:
+        inventory_top = min((w["top"] for w in words if w["text"].startswith("庫存明細")), default=float("inf"))
+        totals_top = min((w["top"] for w in words if "總計" in w["text"]), default=inventory_top)
+        anchors = sorted((w for w in words if re.fullmatch(r"20\d{6}", w["text"]) and w["x0"] < width * 0.3 and w["top"] < totals_top),
+                         key=lambda w: w["top"])
+        for anchor, row in _bands(words, anchors, totals_top, 24):
+            day = f"{anchor['text'][:4]}-{anchor['text'][4:6]}-{anchor['text'][6:]}"
+            dates.add(day)
+            trade, gross = _sinopac_trade(anchor, row, day)
+            trades.append(trade)
+            totals[trade.side] += gross
+        stock_rows = sorted((w for w in words if w["top"] > inventory_top and w["x0"] < width * 0.12
+                             and re.fullmatch(r"\d{4,6}[A-Z]?", w["text"])), key=lambda w: w["top"])
+        for anchor, row in _bands(words, stock_rows, float("inf"), 10):
+            code = anchor["text"]
+            values = [_number(w["text"]) for w in row if INTEGER.match(w["text"]) and w["x0"] > anchor["x1"]]
+            if len(values) < 3:
+                raise StatementError("unrecognized", "inventory")
+            held, margin, _short = values[-3:]
+            if held + margin > 0:
+                symbol = tw_symbol(code)
+                if symbol in positions:
+                    raise StatementError("unrecognized", "duplicate")
+                positions[symbol] = held + margin
+    if inventory_date:
+        report_date = f"{inventory_date[1]}-{inventory_date[2]}-{inventory_date[3]}"
+        dates.add(report_date)
+    if len(dates) != 1:
+        raise StatementError("unrecognized", "date")
+    keys = [t.key for t in trades]
+    if len(set(keys)) != len(keys):
+        raise StatementError("unrecognized", "duplicate")
+    for side, label in (("buy", "買進總計"), ("sell", "賣出總計")):
+        match = re.search(label + r"[:：]\$?([\d,]+)", compact)
+        if match and _number(match[1]) != totals[side]:
+            raise StatementError("unrecognized", "total")
+    if not trades and not inventory_date:
+        raise StatementError("unrecognized", "rows")
+    report_date = dates.pop()
+    snapshot = {"market": "TW", "positions": positions} if inventory_date else None
+    return Statement("sinopac", report_date, hint[1] if hint else "", tuple(trades), snapshot)
+
+
+PARSERS = {"cathay": parse_cathay, "sinopac": parse_sinopac}
 
 
 def parse_statement(data, passwords=(), sender=""):

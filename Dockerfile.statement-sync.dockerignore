@@ -1,6 +1,7 @@
 **
 !statement_sync/
 !statement_sync/**
+!atlas/public/symbols/taiwan.json
 **/__pycache__
 **/*.pyc
 statement_sync/apps_script/**

@@ -5,10 +5,11 @@ import { holdingsContextApi } from './contextApi';
 import { holdingsStore } from './store';
 
 export const STATEMENT_BROKERS = [
-  { key: 'cathay', label: '國泰證券', markets: ['US'] as const },
-  { key: 'sinopac', label: '永豐證券（格式收集中）', markets: [] as const },
-  { key: 'kgi', label: '凱基證券（格式收集中）', markets: [] as const },
-];
+  { key: 'cathay', label: '國泰證券', market: 'US' },
+  { key: 'sinopac', label: '永豐證券', market: 'TW' },
+  { key: 'kgi', label: '凱基證券（格式收集中）', market: null },
+] as const;
+export const marketLabel = (market: 'TW' | 'US') => (market === 'US' ? '美股' : '台股');
 export interface StatementStatus {
   links: { accountId: string; broker: string; market: 'TW' | 'US'; pending: number }[];
   unlinkedPending: number;
@@ -17,6 +18,7 @@ export interface StatementStatus {
 interface ApplyResult {
   status: string;
   applied: number;
+  missingCost?: number;
   symbol?: string;
   tradeDate?: string;
 }
@@ -36,7 +38,11 @@ const label = (code: string) => MESSAGES[code] ?? MESSAGES.service!;
 const brokerName = (key: string | null) => STATEMENT_BROKERS.find((b) => b.key === key)?.label.replace(/（.*$/, '') ?? '—';
 
 export function applyText(result: ApplyResult): string {
-  if (result.status === 'ok') return result.applied ? `已套用 ${result.applied} 筆成交。` : '沒有待套用的成交。';
+  if (result.status === 'ok')
+    return (
+      (result.applied ? `已套用 ${result.applied} 筆成交。` : '沒有待套用的成交。') +
+      (result.missingCost ? `有 ${result.missingCost} 檔庫存沒有成本資料，請用「修正持股」補上平均成本。` : '')
+    );
   if (result.status === 'oversell')
     return `${result.tradeDate ?? ''} ${result.symbol ?? ''} 賣出股數超過帳上持股，已暫停套用。請用「修正持股」補上該檔在這筆成交前的持股，再按「立即套用」。`.trim();
   return label(result.status) + '。';
@@ -69,9 +75,11 @@ export function StatementPanel({ accountId, status, onChanged }: {
   };
   return (
     <section className="console-card" aria-label="Email 對帳單同步">
-      <h3>Email 對帳單同步 · {brokerName(link.broker)} {link.market === 'US' ? '美股' : '台股'}</h3>
+      <h3>Email 對帳單同步 · {brokerName(link.broker)} {marketLabel(link.market)}</h3>
       <p className="holdings-muted">
-        每天由 Gmail 自動送出券商 PDF 對帳單，讀到的買賣會加減到這個帳戶；配股、分割等請用「修正持股」調整。
+        {link.broker === 'sinopac'
+          ? '每天由 Gmail 自動送出券商 PDF 對帳單：成交加減到這個帳戶，報告附的庫存會把股數校正成券商的數字（含配股），不在庫存裡的股票會移除。'
+          : '每天由 Gmail 自動送出券商 PDF 對帳單，讀到的買賣會加減到這個帳戶；配股、分割等請用「修正持股」調整。'}
       </p>
       <p role="status">{link.pending ? `${link.pending} 筆成交待套用` : '沒有待套用的成交'}</p>
       {error && <p role="alert">{error}</p>}
