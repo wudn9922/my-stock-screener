@@ -314,6 +314,7 @@ test('dismissal is per browser account, can be reopened, and leaves legacy avail
   await installStoragePolicy(page, 'device');
   await page.goto('./?page=console');
   await expect(page.getByTestId('legacy-import-card')).toBeVisible();
+  await expectConsoleReady(page);
   await page.getByTestId('legacy-import-dismiss').click();
   await expect(page.getByTestId('legacy-import-card')).toHaveCount(0);
   await page.reload();
