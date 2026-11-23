@@ -40,6 +40,8 @@ export interface FinancialsPageProps extends PageProps {
   p?: 'q' | 'a';
   /** Chart timeframe the 「K線」 tab returns to (`?tf=`). */
   tf?: Timeframe;
+  /** Handles the stock header's back button. */
+  onExit: () => void;
   /** Chooses the chart page view (K線／價量／研究) the next chart navigation opens. */
   onStockView?: (view: StockView) => void;
 }
@@ -91,7 +93,7 @@ function cardNote(group: MetricGroupId, issues: readonly string[], foreignReport
   return null;
 }
 
-export default function FinancialsPage({ report, navigate, symbol, p, tf, onStockView }: FinancialsPageProps) {
+export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit, onStockView }: FinancialsPageProps) {
   const isTaiwanSymbol = !!symbol && (TAIWAN_SYMBOL_REGEX.test(symbol) || /^\d{4,6}[A-Z]?$/.test(symbol));
   const key = financialsKey(symbol);
   const showQuarterly = key !== null || isTaiwanSymbol;
@@ -329,6 +331,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
         localSymbols={localSymbols}
         homeListing={homeListing}
         onBack={onBack}
+        onExit={onExit}
         stockViews={!!onStockView}
         onKind={onKind}
         onMode={onMode}

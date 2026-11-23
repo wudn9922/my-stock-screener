@@ -24,6 +24,7 @@ export interface FinancialsHeaderProps {
   homeListing?: TwAdrListing | null;
   /** Returns to the chart page, optionally in its 價量／研究 view. */
   onBack: (view?: StockView) => void;
+  onExit: () => void;
   /** The chart page offers 價量／研究 views (site build); otherwise only 「K線｜財務」. */
   stockViews?: boolean;
   onKind: (kind: PeriodKind) => void;
@@ -33,7 +34,7 @@ export interface FinancialsHeaderProps {
 }
 
 export function FinancialsHeader({
-  symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, stockViews = false, onKind, onMode, onSymbol, onHomeListing,
+  symbol, name, history, kind, showQuarterly, futuHref, mode, localSymbols, homeListing, onBack, onExit, stockViews = false, onKind, onMode, onSymbol, onHomeListing,
 }: FinancialsHeaderProps) {
   const [searching, setSearching] = useState(!symbol);
   const [qualityOpen, setQualityOpen] = useState(false);
@@ -47,7 +48,7 @@ export function FinancialsHeader({
     <header className="fin-head">
       <div className="ws-header ws-header-compact fin-stock-header">
         <div className="ws-title-row fin-head-main">
-          <button type="button" className="icon-button ws-back fin-back" onClick={() => onBack()} aria-label="回到圖表">
+          <button type="button" className="icon-button ws-back fin-back" onClick={symbol ? onExit : () => onBack()} aria-label={symbol ? '返回' : '回到圖表'}>
             <ChevronLeft size={22} aria-hidden="true" />
           </button>
           <button

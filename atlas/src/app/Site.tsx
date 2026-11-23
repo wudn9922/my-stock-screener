@@ -419,6 +419,7 @@ export function Site() {
             {listNav}
             <Suspense fallback={pageFallback}>
               <FinancialsPage {...pageProps} navigate={navigateStock} symbol={route.symbol} p={route.p} tf={route.tf}
+                onExit={chartBack}
                 onStockView={(view) => { pendingView.current = view; setStockView(view); }} />
             </Suspense>
           </RouteBoundary>

@@ -151,3 +151,14 @@ test('financials uses the same stock tab sizing and identity-first order as the 
     await page.screenshot({ path: test.info().outputPath('financials-shared-stock-tabs.png'), scale: 'css' });
   }
 });
+
+test('the mobile financials back button exits a direct stock link to the watchlist', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await mockSite(page);
+  await page.goto('./?page=financials&symbol=AAPL');
+  const back = page.locator('.fin-head .ws-back');
+  await expect(back).toBeVisible();
+  await expect(back).toHaveAttribute('aria-label', '返回');
+  await back.click();
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'watchlist');
+});
