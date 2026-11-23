@@ -2,7 +2,7 @@
 Taiwan stock dividend events from FinMind (TaiwanStockDividend, one request per stock) → the "stockDividends" block
 of docs/report/financials/<code>.TW(O).json, and capital reductions (TaiwanStockCapitalReductionReferencePrice,
 減資恢復買賣參考價) → the "capitalReductions" block, and stock splits / par-value changes (TaiwanStockSplitPrice +
-TaiwanStockParValueChange, two requests per stock) → the "twSplits" block. The statements themselves are untouched: the Atlas financials page,
+TaiwanStockParValueChange, one all-market request each) → the "twSplits" block. The statements themselves are untouched: the Atlas financials page,
 the P/E river and build_growth.py derive the retroactively restated EPS from the reported EPS and these events
 (tw_stock_dividends.py / tw_capital_reductions.py / tw_splits.py have the rules). Stocks without a financials file are skipped; a
 stock is fetched again after RECHECK_DAYS (a new resolution can appear any time).
@@ -10,6 +10,10 @@ stock is fetched again after RECHECK_DAYS (a new resolution can appear any time)
 Capital reductions: FinMind serves that dataset without data_id ("Free" tier), so one request fetches every stock
 (start_date START_DATE) when any file is due; an answer that is empty or spans fewer than MIN_ALL_DATES days is not
 trusted as the whole market and the due stocks are fetched one request each instead. Unknown 減資原因 are logged.
+
+Splits / par-value changes: TaiwanStockParValueChange refuses data_id, so both datasets are fetched once for the whole
+market when any twSplits block is due. A failed or empty par answer skips every twSplits block this run (nothing is
+marked checked); a failed or empty split answer falls back to one TaiwanStockSplitPrice request per due stock.
 
   python atlas/scripts/build_stock_dividends_tw_finmind.py --budget 1200        resumable, oldest check first
   Options: --tickers 2330,1773, --limit N requests, --report-dir docs/report. Env: FINMIND_TOKEN (optional).
@@ -68,6 +72,20 @@ def fetch_all_reductions(http, token, sleep, log, counter):
     days = {str(row.get("date"))[:10] for row in rows if isinstance(row, dict) and row.get("date")}
     if len(days) < MIN_ALL_DATES:
         log(f"capital reductions: all-market answer has {len(rows)} rows on {len(days)} days; one request per stock instead")
+        return None
+    return cap.group_by_stock(rows)
+
+
+def fetch_all_market(http, dataset, start_date, token, sleep, log, counter):
+    """One request without data_id → {stock_id: rows}, or None when it failed or came back empty. RateLimited /
+    AuthError / LimitReached propagate."""
+    try:
+        rows = fetch_rows(http, dataset, None, start_date, token, sleep, log, counter)
+    except FinMindError as error:
+        log(f"::warning::{dataset}: all-market request failed ({error})")
+        return None
+    if not rows:
+        log(f"::warning::{dataset}: all-market answer is empty")
         return None
     return cap.group_by_stock(rows)
 
@@ -142,10 +160,28 @@ def run(args, http=None, sleep=time.sleep, clock=time.monotonic, log=print, toda
                     log(f"::warning::{code} capital reductions: {error}; skipped")
                     continue
                 store_reductions(code, path, rows)
-        # 2. stock dividends (one request) and splits / par-value changes (one request per dataset), per stock, the
-        #    oldest check first
+        # 2. splits / par-value changes: one all-market request per dataset
+        par_rows = split_rows = None
+        if not paused and any(item[2] == "twSplits" for item in work):
+            if pace():
+                par_rows = fetch_all_market(http, splits.DATASET_PAR, splits.PAR_START_DATE, token, sleep, log, counter)
+            else:
+                paused = True
+            if par_rows is None:
+                log("::warning::twSplits: no par-value answer; every twSplits block skipped this run")
+                work = [item for item in work if item[2] != "twSplits"]
+            elif pace():
+                split_rows = fetch_all_market(http, splits.DATASET_SPLIT, START_DATE, token, sleep, log, counter)
+            else:
+                paused = True
+        # 3. stock dividends (one request per stock) and twSplits (offline from the all-market answers, else one split
+        #    request per stock), the oldest check first
         for _, code, name, path in [] if paused else work:
-            datasets = (div.DATASET,) if name == "stockDividends" else splits.DATASETS
+            if name == "twSplits" and split_rows is not None:
+                events = splits.parse_events(split_rows.get(code.upper(), []), par_rows.get(code.upper(), []), code, log)
+                store(path, name, splits.block(events, today.isoformat()), splits.SOURCE)
+                continue
+            datasets = (div.DATASET,) if name == "stockDividends" else (splits.DATASET_SPLIT,)
             answers = []
             for dataset in datasets:
                 if not pace():
@@ -163,7 +199,7 @@ def run(args, http=None, sleep=time.sleep, clock=time.monotonic, log=print, toda
             if name == "stockDividends":
                 store(path, name, div.block(div.parse_events(answers[0]), today.isoformat()), div.SOURCE)
             else:
-                events = splits.parse_events(answers[0], answers[1], code, log)
+                events = splits.parse_events(answers[0], par_rows.get(code.upper(), []), code, log)
                 store(path, name, splits.block(events, today.isoformat()), splits.SOURCE)
     except AuthError as error:
         log(f"::error::STOPPED: {error}")
