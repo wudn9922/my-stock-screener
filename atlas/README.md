@@ -27,4 +27,9 @@ npm run test:site -- financials.spec.ts --project=mobile-chromium --grep "statem
 - 市場與選股：[市場涵蓋](docs/MARKET_COVERAGE_CHARTS.md)、[市場清單與本益比](docs/MARKET_LISTS_AND_PE.md)、[市場寬度與進出榜原因](docs/TIMEFRAME_BREADTH_WATCHLIST_REASONS.md)、[市場警示](docs/MARKET_WARNINGS.md)、[市場日曆](docs/PR_D_MARKET_CALENDAR.md)、[債券與篩選](docs/BOND_FILTER_EDITOR_FOLLOWUPS.md)、[市場與債券](docs/MARKET_BONDS_DRAWING_CONTROLS.md)、[本益比篩選](docs/SCREENER_PE_FILTER.md)
 - 財報：[資料狀態與同業比較](docs/DATA_STATUS_AND_COMPARISONS.md)、[SEC 驗證](docs/SEC_V1_VALIDATION.md)、[台股驗證](docs/TAIWAN_FINANCIAL_SNAPSHOT_VERIFICATION.md)、[美股歷史回補](docs/US_FINANCIAL_HISTORY_BACKFILL.md)、[美股全市場歷史回補](docs/US_FINANCIAL_MARKET_HISTORY_BACKFILL.md)
 - 持股：[持股匯入](../docs/ATLAS_HOLDINGS.md)、[持股計算](docs/HOLDINGS_ACCOUNT_METHODS.md)、[MEXC 唯讀同步](../docs/ATLAS_MEXC_SYNC.md)
+- [架構說明](docs/ARCHITECTURE.md)
 - 開發：[架構決策（ADR）](docs/architecture/)、[Phase 1 驗證](docs/VERIFICATION.md)、[Phase 2 驗證](docs/PHASE2_VERIFICATION.md)、[V1 驗證](docs/V1_VERIFICATION.md)、[完整文件目錄](docs/)
+
+## Attribution
+
+[TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/) is Apache-2.0; its attribution link remains visible. Atlas assets and drawing interaction code are original. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
