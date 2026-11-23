@@ -2,10 +2,11 @@
 
 券商寄到 Gmail 的 PDF 對帳單 → Apps Script（每天一次）→ Cloud Run `statement-sync` 解析 → Supabase 保存成交並套用到 Atlas 持股帳戶。
 
-- **目前支援**：國泰證券「客戶日買賣報告書」的海外股票（美股）成交。永豐、凱基、月對帳單與台股版面要等收到樣本才加。
+- **目前支援**：國泰證券「客戶日買賣報告書」的海外股票（美股）成交；永豐金證券「當日成交回報」的台股現股成交與庫存明細。凱基、月對帳單、融資融券要等收到樣本才加。
 - **讀不懂就不寫**：每筆成交都要通過報告本身的算式（股數 × 價格 ≈ 成交金額；成交金額 ± 手續費 ± 稅 = 應收付；小計相符）。不符、出現未支援的區段或市場，整份不寫入，網站顯示「無法辨識／尚未支援」，信不加標籤，之後會再試。
 - **只算一次**：成交以「報告日:成交序號」為鍵，重寄同一封信不會重複計算。持股寫入和「已套用」標記在同一個資料庫交易內完成。
 - **套用規則**：買進加股數，成本含手續費與稅；賣出減股數，平均成本不變；賣出超過帳上股數就暫停套用並在網站提示。配股、分割、期初持股用「修正持股」調整，之後的成交會加在修正後的持股上。
+- **永豐庫存核對**：永豐的回報附完整庫存（集保＋融資）。套用當天成交後，帳戶股數會設成庫存的數字：已有成本的股票總成本不變（配股會拉低均價），沒有成本資料的股票均價先記 0，網站會提示用「修正持股」補上；不在庫存裡的股票會移除。比最新已套用庫存更舊的回報只標記已處理，不會倒退。台股代號用網站的上市櫃目錄換成 `.TW`／`.TWO`。
 - **保存內容**：只存解析後的成交、處理結果與遮蔽後的帳號（例如 D3\*\*\*00）。PDF、密碼、信件內容都不保存；服務日誌只記結果代碼與筆數。
 
 ## 一次性設定（維護者）
@@ -18,7 +19,7 @@
 3. **GitHub repository variables**：設定 `STATEMENT_SYNC_ENABLED=true`，再手動執行一次「Deploy statement sync」workflow。輸出的網址就是服務位址。其餘沿用既有的 `GCP_*`、`CLOUD_RUN_BREAKOUT_IMAGE`、`SINOPAC_SUPABASE_URL`、`ADMIN_LINE_USER_ID`。
    第一次部署後，擁有者在 Cloud Shell 執行一次 `gcloud run services update statement-sync --region us-central1 --no-invoker-iam-check`，讓 Apps Script 不需 Google 身分驗證即可呼叫（服務仍以 `X-Statement-Secret` 驗證）。部署帳號沒有修改存取權限的權限，之後的部署會保留這個設定。
 4. **Gmail Apps Script**：到 <https://script.google.com> 建新專案，貼上 [`apps_script/Code.gs`](apps_script/Code.gs)。在「專案設定 → 指令碼屬性」加入 `STATEMENT_URL`（上一步的網址）與 `STATEMENT_SECRET`（同 `statement-shared-secret`），執行一次 `syncStatements` 並授權，再執行一次 `installDailyTrigger`。
-5. **Atlas**：持股 → 新增帳戶 → 新增方式「Email 對帳單」→ 國泰證券 → 建立並連結。已收到的成交會立刻套用。
+5. **Atlas**：持股 → 新增帳戶 → 新增方式「Email 對帳單」→ 國泰證券（美股）或永豐證券（台股）→ 建立並連結。已收到的成交會立刻套用。
 
 ## 處理結果代碼
 

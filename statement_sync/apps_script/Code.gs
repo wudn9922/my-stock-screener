@@ -7,7 +7,7 @@
  * 指令碼屬性（專案設定 → 指令碼屬性）：
  *   STATEMENT_URL     服務網址，例如 https://statement-sync-xxxx-uc.a.run.app
  *   STATEMENT_SECRET  與 Secret Manager 的 statement-shared-secret 相同
- *   STATEMENT_SENDERS 選填，券商寄件網域，逗號分隔（預設 cathaysec.com.tw,sinopac.com,kgi.com）
+ *   STATEMENT_SENDERS 選填，券商寄件網域，逗號分隔（預設 cathaysec.com.tw,sinopac.com,sinotrade.com.tw,kgi.com）
  */
 const LABEL = 'Atlas/已同步';
 
@@ -16,7 +16,7 @@ function syncStatements() {
   const base = (props.getProperty('STATEMENT_URL') || '').replace(/\/+$/, '');
   const secret = props.getProperty('STATEMENT_SECRET') || '';
   if (!/^https:\/\/[^/]+\.run\.app$/.test(base) || secret.length < 32) throw new Error('請先設定 STATEMENT_URL 與 STATEMENT_SECRET');
-  const senders = (props.getProperty('STATEMENT_SENDERS') || 'cathaysec.com.tw,sinopac.com,kgi.com')
+  const senders = (props.getProperty('STATEMENT_SENDERS') || 'cathaysec.com.tw,sinopac.com,sinotrade.com.tw,kgi.com')
     .split(',').map((s) => s.trim()).filter(Boolean);
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
   const query = '(' + senders.map((s) => 'from:' + s).join(' OR ') + ') has:attachment filename:pdf newer_than:60d -label:"' + LABEL + '"';

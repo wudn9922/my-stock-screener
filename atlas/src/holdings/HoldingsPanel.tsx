@@ -1,6 +1,6 @@
 import { getStorageContextKey } from '../auth/storage';
 import { SinopacPanel } from './SinopacPanel';
-import { STATEMENT_BROKERS, StatementPanel, applyText, type StatementStatus } from './StatementPanel';
+import { STATEMENT_BROKERS, StatementPanel, applyText, marketLabel, type StatementStatus } from './StatementPanel';
 import { holdingsContextApi } from './contextApi';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { chartList } from '../app/listContext';
@@ -246,7 +246,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   // SinoPac sync is the owner's own service: only the server-verified administrator sees its panel
   // (the server refuses everyone else anyway). Others keep editing a legacy CSV SinoPac account.
   const sinopacAdmin = access.isAdmin;
+  // An account fed by e-mail statements is edited like any other (corrections, costs).
+  const statementLinked = !!selected && !!statementStatus?.links.some((l) => l.accountId === selected.account.id);
   const sinopacReadOnly =
+    !statementLinked &&
     selected?.account.broker === 'sinopac' &&
     (selected.holdings.some((h) => h.source === 'api') ||
       (sinopacAdmin && (sinopacManaged?.key !== sinopacKey || sinopacManaged.id === selected.account.id)));
@@ -496,9 +499,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 券商
                 <select aria-label="對帳單券商" value={statementBroker} onChange={(event) => setStatementBroker(event.target.value)}>
                   {STATEMENT_BROKERS.map((broker) => (
-                    <option key={broker.key} value={broker.key} disabled={!broker.markets.length}>
+                    <option key={broker.key} value={broker.key} disabled={!broker.market}>
                       {broker.label}
-                      {broker.markets.length ? '（美股）' : ''}
+                      {broker.market ? `（${marketLabel(broker.market)}）` : ''}
                     </option>
                   ))}
                 </select>
@@ -541,7 +544,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 onChange={(event) => setName(event.target.value)}
                 required={method === 'csv' || method === 'email'}
                 placeholder={
-                  method === 'email' ? '例如：國泰美股' : method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'
+                  method === 'email' ? (statementBroker === 'sinopac' ? '例如：永豐台股' : '例如：國泰美股') : method === 'csv' ? '例如：永豐美股帳戶' : brokerKey === 'sinopac' ? '永豐證券' : 'MEXC'
                 }
               />
             </label>
@@ -565,12 +568,15 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 className="primary-button"
                 disabled={!name.trim() || blocked || !statementStatus}
                 onClick={() => {
+                  const entry = STATEMENT_BROKERS.find((b) => b.key === statementBroker);
+                  const market = entry?.market;
+                  if (!entry || !market) return;
                   const account: HoldingAccount = {
                     id: crypto.randomUUID(),
                     name: name.trim(),
-                    broker: 'cathay',
-                    kind: 'us-broker',
-                    currency: 'USD',
+                    broker: entry.key,
+                    kind: market === 'US' ? 'us-broker' : 'tw-broker',
+                    currency: market === 'US' ? 'USD' : 'TWD',
                   };
                   setBusy(true);
                   setError('');
@@ -580,7 +586,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                       holdingsContextApi<Parameters<typeof applyText>[0]>(getStorageContextKey(), 'holdings.statement.link', {
                         accountId: account.id,
                         broker: statementBroker,
-                        market: 'US',
+                        market,
                       }),
                     )
                     .then(async (result) => {
@@ -659,7 +665,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           }}
         />
       )}
-      {sinopacAdmin && selected?.account.broker === 'sinopac' && (
+      {sinopacAdmin && selected?.account.broker === 'sinopac' && !statementLinked && (
         <SinopacPanel
           key={selected.account.id}
           accountId={selected.account.id}

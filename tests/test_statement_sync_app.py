@@ -6,6 +6,7 @@ from unittest.mock import patch
 try:
     from statement_sync import app as service
     from test_statement_parser import MMS, UHS, report
+    from test_statement_sinopac import report as sinopac_report
 except ImportError as missing:  # the statement-sync workflow installs these; other suites skip
     raise unittest.SkipTest(f"statement sync test dependencies unavailable: {missing.name}")
 
@@ -17,10 +18,13 @@ ENV = {"STATEMENT_SHARED_SECRET": SECRET, "STATEMENT_OWNER_ID": OWNER, "SUPABASE
 
 class FakeRepository:
     def __init__(self, status="ok"):
-        self.status, self.trades, self.messages, self.applied = status, [], [], []
+        self.status, self.trades, self.messages, self.applied, self.snapshots = status, [], [], [], []
 
     def save_trades(self, owner, broker, message_id, trades):
         self.trades.extend(trades)
+
+    def save_snapshot(self, owner, broker, message_id, report_date, snapshot):
+        self.snapshots.append((broker, report_date, snapshot["market"], dict(snapshot["positions"])))
 
     def save_message(self, owner, message_id, **fields):
         self.messages.append(dict(fields, message_id=message_id))
@@ -51,6 +55,13 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(fake.applied, [("cathay", "US")])
         self.assertEqual(fake.messages[-1]["status"], "ok")
         self.assertEqual(fake.messages[-1]["report_date"], "2026-11-19")
+
+    def test_sinopac_report_stores_inventory_snapshot_and_applies_taiwan(self):
+        fake = FakeRepository()
+        self.assertEqual(self.post(sinopac_report(), fake).get_json(), {"code": "ok", "trades": 1, "done": True})
+        self.assertEqual(fake.applied, [("sinopac", "TW")])
+        self.assertEqual([s[:3] for s in fake.snapshots], [("sinopac", "2026-11-23", "TW")])
+        self.assertEqual(set(fake.snapshots[0][3]), {"031863.TW", "2308.TW"})
 
     def test_no_linked_account_still_counts_as_handled(self):
         fake = FakeRepository("no-account")

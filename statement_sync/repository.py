@@ -37,6 +37,13 @@ class Repository:
         self._post("atlas_statement_trades?on_conflict=line_user_id,broker,market,trade_key", rows,
                    "resolution=ignore-duplicates,return=minimal")
 
+    def save_snapshot(self, owner, broker, message_id, report_date, snapshot):
+        positions = {symbol: str(quantity) for symbol, quantity in snapshot["positions"].items()}
+        self._post("atlas_statement_snapshots?on_conflict=line_user_id,broker,market,report_date", [{
+            "line_user_id": owner, "broker": broker, "market": snapshot["market"], "report_date": report_date,
+            "positions": positions, "message_id": message_id,
+        }], "resolution=ignore-duplicates,return=minimal")
+
     def save_message(self, owner, message_id, *, broker, received_at, report_date, status, detail, trades):
         self._post("atlas_statement_messages?on_conflict=line_user_id,message_id", [{
             "line_user_id": owner, "message_id": message_id, "broker": broker, "received_at": received_at,

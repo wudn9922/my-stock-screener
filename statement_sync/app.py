@@ -74,7 +74,11 @@ def ingest():
             return jsonify(code=code, detail=error.detail, done=done)
         trades = len(statement.trades)
         repo.save_trades(owner, statement.broker, message, statement.trades)
-        results = [repo.apply(owner, statement.broker, market) for market in sorted({t.market for t in statement.trades})]
+        markets = {t.market for t in statement.trades}
+        if statement.snapshot:
+            repo.save_snapshot(owner, statement.broker, message, statement.report_date, statement.snapshot)
+            markets.add(statement.snapshot["market"])
+        results = [repo.apply(owner, statement.broker, market) for market in sorted(markets)]
         statuses = [r["status"] for r in results] or ["ok"]
         code = next((s for s in statuses if s != "ok"), "ok")
         done = all(s in APPLY_DONE for s in statuses)
