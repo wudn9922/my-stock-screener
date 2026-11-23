@@ -1,5 +1,5 @@
--- Maintainer only; apply manually in the Supabase SQL editor BEFORE deploying user-settings and
--- the statement-sync service. Requires atlas_holdings.sql and account_storage_permissions.sql.
+-- Applied automatically (idempotently) by the "Deploy Supabase Edge Functions" workflow before it
+-- deploys user-settings; can also be run by hand in the Supabase SQL editor. Requires atlas_holdings.sql and account_storage_permissions.sql.
 -- Holds parsed broker trades (no PDFs, no passwords, no e-mail bodies).
 begin;
 create table if not exists public.atlas_statement_links (

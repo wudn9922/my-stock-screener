@@ -248,6 +248,12 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   const sinopacAdmin = access.isAdmin;
   // An account fed by e-mail statements is edited like any other (corrections, costs).
   const statementLinked = !!selected && !!statementStatus?.links.some((l) => l.accountId === selected.account.id);
+  // One account per broker: a broker already linked to an existing account cannot be linked again.
+  const linkedAccountOf = (broker: string) => {
+    const link = statementStatus?.links.find((l) => l.broker === broker);
+    return link && document.accounts.find((entry) => entry.account.id === link.accountId)?.account;
+  };
+  const statementTaken = linkedAccountOf(statementBroker);
   const sinopacReadOnly =
     !statementLinked &&
     selected?.account.broker === 'sinopac' &&
@@ -499,9 +505,10 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 券商
                 <select aria-label="對帳單券商" value={statementBroker} onChange={(event) => setStatementBroker(event.target.value)}>
                   {STATEMENT_BROKERS.map((broker) => (
-                    <option key={broker.key} value={broker.key} disabled={!broker.market}>
+                    <option key={broker.key} value={broker.key} disabled={!broker.market || !!linkedAccountOf(broker.key)}>
                       {broker.label}
                       {broker.market ? `（${marketLabel(broker.market)}）` : ''}
+                      {linkedAccountOf(broker.key) ? ' · 已連結' : ''}
                     </option>
                   ))}
                 </select>
@@ -566,11 +573,11 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               <button
                 type="button"
                 className="primary-button"
-                disabled={!name.trim() || blocked || !statementStatus}
+                disabled={!name.trim() || blocked || !statementStatus || !!statementTaken}
                 onClick={() => {
                   const entry = STATEMENT_BROKERS.find((b) => b.key === statementBroker);
                   const market = entry?.market;
-                  if (!entry || !market) return;
+                  if (!entry || !market || busy || linkedAccountOf(entry.key)) return;
                   const account: HoldingAccount = {
                     id: crypto.randomUUID(),
                     name: name.trim(),
@@ -585,8 +592,12 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                     .then(() =>
                       holdingsContextApi<Parameters<typeof applyText>[0]>(getStorageContextKey(), 'holdings.statement.link', {
                         accountId: account.id,
-                        broker: statementBroker,
+                        broker: entry.key,
                         market,
+                      }).catch(async (reason: unknown) => {
+                        // Linking failed: remove the empty account again so a retry never leaves duplicates.
+                        await store.removeAccount(account.id).catch(() => undefined);
+                        throw reason;
                       }),
                     )
                     .then(async (result) => {
@@ -635,6 +646,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
               取消
             </button>
           </div>
+          {method === 'email' && statementTaken && (
+            <p role="note">這家券商已連結「{statementTaken.name}」，一家券商只能連結一個帳戶；要換帳戶請先刪除原帳戶。</p>
+          )}
           {method === 'email' && (
             <p className="holdings-muted">
               帳戶從空持股開始，之後每天讀 Gmail 裡的 PDF 對帳單加減買賣。已有持股請在建立後用「修正持股」補上期初持股。
@@ -718,20 +732,26 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <button
               type="button"
               className="text-button"
-              disabled={blocked || editing || creating || connecting}
+              disabled={blocked || editing || connecting}
               onClick={() => {
                 if (!selected || !confirm('刪除此帳戶與全部持股？此操作無法復原。')) return;
                 setBusy(true);
                 const removed = selected.account.id;
-                void store
-                  .removeAccount(removed)
+                const unlink = statementLinked
+                  ? holdingsContextApi(getStorageContextKey(), 'holdings.statement.unlink', { accountId: removed })
+                  : Promise.resolve();
+                void unlink
+                  .then(() => store.removeAccount(removed))
                   .then(() => {
                     visibility.update((current) => forgetAccount(current, removed));
                     setEditing(false);
                     setDraft(null);
                   })
                   .catch(() => setError('刪除未完成，請重新載入持股後重試。'))
-                  .finally(() => setBusy(false));
+                  .finally(() => {
+                    setBusy(false);
+                    if (statementLinked) setStatementRefresh((n) => n + 1);
+                  });
               }}
             >
               刪除帳戶

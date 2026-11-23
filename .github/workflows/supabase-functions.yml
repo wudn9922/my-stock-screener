@@ -11,6 +11,7 @@ on:
       - 'supabase/functions/_shared/**'
       - 'supabase/functions/chart-drawings/**'
       - 'supabase/functions/monitor-signals/**'
+      - 'supabase/manual/atlas_statement_sync.sql'
       - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
@@ -55,6 +56,19 @@ jobs:
       - name: Deploy market-chart
         if: steps.token.outputs.available == 'true'
         run: supabase functions deploy market-chart --no-verify-jwt --project-ref "${SUPABASE_PROJECT_REF}" --yes
+
+      - name: Apply statement sync SQL
+        # Idempotent (create if not exists / create or replace); runs before user-settings so the
+        # function never meets a missing table. Uses the Management API with the same access token.
+        if: steps.token.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          jq -Rs '{query: .}' supabase/manual/atlas_statement_sync.sql > "${RUNNER_TEMP}/statement-sql.json"
+          curl -fsS --retry 2 -o /dev/null -X POST \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' \
+            --data-binary @"${RUNNER_TEMP}/statement-sql.json" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query"
+          echo "atlas_statement_sync.sql applied"
 
       - name: Deploy user-settings
         if: steps.token.outputs.available == 'true'

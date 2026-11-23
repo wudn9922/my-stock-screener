@@ -17,7 +17,7 @@ import time
 
 from flask import Flask, jsonify, request
 
-from .parser import StatementError, parse_statement
+from .parser import SENDER_DOMAINS, StatementError, parse_statement
 from .repository import Repository, RepositoryError
 
 app = Flask(__name__)
@@ -39,13 +39,25 @@ def health():
     return jsonify(status="ok")
 
 
+def authorized():
+    secret = env("STATEMENT_SHARED_SECRET")
+    return len(secret.encode()) >= 32 and hmac.compare_digest(request.headers.get("X-Statement-Secret", "").encode(), secret.encode())
+
+
+@app.get("/senders")
+def senders():
+    """Broker sender domains for the Gmail search, so a new broker never needs an Apps Script edit."""
+    if not authorized():
+        return jsonify(code="forbidden"), 403
+    return jsonify(senders=sorted(SENDER_DOMAINS))
+
+
 @app.post("/ingest")
 def ingest():
     started = time.monotonic()
     code, trades, done = "service", 0, False
     try:
-        secret = env("STATEMENT_SHARED_SECRET")
-        if len(secret.encode()) < 32 or not hmac.compare_digest(request.headers.get("X-Statement-Secret", "").encode(), secret.encode()):
+        if not authorized():
             code = "forbidden"
             return jsonify(code=code, done=False), 403
         owner = env("STATEMENT_OWNER_ID")

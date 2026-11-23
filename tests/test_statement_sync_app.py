@@ -83,6 +83,12 @@ class IngestTests(unittest.TestCase):
         self.assertEqual((ignored["code"], ignored["done"]), ("ignored", True))
         self.assertEqual(fake.trades, [])
 
+    def test_sender_list_needs_the_secret(self):
+        self.assertEqual(self.client.get("/senders", headers={"X-Statement-Secret": "x" * 40}).status_code, 403)
+        senders = self.client.get("/senders", headers={"X-Statement-Secret": SECRET}).get_json()["senders"]
+        self.assertIn("sinotrade.com.tw", senders)
+        self.assertIn("cathaysec.com.tw", senders)
+
     def test_invalid_base64_is_rejected(self):
         with patch.object(service, "repository", return_value=FakeRepository()):
             response = self.client.post("/ingest", headers={"X-Statement-Secret": SECRET}, json={"messageId": "m", "pdf": "@@"})

@@ -7,7 +7,7 @@
  * 指令碼屬性（專案設定 → 指令碼屬性）：
  *   STATEMENT_URL     服務網址，例如 https://statement-sync-xxxx-uc.a.run.app
  *   STATEMENT_SECRET  與 Secret Manager 的 statement-shared-secret 相同
- *   STATEMENT_SENDERS 選填，券商寄件網域，逗號分隔（預設 cathaysec.com.tw,sinopac.com,sinotrade.com.tw,kgi.com）
+ *   STATEMENT_SENDERS 選填，額外的寄件網域，逗號分隔。券商網域由服務提供，新增券商不必改這份程式。
  */
 const LABEL = 'Atlas/已同步';
 
@@ -16,8 +16,9 @@ function syncStatements() {
   const base = (props.getProperty('STATEMENT_URL') || '').replace(/\/+$/, '');
   const secret = props.getProperty('STATEMENT_SECRET') || '';
   if (!/^https:\/\/[^/]+\.run\.app$/.test(base) || secret.length < 32) throw new Error('請先設定 STATEMENT_URL 與 STATEMENT_SECRET');
-  const senders = (props.getProperty('STATEMENT_SENDERS') || 'cathaysec.com.tw,sinopac.com,sinotrade.com.tw,kgi.com')
-    .split(',').map((s) => s.trim()).filter(Boolean);
+  const senders = brokerSenders(base, secret)
+    .concat((props.getProperty('STATEMENT_SENDERS') || '').split(','))
+    .map((s) => s.trim().toLowerCase()).filter((s, i, all) => /^[a-z0-9.-]+$/.test(s) && all.indexOf(s) === i);
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
   const query = '(' + senders.map((s) => 'from:' + s).join(' OR ') + ') has:attachment filename:pdf newer_than:60d -label:"' + LABEL + '"';
   const results = [];
@@ -47,6 +48,18 @@ function syncStatements() {
     if (done) thread.addLabel(label);
   }
   console.log(results.length ? results.join('\n') : '沒有新的對帳單');
+}
+
+/** 服務支援的券商寄件網域；服務暫時連不上時用內建清單。 */
+function brokerSenders(base, secret) {
+  const fallback = ['cathaysec.com.tw', 'sinopac.com', 'sinotrade.com.tw', 'kgi.com', 'kgi.com.tw'];
+  try {
+    const response = UrlFetchApp.fetch(base + '/senders', { headers: { 'X-Statement-Secret': secret }, muteHttpExceptions: true });
+    const list = JSON.parse(response.getContentText()).senders;
+    return Array.isArray(list) && list.length ? list.map(String) : fallback;
+  } catch (e) {
+    return fallback;
+  }
 }
 
 /** 執行一次即可：建立每天晚上 9 點的自動觸發。 */
