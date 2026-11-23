@@ -1,3 +1,6 @@
+## 2026-11-23 Financial statement EPS grades
+Primary self-review. Vitest 33 tests and 390px mobile Chromium 3 cases passed.
+
 ## 2026-11-20 Per-list notifications (均線／畫線)
 Primary self-review only. `atlas_alert_settings` + `alerts.settings.*`; breakout runner filters MA/drawing alerts by list once per run (absent = all lists, baselines never pruned by settings); UI in 我的 › 清單.
 Verification: pytest list_notifications/runner/watchlists, Vitest alert-settings/settings-handler/unified-lists, e2e-site unified-lists etc. on desktop/mobile Chromium; WebKit unavailable here.
