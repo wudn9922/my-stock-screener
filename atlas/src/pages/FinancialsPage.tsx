@@ -318,7 +318,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit
   }
 
   return (
-    <>
+    <div className="financials-page">
       <FinancialsHeader
         key={symbol ?? ''}
         symbol={symbol}
@@ -338,7 +338,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit
         onSymbol={onSymbol}
         onHomeListing={onHomeListing}
       />
-      <div className="page financials-page">
+      <div className="page financials-page-body">
         {body}
         {symbol && isChipsPageSymbol(symbol) && <><ChipsSection symbol={symbol} /><InstitutionPanel key={symbol} symbol={symbol}/><OfficialAlerts symbol={symbol}/></>}
         {symbol && key && <VolumePanel key={`volume-${symbol}`} symbol={symbol}/>}
@@ -355,7 +355,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit
           </FinancialNote>
         </footer>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 /* Financials page (?page=financials). Dark theme tokens from styles.css; up/down follow the color preference. */
-.financials-page {
+.financials-page-body {
   max-width: 1280px;
   padding-top: 0;
 }
