@@ -122,19 +122,43 @@ test('financials uses the same stock tab sizing and identity-first order as the 
   await page.goto('./?page=chart&symbol=AAPL&tf=1D');
   await expect(page.getByTestId('ohlc-header')).toContainText('O ');
   const measure = (button: HTMLElement) => { const css = getComputedStyle(button); return { width: button.getBoundingClientRect().width, font: css.fontSize, padding: css.padding, minHeight: css.minHeight }; };
+  const compactTitle = page.locator('.ws-header-compact .ws-title-row');
+  const compact = await compactTitle.isVisible();
+  const chartTitleHeight = compact ? (await compactTitle.boundingBox())!.height : null;
   const chartTabs = await page.getByTestId('stock-tab-financials').evaluate(measure);
   await page.getByTestId('stock-tab-financials').click();
   await expect(page.locator('.fin-head')).toBeVisible();
   const tabs = page.locator('.fin-head').getByRole('navigation', { name: '個股頁面' });
   await expect(tabs.getByRole('button')).toHaveText(['K線', '財務', '價量', '研究']);
   expect(await tabs.getByRole('button', { name: '財務', exact: true }).evaluate(measure)).toEqual(chartTabs);
-  const order = await page.locator('.fin-head').evaluate(header => ({
-    identity: header.querySelector('.fin-title')!.getBoundingClientRect().top,
-    tabs: header.querySelector('.stock-tabs')!.getBoundingClientRect().top,
-  }));
-  expect(order.tabs).toBeGreaterThan(order.identity);
-  await expect(page.locator('.fin-head').getByRole('button', { name: '搜尋其他股票' })).toBeVisible();
-  await expect(page.locator('.fin-head').getByRole('group', { name: '期間', exact: true })).toBeVisible();
+  await expect(tabs.getByRole('button', { name: '財務', exact: true })).toHaveAttribute('aria-current', 'page');
+  const title = page.locator('.fin-head-main');
+  const period = page.locator('.fin-head').getByRole('group', { name: '期間', exact: true });
+  await expect(period).toBeVisible();
+  await expect(title.getByRole('button', { name: '搜尋其他股票' })).toBeVisible();
+  const tabBounds = (await tabs.boundingBox())!;
+  const titleBounds = (await title.locator('.fin-title').boundingBox())!;
+  if (compact) {
+    expect((await title.boundingBox())!.height).toBe(chartTitleHeight);
+    expect(tabBounds.y).toBeGreaterThanOrEqual(titleBounds.y + titleBounds.height);
+    await expect(page.locator('.site-topbar')).toBeHidden();
+  } else {
+    expect(tabBounds.x).toBeGreaterThanOrEqual(titleBounds.x + titleBounds.width);
+  }
+  expect((await period.boundingBox())!.y).toBeGreaterThanOrEqual(tabBounds.y + tabBounds.height);
   expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: 'test-results/site/financials-shared-stock-tabs.png' });
+  if (page.viewportSize()?.width === 390 && test.info().project.name === 'iphone-webkit') {
+    await page.screenshot({ path: test.info().outputPath('financials-shared-stock-tabs.png'), scale: 'css' });
+  }
+});
+
+test('the mobile financials back button exits a direct stock link to the watchlist', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await mockSite(page);
+  await page.goto('./?page=financials&symbol=AAPL');
+  const back = page.locator('.fin-head .ws-back');
+  await expect(back).toBeVisible();
+  await expect(back).toHaveAttribute('aria-label', '返回');
+  await back.click();
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'watchlist');
 });

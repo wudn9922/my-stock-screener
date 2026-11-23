@@ -1670,16 +1670,16 @@ h3 {
       'main'
       'tab';
   }
-  .site.on-chart {
+  .site:is(.on-chart, .on-financial-stock) {
     grid-template-rows: 0 minmax(0, 1fr) calc(var(--tabbar) + var(--safe-bottom));
   }
-  .site.on-chart .site-topbar {
+  .site:is(.on-chart, .on-financial-stock) .site-topbar {
     visibility: hidden;
     padding-top: 0;
     border: 0;
     overflow: hidden;
   }
-  .site.on-chart .site-main {
+  .site:is(.on-chart, .on-financial-stock) .site-main {
     padding-top: var(--safe-top);
   }
   .site-rail {

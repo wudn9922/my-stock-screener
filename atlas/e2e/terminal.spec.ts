@@ -192,6 +192,14 @@ test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
     x = r.x + r.width * 0.35,
     y = r.y + r.height * 0.5;
   await chooseDrawingTool(page, '趨勢線');
+  const loupe = page.getByTestId('loupe');
+  const expectLoupeAt = async (side: 'left' | 'right') => {
+    await expect(loupe).toBeVisible();
+    await expect(loupe).toHaveCSS('top', '8px');
+    await expect(loupe).toHaveCSS(side, '12px');
+    await expect(loupe).toHaveCSS('width', '112px');
+    await expect(loupe).toHaveCSS('height', '78px');
+  };
   if (browserName === 'chromium') {
     const cdp = await page.context().newCDPSession(page);
     const touch = async (
@@ -205,13 +213,11 @@ test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
       });
     await touch('touchStart');
     await touch('touchMove', x + 10, y + 10);
-    await expect(page.getByTestId('loupe')).toBeVisible();
-    await expect(page.getByTestId('loupe')).toHaveCSS('right', '12px');
+    await expectLoupeAt('right');
     await touch('touchEnd');
     await expect(page.getByTestId('loupe')).toBeHidden();
     await touch('touchStart', r.x + r.width * 0.75, y + 50);
-    await expect(page.getByTestId('loupe')).toBeVisible();
-    await expect(page.getByTestId('loupe')).toHaveCSS('left', '12px');
+    await expectLoupeAt('left');
     await touch('touchEnd');
     await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
     // Endpoint editing must also show the loupe. Release first endpoint at the exact updated coordinate.
@@ -258,9 +264,14 @@ test('mobile touch placement loupe, pointer cancel and no page scroll', async ({
     await page.mouse.move(x, y);
     await page.mouse.down();
     await page.mouse.move(x + 10, y + 10);
-    await expect(page.getByTestId('loupe')).toBeVisible();
+    await expectLoupeAt('right');
     await page.mouse.up();
-    await drag(page, r.x + r.width * 0.75, y + 50, r.x + r.width * 0.75 + 10, y + 60);
+    await page.mouse.move(r.x + r.width * 0.75, y + 50);
+    await page.mouse.down();
+    await page.mouse.move(r.x + r.width * 0.75 + 10, y + 60);
+    await expectLoupeAt('left');
+    await page.mouse.up();
+    await expect(loupe).toBeHidden();
     await expect.poll(async () => (await readSymbol(page))?.drawings.length).toBe(1);
   }
   expect(await page.evaluate(() => scrollY)).toBe(0);

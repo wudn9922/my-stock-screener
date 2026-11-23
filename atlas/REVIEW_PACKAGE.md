@@ -1,3 +1,6 @@
+## 2026-11-23 Drawing loupe and financials header
+Primary self-review of touch placement, endpoint editing, and the shared stock header layout.
+
 ## 2026-11-23 Shared LINE ID token verification
 Primary self-review. 142 targeted Vitest cases, 34 native PostgreSQL tests, 15 account-permission tests, lint, build and both Deno checks passed.
 
