@@ -26,8 +26,18 @@ jobs:
           cache-dependency-path: statement_sync/requirements.txt
       - run: pip install -r statement_sync/requirements.txt pypdf==6.17.0 reportlab==5.0.1
       - run: python -m unittest discover -s tests -p 'test_statement_*.py' -v
-      # The runner image ships PostgreSQL 16 binaries; the suite builds its own throwaway cluster.
-      - run: ATLAS_PG_BIN=/usr/lib/postgresql/16/bin python supabase/tests/test_statement_sync_sql.py -v
+      # Same discovery as atlas-review: the suite builds its own throwaway cluster.
+      - name: SQL suite on native PostgreSQL
+        run: |
+          pg_bindir="$(pg_config --bindir 2>/dev/null || true)"
+          if [ ! -x "$pg_bindir/initdb" ] || [ ! -x "$pg_bindir/psql" ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql
+            pg_bindir="$(find /usr/lib/postgresql -type f -name initdb -printf '%h\n' | sort -Vr | head -n 1)"
+          fi
+          test -x "$pg_bindir/initdb"
+          test -x "$pg_bindir/psql"
+          ATLAS_PG_BIN="$pg_bindir" python supabase/tests/test_statement_sync_sql.py -v
       - run: docker build -f Dockerfile.statement-sync -t statement-sync-test:local .
   edge-check:
     runs-on: ubuntu-latest
