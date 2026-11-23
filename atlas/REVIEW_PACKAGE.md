@@ -1,3 +1,6 @@
+## 2026-11-23 Drawing loupe and financials header
+Primary self-review of touch placement, endpoint editing, and the shared stock header layout.
+
 ## 2026-11-23 Financial statement EPS grades
 Primary self-review. Vitest 33 tests and 390px mobile Chromium 3 cases passed.
 

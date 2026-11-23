@@ -1,0 +1,146 @@
+/* ---- Symbol header */
+.ws-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 62px;
+  padding: 6px 10px 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.ws-symbol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  min-width: 0;
+  padding: 4px 10px 4px 8px;
+  border-radius: 10px;
+  text-align: left;
+  transition: background 0.15s;
+}
+.ws-symbol:hover {
+  background: var(--surface-3);
+}
+.ws-symbol-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ws-symbol-text b {
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ws-symbol-text small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.ws-market-tag {
+  font-size: 10px;
+  color: var(--text-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.ws-symbol-icon {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+@media (max-width: 1099px) {
+  .ws-header.ws-header-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-height: 0;
+    padding: 0;
+    border-bottom: 0;
+    background: var(--bg);
+  }
+  .ws-header-compact .ws-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    height: 50px;
+    padding: 6px 8px 0;
+    min-width: 0;
+  }
+  .ws-header-compact .ws-back {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: var(--text);
+  }
+  .ws-header-compact .ws-symbol {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 44px;
+    gap: 6px;
+    padding: 0;
+    border-radius: 10px;
+    background: none;
+  }
+  .ws-header-compact .ws-symbol:hover { background: none; }
+  .ws-header-compact .ws-symbol-text {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+  .ws-header-compact .ws-symbol-text b {
+    flex: none;
+    color: var(--text);
+    font: 600 18px/1.2 var(--font-num);
+    letter-spacing: 0;
+  }
+  .ws-header-compact .ws-ticker-suffix { display: none; }
+  .ws-header-compact .ws-symbol-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-size: 15px;
+  }
+  .ws-header-compact .ws-market-tag {
+    flex: none;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text-2);
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .ws-header-compact .ws-symbol-icon { flex: none; color: var(--text-3); }
+  /* View tabs: underline, 40px, 22px apart. */
+  .ws-header-compact > .ws-stock-controls {
+    display: block;
+    margin-top: 6px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+}
+/* Narrow phones: the badge and search hint give way to the stock name. */
+@media (max-width: 359px) {
+  .ws-header-compact .ws-market-tag,
+  .ws-header-compact .ws-symbol-icon { display: none; }
+}

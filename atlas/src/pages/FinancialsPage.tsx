@@ -316,7 +316,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
   }
 
   return (
-    <div className="page financials-page">
+    <>
       <FinancialsHeader
         key={symbol ?? ''}
         symbol={symbol}
@@ -335,22 +335,24 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onStoc
         onSymbol={onSymbol}
         onHomeListing={onHomeListing}
       />
-      {body}
-      {symbol && isChipsPageSymbol(symbol) && <><ChipsSection symbol={symbol} /><InstitutionPanel key={symbol} symbol={symbol}/><OfficialAlerts symbol={symbol}/></>}
-      {symbol && key && <VolumePanel key={`volume-${symbol}`} symbol={symbol}/>}
-      {symbol && key && !isTaiwanSymbol && <SecRadar symbol={symbol}/>}
-      {history && displayHistory && <PeerComparison key={`peers-${history.symbol}`} history={displayHistory} kind={effectiveKind} navigate={navigate} />}
-      <footer className="page-foot fin-foot">
-        <FinancialNote label="資料限制與研究說明">
-        <p>
-          {showQuarterly
-            ? '限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'
-            : '限制：缺少的財報欄位以「—」呈現；比率由本頁依所選期間計算，可能與公司公告口徑不同。'}
-        </p>
-        <p>僅供研究參考，非投資建議。</p>
-        </FinancialNote>
-      </footer>
-    </div>
+      <div className="page financials-page">
+        {body}
+        {symbol && isChipsPageSymbol(symbol) && <><ChipsSection symbol={symbol} /><InstitutionPanel key={symbol} symbol={symbol}/><OfficialAlerts symbol={symbol}/></>}
+        {symbol && key && <VolumePanel key={`volume-${symbol}`} symbol={symbol}/>}
+        {symbol && key && !isTaiwanSymbol && <SecRadar symbol={symbol}/>}
+        {history && displayHistory && <PeerComparison key={`peers-${history.symbol}`} history={displayHistory} kind={effectiveKind} navigate={navigate} />}
+        <footer className="page-foot fin-foot">
+          <FinancialNote label="資料限制與研究說明">
+            <p>
+              {showQuarterly
+                ? '限制：Yahoo 只提供約 4 年年度、5–8 季季度財報，本站逐季累積、無法往回補（部分美股另以 SEC 申報補歷史，台股另以 FinMind〔源自公開資訊觀測站〕回溯至 2015 年）；比率由本頁依公式計算，可能與公司公告口徑不同；有息負債可能含租賃負債。'
+                : '限制：缺少的財報欄位以「—」呈現；比率由本頁依所選期間計算，可能與公司公告口徑不同。'}
+            </p>
+            <p>僅供研究參考，非投資建議。</p>
+          </FinancialNote>
+        </footer>
+      </div>
+    </>
   );
 }
 

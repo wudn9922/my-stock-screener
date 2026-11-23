@@ -1,6 +1,12 @@
 import type { IChartApi } from 'lightweight-charts';
 import type { DrawingScene } from './DrawingStateMachine';
 import type { DrawingProjection } from './DrawingModel';
+import './loupe.css';
+
+const width = 112;
+const height = 78;
+const zoom = 2.75;
+
 /** DOM overlay is transient. Its centre is the post-magnet anchor, exactly as committed. */
 export class Loupe {
   private canvas = document.createElement('canvas');
@@ -10,6 +16,8 @@ export class Loupe {
     private projection: DrawingProjection,
   ) {
     this.canvas.className = 'loupe';
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
     this.canvas.setAttribute('aria-hidden', 'true');
     this.canvas.dataset.testid = 'loupe';
     host.append(this.canvas);
@@ -25,10 +33,7 @@ export class Loupe {
       this.hide();
       return;
     }
-    const width = 180,
-      height = 125,
-      zoom = 2.75,
-      dpr = window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio || 1;
     if (
       this.canvas.width !== Math.round(width * dpr) ||
       this.canvas.height !== Math.round(height * dpr)
@@ -37,8 +42,7 @@ export class Loupe {
       this.canvas.height = Math.round(height * dpr);
     }
     this.canvas.style.display = 'block';
-    this.canvas.style.left = scene.pointer.x < this.projection.width() / 2 ? 'auto' : '12px';
-    this.canvas.style.right = scene.pointer.x < this.projection.width() / 2 ? '12px' : 'auto';
+    this.canvas.dataset.corner = scene.pointer.x < this.projection.width() / 2 ? 'right' : 'left';
     const ctx = this.canvas.getContext('2d')!;
     // Public screenshot API; runs once per interaction RAF, never per raw pointer event.
     const snapshot = this.chart.takeScreenshot(true, true),

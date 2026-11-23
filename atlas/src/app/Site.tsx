@@ -222,6 +222,7 @@ export function Site() {
   const onStockPage = route.page === 'chart' || route.page === 'financials';
   const chartList = onStockPage ? chartListFor(historyState) : null;
   const stockSymbol = onStockPage ? route.symbol : undefined;
+  const onFinancialStock = route.page === 'financials' && !!stockSymbol;
   const position = useMemo(() => listPosition(chartList, stockSymbol), [chartList, stockSymbol]);
   /** Chart/financials navigations keep the list reference; any other destination drops it. */
   const navigateStock = useCallback(
@@ -338,7 +339,7 @@ export function Site() {
   };
 
   return (
-    <div className={`site ${route.page === 'chart' ? 'on-chart' : ''}`} data-page={route.page}
+    <div className={`site ${route.page === 'chart' ? 'on-chart' : onFinancialStock ? 'on-financial-stock' : ''}`} data-page={route.page}
       data-console-view={mobile && route.page === 'console' ? route.view : undefined}>
       <header className="site-topbar">
         <a
@@ -415,7 +416,7 @@ export function Site() {
         })}
         {route.page === 'financials' && (
           <RouteBoundary key={route.page}>
-            {listNav && <div className="financials-list-nav">{listNav}</div>}
+            {listNav}
             <Suspense fallback={pageFallback}>
               <FinancialsPage {...pageProps} navigate={navigateStock} symbol={route.symbol} p={route.p} tf={route.tf}
                 onStockView={(view) => { pendingView.current = view; setStockView(view); }} />
