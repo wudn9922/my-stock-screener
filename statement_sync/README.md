@@ -11,15 +11,15 @@
 
 ## 一次性設定（維護者）
 
-1. **Supabase**：在 SQL Editor 執行 [`supabase/manual/atlas_statement_sync.sql`](../supabase/manual/atlas_statement_sync.sql)，然後重新部署 `user-settings` edge function。
+1. **Supabase**：[`supabase/manual/atlas_statement_sync.sql`](../supabase/manual/atlas_statement_sync.sql) 由「Deploy Supabase Edge Functions」workflow 在部署 `user-settings` 前自動套用（可重複執行），不必手動跑。
 2. **Secret Manager**（同一個 GCP 專案）：
    - `statement-shared-secret`：至少 32 字元的隨機字串（Cloud Shell：`openssl rand -hex 32`）。
    - `statement-pdf-passwords`：PDF 開啟密碼，一行一個（不同券商密碼不同時各一行）。
    - 讓 Cloud Run 執行身分（沿用 `SINOPAC_RUNTIME_SA`，或另設 `STATEMENT_RUNTIME_SA`）可以讀這兩個 secret，以及既有的 `sinopac-supabase`。
 3. **GitHub repository variables**：設定 `STATEMENT_SYNC_ENABLED=true`，再手動執行一次「Deploy statement sync」workflow。輸出的網址就是服務位址。其餘沿用既有的 `GCP_*`、`CLOUD_RUN_BREAKOUT_IMAGE`、`SINOPAC_SUPABASE_URL`、`ADMIN_LINE_USER_ID`。
    第一次部署後，擁有者在 Cloud Shell 執行一次 `gcloud run services update statement-sync --region us-central1 --no-invoker-iam-check`，讓 Apps Script 不需 Google 身分驗證即可呼叫（服務仍以 `X-Statement-Secret` 驗證）。部署帳號沒有修改存取權限的權限，之後的部署會保留這個設定。
-4. **Gmail Apps Script**：到 <https://script.google.com> 建新專案，貼上 [`apps_script/Code.gs`](apps_script/Code.gs)。在「專案設定 → 指令碼屬性」加入 `STATEMENT_URL`（上一步的網址）與 `STATEMENT_SECRET`（同 `statement-shared-secret`），執行一次 `syncStatements` 並授權，再執行一次 `installDailyTrigger`。
-5. **Atlas**：持股 → 新增帳戶 → 新增方式「Email 對帳單」→ 國泰證券（美股）或永豐證券（台股）→ 建立並連結。已收到的成交會立刻套用。
+4. **Gmail Apps Script**：到 <https://script.google.com> 建新專案，貼上 [`apps_script/Code.gs`](apps_script/Code.gs)。在「專案設定 → 指令碼屬性」加入 `STATEMENT_URL`（上一步的網址）與 `STATEMENT_SECRET`（同 `statement-shared-secret`），執行一次 `syncStatements` 並授權，再執行一次 `installDailyTrigger`。券商寄件網域由服務的 `/senders` 提供，之後新增券商不必再改這份程式。
+5. **Atlas**：持股 → 新增帳戶 → 新增方式「Email 對帳單」→ 國泰證券（美股）或永豐證券（台股）→ 建立並連結。已收到的成交會立刻套用。一家券商只能連結一個帳戶；連結失敗時剛建立的空帳戶會自動移除。刪除已連結的帳戶會同時取消連結。
 
 ## 處理結果代碼
 

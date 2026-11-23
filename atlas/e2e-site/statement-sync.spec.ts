@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
 
-async function ownerSite(page: Page, applyResult: Record<string, unknown>) {
+async function ownerSite(page: Page, applyResult: Record<string, unknown>, options: { linkFailures?: number } = {}) {
+  let linkFailures = options.linkFailures ?? 0;
   await mockSite(page);
   await installLineAccount(page, OWNER_USER_ID);
   let doc = { version: 1, accounts: [] as { account: { id: string }; holdings: unknown[]; revision: number }[] };
@@ -13,7 +14,18 @@ async function ownerSite(page: Page, applyResult: Record<string, unknown>) {
     calls.push(body);
     if (body.action === 'access.get') return route.fulfill({ json: accessEnvelope(OWNER_USER_ID, 'cloud', true) });
     if (body.action === 'holdings.replaceAccount')
-      doc = { version: 1, accounts: [{ account: body.account, holdings: body.holdings, revision: 1 }] };
+      doc = { version: 1, accounts: [...doc.accounts.filter((e) => e.account.id !== body.account.id),
+        { account: body.account, holdings: body.holdings, revision: 1 }] };
+    if (body.action === 'holdings.deleteAccount')
+      doc = { version: 1, accounts: doc.accounts.filter((e) => e.account.id !== body.accountId) };
+    if (body.action === 'holdings.statement.unlink') {
+      links.splice(links.findIndex((l) => l.accountId === body.accountId), 1);
+      return route.fulfill({ json: { ok: true, data: { unlinked: true } } });
+    }
+    if (body.action === 'holdings.statement.link' && linkFailures > 0) {
+      linkFailures -= 1;
+      return route.fulfill({ status: 503, json: { ok: false, error: '對帳單同步資料表尚未部署' } });
+    }
     if (body.action === 'holdings.statement.link') {
       links.push({ accountId: body.accountId, broker: body.broker, market: body.market, pending: 0 });
       return route.fulfill({ json: { ok: true, data: applyResult } });
@@ -30,7 +42,7 @@ async function ownerSite(page: Page, applyResult: Record<string, unknown>) {
   await page.getByRole('button', { name: '新增帳戶', exact: true }).click();
   const form = page.getByRole('form', { name: '新增持股帳戶' });
   await form.getByRole('combobox', { name: '新增方式' }).selectOption('email');
-  return { form, calls, panel: page.getByRole('region', { name: 'Email 對帳單同步' }) };
+  return { form, calls, panel: page.getByRole('region', { name: 'Email 對帳單同步' }), accounts: () => doc.accounts.length };
 }
 
 test('owner creates a Cathay US account linked to e-mail statements and sees its log', async ({ page }, info) => {
@@ -64,6 +76,27 @@ test('owner links a SinoPac Taiwan account that stays editable', async ({ page }
   expect(calls.find((c) => c.action === 'holdings.statement.link')).toMatchObject({ broker: 'sinopac', market: 'TW' });
   // Not the read-only SinoPac API account: costs can be filled in by hand.
   await expect(page.getByRole('button', { name: '修正持股', exact: true })).toBeEnabled();
+});
+
+test('a failed link leaves no account behind, a linked broker cannot be added twice, and a linked account can be deleted', async ({ page }) => {
+  const { form, calls, panel, accounts } = await ownerSite(page, { status: 'ok', applied: 0 }, { linkFailures: 1 });
+  await form.getByRole('textbox', { name: '帳戶名稱' }).fill('國泰美股');
+  await form.getByRole('button', { name: '建立並連結' }).click();
+  await expect(page.getByRole('alert')).toContainText('尚未部署');
+  expect(accounts()).toBe(0);
+  await form.getByRole('button', { name: '建立並連結' }).click();
+  await expect(panel).toContainText('國泰證券 美股');
+  expect(accounts()).toBe(1);
+  await page.getByRole('button', { name: '新增帳戶', exact: true }).click();
+  await form.getByRole('combobox', { name: '新增方式' }).selectOption('email');
+  await expect(form.getByRole('combobox', { name: '對帳單券商' }).getByRole('option', { name: /國泰/ })).toHaveAttribute('disabled', '');
+  await expect(form.getByRole('button', { name: '建立並連結' })).toBeDisabled();
+  await expect(form.getByRole('note')).toContainText('已連結「國泰美股」');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: '刪除帳戶', exact: true }).click();
+  await expect.poll(accounts).toBe(0);
+  const actions = calls.map((c) => c.action);
+  expect(actions.lastIndexOf('holdings.statement.unlink')).toBeLessThan(actions.lastIndexOf('holdings.deleteAccount'));
 });
 
 test('non-owners never see the e-mail option', async ({ page }) => {
