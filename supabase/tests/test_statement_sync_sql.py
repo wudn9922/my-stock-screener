@@ -25,7 +25,7 @@ class StatementSyncSqlTests(_PostgresFixture):
 
     def setUp(self):
         super().setUp()
-        self.run_sql("truncate public.atlas_statement_links, public.atlas_statement_trades, public.atlas_statement_messages, public.atlas_statement_snapshots;")
+        self.run_sql("truncate public.atlas_statement_links, public.atlas_statement_trades, public.atlas_statement_messages, public.atlas_statement_snapshots, public.atlas_statement_layouts;")
 
     def call(self, sql, role="service_role", success=True):
         result = self.run_sql(f"set role {role}; {sql}", success=success)
@@ -68,7 +68,7 @@ class StatementSyncSqlTests(_PostgresFixture):
     def test_browsers_cannot_reach_tables_or_function(self):
         for role in ("anon", "authenticated"):
             self.assertIn("permission denied", self.apply(role=role, success=False))
-            for table in ("links", "trades", "messages", "snapshots"):
+            for table in ("links", "trades", "messages", "snapshots", "layouts"):
                 self.assertIn("permission denied", self.call(f"select count(*) from public.atlas_statement_{table};", role=role, success=False))
 
     def test_unlinked_or_missing_account_keeps_trades_pending(self):

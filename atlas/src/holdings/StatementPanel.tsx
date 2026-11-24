@@ -24,6 +24,7 @@ interface ApplyResult {
 }
 const MESSAGES: Record<string, string> = {
   ok: '已套用',
+  partial: '成交已套用，庫存未能讀取（修正後自動重讀）',
   'no-account': '成交已保存，尚未連結帳戶',
   oversell: '賣出股數超過帳上持股，已暫停套用',
   conflict: '持股剛被修改，請按「立即套用」重試',

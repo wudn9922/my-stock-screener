@@ -3,7 +3,9 @@
 POST /ingest with header X-Statement-Secret and JSON {messageId, from, receivedAt, pdf(base64)}.
 The response's `done` tells the script whether to label the e-mail as handled: true once the
 trades are stored (even if no account is linked yet) or the PDF is not a statement; false for
-a wrong password or a layout we cannot read yet, so the e-mail is sent again after a fix.
+a wrong password or a layout we cannot read yet, so the e-mail is sent again after a fix. For an
+unreadable layout a masked copy of its word boxes (digits and letters replaced) is kept for 14 days
+so the parser can be fixed without anyone handling the PDF.
 Logs carry only a result code, counts and timing: no symbols, quantities or amounts.
 """
 
@@ -17,7 +19,7 @@ import time
 
 from flask import Flask, jsonify, request
 
-from .parser import SENDER_DOMAINS, StatementError, parse_statement
+from .parser import SENDER_DOMAINS, StatementError, mask_layout, open_pages, parse_pages
 from .repository import Repository, RepositoryError
 
 app = Flask(__name__)
@@ -76,13 +78,17 @@ def ingest():
         passwords = [p for p in env("STATEMENT_PDF_PASSWORDS").splitlines() if p.strip()]
         repo = repository()
         message = body["messageId"]
+        pages = None
         try:
-            statement = parse_statement(data, passwords, str(body.get("from") or ""))
+            pages = open_pages(data, passwords)
+            statement = parse_pages(pages, str(body.get("from") or ""))
         except StatementError as error:
             code = "ignored" if error.code == "not-statement" else error.code
             done = code == "ignored"
             repo.save_message(owner, message, broker=None, received_at=received, report_date=None,
                               status=code, detail=error.detail, trades=0)
+            if code == "unrecognized" and pages:
+                repo.save_layout(owner, message, code=code, detail=error.detail, pages=mask_layout(pages))
             return jsonify(code=code, detail=error.detail, done=done)
         trades = len(statement.trades)
         repo.save_trades(owner, statement.broker, message, statement.trades)
@@ -94,6 +100,10 @@ def ingest():
         statuses = [r["status"] for r in results] or ["ok"]
         code = next((s for s in statuses if s != "ok"), "ok")
         done = all(s in APPLY_DONE for s in statuses)
+        if statement.diagnostics:
+            # Trades are kept and applied; the unread part is retried once the parser is fixed.
+            code, done = ("partial" if code == "ok" else code), False
+            repo.save_layout(owner, message, code="partial", detail=statement.diagnostics, pages=mask_layout(pages))
         repo.save_message(owner, message, broker=statement.broker, received_at=received, report_date=statement.report_date,
                           status=code, detail=statement.account_hint, trades=trades)
         return jsonify(code=code, trades=trades, done=done)
