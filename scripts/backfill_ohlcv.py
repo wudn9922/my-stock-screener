@@ -97,7 +97,14 @@ def yahoo(symbol, start, end, cache):
 
 def tpex(start, end, cache):
     sys.path.insert(0, str(ROOT))
-    import main
+    from tpex_otc import (
+        TPEX_HTTP_HEADERS,
+        TPEX_INDEX_HISTORY_LEGACY_URL,
+        TPEX_REQUEST_DELAY,
+        TPEX_TRADING_INDEX_URL,
+        parse_tpex_index_payload,
+        parse_tpex_trading_payload,
+    )
     import pandas as pd
 
     rows = []
@@ -111,7 +118,7 @@ def tpex(start, end, cache):
                 raw_target = cache / f"tpex-{month}-{kind}.json"
                 if raw_target.exists():
                     return json.loads(raw_target.read_text())
-                request = urllib.request.Request(url, headers=main.TPEX_HTTP_HEADERS)
+                request = urllib.request.Request(url, headers=TPEX_HTTP_HEADERS)
                 with urllib.request.urlopen(request, timeout=20) as response:
                     raw = response.read()
                 payload = json.loads(raw.decode("utf-8-sig"))
@@ -120,23 +127,23 @@ def tpex(start, end, cache):
 
             # The configured new index URL currently returns a 404 HTML page.
             # Use the project's original official legacy endpoint directly.
-            payload = fetch(main.TPEX_INDEX_HISTORY_LEGACY_URL,
+            payload = fetch(TPEX_INDEX_HISTORY_LEGACY_URL,
                             {"l": "zh-tw", "d": f"{month.year - 1911}/{month.month:02d}", "o": "json"}, "index")
-            frame = main.parse_tpex_index_payload(payload)
-            payload = fetch(main.TPEX_TRADING_INDEX_URL,
+            frame = parse_tpex_index_payload(payload)
+            payload = fetch(TPEX_TRADING_INDEX_URL,
                             {"date": f"{month.year}/{month.month:02d}/01", "response": "json"}, "volume")
-            volume = main.parse_tpex_trading_payload(payload)
+            volume = parse_tpex_trading_payload(payload)
             frame = frame[(frame.index.year == month.year) & (frame.index.month == month.month)].copy()
             if frame.empty:
                 raise ValueError(f"TPEx returned no index bars for {month}")
             frame["Volume"] = volume.reindex(frame.index)
             frame.to_csv(target)
-            time.sleep(main.TPEX_REQUEST_DELAY)
+            time.sleep(TPEX_REQUEST_DELAY)
         for day, row in frame.iterrows():
             day = day.strftime("%Y-%m-%d")
             if start <= day <= end:
                 rows.append({"Date": day, **{c: row[c] for c in COLUMNS}})
-    return rows, str(cache.relative_to(ROOT)) + "/tpex-*", main.TPEX_INDEX_HISTORY_LEGACY_URL
+    return rows, str(cache.relative_to(ROOT)) + "/tpex-*", TPEX_INDEX_HISTORY_LEGACY_URL
 
 
 def process(path, args, now, cache, backup):

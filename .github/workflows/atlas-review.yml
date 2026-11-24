@@ -31,6 +31,7 @@ on:
       - '.github/workflows/research-data.yml'
       - 'breakout_alert/**'
       - 'main.py'
+      - 'tpex_otc.py'
       - 'report_metrics.py'
       - 'scripts/market_sessions.py'
       - 'scripts/scan_market_closures.py'
