@@ -13,7 +13,47 @@ export const pushScript = () => new URL('push-sw.js', base()).href;
 /** At most one worker update check per foreground return within this window. */
 const WORKER_REFRESH_MS = 10 * 60 * 1000;
 /** When a foregrounded app asks the push worker for a pending tap. */
-const TAP_PULL_DELAYS_MS = [0, 400, 1500, 3000, 6000, 10000];
+const TAP_PULL_DELAYS_MS = [0, 500, 1500, 3000];
+
+/** Same store as public/push-sw.js: one record { url, at } written by a notification tap. */
+const TAP_DB = 'atlas-push-tap';
+const TAP_STORE = 'tap';
+const TAP_KEY = 'latest';
+const TAP_TTL_MS = 60 * 1000;
+
+/** Read and delete the recorded tap in one transaction; a stale or malformed record yields null. */
+export function takeRecordedTap(now = () => Date.now()): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') { resolve(null); return; }
+    let request: IDBOpenDBRequest;
+    try { request = indexedDB.open(TAP_DB, 1); } catch { resolve(null); return; }
+    request.onupgradeneeded = () => request.result.createObjectStore(TAP_STORE);
+    request.onerror = () => resolve(null);
+    request.onsuccess = () => {
+      const db = request.result;
+      let record: unknown = null;
+      try {
+        const transaction = db.transaction(TAP_STORE, 'readwrite');
+        const store = transaction.objectStore(TAP_STORE);
+        const read = store.get(TAP_KEY);
+        read.onsuccess = () => {
+          record = read.result ?? null;
+          if (record) store.delete(TAP_KEY);
+        };
+        transaction.oncomplete = () => {
+          db.close();
+          const tap = record as { url?: unknown; at?: unknown } | null;
+          const age = tap && typeof tap.at === 'number' ? now() - tap.at : NaN;
+          resolve(tap && typeof tap.url === 'string' && age >= -5000 && age <= TAP_TTL_MS ? tap.url : null);
+        };
+        transaction.onerror = transaction.onabort = () => { db.close(); resolve(null); };
+      } catch {
+        db.close();
+        resolve(null);
+      }
+    };
+  });
+}
 
 // TEMPORARY tap diagnostics (iPhone background tap investigation). Armed for a few minutes by the test button,
 // shows each step on screen, memory only. Remove once the background tap works.
@@ -84,27 +124,14 @@ export function startPushNavigation() {
     const url = accept(data.url);
     if (url) event.ports[0]?.postMessage(url.href);
   });
-  // Ask the push worker for a tap it is still holding (iOS does not deliver its message to a resumed app).
+  // Take a tap the push worker recorded (iOS delivers no worker message to a resumed Home Screen app). Only
+  // a device with a push registration reads the store, so guests never create it (ADR-016).
   const pullTap = (reason = '') => {
-    navigator.serviceWorker?.getRegistration?.(pushScope()).then((registration) => {
-      const worker = registration?.active;
-      if (!worker || worker.scriptURL !== script || typeof MessageChannel === 'undefined') {
-        diagnose(`頁面：取回${reason}失敗，${!registration ? '找不到推播註冊' : !worker ? '推播 worker 未啟用' : '推播 worker 網址不符'}`);
-        return;
-      }
-      const channel = new MessageChannel();
-      channel.port1.onmessage = (event: MessageEvent) => {
-        channel.port1.close();
-        const reply = event.data as { url?: unknown; trace?: unknown; worker?: unknown; pushes?: unknown } | string | null;
-        const url = reply && typeof reply === 'object' ? reply.url : reply;
-        const steps = reply && typeof reply === 'object' && Array.isArray(reply.trace) ? reply.trace.map(String) : [];
-        const events = reply && typeof reply === 'object' && Array.isArray(reply.pushes) ? reply.pushes.map(String) : [];
-        const instance = reply && typeof reply === 'object' && typeof reply.worker === 'string' ? reply.worker : '?';
-        diagnose(`頁面：取回${reason} → ${typeof url === 'string' ? '有通知' : '沒有待處理的通知'}（worker ${instance}）`
-          + `${events.length ? `\n  事件：${events.join('\n  事件：')}` : ''}${steps.length ? `\n  步驟：${steps.join('\n  步驟：')}` : ''}`);
-        accept(url);
-      };
-      worker.postMessage({ type: 'atlas-push-pull' }, [channel.port2]);
+    navigator.serviceWorker?.getRegistration?.(pushScope()).then(async (registration) => {
+      if (!registration) { diagnose(`頁面：取回${reason}略過，找不到推播註冊`); return; }
+      const url = await takeRecordedTap();
+      diagnose(`頁面：取回${reason} → ${url ? '有剛點的通知' : '沒有待處理的通知'}`);
+      if (url) accept(url);
     }).catch((error: unknown) => { diagnose(`頁面：取回${reason}出錯 ${error instanceof Error ? error.name : ''}`); });
   };
   navigator.serviceWorker.startMessages?.();

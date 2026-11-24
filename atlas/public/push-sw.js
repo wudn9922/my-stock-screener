@@ -4,12 +4,21 @@
  * Deliberately NO fetch handler and NO CacheStorage: the screener deployment stays memory-only
  * (ADR-016) and the retired offline shell worker (sw.js) is not reintroduced. Its scope does not
  * contain any Atlas page, so it never controls or intercepts a page either.
+ *
+ * Tap handoff: iOS runs the push/click handlers in a worker instance the page cannot reach, delivers no
+ * message to a resumed Home Screen app, and openWindow does not move it. So a tap also records the chart
+ * URL in a one-record IndexedDB store that the page takes (and deletes) when it comes to the foreground.
+ * Push requires the account's cloud storage grant (user-settings checks it on every push request), and the
+ * record is only a public chart URL that expires after a minute.
  */
 const scopeURL = new URL(self.registration.scope);
 // The Atlas app root is the parent of this worker's push/ scope.
 const atlasRoot = new URL('../', scopeURL);
 const iconURL = new URL('icon-192.png', atlasRoot).href;
 const badgeURL = new URL('badge-96.png', atlasRoot).href;
+const TAP_DB = 'atlas-push-tap';
+const TAP_STORE = 'tap';
+const TAP_KEY = 'latest';
 
 function atlasURL(value) {
   try {
@@ -21,12 +30,28 @@ function atlasURL(value) {
   return atlasRoot.href;
 }
 
+/** Run one request against the tap store; resolves when its transaction commits. */
+function tapStore(mode, run) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(TAP_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(TAP_STORE);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction(TAP_STORE, mode);
+      run(transaction.objectStore(TAP_STORE));
+      transaction.oncomplete = () => { db.close(); resolve(); };
+      transaction.onerror = transaction.onabort = () => { db.close(); reject(transaction.error); };
+    };
+  });
+}
+const saveTap = (url) => tapStore('readwrite', (store) => store.put({ url, at: Date.now() }, TAP_KEY)).catch(() => {});
+const clearTap = () => tapStore('readwrite', (store) => store.delete(TAP_KEY)).catch(() => {});
+
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
 
 self.addEventListener('push', (event) => {
-  recentPushes.push(`${clock(Date.now())} 收到推播（worker ${workerInstance}）`);
-  if (recentPushes.length > 5) recentPushes.shift();
   let message = {};
   try {
     message = event.data ? event.data.json() : {};
@@ -47,48 +72,6 @@ self.addEventListener('push', (event) => {
   }));
 });
 
-// A tap is also kept in memory until the Atlas page asks for it. iOS resumes a backgrounded Home Screen app
-// without delivering a worker message sent while it was suspended (and may not list it as a client), so the
-// page pulls the tap when it returns to the foreground. Memory only: no storage outside the account policy.
-const PENDING_TAP_MS = 60 * 1000;
-const HOLD_TAP_MS = 30 * 1000;
-let pendingTap = null;
-// TEMPORARY tap diagnostics (iPhone background tap investigation): steps of the latest tap, sent with each pull.
-let tapTrace = [];
-const trace = (step) => { tapTrace.push(`${((Date.now() - (tapTrace.at || Date.now())) / 1000).toFixed(1)}s ${step}`); };
-// Which worker instance answers (a restart loses memory), when it started, and the pushes it received.
-const workerInstance = Math.random().toString(36).slice(2, 6);
-const workerStarted = Date.now();
-const recentPushes = [];
-const clock = (time) => new Date(time).toTimeString().slice(0, 8);
-
-function rememberTap(url) {
-  if (pendingTap) pendingTap.release();
-  let release;
-  const taken = new Promise((resolve) => { release = resolve; });
-  pendingTap = { url, at: Date.now(), release };
-  tapTrace = [];
-  tapTrace.at = Date.now();
-  return taken;
-}
-
-function takeTap() {
-  const tap = pendingTap;
-  pendingTap = null;
-  if (!tap) return null;
-  tap.release();
-  return Date.now() - tap.at <= PENDING_TAP_MS ? tap.url : null;
-}
-
-self.addEventListener('message', (event) => {
-  const data = event.data;
-  const port = event.ports && event.ports[0];
-  if (!data || data.type !== 'atlas-push-pull' || !port) return;
-  const url = takeTap();
-  if (url) trace('pulled');
-  port.postMessage({ url, trace: tapTrace.slice(), worker: `${workerInstance} 啟動於 ${clock(workerStarted)}`, pushes: recentPushes.slice() });
-});
-
 function routeInWindow(client, url) {
   const channel = new MessageChannel();
   let timer;
@@ -103,44 +86,32 @@ function routeInWindow(client, url) {
 }
 
 self.addEventListener('notificationclick', (event) => {
-  recentPushes.push(`${clock(Date.now())} 收到點擊（worker ${workerInstance}）`);
-  if (recentPushes.length > 5) recentPushes.shift();
   event.notification.close();
   const url = atlasURL(event.notification.data && event.notification.data.url);
-  const taken = rememberTap(url);
   event.waitUntil((async () => {
-    trace('click');
+    // Record first: on iOS this is the only path that reaches a resumed app.
+    await saveTap(url);
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const open = windows.find((client) => {
       try { return new URL(client.url).pathname.startsWith(atlasRoot.pathname); } catch { return false; }
     });
-    trace(`windows ${windows.length}, atlas ${open ? 'found' : 'none'}`);
     if (open) {
       // Prefer in-page routing to keep the active Atlas session and workspace. Focus can be refused
       // (iOS Home Screen apps), so route the window whether or not focusing it worked.
       let target = open;
-      try { target = (await open.focus()) || open; trace('focus ok'); } catch (error) { trace(`focus failed ${error && error.name}`); }
+      try { target = (await open.focus()) || open; } catch { /* Route the unfocused window below. */ }
       try {
-        if (await routeInWindow(target, url)) { trace('page acknowledged'); takeTap(); return; }
-        trace('no page acknowledgement');
-      } catch (error) { trace(`message failed ${error && error.name}`); }
+        if (await routeInWindow(target, url)) { await clearTap(); return; }
+      } catch { /* Fall back to navigation with the actual stock URL. */ }
       try {
         const navigated = await open.navigate(url);
         if (navigated) {
-          takeTap();
+          await clearTap();
           await navigated.focus();
           return;
         }
-      } catch (error) { trace(`navigate failed ${error && error.name}`); }
+      } catch { /* The original window may already have closed. */ }
     }
-    try {
-      const opened = await self.clients.openWindow(url);
-      trace(`openWindow ${opened ? 'client' : 'null'}`);
-    } catch (error) { trace(`openWindow failed ${error && error.name}`); }
-    // Stay alive until the page pulls the tap (or give up): an opened or resumed window asks on start/foreground.
-    let timer;
-    const pulled = await Promise.race([taken.then(() => true), new Promise((resolve) => { timer = setTimeout(() => resolve(false), HOLD_TAP_MS); })]);
-    clearTimeout(timer);
-    if (!pulled) trace('hold expired without a pull');
+    await self.clients.openWindow(url).catch(() => null);
   })());
 });
