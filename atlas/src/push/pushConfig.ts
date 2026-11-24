@@ -10,6 +10,8 @@ export const webPushEnabled = () => WEB_PUSH_PUBLIC_KEY !== '';
 const base = () => new URL(import.meta.env?.BASE_URL || '/', location.origin);
 export const pushScope = () => new URL('push/', base()).href;
 export const pushScript = () => new URL('push-sw.js', base()).href;
+/** At most one worker update check per foreground return within this window. */
+const WORKER_REFRESH_MS = 10 * 60 * 1000;
 
 /** Capture taps at startup and defer URL changes until LINE has consumed any OAuth return. */
 export function startPushNavigation() {
@@ -36,8 +38,20 @@ export function startPushNavigation() {
   });
   navigator.serviceWorker.startMessages?.();
   // The push worker's scope (push/) is never navigated to, so the browser rarely checks it for updates on its own.
-  // Ask once per start so a deployed fix to notification taps reaches devices that enabled push earlier.
-  navigator.serviceWorker.getRegistration?.(pushScope()).then((registration) => registration?.update()).catch(() => {});
+  // Ask at start and when the app returns to the foreground (iOS resumes a Home Screen app without restarting it),
+  // so a deployed fix to notification taps reaches devices that enabled push earlier.
+  const refreshWorker = () => {
+    navigator.serviceWorker.getRegistration?.(pushScope()).then((registration) => registration?.update()).catch(() => {});
+  };
+  refreshWorker();
+  let refreshedAt = Date.now();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || Date.now() - refreshedAt < WORKER_REFRESH_MS) return;
+      refreshedAt = Date.now();
+      refreshWorker();
+    });
+  }
   return () => {
     ready = true;
     if (pending) open(pending);

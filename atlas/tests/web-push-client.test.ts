@@ -93,6 +93,32 @@ it('asks the browser to update an existing push worker at startup, and tolerates
   await vi.waitFor(() => expect(failing).toHaveBeenCalled());
 });
 
+it('checks the push worker for updates again when a resumed app returns to the foreground, at most every 10 minutes', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
+  vi.resetModules();
+  const { startPushNavigation } = await import('../src/push/pushConfig');
+  vi.stubGlobal('location', new URL('https://atlas.example/'));
+  const update = vi.fn(async () => undefined);
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => ({ update }) }) });
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  vi.stubGlobal('document', doc);
+  startPushNavigation();
+  await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await Promise.resolve();
+  expect(update).toHaveBeenCalledTimes(1);
+  vi.setSystemTime(Date.now() + 11 * 60 * 1000);
+  doc.visibilityState = 'hidden';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await Promise.resolve();
+  expect(update).toHaveBeenCalledTimes(1);
+  doc.visibilityState = 'visible';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  vi.useRealTimers();
+});
+
 /** Run public/push-sw.js against a fake worker global. */
 function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = []) {
   const listeners: Record<string, (event: unknown) => void> = {};
