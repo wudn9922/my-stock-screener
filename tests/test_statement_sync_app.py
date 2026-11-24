@@ -79,6 +79,30 @@ class IngestTests(unittest.TestCase):
         self.assertFalse(any(ch.isdigit() and ch != "9" for t in texts for ch in t))
         self.assertFalse(any("UHS" in t or "181.36" in t for t in texts))
 
+    def test_layout_cleanup_query_is_url_safe_and_failures_do_not_block(self):
+        from statement_sync.repository import Repository
+
+        class Session:
+            def __init__(self):
+                self.urls = []
+
+            def request(self, method, url, **kwargs):
+                self.urls.append(url)
+                return type("R", (), {"ok": True, "content": b"", "json": lambda self: None})()
+
+        session = Session()
+        Repository("https://x.supabase.co", "key", session).save_layout(OWNER, "m", code="unrecognized", detail="row", pages=[])
+        self.assertNotIn("+", session.urls[0])
+        self.assertRegex(session.urls[0], r"created_at=lt\.\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+        class Failing(FakeRepository):
+            def save_layout(self, *args, **kwargs):
+                from statement_sync.repository import RepositoryError
+                raise RepositoryError()
+        broken = UHS[:9] + ("181.36", "181.36")
+        result = self.post(report(rows=(broken, MMS), subtotal="429.79"), Failing()).get_json()
+        self.assertEqual((result["code"], result["done"]), ("unrecognized", False))
+
     def test_sinopac_inventory_that_cannot_be_read_is_partial_and_retried(self):
         fake = FakeRepository()
         result = self.post(sinopac_report(stocks=()), fake).get_json()
