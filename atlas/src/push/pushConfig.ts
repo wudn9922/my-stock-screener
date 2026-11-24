@@ -35,6 +35,9 @@ export function startPushNavigation() {
     event.ports[0]?.postMessage(url.href);
   });
   navigator.serviceWorker.startMessages?.();
+  // The push worker's scope (push/) is never navigated to, so the browser rarely checks it for updates on its own.
+  // Ask once per start so a deployed fix to notification taps reaches devices that enabled push earlier.
+  navigator.serviceWorker.getRegistration?.(pushScope()).then((registration) => registration?.update()).catch(() => {});
   return () => {
     ready = true;
     if (pending) open(pending);

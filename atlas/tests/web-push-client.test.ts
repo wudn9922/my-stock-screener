@@ -73,6 +73,26 @@ it('acknowledges a tap during startup and defers navigation until the login URL 
   expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'popstate' }));
 });
 
+it('asks the browser to update an existing push worker at startup, and tolerates none', async () => {
+  vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
+  vi.resetModules();
+  const { startPushNavigation, pushScope } = await import('../src/push/pushConfig');
+  vi.stubGlobal('location', new URL('https://atlas.example/'));
+  const update = vi.fn(async () => undefined);
+  const getRegistration = vi.fn(async () => ({ update }));
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration }) });
+  startPushNavigation();
+  await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(getRegistration).toHaveBeenCalledWith(pushScope());
+
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => undefined }) });
+  expect(() => startPushNavigation()).not.toThrow();
+  const failing = vi.fn(async () => { throw new Error('offline'); });
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => ({ update: failing }) }) });
+  startPushNavigation();
+  await vi.waitFor(() => expect(failing).toHaveBeenCalled());
+});
+
 /** Run public/push-sw.js against a fake worker global. */
 function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = []) {
   const listeners: Record<string, (event: unknown) => void> = {};
@@ -133,6 +153,19 @@ describe('push-only worker', () => {
     const closed = worker();
     await closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url: 'javascript:alert(1)' } } });
     expect(closed.opened).toEqual(['https://wudn9922.github.io/my-stock-screener/atlas/']);
+  });
+
+  it('still routes the open window in place when focusing it is refused', async () => {
+    const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
+    const posted: unknown[] = [];
+    const navigate = vi.fn();
+    const sw = worker([{ url: 'https://wudn9922.github.io/my-stock-screener/atlas/', navigate,
+      focus: vi.fn(async () => { throw new Error('InvalidAccessError'); }),
+      postMessage: (m, [port]) => { posted.push(m); port.postMessage(url); port.close(); } }]);
+    await sw.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
+    expect(posted).toEqual([{ type: 'atlas-push-open', url }]);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(sw.opened).toEqual([]);
   });
 
   it('falls back to the stock URL when an existing page does not acknowledge the tap', async () => {
