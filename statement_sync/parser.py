@@ -48,6 +48,9 @@ class Statement:
     trades: tuple
     # Full long position list printed by the broker after the day's trades: {"market", "positions": {symbol: qty}}.
     snapshot: dict | None = None
+    # Non-empty when part of the report could not be read (e.g. "inventory"): trades are kept, the
+    # e-mail is retried after a parser fix.
+    diagnostics: str = ""
 
 
 BROKER_MARKS = (("cathay", ("國泰綜合證券", "Cathay Securities")), ("sinopac", ("永豐金", "SinoPac", "sinotrade")), ("kgi", ("凱基證券", "KGI")))
@@ -330,14 +333,29 @@ def parse_sinopac(pages):
     report_date = dates.pop()
     # No position read is never taken as "holds nothing": without rows there is no snapshot to reconcile.
     snapshot = {"market": "TW", "positions": positions} if inventory_date and positions else None
-    return Statement("sinopac", report_date, hint[1] if hint else "", tuple(trades), snapshot)
+    return Statement("sinopac", report_date, hint[1] if hint else "", tuple(trades), snapshot,
+                     "inventory" if inventory_date and not positions else "")
 
 
 PARSERS = {"cathay": parse_cathay, "sinopac": parse_sinopac}
 
 
+def mask_layout(pages, max_pages=6, max_words=1500):
+    """Word boxes with every digit → 9 and Latin letter → A/a: enough to see a report's table
+    structure when it cannot be read, without amounts, quantities, tickers or account numbers
+    (Chinese text is kept so headers stay readable)."""
+    def mask(text):
+        return re.sub(r"[a-z]", "a", re.sub(r"[A-Z]", "A", re.sub(r"\d", "9", text)))
+    return [{"width": round(width, 1), "words": [
+        [round(w["x0"], 1), round(w["top"], 1), round(w["x1"], 1), round(w["bottom"], 1), mask(w["text"])[:60]]
+        for w in words[:max_words]]} for _, words, width in pages[:max_pages]]
+
+
 def parse_statement(data, passwords=(), sender=""):
-    pages = open_pages(data, passwords)
+    return parse_pages(open_pages(data, passwords), sender)
+
+
+def parse_pages(pages, sender=""):
     broker = detect_broker("\n".join(page[0] for page in pages), sender)
     if broker is None:
         raise StatementError("not-statement")

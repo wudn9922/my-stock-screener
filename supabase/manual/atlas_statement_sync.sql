@@ -56,14 +56,26 @@ create table if not exists public.atlas_statement_snapshots (
   created_at timestamptz not null default clock_timestamp(),
   primary key (line_user_id, broker, market, report_date)
 );
+-- Masked word boxes (digits → 9, letters → A/a) of reports the parser could not read, kept 14 days
+-- so the parser can be fixed without handling the PDF. Holds no amounts, tickers or account numbers.
+create table if not exists public.atlas_statement_layouts (
+  line_user_id text not null check (line_user_id ~ '^U[0-9a-f]{32}$'),
+  message_id text not null check (length(message_id) between 1 and 200),
+  code text not null check (length(code) between 1 and 40),
+  detail text check (length(detail) <= 200),
+  pages jsonb not null check (jsonb_typeof(pages) = 'array'),
+  created_at timestamptz not null default clock_timestamp(),
+  primary key (line_user_id, message_id)
+);
+alter table public.atlas_statement_layouts enable row level security;
 alter table public.atlas_statement_links enable row level security;
 alter table public.atlas_statement_snapshots enable row level security;
 alter table public.atlas_statement_trades enable row level security;
 alter table public.atlas_statement_messages enable row level security;
 revoke all on public.atlas_statement_links, public.atlas_statement_trades, public.atlas_statement_messages,
-  public.atlas_statement_snapshots from public, anon, authenticated;
+  public.atlas_statement_snapshots, public.atlas_statement_layouts from public, anon, authenticated;
 grant select, insert, update, delete on public.atlas_statement_links, public.atlas_statement_trades,
-  public.atlas_statement_messages, public.atlas_statement_snapshots to service_role;
+  public.atlas_statement_messages, public.atlas_statement_snapshots, public.atlas_statement_layouts to service_role;
 
 -- Same rule as the SinoPac sync: holdings are written only while the owner's cloud grant holds.
 create or replace function public.atlas_statement_policy_ok(owner_id text)

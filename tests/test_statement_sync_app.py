@@ -19,12 +19,16 @@ ENV = {"STATEMENT_SHARED_SECRET": SECRET, "STATEMENT_OWNER_ID": OWNER, "SUPABASE
 class FakeRepository:
     def __init__(self, status="ok"):
         self.status, self.trades, self.messages, self.applied, self.snapshots = status, [], [], [], []
+        self.layouts = []
 
     def save_trades(self, owner, broker, message_id, trades):
         self.trades.extend(trades)
 
     def save_snapshot(self, owner, broker, message_id, report_date, snapshot):
         self.snapshots.append((broker, report_date, snapshot["market"], dict(snapshot["positions"])))
+
+    def save_layout(self, owner, message_id, *, code, detail, pages):
+        self.layouts.append({"code": code, "detail": detail, "pages": pages})
 
     def save_message(self, owner, message_id, **fields):
         self.messages.append(dict(fields, message_id=message_id))
@@ -62,6 +66,25 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(fake.applied, [("sinopac", "TW")])
         self.assertEqual([s[:3] for s in fake.snapshots], [("sinopac", "2026-11-23", "TW")])
         self.assertEqual(set(fake.snapshots[0][3]), {"031863.TW", "2308.TW"})
+
+    def test_unreadable_rows_keep_a_masked_layout_and_retry(self):
+        fake = FakeRepository()
+        broken = UHS[:9] + ("181.36", "181.36")
+        result = self.post(report(rows=(broken, MMS), subtotal="429.79"), fake).get_json()
+        self.assertEqual((result["code"], result["done"]), ("unrecognized", False))
+        (layout,) = fake.layouts
+        texts = [w[4] for page in layout["pages"] for w in page["words"]]
+        self.assertIn("海外股票交易明細", texts)
+        self.assertIn("99999999", texts)  # reference number, masked
+        self.assertFalse(any(ch.isdigit() and ch != "9" for t in texts for ch in t))
+        self.assertFalse(any("UHS" in t or "181.36" in t for t in texts))
+
+    def test_sinopac_inventory_that_cannot_be_read_is_partial_and_retried(self):
+        fake = FakeRepository()
+        result = self.post(sinopac_report(stocks=()), fake).get_json()
+        self.assertEqual(result, {"code": "partial", "trades": 1, "done": False})
+        self.assertEqual((len(fake.trades), fake.snapshots, fake.layouts[0]["detail"]), (1, [], "inventory"))
+        self.assertEqual(fake.messages[-1]["status"], "partial")
 
     def test_no_linked_account_still_counts_as_handled(self):
         fake = FakeRepository("no-account")

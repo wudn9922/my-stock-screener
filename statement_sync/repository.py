@@ -1,6 +1,6 @@
 """Supabase REST access with the service-role key. Errors never carry response bodies."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -16,9 +16,12 @@ class Repository:
         self.session = session or requests.Session()
 
     def _post(self, path, body, prefer=None):
+        return self._request("post", path, body, prefer)
+
+    def _request(self, method, path, body=None, prefer=None):
         headers = dict(self.headers, **({"Prefer": prefer} if prefer else {}))
         try:
-            response = self.session.post(self.base + path, headers=headers, json=body, timeout=20, allow_redirects=False)
+            response = self.session.request(method, self.base + path, headers=headers, json=body, timeout=20, allow_redirects=False)
         except Exception:  # noqa: BLE001
             raise RepositoryError() from None
         if not response.ok:
@@ -43,6 +46,14 @@ class Repository:
             "line_user_id": owner, "broker": broker, "market": snapshot["market"], "report_date": report_date,
             "positions": positions, "message_id": message_id,
         }], "resolution=ignore-duplicates,return=minimal")
+
+    def save_layout(self, owner, message_id, *, code, detail, pages):
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        self._request("delete", f"atlas_statement_layouts?line_user_id=eq.{owner}&created_at=lt.{cutoff}")
+        self._post("atlas_statement_layouts?on_conflict=line_user_id,message_id", [{
+            "line_user_id": owner, "message_id": message_id, "code": code, "detail": detail or None, "pages": pages,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }], "resolution=merge-duplicates,return=minimal")
 
     def save_message(self, owner, message_id, *, broker, received_at, report_date, status, detail, trades):
         self._post("atlas_statement_messages?on_conflict=line_user_id,message_id", [{
