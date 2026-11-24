@@ -13,77 +13,105 @@ export const pushScript = () => new URL('push-sw.js', base()).href;
 /** At most one worker update check per foreground return within this window. */
 const WORKER_REFRESH_MS = 10 * 60 * 1000;
 /** When a foregrounded app asks the push worker for a pending tap. */
-const TAP_PULL_DELAYS_MS = [0, 500, 1500, 3000];
+const TAP_PULL_DELAYS_MS = [0, 500, 1500, 3000, 6000, 10000];
 
-/** Same store as public/push-sw.js: one record { url, at } written by a notification tap. */
+/** Same store as public/push-sw.js: a tap record { url, at } and the last push { id, url, at, listed }. */
 const TAP_DB = 'atlas-push-tap';
 const TAP_STORE = 'tap';
 const TAP_KEY = 'latest';
+const PUSH_KEY = 'push';
 const TAP_TTL_MS = 60 * 1000;
+/** How long a shown notification can still count as tapped once it disappears. */
+const PUSH_TTL_MS = 2 * 60 * 1000;
+/** How often a visible iOS Home Screen app checks for a tapped notification. */
+const PUSH_POLL_MS = 2000;
+/** The same chart reported again within this window (a tap record after a disappeared notification) is one tap. */
+const TAKE_REPEAT_MS = 15 * 1000;
 
-/** Read and delete the recorded tap in one transaction; a stale or malformed record yields null. */
-export function takeRecordedTap(now = () => Date.now()): Promise<string | null> {
+type Stored = { id?: unknown; url?: unknown; at?: unknown; listed?: unknown };
+
+/** Run requests in one store transaction; resolves with `run`'s result once it commits, else `fallback`. */
+function tapStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => () => T, fallback: T): Promise<T> {
   return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
+    if (typeof indexedDB === 'undefined') { resolve(fallback); return; }
     let request: IDBOpenDBRequest;
-    try { request = indexedDB.open(TAP_DB, 1); } catch { resolve(null); return; }
+    try { request = indexedDB.open(TAP_DB, 1); } catch { resolve(fallback); return; }
     request.onupgradeneeded = () => request.result.createObjectStore(TAP_STORE);
-    request.onerror = () => resolve(null);
+    request.onerror = () => resolve(fallback);
     request.onsuccess = () => {
       const db = request.result;
-      let record: unknown = null;
       try {
-        const transaction = db.transaction(TAP_STORE, 'readwrite');
-        const store = transaction.objectStore(TAP_STORE);
-        const read = store.get(TAP_KEY);
-        read.onsuccess = () => {
-          record = read.result ?? null;
-          if (record) store.delete(TAP_KEY);
-        };
-        transaction.oncomplete = () => {
-          db.close();
-          const tap = record as { url?: unknown; at?: unknown } | null;
-          const age = tap && typeof tap.at === 'number' ? now() - tap.at : NaN;
-          resolve(tap && typeof tap.url === 'string' && age >= -5000 && age <= TAP_TTL_MS ? tap.url : null);
-        };
-        transaction.onerror = transaction.onabort = () => { db.close(); resolve(null); };
+        const transaction = db.transaction(TAP_STORE, mode);
+        const result = run(transaction.objectStore(TAP_STORE));
+        transaction.oncomplete = () => { db.close(); resolve(result()); };
+        transaction.onerror = transaction.onabort = () => { db.close(); resolve(fallback); };
       } catch {
         db.close();
-        resolve(null);
+        resolve(fallback);
       }
     };
   });
 }
 
-// TEMPORARY tap diagnostics (iPhone background tap investigation). Armed for a few minutes by the test button,
-// shows each step on screen, memory only. Remove once the background tap works.
-const DIAGNOSTICS_MS = 3 * 60 * 1000;
-let diagnosticsUntil = 0;
-const diagnosticLines: string[] = [];
-export function armPushDiagnostics() {
-  diagnosticsUntil = Date.now() + DIAGNOSTICS_MS;
-  diagnosticLines.length = 0;
-  diagnose('診斷已開啟：把 Atlas 留在背景後點通知');
+/** The record's URL when it is well formed and younger than `ttl` (allowing small clock skew). */
+function freshURL(record: Stored | null, now: number, ttl: number): string | null {
+  const age = record && typeof record.at === 'number' ? now - record.at : NaN;
+  return record && typeof record.url === 'string' && age >= -5000 && age <= ttl ? record.url : null;
 }
-let diagnosticHide: ReturnType<typeof setTimeout> | undefined;
-function diagnose(text: string) {
-  if (Date.now() > diagnosticsUntil || typeof document === 'undefined' || !document.body) return;
-  const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-  diagnosticLines.push(`${time} ${text}`);
-  if (diagnosticLines.length > 24) diagnosticLines.splice(0, diagnosticLines.length - 24);
-  let box = document.getElementById('atlas-push-diagnostics');
-  if (!box) {
-    box = document.createElement('pre');
-    box.id = 'atlas-push-diagnostics';
-    box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;max-height:45vh;overflow:auto;margin:0;'
-      + 'padding:8px;font:11px/1.4 ui-monospace,monospace;white-space:pre-wrap;color:#e6edf3;background:rgba(13,17,23,.94);'
-      + 'border:1px solid #f0b72f;border-radius:8px;pointer-events:auto';
-    box.addEventListener('click', () => box?.remove());
-    document.body.appendChild(box);
+
+/** Read and delete the recorded tap in one transaction; a stale or malformed record yields null. */
+export function takeRecordedTap(now = () => Date.now()): Promise<string | null> {
+  return tapStore('readwrite', (store) => {
+    let record: Stored | null = null;
+    const read = store.get(TAP_KEY);
+    read.onsuccess = () => {
+      record = (read.result as Stored | undefined) ?? null;
+      if (record) store.delete(TAP_KEY);
+    };
+    return () => freshURL(record, now(), TAP_TTL_MS);
+  }, null);
+}
+
+/**
+ * iOS can bring the Home Screen app forward from a notification without firing notificationclick (a tap while
+ * Atlas is open, or just after leaving it). A notification the worker saw listed that is gone within two minutes
+ * was tapped (a banner swiped away moves to Notification Center and stays listed), so take its chart URL once.
+ */
+export async function takeDismissedPush(
+  registration: Pick<ServiceWorkerRegistration, 'getNotifications'>, now = () => Date.now(),
+): Promise<string | null> {
+  const record = await tapStore('readonly', (store) => {
+    let value: Stored | null = null;
+    const read = store.get(PUSH_KEY);
+    read.onsuccess = () => { value = (read.result as Stored | undefined) ?? null; };
+    return () => value;
+  }, null as Stored | null);
+  if (!record) return null;
+  const url = freshURL(record, now(), PUSH_TTL_MS);
+  if (!url || typeof record.id !== 'string' || record.listed !== true) {
+    // Expired, or a platform that does not list its notifications: nothing to guess from.
+    if (!url) await removePush(record.id);
+    return null;
   }
-  box.textContent = `推播點擊診斷（點此關閉）\n${diagnosticLines.join('\n')}`;
-  clearTimeout(diagnosticHide);
-  diagnosticHide = setTimeout(() => document.getElementById('atlas-push-diagnostics')?.remove(), 60_000);
+  let shown: Notification[];
+  try { shown = await registration.getNotifications(); } catch { return null; }
+  if (shown.some((notification) => (notification.data as { pushId?: unknown } | null)?.pushId === record.id)) return null;
+  return await removePush(record.id) ? url : null;
+}
+
+/** Delete the push record if it is still the one with `id` (a newer push may have replaced it). */
+function removePush(id: unknown): Promise<boolean> {
+  return tapStore('readwrite', (store) => {
+    let removed = false;
+    const read = store.get(PUSH_KEY);
+    read.onsuccess = () => {
+      const record = read.result as Stored | undefined;
+      if (!record || record.id !== id) return;
+      store.delete(PUSH_KEY);
+      removed = true;
+    };
+    return () => removed;
+  }, false);
 }
 
 /** Capture taps at startup and defer URL changes until LINE has consumed any OAuth return. */
@@ -100,39 +128,56 @@ export function startPushNavigation() {
     return `${url.origin}${url.pathname}?${params}`;
   };
   const open = (url: URL) => {
-    if (target(new URL(location.href)) === target(url)) { diagnose('頁面：已經在這張圖，不切換'); return; }
+    if (target(new URL(location.href)) === target(url)) return;
     history.pushState(null, '', url.href);
     dispatchEvent(new PopStateEvent('popstate'));
-    diagnose(`頁面：已切換到 ${url.search}`);
   };
   /** Accept an Atlas URL from the push worker; returns it when valid. */
   const accept = (value: unknown): URL | null => {
     if (typeof value !== 'string') return null;
     let url: URL;
     try { url = new URL(value, root); } catch { return null; }
-    if (url.origin !== root.origin || !url.pathname.startsWith(root.pathname)) { diagnose('頁面：網址不在 Atlas，忽略'); return null; }
+    if (url.origin !== root.origin || !url.pathname.startsWith(root.pathname)) return null;
     if (ready) open(url);
-    else { pending = url; diagnose('頁面：尚未就緒，稍後切換'); }
+    else pending = url;
     return url;
   };
   navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
     const source = event.source as ServiceWorker | null;
     const data = event.data as { type?: string; url?: string } | null;
-    if (data?.type !== 'atlas-push-open') return;
-    diagnose(`頁面：收到 worker 推送的訊息${source?.scriptURL === script ? '' : '（來源不符）'}`);
-    if (source?.scriptURL !== script) return;
+    if (data?.type !== 'atlas-push-open' || source?.scriptURL !== script) return;
     const url = accept(data.url);
     if (url) event.ports[0]?.postMessage(url.href);
   });
-  // Take a tap the push worker recorded (iOS delivers no worker message to a resumed Home Screen app). Only
-  // a device with a push registration reads the store, so guests never create it (ADR-016).
-  const pullTap = (reason = '') => {
-    navigator.serviceWorker?.getRegistration?.(pushScope()).then(async (registration) => {
-      if (!registration) { diagnose(`頁面：取回${reason}略過，找不到推播註冊`); return; }
-      const url = await takeRecordedTap();
-      diagnose(`頁面：取回${reason} → ${url ? '有剛點的通知' : '沒有待處理的通知'}`);
-      if (url) accept(url);
-    }).catch((error: unknown) => { diagnose(`頁面：取回${reason}出錯 ${error instanceof Error ? error.name : ''}`); });
+  // Take a tap the push worker recorded (iOS delivers no worker message to a resumed Home Screen app), and on
+  // iOS a notification that disappeared. Only a device with a push registration reads the store, so guests never
+  // create it (ADR-016). Both paths can report the same tap: route the same chart once.
+  const iosHomeScreen = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  let taken: { key: string; at: number } | null = null;
+  const take = (value: string | null) => {
+    if (!value) return;
+    let key: string;
+    try { key = target(new URL(value, root)); } catch { return; }
+    if (taken?.key === key && Date.now() - taken.at < TAKE_REPEAT_MS) return;
+    if (accept(value)) taken = { key, at: Date.now() };
+  };
+  let pulling = false;
+  const pullTap = () => {
+    if (pulling) return;
+    pulling = true;
+    Promise.resolve(navigator.serviceWorker?.getRegistration?.(pushScope())).then(async (registration) => {
+      if (!registration) return;
+      take(await takeRecordedTap());
+      if (iosHomeScreen) take(await takeDismissedPush(registration));
+    }).catch(() => {}).finally(() => { pulling = false; });
+  };
+  // iOS gives a page that stays open no event for a notification tap: check while the Home Screen app is visible.
+  let poll: ReturnType<typeof setInterval> | undefined;
+  const watch = () => {
+    if (!iosHomeScreen || !ready || typeof document === 'undefined') return;
+    const visible = document.visibilityState === 'visible';
+    if (visible && poll === undefined) poll = setInterval(pullTap, PUSH_POLL_MS);
+    if (!visible && poll !== undefined) { clearInterval(poll); poll = undefined; }
   };
   navigator.serviceWorker.startMessages?.();
   // The push worker's scope (push/) is never navigated to, so the browser rarely checks it for updates on its own.
@@ -145,25 +190,20 @@ export function startPushNavigation() {
   let refreshedAt = Date.now();
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      diagnose(`頁面：visibilitychange → ${document.visibilityState}`);
+      watch();
       if (document.visibilityState !== 'visible') return;
-      navigator.serviceWorker?.getRegistration?.(pushScope()).then((registration) => registration?.getNotifications?.())
-        .then((shown) => { if (shown) diagnose(`頁面：通知中心還有 ${shown.length} 則 Atlas 通知`); }).catch(() => {});
-      // The tap handler may still be running when the app comes forward: ask again shortly after.
-      for (const delay of TAP_PULL_DELAYS_MS) setTimeout(() => pullTap(`（${delay}ms）`), delay);
+      // The tap handler may still be running (or run late) when the app comes forward: ask again for a while.
+      for (const delay of TAP_PULL_DELAYS_MS) setTimeout(pullTap, delay);
       if (Date.now() - refreshedAt < WORKER_REFRESH_MS) return;
       refreshedAt = Date.now();
       refreshWorker();
     });
-  }
-  if (typeof addEventListener === 'function') {
-    addEventListener('pageshow', (event) => diagnose(`頁面：pageshow${(event as PageTransitionEvent).persisted ? '（從快取恢復）' : ''}`));
-    addEventListener('focus', () => diagnose('頁面：focus'));
   }
   return () => {
     ready = true;
     if (pending) open(pending);
     pending = null;
     pullTap();
+    watch();
   };
 }

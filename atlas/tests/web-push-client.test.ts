@@ -196,15 +196,140 @@ it('routes a recorded tap at startup and when the app returns to the foreground,
   expect(open).not.toHaveBeenCalled();
 });
 
+/** Read the push record the way the page does. */
+function readPush(factory: IDBFactory) {
+  return new Promise<unknown>((resolve, reject) => {
+    const request = factory.open('atlas-push-tap', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('tap');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const read = request.result.transaction('tap').objectStore('tap').get('push');
+      read.onsuccess = () => { request.result.close(); resolve(read.result ?? null); };
+    };
+  });
+}
+
+it('takes a listed notification that disappeared within two minutes as a tap, once', async () => {
+  vi.resetModules();
+  const factory = new IDBFactory();
+  vi.stubGlobal('indexedDB', factory);
+  const { takeDismissedPush } = await import('../src/push/pushConfig');
+  const now = 1_800_000_000_000;
+  const url = 'https://atlas.example/?page=chart&tf=1D&symbol=2330.TW';
+  const write = (value: unknown) => new Promise<void>((resolve) => {
+    const request = factory.open('atlas-push-tap', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('tap');
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('tap', 'readwrite');
+      transaction.objectStore('tap').put(value, 'push');
+      transaction.oncomplete = () => { request.result.close(); resolve(); };
+    };
+  });
+  let shown = [{ data: { url, pushId: 'a' } }];
+  const registration = { getNotifications: async () => shown as unknown as Notification[] };
+  expect(await takeDismissedPush(registration, () => now)).toBeNull();
+  await write({ id: 'a', url, at: now - 90_000, listed: true });
+  // Still in Notification Center (a swiped banner stays listed): not a tap.
+  expect(await takeDismissedPush(registration, () => now)).toBeNull();
+  shown = [{ data: { url, pushId: 'older' } }];
+  expect(await takeDismissedPush(registration, () => now)).toBe(url);
+  expect(await takeDismissedPush(registration, () => now)).toBeNull();
+  expect(await readPush(factory)).toBeNull();
+  // Expired records are dropped; a platform that never listed the notification is never guessed from.
+  await write({ id: 'b', url, at: now - 121_000, listed: true });
+  expect(await takeDismissedPush(registration, () => now)).toBeNull();
+  expect(await readPush(factory)).toBeNull();
+  await write({ id: 'c', url, at: now, listed: false });
+  expect(await takeDismissedPush(registration, () => now)).toBeNull();
+  await write({ id: 'd', url, at: now, listed: true });
+  const failing = { getNotifications: async () => { throw new Error('denied'); } };
+  expect(await takeDismissedPush(failing, () => now)).toBeNull();
+  expect(await readPush(factory)).toMatchObject({ id: 'd' });
+});
+
+it('an open iOS Home Screen app routes a notification tapped while it is visible, and stops checking when hidden', async () => {
+  vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
+  vi.resetModules();
+  const factory = new IDBFactory();
+  vi.stubGlobal('indexedDB', factory);
+  const { startPushNavigation } = await import('../src/push/pushConfig');
+  const location = new URL('https://wudn9922.github.io/my-stock-screener/atlas/?page=markets');
+  vi.stubGlobal('location', location);
+  const history = { pushState: vi.fn((_state: unknown, _title: string, href: string) => { location.href = href; }) };
+  vi.stubGlobal('history', history);
+  vi.stubGlobal('PopStateEvent', Event);
+  vi.stubGlobal('dispatchEvent', vi.fn());
+  const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
+  const sw = worker([], factory);
+  sw.shown.length = 0;
+  const getNotifications = vi.fn(async () => sw.shown.map(({ options }) => ({ data: options.data })));
+  const registration = { update: async () => {}, getNotifications };
+  vi.stubGlobal('navigator', { standalone: true, serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => registration }) });
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  vi.stubGlobal('document', doc);
+  const setInterval = vi.spyOn(globalThis, 'setInterval');
+  const clearInterval = vi.spyOn(globalThis, 'clearInterval');
+  startPushNavigation()();
+  expect(setInterval).toHaveBeenCalledWith(expect.any(Function), 2000);
+  const check = setInterval.mock.calls[0][0] as () => void;
+
+  await sw.dispatch('push', { data: { json: () => ({ title: '2330', url }) } });
+  check();
+  await vi.waitFor(() => expect(getNotifications).toHaveBeenCalled());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(history.pushState).not.toHaveBeenCalled();
+  // The tap removes the notification without any event reaching the page.
+  sw.shown.length = 0;
+  check();
+  await vi.waitFor(() => expect(history.pushState).toHaveBeenCalledWith(null, '', url));
+  // A late tap record for the same notification does not route again.
+  location.href = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=markets';
+  await recordTap(factory, { url, at: Date.now() });
+  check();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(history.pushState).toHaveBeenCalledTimes(1);
+
+  doc.visibilityState = 'hidden';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  expect(clearInterval).toHaveBeenCalled();
+  setInterval.mockRestore();
+  clearInterval.mockRestore();
+});
+
+it('only the iOS Home Screen app guesses taps from disappeared notifications', async () => {
+  vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
+  vi.resetModules();
+  const factory = new IDBFactory();
+  vi.stubGlobal('indexedDB', factory);
+  const { startPushNavigation } = await import('../src/push/pushConfig');
+  vi.stubGlobal('location', new URL('https://wudn9922.github.io/my-stock-screener/atlas/?page=markets'));
+  const history = { pushState: vi.fn() };
+  vi.stubGlobal('history', history);
+  const sw = worker([], factory);
+  await sw.dispatch('push', { data: { json: () => ({ title: '2330', url: 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&symbol=2330.TW' }) } });
+  const getNotifications = vi.fn(async () => []);
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => ({ update: async () => {}, getNotifications }) }) });
+  vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }));
+  const setInterval = vi.spyOn(globalThis, 'setInterval');
+  startPushNavigation()();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(setInterval).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+  expect(getNotifications).not.toHaveBeenCalled();
+  expect(history.pushState).not.toHaveBeenCalled();
+  setInterval.mockRestore();
+});
+
 /** Run public/push-sw.js against a fake worker global. */
 function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = [], indexedDB: IDBFactory = new IDBFactory()) {
   const listeners: Record<string, (event: unknown) => void> = {};
   const shown: { title: string; options: Record<string, unknown> }[] = [];
   const opened: string[] = [];
+  const listing = { listed: true };
   const self = {
     registration: {
       scope: 'https://wudn9922.github.io/my-stock-screener/atlas/push/',
       showNotification: async (title: string, options: Record<string, unknown>) => { shown.push({ title, options }); },
+      getNotifications: async () => (listing.listed ? shown.map(({ options }) => ({ data: options.data })) : []),
     },
     clients: { matchAll: async () => windows, openWindow: async (url: string) => { opened.push(url); }, claim: async () => {} },
     skipWaiting: () => {},
@@ -218,7 +343,7 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
     listeners[type]({ ...event, waitUntil: (promise: Promise<unknown>) => { pending = promise; } });
     await pending;
   };
-  return { listeners, shown, opened, dispatch };
+  return { listeners, shown, opened, dispatch, listing };
 }
 
 describe('push-only worker', () => {
@@ -234,10 +359,11 @@ describe('push-only worker', () => {
       url: 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW' };
     await sw.dispatch('push', { data: { json: () => payload } });
     expect(sw.shown[0].title).toBe(payload.title);
-    expect(sw.shown[0].options).toMatchObject({ body: payload.body, tag: payload.tag, data: { url: payload.url },
+    expect(sw.shown[0].options).toMatchObject({ body: payload.body, tag: payload.tag, data: { url: payload.url, pushId: expect.any(String) },
       icon: 'https://wudn9922.github.io/my-stock-screener/atlas/icon-192.png', badge: 'https://wudn9922.github.io/my-stock-screener/atlas/badge-96.png' });
     await sw.dispatch('push', { data: { json: () => ({ title: 'x', url: 'https://evil.example/' }) } });
-    expect(sw.shown[1].options.data).toEqual({ url: 'https://wudn9922.github.io/my-stock-screener/atlas/' });
+    expect(sw.shown[1].options.data).toMatchObject({ url: 'https://wudn9922.github.io/my-stock-screener/atlas/' });
+    expect((sw.shown[1].options.data as { pushId: string }).pushId).not.toBe((sw.shown[0].options.data as { pushId: string }).pushId);
     await sw.dispatch('push', { data: { json: () => { throw new Error('not json'); }, text: () => 'plain' } });
     expect(sw.shown[2].title).toBe('Atlas 提醒');
   });
@@ -258,6 +384,23 @@ describe('push-only worker', () => {
     const closed = worker();
     await closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url: 'javascript:alert(1)' } } });
     expect(closed.opened).toEqual(['https://wudn9922.github.io/my-stock-screener/atlas/']);
+  });
+
+  it('records each shown notification for the page, and a tap replaces that record', async () => {
+    const factory = new IDBFactory();
+    const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
+    const sw = worker([], factory);
+    await sw.dispatch('push', { data: { json: () => ({ title: '2330', url }) } });
+    const pushId = (sw.shown[0].options.data as { pushId: string }).pushId;
+    expect(await readPush(factory)).toMatchObject({ id: pushId, url, listed: true, at: expect.any(Number) });
+    await sw.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url, pushId } } });
+    expect(await readPush(factory)).toBeNull();
+
+    // A platform that does not list shown notifications records that, so the page never guesses from it.
+    const unlisted = worker([], factory);
+    unlisted.listing.listed = false;
+    await unlisted.dispatch('push', { data: { json: () => ({ title: '2330', url }) } });
+    expect(await readPush(factory)).toMatchObject({ listed: false });
   });
 
   it('records the tap for the page unless the open window routed in place', async () => {
