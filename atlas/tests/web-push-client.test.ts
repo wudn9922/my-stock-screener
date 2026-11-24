@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { MessageChannel, type MessagePort } from 'node:worker_threads';
+import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { retireScreenerWorker } from '../src/auth/retireWorker';
 import { configuredPublicKey } from '../src/push/pushConfig';
@@ -119,45 +120,84 @@ it('checks the push worker for updates again when a resumed app returns to the f
   vi.useRealTimers();
 });
 
-it('pulls a tap held by the push worker at startup and when the app returns to the foreground', async () => {
+/** Write a tap the way public/push-sw.js does. */
+function recordTap(factory: IDBFactory, value: unknown) {
+  return new Promise<void>((resolve, reject) => {
+    const request = factory.open('atlas-push-tap', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('tap');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('tap', 'readwrite');
+      transaction.objectStore('tap').put(value, 'latest');
+      transaction.oncomplete = () => { request.result.close(); resolve(); };
+    };
+  });
+}
+
+it('takes a recorded tap once, ignoring stale or malformed records', async () => {
+  vi.resetModules();
+  const factory = new IDBFactory();
+  vi.stubGlobal('indexedDB', factory);
+  const { takeRecordedTap } = await import('../src/push/pushConfig');
+  const now = 1_800_000_000_000;
+  const url = 'https://atlas.example/?page=chart&tf=1D&symbol=2330.TW';
+  expect(await takeRecordedTap(() => now)).toBeNull();
+  await recordTap(factory, { url, at: now - 59_000 });
+  expect(await takeRecordedTap(() => now)).toBe(url);
+  expect(await takeRecordedTap(() => now)).toBeNull();
+  await recordTap(factory, { url, at: now - 61_000 });
+  expect(await takeRecordedTap(() => now)).toBeNull();
+  expect(await takeRecordedTap(() => now)).toBeNull();
+  await recordTap(factory, { url: 42, at: now });
+  expect(await takeRecordedTap(() => now)).toBeNull();
+});
+
+it('routes a recorded tap at startup and when the app returns to the foreground, without duplicate entries', async () => {
   vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
   vi.resetModules();
-  const { startPushNavigation, pushScript } = await import('../src/push/pushConfig');
+  const factory = new IDBFactory();
+  vi.stubGlobal('indexedDB', factory);
+  const { startPushNavigation } = await import('../src/push/pushConfig');
   const location = new URL('https://atlas.example/?page=markets');
   vi.stubGlobal('location', location);
-  const url = 'https://atlas.example/?page=chart&tf=1D&symbol=2330.TW';
-  let reply: unknown = url;
-  const pulls: unknown[] = [];
-  const active = { scriptURL: pushScript(), postMessage: (message: unknown, [port]: MessagePort[]) => { pulls.push(message); port.postMessage(reply); } };
   const history = { pushState: vi.fn((_state: unknown, _title: string, href: string) => { location.href = href; }) };
   vi.stubGlobal('history', history);
   vi.stubGlobal('PopStateEvent', Event);
   vi.stubGlobal('dispatchEvent', vi.fn());
-  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => ({ active, update: async () => {} }) }) });
+  let registration: object | undefined = { update: async () => {} };
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => registration }) });
   const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
   vi.stubGlobal('document', doc);
+  const url = 'https://atlas.example/?page=chart&tf=1D&symbol=2330.TW';
+  await recordTap(factory, { url, at: Date.now() });
   const ready = startPushNavigation();
   ready();
   await vi.waitFor(() => expect(history.pushState).toHaveBeenCalledWith(null, '', url));
-  expect(pulls[0]).toEqual({ type: 'atlas-push-pull' });
 
-  // A later pull for the same chart (parameters reordered) adds no history entry; a new tap routes again.
-  reply = 'https://atlas.example/?symbol=2330.TW&page=chart&tf=1D';
+  // The same chart with reordered parameters adds no entry; another stock routes again; other origins never route.
+  await recordTap(factory, { url: 'https://atlas.example/?symbol=2330.TW&page=chart&tf=1D', at: Date.now() });
   doc.dispatchEvent(new Event('visibilitychange'));
-  await vi.waitFor(() => expect(pulls.length).toBeGreaterThanOrEqual(2));
+  await new Promise((resolve) => setTimeout(resolve, 50));
   expect(history.pushState).toHaveBeenCalledTimes(1);
-  reply = 'https://atlas.example/?page=chart&tf=1W&symbol=NVDA';
+  const nvda = 'https://atlas.example/?page=chart&tf=1W&symbol=NVDA';
+  await recordTap(factory, { url: nvda, at: Date.now() });
   doc.dispatchEvent(new Event('visibilitychange'));
-  await vi.waitFor(() => expect(history.pushState).toHaveBeenLastCalledWith(null, '', reply));
-  reply = 'https://evil.example/?page=chart';
-  const before = history.pushState.mock.calls.length;
+  await vi.waitFor(() => expect(history.pushState).toHaveBeenLastCalledWith(null, '', nvda));
+  await recordTap(factory, { url: 'https://evil.example/?page=chart', at: Date.now() });
   doc.dispatchEvent(new Event('visibilitychange'));
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  expect(history.pushState).toHaveBeenCalledTimes(before);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(history.pushState).toHaveBeenCalledTimes(2);
+
+  // Without a push registration (guests), the store is never opened.
+  registration = undefined;
+  const open = vi.spyOn(factory, 'open');
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(open).not.toHaveBeenCalled();
 });
 
 /** Run public/push-sw.js against a fake worker global. */
-function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = []) {
+function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = [], indexedDB: IDBFactory = new IDBFactory()) {
   const listeners: Record<string, (event: unknown) => void> = {};
   const shown: { title: string; options: Record<string, unknown> }[] = [];
   const opened: string[] = [];
@@ -170,9 +210,9 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
     skipWaiting: () => {},
     addEventListener: (type: string, listener: (event: unknown) => void) => { listeners[type] = listener; },
   };
-  // The worker waits up to 30 s for the page to pull a tap; keep the fake worker's timers short.
+  // Keep the fake worker's acknowledgement timeout short.
   const fastTimeout = (callback: () => void, ms: number) => setTimeout(callback, Math.min(ms, 20));
-  runInNewContext(readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8'), { self, URL, Date, Number, String, MessageChannel, setTimeout: fastTimeout, clearTimeout });
+  runInNewContext(readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8'), { self, URL, Date, Number, String, MessageChannel, setTimeout: fastTimeout, clearTimeout, indexedDB });
   const dispatch = async (type: string, event: Record<string, unknown>) => {
     let pending: Promise<unknown> = Promise.resolve();
     listeners[type]({ ...event, waitUntil: (promise: Promise<unknown>) => { pending = promise; } });
@@ -184,7 +224,7 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
 describe('push-only worker', () => {
   it('has no fetch handler and uses no CacheStorage', () => {
     const source = readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8');
-    expect(Object.keys(worker().listeners).sort()).toEqual(['activate', 'install', 'message', 'notificationclick', 'push']);
+    expect(Object.keys(worker().listeners).sort()).toEqual(['activate', 'install', 'notificationclick', 'push']);
     expect(source).not.toMatch(/caches\.|addEventListener\('fetch'/);
   });
 
@@ -220,37 +260,27 @@ describe('push-only worker', () => {
     expect(closed.opened).toEqual(['https://wudn9922.github.io/my-stock-screener/atlas/']);
   });
 
-  it('holds a tap in memory until the page pulls it once, and drops it after in-page routing', async () => {
+  it('records the tap for the page unless the open window routed in place', async () => {
+    vi.resetModules();
+    const { takeRecordedTap } = await import('../src/push/pushConfig');
     const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
-    const pull = (sw: ReturnType<typeof worker>) => new Promise<unknown>((resolve) => {
-      const channel = new MessageChannel();
-      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value?.url ?? null); });
-      sw.listeners.message({ data: { type: 'atlas-push-pull' }, ports: [channel.port2] });
-    });
-    // No Atlas window listed (iOS may not list a resumed Home Screen app): open the URL and keep the tap.
-    const closed = worker();
-    const click = closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
-    expect(await pull(closed)).toBe(url);
-    expect(await pull(closed)).toBeNull();
-    await click;
+    // No Atlas window listed (iOS does not list a resumed Home Screen app): open the URL and keep the record.
+    const factory = new IDBFactory();
+    vi.stubGlobal('indexedDB', factory);
+    const closed = worker([], factory);
+    await closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
     expect(closed.opened).toEqual([url]);
-    // Temporary diagnostics: the reply carries the steps of the latest tap.
-    const trace = await new Promise<string[]>((resolve) => {
-      const channel = new MessageChannel();
-      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value.trace); });
-      closed.listeners.message({ data: { type: 'atlas-push-pull' }, ports: [channel.port2] });
-    });
-    for (const step of ['click', 'windows 0, atlas none', 'openWindow null', 'pulled']) {
-      expect(trace.some((line) => line.endsWith(step))).toBe(true);
-    }
-    closed.listeners.message({ data: { type: 'other' }, ports: [] });
+    expect(await takeRecordedTap()).toBe(url);
+    expect(await takeRecordedTap()).toBeNull();
 
-    // The open window acknowledged the in-page route: nothing is left to pull.
+    // The open window acknowledged the in-page route: nothing is left for the page to take again.
+    const routedFactory = new IDBFactory();
+    vi.stubGlobal('indexedDB', routedFactory);
     const routed = worker([{
       url: 'https://wudn9922.github.io/my-stock-screener/atlas/', focus: vi.fn(async () => undefined),
-      postMessage: (_m, [port]) => { port.postMessage(url); port.close(); } }]);
+      postMessage: (_m, [port]) => { port.postMessage(url); port.close(); } }], routedFactory);
     await routed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
-    expect(await pull(routed)).toBeNull();
+    expect(await takeRecordedTap()).toBeNull();
   });
 
   it('still routes the open window in place when focusing it is refused', async () => {
