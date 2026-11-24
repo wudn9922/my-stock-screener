@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { transformSync } from 'esbuild';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as policy from '../../supabase/functions/_shared/storageAccess';
 import * as deviceSession from '../../supabase/functions/_shared/deviceSession';
 import * as lineIdToken from '../../supabase/functions/_shared/lineIdToken';
@@ -25,7 +25,7 @@ const ENV: Record<string, string> = {
 };
 
 /** An offline stand-in for public.atlas_web_push plus the storage-policy table and the push services. */
-function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string) => number); env?: Record<string, string> } = {}) {
+function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string) => number); reason?: (endpoint: string) => string; env?: Record<string, string> } = {}) {
   const env = { ...ENV, ...options.env };
   const devices: Row[] = [];
   const rpcCalls: { operation: string; account: string; payload: Row }[] = [];
@@ -62,7 +62,7 @@ function fixture(options: { grants?: Row[]; status?: number | ((endpoint: string
     }
     sent.push({ url, headers: init!.headers as Record<string, string>, body: new Uint8Array(init!.body as ArrayBuffer) });
     const status = typeof options.status === 'function' ? options.status(url) : options.status ?? 201;
-    return new Response(null, { status });
+    return new Response(status >= 400 && options.reason ? JSON.stringify({ reason: options.reason(url) }) : null, { status });
   };
   const deps: webPush.PushDeps = { db, env: (name) => env[name], fetch: pushFetch, now: () => 1_800_000_000_000 };
   let serve!: (request: Request) => Promise<Response>;
@@ -190,6 +190,45 @@ describe('push.notify server-to-server authentication', () => {
   it('answers 503 without sending when the VAPID secrets are missing', async () => {
     const offline = fixture({ grants: [{ line_user_id: A, storage_mode: 'cloud', label: '', updated_at: '2026-11-01T00:00:00Z' }], env: { WEB_PUSH_VAPID_PRIVATE_KEY: '' } });
     expect(await offline.request(notify(), bearer())).toMatchObject({ status: 503, body: { code: 'not_configured' } });
+  });
+});
+
+describe('push delivery', () => {
+  it('reuses the VAPID JWT across sends to the same service and refreshes it before expiry', async () => {
+    const offline = fixture({ env: { WEB_PUSH_SUBJECT: 'mailto:cache-test@example.invalid' } });
+    const message = { title: 'test', url: CHART, tag: 'test' };
+    offline.devices.push({ id: 'a1', account: A, endpoint: 'https://web.push.apple.com/QA', ...UA },
+      { id: 'a2', account: A, endpoint: 'https://web.push.apple.com/QB', ...UA },
+      { id: 'g1', account: A, endpoint: 'https://fcm.googleapis.com/fcm/send/QC', ...UA });
+    let now = 1_800_000_000_000;
+    offline.deps.now = () => now;
+    const send = () => webPush.sendToUser(offline.deps, A, message);
+    await Promise.all([send(), send()]);
+    const appleTokens = () => offline.sent.filter(entry => entry.url.includes('push.apple.com')).map(entry => entry.headers.Authorization);
+    const initial = appleTokens()[0];
+    expect(appleTokens()).toEqual(Array(4).fill(initial));
+    expect(offline.sent.find(entry => entry.url.includes('googleapis'))?.headers.Authorization).not.toBe(initial);
+    now += 30 * 60 * 1000;
+    await send();
+    expect(appleTokens().at(-1)).toBe(initial);
+    now += 11 * 3600 * 1000;
+    await send();
+    expect(appleTokens().at(-1)).not.toBe(initial);
+    expect(appleTokens().at(-2)).toBe(appleTokens().at(-1));
+  });
+
+  it('logs a known Apple rejection reason without copying response text or subscription URLs', async () => {
+    const offline = fixture({ status: 400, reason: endpoint => endpoint.endsWith('QA') ? 'BadJwtToken' : endpoint });
+    offline.devices.push({ id: 'a1', account: A, endpoint: 'https://web.push.apple.com/QA', ...UA },
+      { id: 'a2', account: A, endpoint: 'https://web.push.apple.com/QB', ...UA });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(webPush.sendToUser(offline.deps, A, { title: 'test', url: CHART, tag: 'test' }))
+        .resolves.toEqual({ devices: 2, sent: 0, removed: 0, failed: 2 });
+      expect(error).toHaveBeenCalledWith('Web push delivery failed', 400, 'BadJwtToken');
+      expect(error).toHaveBeenCalledWith('Web push delivery failed', 400);
+      expect(JSON.stringify(error.mock.calls)).not.toContain('push.apple.com');
+    } finally { error.mockRestore(); }
   });
 });
 

@@ -1,3 +1,6 @@
+## 2026-11-24 Alert delivery and stock links
+Primary self-review of VAPID token reuse, notification navigation fallback, and Discord stock links.
+
 ## 2026-11-23 Drawing loupe and financials header
 Primary self-review of touch placement, endpoint editing, and the shared stock header layout.
 
