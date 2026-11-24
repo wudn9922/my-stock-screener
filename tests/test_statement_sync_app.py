@@ -103,6 +103,17 @@ class IngestTests(unittest.TestCase):
         result = self.post(report(rows=(broken, MMS), subtotal="429.79"), Failing()).get_json()
         self.assertEqual((result["code"], result["done"]), ("unrecognized", False))
 
+    def test_unknown_report_from_a_broker_is_kept_pending_with_its_layout(self):
+        fake = FakeRepository()
+        result = self.post(report(extra_section="國內股票交易明細 Domestic"), fake).get_json()  # 國泰台股: no parser yet
+        self.assertEqual((result["code"], result["done"]), ("unsupported", False))
+        self.assertEqual(fake.layouts[-1]["code"], "unsupported")
+        other = sinopac_report()  # stands in for a broker PDF that is not a known report
+        with patch.object(service, "parse_pages", side_effect=service.StatementError("not-statement")):
+            result = self.post(other, fake, message="msg-9").get_json()
+        self.assertEqual((result["code"], result["done"]), ("unsupported", False))
+        self.assertEqual(fake.messages[-1]["broker"], "sinopac")
+
     def test_sinopac_inventory_that_cannot_be_read_is_partial_and_retried(self):
         fake = FakeRepository()
         result = self.post(sinopac_report(stocks=()), fake).get_json()
