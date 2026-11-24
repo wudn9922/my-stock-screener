@@ -119,6 +119,43 @@ it('checks the push worker for updates again when a resumed app returns to the f
   vi.useRealTimers();
 });
 
+it('pulls a tap held by the push worker at startup and when the app returns to the foreground', async () => {
+  vi.stubEnv('VITE_WEB_PUSH_PUBLIC_KEY', KEY);
+  vi.resetModules();
+  const { startPushNavigation, pushScript } = await import('../src/push/pushConfig');
+  const location = new URL('https://atlas.example/?page=markets');
+  vi.stubGlobal('location', location);
+  const url = 'https://atlas.example/?page=chart&tf=1D&symbol=2330.TW';
+  let reply: unknown = url;
+  const pulls: unknown[] = [];
+  const active = { scriptURL: pushScript(), postMessage: (message: unknown, [port]: MessagePort[]) => { pulls.push(message); port.postMessage(reply); } };
+  const history = { pushState: vi.fn((_state: unknown, _title: string, href: string) => { location.href = href; }) };
+  vi.stubGlobal('history', history);
+  vi.stubGlobal('PopStateEvent', Event);
+  vi.stubGlobal('dispatchEvent', vi.fn());
+  vi.stubGlobal('navigator', { serviceWorker: Object.assign(new EventTarget(), { getRegistration: async () => ({ active, update: async () => {} }) }) });
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  vi.stubGlobal('document', doc);
+  const ready = startPushNavigation();
+  ready();
+  await vi.waitFor(() => expect(history.pushState).toHaveBeenCalledWith(null, '', url));
+  expect(pulls[0]).toEqual({ type: 'atlas-push-pull' });
+
+  // A later pull for the same chart (parameters reordered) adds no history entry; a new tap routes again.
+  reply = 'https://atlas.example/?symbol=2330.TW&page=chart&tf=1D';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await vi.waitFor(() => expect(pulls.length).toBeGreaterThanOrEqual(2));
+  expect(history.pushState).toHaveBeenCalledTimes(1);
+  reply = 'https://atlas.example/?page=chart&tf=1W&symbol=NVDA';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await vi.waitFor(() => expect(history.pushState).toHaveBeenLastCalledWith(null, '', reply));
+  reply = 'https://evil.example/?page=chart';
+  const before = history.pushState.mock.calls.length;
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  expect(history.pushState).toHaveBeenCalledTimes(before);
+});
+
 /** Run public/push-sw.js against a fake worker global. */
 function worker(windows: { url: string; focus?: () => Promise<unknown>; postMessage?: (m: unknown, ports: MessagePort[]) => void; navigate?: (url: string) => Promise<unknown> }[] = []) {
   const listeners: Record<string, (event: unknown) => void> = {};
@@ -133,7 +170,9 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
     skipWaiting: () => {},
     addEventListener: (type: string, listener: (event: unknown) => void) => { listeners[type] = listener; },
   };
-  runInNewContext(readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8'), { self, URL, Date, Number, String, MessageChannel, setTimeout, clearTimeout });
+  // The worker waits up to 30 s for the page to pull a tap; keep the fake worker's timers short.
+  const fastTimeout = (callback: () => void, ms: number) => setTimeout(callback, Math.min(ms, 20));
+  runInNewContext(readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8'), { self, URL, Date, Number, String, MessageChannel, setTimeout: fastTimeout, clearTimeout });
   const dispatch = async (type: string, event: Record<string, unknown>) => {
     let pending: Promise<unknown> = Promise.resolve();
     listeners[type]({ ...event, waitUntil: (promise: Promise<unknown>) => { pending = promise; } });
@@ -145,7 +184,7 @@ function worker(windows: { url: string; focus?: () => Promise<unknown>; postMess
 describe('push-only worker', () => {
   it('has no fetch handler and uses no CacheStorage', () => {
     const source = readFileSync(new URL('../public/push-sw.js', import.meta.url), 'utf8');
-    expect(Object.keys(worker().listeners).sort()).toEqual(['activate', 'install', 'notificationclick', 'push']);
+    expect(Object.keys(worker().listeners).sort()).toEqual(['activate', 'install', 'message', 'notificationclick', 'push']);
     expect(source).not.toMatch(/caches\.|addEventListener\('fetch'/);
   });
 
@@ -179,6 +218,30 @@ describe('push-only worker', () => {
     const closed = worker();
     await closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url: 'javascript:alert(1)' } } });
     expect(closed.opened).toEqual(['https://wudn9922.github.io/my-stock-screener/atlas/']);
+  });
+
+  it('holds a tap in memory until the page pulls it once, and drops it after in-page routing', async () => {
+    const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
+    const pull = (sw: ReturnType<typeof worker>) => new Promise<unknown>((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value); });
+      sw.listeners.message({ data: { type: 'atlas-push-pull' }, ports: [channel.port2] });
+    });
+    // No Atlas window listed (iOS may not list a resumed Home Screen app): open the URL and keep the tap.
+    const closed = worker();
+    const click = closed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
+    expect(await pull(closed)).toBe(url);
+    expect(await pull(closed)).toBeNull();
+    await click;
+    expect(closed.opened).toEqual([url]);
+    closed.listeners.message({ data: { type: 'other' }, ports: [] });
+
+    // The open window acknowledged the in-page route: nothing is left to pull.
+    const routed = worker([{
+      url: 'https://wudn9922.github.io/my-stock-screener/atlas/', focus: vi.fn(async () => undefined),
+      postMessage: (_m, [port]) => { port.postMessage(url); port.close(); } }]);
+    await routed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
+    expect(await pull(routed)).toBeNull();
   });
 
   it('still routes the open window in place when focusing it is refused', async () => {
