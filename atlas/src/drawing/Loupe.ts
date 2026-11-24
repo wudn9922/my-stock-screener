@@ -6,6 +6,7 @@ import './loupe.css';
 const width = 112;
 const height = 78;
 const zoom = 2.75;
+const verticalInset = 8;
 
 /** DOM overlay is transient. Its centre is the post-magnet anchor, exactly as committed. */
 export class Loupe {
@@ -43,6 +44,9 @@ export class Loupe {
     }
     this.canvas.style.display = 'block';
     this.canvas.dataset.corner = scene.pointer.x < this.projection.width() / 2 ? 'right' : 'left';
+    const paneHeight = this.projection.height();
+    const top = scene.pointer.y < paneHeight / 2 ? Math.max(verticalInset, paneHeight - height - verticalInset) : verticalInset;
+    this.canvas.style.top = `${top}px`;
     const ctx = this.canvas.getContext('2d')!;
     // Public screenshot API; runs once per interaction RAF, never per raw pointer event.
     const snapshot = this.chart.takeScreenshot(true, true),

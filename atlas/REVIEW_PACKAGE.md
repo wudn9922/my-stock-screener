@@ -1,3 +1,6 @@
+## 2026-11-24 Chart loupe and opening quote
+Primary self-review. 85 related Vitest cases, 9 mobile Playwright regressions, lint and build passed.
+
 ## 2026-11-24 Alert delivery and stock links
 Primary self-review of VAPID token reuse, notification navigation fallback, and Discord stock links.
 
