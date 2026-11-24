@@ -45,6 +45,19 @@ self.addEventListener('push', (event) => {
   }));
 });
 
+function routeInWindow(client, url) {
+  const channel = new MessageChannel();
+  let timer;
+  return new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), 750);
+    channel.port1.onmessage = (event) => resolve(event.data === url);
+    client.postMessage({ type: 'atlas-push-open', url }, [channel.port2]);
+  }).finally(() => {
+    clearTimeout(timer);
+    channel.port1.close();
+  });
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = atlasURL(event.notification.data && event.notification.data.url);
@@ -54,14 +67,18 @@ self.addEventListener('notificationclick', (event) => {
       try { return new URL(client.url).pathname.startsWith(atlasRoot.pathname); } catch { return false; }
     });
     if (open) {
-      // This worker does not control Atlas pages, so the page itself routes to the chart.
+      // Prefer in-page routing to keep the active Atlas session and workspace.
       try {
         const focused = await open.focus();
-        (focused || open).postMessage({ type: 'atlas-push-open', url });
-        return;
-      } catch {
-        // A window that cannot be focused: open a fresh one below.
-      }
+        if (await routeInWindow(focused || open, url)) return;
+      } catch { /* Fall back to navigation with the actual stock URL. */ }
+      try {
+        const navigated = await open.navigate(url);
+        if (navigated) {
+          await navigated.focus();
+          return;
+        }
+      } catch { /* The original window may already have closed. */ }
     }
     await self.clients.openWindow(url);
   })());

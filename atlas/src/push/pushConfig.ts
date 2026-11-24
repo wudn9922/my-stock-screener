@@ -11,19 +11,33 @@ const base = () => new URL(import.meta.env?.BASE_URL || '/', location.origin);
 export const pushScope = () => new URL('push/', base()).href;
 export const pushScript = () => new URL('push-sw.js', base()).href;
 
-/** Notification taps focus an open Atlas window; the push worker asks it to open the chart. */
+/** Capture taps at startup and defer URL changes until LINE has consumed any OAuth return. */
 export function startPushNavigation() {
-  if (!webPushEnabled() || !('serviceWorker' in navigator)) return;
+  if (!webPushEnabled() || !('serviceWorker' in navigator)) return () => {};
   const root = base();
+  const script = pushScript();
+  let ready = false;
+  let pending: URL | null = null;
+  const open = (url: URL) => {
+    if (location.href === url.href) return;
+    history.pushState(null, '', url.href);
+    dispatchEvent(new PopStateEvent('popstate'));
+  };
   navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
     const source = event.source as ServiceWorker | null;
     const data = event.data as { type?: string; url?: string } | null;
-    if (data?.type !== 'atlas-push-open' || !source?.scriptURL?.endsWith('/push-sw.js')) return;
+    if (data?.type !== 'atlas-push-open' || typeof data.url !== 'string' || source?.scriptURL !== script) return;
     let url: URL;
-    try { url = new URL(String(data.url), root); } catch { return; }
+    try { url = new URL(data.url, root); } catch { return; }
     if (url.origin !== root.origin || !url.pathname.startsWith(root.pathname)) return;
-    history.pushState(null, '', url.href);
-    dispatchEvent(new PopStateEvent('popstate'));
+    if (ready) open(url);
+    else pending = url;
+    event.ports[0]?.postMessage(url.href);
   });
   navigator.serviceWorker.startMessages?.();
+  return () => {
+    ready = true;
+    if (pending) open(pending);
+    pending = null;
+  };
 }

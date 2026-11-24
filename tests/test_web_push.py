@@ -145,6 +145,14 @@ class WebPushTests(unittest.TestCase):
         self.assertEqual(line["url"], "https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=4H&symbol=NVDA")
         self.assertEqual(line["tag"], "NVDA:line")
 
+    def test_no_device_delivery_is_a_failure_even_with_http_200(self):
+        for devices in (0, 1):
+            session = FakeSession(response=FakeResponse(200, {"ok": True, "data": {"devices": devices, "sent": 0}}))
+            client = WebPushClient(ENV["WEB_PUSH_NOTIFY_URL"], SECRET, session=session)
+            sent, output = self.quiet(client.notify, USER, breakout_message(**BREAKOUT))
+            self.assertFalse(sent)
+            self.assertIn(f"手機通知失敗：0/{devices}", output)
+
     def test_drawing_alert_hook_pushes_each_sent_line(self):
         session = FakeSession()
         notifier = PushingNotifier(FakeDiscord(), WebPushClient(ENV["WEB_PUSH_NOTIFY_URL"], SECRET, session=session), USER)

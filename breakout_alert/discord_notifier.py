@@ -217,7 +217,8 @@ class DiscordNotifier:
             "content": append_atlas_link(
                 content,
                 ticker,
-                1950
+                1950,
+                with_line=True,
             ),
             "allowed_mentions": {
                 "parse": []

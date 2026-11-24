@@ -355,7 +355,8 @@ class MessageFormatTest(unittest.TestCase):
             "🚨 向上突破 箱頂 1,085.00｜現價 1,092.00（+0.65%）\n"
             "週期 1D・矩形上緣｜確認：連續 2 次\n"
             "上方最近畫線 1,120.00（+2.6%）｜下方 1,040.00（−4.8%）\n"
-            "<https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW>",
+            "[在 LINE 開啟 Atlas](<https://liff.line.me/2010330411-6JhrotT9/atlas/?page=chart&tf=1D&symbol=2330.TW>) · "
+            "[開啟 Atlas 圖表](<https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW>)",
         )
 
     def test_down_message_without_neighbours(self):
@@ -371,7 +372,8 @@ class MessageFormatTest(unittest.TestCase):
             "⚠️ 向下跌破 水平射線 480.50｜現價 470.00（−2.19%）\n"
             "週期 1W・水平射線｜確認：連續 2 次\n"
             "上方最近畫線 無｜下方 無\n"
-            "<https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1W&symbol=BRK.B>",
+            "[在 LINE 開啟 Atlas](<https://liff.line.me/2010330411-6JhrotT9/atlas/?page=chart&tf=1W&symbol=BRK.B>) · "
+            "[開啟 Atlas 圖表](<https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1W&symbol=BRK.B>)",
         )
 
     def test_packing(self):
