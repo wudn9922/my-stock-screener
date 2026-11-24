@@ -224,7 +224,7 @@ describe('push-only worker', () => {
     const url = 'https://wudn9922.github.io/my-stock-screener/atlas/?page=chart&tf=1D&symbol=2330.TW';
     const pull = (sw: ReturnType<typeof worker>) => new Promise<unknown>((resolve) => {
       const channel = new MessageChannel();
-      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value); });
+      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value?.url ?? null); });
       sw.listeners.message({ data: { type: 'atlas-push-pull' }, ports: [channel.port2] });
     });
     // No Atlas window listed (iOS may not list a resumed Home Screen app): open the URL and keep the tap.
@@ -234,6 +234,15 @@ describe('push-only worker', () => {
     expect(await pull(closed)).toBeNull();
     await click;
     expect(closed.opened).toEqual([url]);
+    // Temporary diagnostics: the reply carries the steps of the latest tap.
+    const trace = await new Promise<string[]>((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.on('message', (value) => { channel.port1.close(); resolve(value.trace); });
+      closed.listeners.message({ data: { type: 'atlas-push-pull' }, ports: [channel.port2] });
+    });
+    for (const step of ['click', 'windows 0, atlas none', 'openWindow null', 'pulled']) {
+      expect(trace.some((line) => line.endsWith(step))).toBe(true);
+    }
     closed.listeners.message({ data: { type: 'other' }, ports: [] });
 
     // The open window acknowledged the in-page route: nothing is left to pull.

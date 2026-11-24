@@ -51,12 +51,17 @@ self.addEventListener('push', (event) => {
 const PENDING_TAP_MS = 60 * 1000;
 const HOLD_TAP_MS = 30 * 1000;
 let pendingTap = null;
+// TEMPORARY tap diagnostics (iPhone background tap investigation): steps of the latest tap, sent with each pull.
+let tapTrace = [];
+const trace = (step) => { tapTrace.push(`${((Date.now() - (tapTrace.at || Date.now())) / 1000).toFixed(1)}s ${step}`); };
 
 function rememberTap(url) {
   if (pendingTap) pendingTap.release();
   let release;
   const taken = new Promise((resolve) => { release = resolve; });
   pendingTap = { url, at: Date.now(), release };
+  tapTrace = [];
+  tapTrace.at = Date.now();
   return taken;
 }
 
@@ -72,7 +77,9 @@ self.addEventListener('message', (event) => {
   const data = event.data;
   const port = event.ports && event.ports[0];
   if (!data || data.type !== 'atlas-push-pull' || !port) return;
-  port.postMessage(takeTap());
+  const url = takeTap();
+  if (url) trace('pulled');
+  port.postMessage({ url, trace: tapTrace.slice() });
 });
 
 function routeInWindow(client, url) {
@@ -93,18 +100,21 @@ self.addEventListener('notificationclick', (event) => {
   const url = atlasURL(event.notification.data && event.notification.data.url);
   const taken = rememberTap(url);
   event.waitUntil((async () => {
+    trace('click');
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const open = windows.find((client) => {
       try { return new URL(client.url).pathname.startsWith(atlasRoot.pathname); } catch { return false; }
     });
+    trace(`windows ${windows.length}, atlas ${open ? 'found' : 'none'}`);
     if (open) {
       // Prefer in-page routing to keep the active Atlas session and workspace. Focus can be refused
       // (iOS Home Screen apps), so route the window whether or not focusing it worked.
       let target = open;
-      try { target = (await open.focus()) || open; } catch { /* Route the unfocused window below. */ }
+      try { target = (await open.focus()) || open; trace('focus ok'); } catch (error) { trace(`focus failed ${error && error.name}`); }
       try {
-        if (await routeInWindow(target, url)) { takeTap(); return; }
-      } catch { /* Fall back to navigation with the actual stock URL. */ }
+        if (await routeInWindow(target, url)) { trace('page acknowledged'); takeTap(); return; }
+        trace('no page acknowledgement');
+      } catch (error) { trace(`message failed ${error && error.name}`); }
       try {
         const navigated = await open.navigate(url);
         if (navigated) {
@@ -112,12 +122,16 @@ self.addEventListener('notificationclick', (event) => {
           await navigated.focus();
           return;
         }
-      } catch { /* The original window may already have closed. */ }
+      } catch (error) { trace(`navigate failed ${error && error.name}`); }
     }
-    await self.clients.openWindow(url).catch(() => null);
+    try {
+      const opened = await self.clients.openWindow(url);
+      trace(`openWindow ${opened ? 'client' : 'null'}`);
+    } catch (error) { trace(`openWindow failed ${error && error.name}`); }
     // Stay alive until the page pulls the tap (or give up): an opened or resumed window asks on start/foreground.
     let timer;
-    await Promise.race([taken, new Promise((resolve) => { timer = setTimeout(resolve, HOLD_TAP_MS); })]);
+    const pulled = await Promise.race([taken.then(() => true), new Promise((resolve) => { timer = setTimeout(() => resolve(false), HOLD_TAP_MS); })]);
     clearTimeout(timer);
+    if (!pulled) trace('hold expired without a pull');
   })());
 });
