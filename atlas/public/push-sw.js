@@ -126,10 +126,12 @@ self.addEventListener('notificationclick', (event) => {
       try {
         if (await routeInWindow(target, url)) { await clearTap(); return; }
       } catch { /* Fall back to navigation with the actual stock URL. */ }
+      // Keep the tap record after navigate(): iOS can still list a Home Screen app the user just left and
+      // resolve navigate() without moving it, so only an acknowledged in-page route clears the record. A page
+      // that did navigate takes the record at startup for the URL it already shows, which changes nothing.
       try {
         const navigated = await open.navigate(url);
         if (navigated) {
-          await clearTap();
           await navigated.focus();
           return;
         }
