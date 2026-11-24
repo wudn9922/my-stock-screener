@@ -132,7 +132,7 @@ describe('LiveQuoteFeed', () => {
   function setup(inSession = true) {
     let now = Date.UTC(2026, 10, 3, 16);
     const urls: string[] = [];
-    let respond: (symbols: string[]) => Response = (symbols) =>
+    let respond: (symbols: string[]) => Response | Promise<Response> = (symbols) =>
       Response.json({ results: Object.fromEntries(symbols.map((s) => [s, yahooPayload(s, days, [10, 11, 12 + urls.length])])), errors: {} });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
@@ -174,6 +174,43 @@ describe('LiveQuoteFeed', () => {
     await advance(300);
     await advance(LIVE_INTERVAL_MS * 3);
     expect(urls).toHaveLength(1);
+  });
+
+  it('refreshes an older watchlist quote on chart entry without replaying it first', async () => {
+    const { feed, urls, advance } = setup();
+    const stopWatching = feed.subscribe('AAPL', () => undefined);
+    await advance(300);
+    await advance(25_000);
+    const prices: number[] = [];
+    const close = feed.subscribe('AAPL', value => prices.push(value.bars.at(-1)!.close), { freshOnSubscribe: true });
+    await advance(300);
+    expect(urls).toHaveLength(2);
+    expect(prices).toEqual([14]);
+    close();
+    stopWatching();
+  });
+
+  it('fetches a chart opened during another batch without waiting for the next minute', async () => {
+    const { feed, urls, advance, setResponse } = setup();
+    let release!: () => void;
+    const first = new Promise<void>(resolve => { release = resolve; });
+    setResponse(async (symbols) => {
+      if (symbols.includes('AAPL')) await first;
+      return Response.json({ results: Object.fromEntries(symbols.map(s => [s, yahooPayload(s, days, [10, 11, 12])])) });
+    });
+    const stopFirst = feed.subscribe('AAPL', () => undefined);
+    await advance(300);
+    const received = vi.fn();
+    const close = feed.subscribe('MSFT', received, { freshOnSubscribe: true });
+    await advance(300);
+    expect(urls).toHaveLength(1);
+    release();
+    await advance(0);
+    await advance(300);
+    expect(urls).toHaveLength(2);
+    expect(received).toHaveBeenCalledTimes(1);
+    close();
+    stopFirst();
   });
 
   it('backs off on rate limiting or failures and recovers after a success', async () => {

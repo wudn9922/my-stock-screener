@@ -84,7 +84,7 @@ import { sameTimeVolume } from '../market-data/SameTimeVolume';
 import { intradayIndexVolume, todayVolumeMissing, withIntradayIndexVolume } from '../market-data/IntradayVolume';
 import { useIntradayVolumeBars } from '../ui/useIntradayVolumeBars';
 import { SameTimeVolumeChip } from '../ui/SameTimeVolumeChip';
-import { EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
+import { defaultMarketProxyUrl, EDGE_YAHOO_SOURCE } from '../market-data/EdgeYahooProvider';
 import { archiveUnavailableSource, mergeArchivedLive } from '../market-data/ArchiveFirstProvider';
 import { subscribeWatchlistQuotes } from '../market-data/watchlistQuotes';
 import { getWatchlistDailyResult } from './dataSources';
@@ -108,7 +108,7 @@ import { worldAssetFor } from '../market-data/worldAssets';
 import type { LocalSymbol } from '../ui/SymbolSearch';
 import '../ui/stockHeader.css';
 import '../ui/workspace.css';
-import { isMarketLoginRequired } from '../market-data/marketProxyAccess';
+import { isMarketLoginRequired, marketProxyAccess } from '../market-data/marketProxyAccess';
 import { MarketLoginPrompt } from '../ui/MarketLogin';
 import { ListPicker } from '../ui/ListPicker';
 import { symbolInAnyList } from '../lists/unifiedLists';
@@ -616,6 +616,19 @@ export function App({
     return () => abort.abort();
   }, [state.ready, symbol, providerId, reloadToken]);
   // Live refresh of the open chart: a fresh price right away, then once a minute during the session.
+  // Taiwan's quote can arrive before archive history, and is independent of the selected bar interval.
+  const quoteAccess = useSyncExternalStore(marketProxyAccess.subscribe, marketProxyAccess.getSnapshot);
+  const useTaiwanQuoteFeed = active && state.ready && providerId === 'market' && !!defaultMarketProxyUrl()
+    && getMarketProfile(symbol).market === 'TW' && isLiveSymbol(symbol);
+  const [taiwanQuote, setTaiwanQuote] = useState<{ symbol: string; quote?: Quote } | null>(null);
+  useEffect(() => {
+    if (!useTaiwanQuoteFeed || quoteAccess.status !== 'ready') return;
+    setTaiwanQuote(null);
+    return liveQuotes().subscribe(symbol, ({ quote }) => setTaiwanQuote({ symbol, quote }), {
+      freshOnSubscribe: true,
+      onError: () => setTaiwanQuote({ symbol }),
+    });
+  }, [symbol, useTaiwanQuoteFeed, quoteAccess.status]);
   // When the open chart last received live data (shown next to the header price).
   const [liveAt, setLiveAt] = useState<{ key: string; at: number } | null>(null);
   const liveKey = `${symbol}:${tf}:${providerId}`;
@@ -735,12 +748,18 @@ export function App({
     liveState.current.result = next;
     setResult(next);
   }, [indexVolume, symbol, tf]);
-  const headerQuote =
+  const fallbackQuote =
     quote && quote.symbol === symbol && quote.provider === providerId
       ? quote.quote
       : result?.quote && result.quote.symbol === symbol
         ? result.quote
         : null;
+  const entryQuote = useTaiwanQuoteFeed && quoteAccess.status === 'ready' && taiwanQuote?.symbol === symbol ? taiwanQuote : null;
+  const loadingTaiwanQuote = useTaiwanQuoteFeed && (quoteAccess.status === 'pending' || quoteAccess.status === 'ready')
+    && !entryQuote && fallbackQuote?.dataState !== 'live' && inRegularSession(getMarketProfile(symbol), Date.now(), 0);
+  const headerQuote = loadingTaiwanQuote ? null : entryQuote?.quote ?? fallbackQuote;
+  const headerQuoteReceivedAt = entryQuote?.quote?.retrievedAt ? entryQuote.quote.retrievedAt * 1000
+    : liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined;
   const headerPrice = headerQuote?.price ?? null;
   const [extendedDetails, setExtendedDetails] = useState<{ symbol: string; open: boolean }>();
   const extendedOpen = extendedDetails?.symbol === symbol && extendedDetails.open;
@@ -1255,6 +1274,9 @@ export function App({
   const compactTicker = ticker.startsWith(displayTicker(symbol)) ? displayTicker(symbol) : ticker;
   const dataStateLabel = providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲';
   const dataStateBadge = <span className={`demo-badge ${providerId}`} data-testid="chart-data-state">{dataStateLabel}</span>;
+  const compactQuoteState = headerQuote?.dataState === 'live' ? '即時' : entryQuote?.quote ? '延遲' : dataStateLabel;
+  const compactQuoteBadge = loadingTaiwanQuote ? '報價載入中…'
+    : <><span className={`demo-badge ${providerId}`} data-testid="chart-data-state">{compactQuoteState}</span>報價</>;
   const chartStatus = (idle: boolean) => (
     <div className={`chart-status ${idle ? 'chart-status-idle' : 'ws-more-status'}`}>
       <span aria-hidden="true" />
@@ -1292,7 +1314,7 @@ export function App({
   };
   // Phone and tablet (≤1099px): one title row, the price row and the K線｜財務｜價量｜研究 tabs; everything the
   // desktop header shows beside them opens from the 更多 (⋯) menu.
-  const compactLiveStatus = !asset && headerQuote ? quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined) : null;
+  const compactLiveStatus = !asset && headerQuote ? quoteStatus(symbol, headerQuote, headerQuoteReceivedAt) : null;
   // The data-state word already leads the line, so it shows the short form (「更新於 12:20:31」, 「11/13 收盤」);
   // the full status stays in the document for assistive tech.
   const compactLiveShort = compactLiveStatus
@@ -1399,7 +1421,7 @@ export function App({
             <small className={asset ? 'ws-quote-unit' : 'ws-quote-unit sr-only'}>{asset?.unit ?? market.currency}</small>
           </div>
           <div className="ws-price-meta">
-            <span className="ws-meta-item">{dataStateBadge}報價</span>
+            <span className="ws-meta-item">{compactQuoteBadge}</span>
             {compactLiveStatus !== null && (
               <span className="ws-meta-item">
                 <small className="ws-live-time sr-only" data-testid="live-time">{compactLiveStatus}</small>
@@ -1470,7 +1492,8 @@ export function App({
             {headerQuote ? ` (${formatPercent(headerQuote.changePercent)})` : ''}
           </span>
           <small>{asset?.unit ?? market.currency}</small>
-          {!asset && headerQuote && <small className="ws-live-time" data-testid="live-time">{quoteStatus(symbol, headerQuote, liveAt?.key === liveKey ? liveAt.at : result?.asOf ? result.asOf * 1000 : undefined)}</small>}
+          {loadingTaiwanQuote && <small className="ws-live-time">報價載入中…</small>}
+          {!asset && headerQuote && <small className="ws-live-time" data-testid="live-time">{quoteStatus(symbol, headerQuote, headerQuoteReceivedAt)}</small>}
         </div>
         {market.market === 'US' && !isIndex && !asset && providerId !== 'demo' && <ExtendedQuoteLine symbol={symbol} quote={headerQuote} expanded={extendedOpen} onToggle={() => setExtendedDetails({ symbol, open: !extendedOpen })} />}
         </div>
