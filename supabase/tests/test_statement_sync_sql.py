@@ -138,6 +138,10 @@ class StatementSyncSqlTests(_PostgresFixture):
         self.assertEqual(float(rows["2308.TW"]["averageCost"]), 0)
         self.assertAlmostEqual(float(rows["2330.TW"]["averageCost"]), 50000 / 110, places=10)
         self.assertEqual((rows["2330.TW"]["id"], rows["2330.TW"]["source"]), (manual["id"], "manual"))
+        # An empty snapshot (nothing could be read) changes nothing.
+        self.snapshot("2026-11-24", {})
+        self.assertEqual(self.apply(**tw)["status"], "ok")
+        self.assertEqual(len(self.current()[1]), 3)
         # A late, re-sent older report is already reflected in the newer snapshot.
         self.trade("2026-11-20:Y-1:1", "buy", 1000, 10, 10020, day="2026-11-20", symbol="2884.TW", **tw)
         self.snapshot("2026-11-20", {"2884.TW": "1000"})

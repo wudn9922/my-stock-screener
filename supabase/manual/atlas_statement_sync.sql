@@ -138,7 +138,8 @@ begin
   loop
     if event.kind = 1 then
       snapshots := snapshots || event.day;
-      continue when baseline is not null and event.day <= baseline;
+      -- An empty list is never read as "sold everything".
+      continue when (baseline is not null and event.day <= baseline) or event.positions = '{}'::jsonb;
       baseline := event.day;
       -- Quantities follow the broker; the total cost of a held symbol stays (so a stock dividend
       -- lowers the average). A symbol with no known cost gets 0 and is reported as missingCost.
