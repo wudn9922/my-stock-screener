@@ -19,7 +19,7 @@ import time
 
 from flask import Flask, jsonify, request
 
-from .parser import SENDER_DOMAINS, StatementError, mask_layout, open_pages, parse_pages
+from .parser import SENDER_DOMAINS, StatementError, detect_broker, mask_layout, open_pages, parse_pages
 from .repository import Repository, RepositoryError
 
 app = Flask(__name__)
@@ -91,13 +91,18 @@ def ingest():
             pages = open_pages(data, passwords)
             statement = parse_pages(pages, str(body.get("from") or ""))
         except StatementError as error:
-            code = "ignored" if error.code == "not-statement" else error.code
+            code, detail = ("ignored" if error.code == "not-statement" else error.code), error.detail
+            broker = detect_broker("\n".join(page[0] for page in pages), str(body.get("from") or "")) if pages else None
+            if code == "ignored" and broker:
+                # A broker's PDF we do not know yet (another report type or market): keep it pending
+                # with a masked layout, so a parser can be added and it is picked up on a later run.
+                code, detail = "unsupported", "report"
             done = code == "ignored"
-            repo.save_message(owner, message, broker=None, received_at=received, report_date=None,
-                              status=code, detail=error.detail, trades=0)
-            if code == "unrecognized" and pages:
-                save_layout(repo, owner, message, code, error.detail, pages)
-            return jsonify(code=code, detail=error.detail, done=done)
+            repo.save_message(owner, message, broker=broker, received_at=received, report_date=None,
+                              status=code, detail=detail, trades=0)
+            if code in ("unrecognized", "unsupported") and pages:
+                save_layout(repo, owner, message, code, detail, pages)
+            return jsonify(code=code, detail=detail, done=done)
         trades = len(statement.trades)
         repo.save_trades(owner, statement.broker, message, statement.trades)
         markets = {t.market for t in statement.trades}

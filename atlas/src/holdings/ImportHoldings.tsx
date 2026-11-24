@@ -14,7 +14,7 @@ import {
   type ImportTable,
   type PreviewRow,
 } from './import';
-import { HOLDINGS_LIMITS, type ColumnMapping, type Holding, type HoldingAccount } from './model';
+import { HOLDINGS_LIMITS, decimalText, type ColumnMapping, type Holding, type HoldingAccount } from './model';
 
 interface Props {
   account: HoldingAccount;
@@ -34,8 +34,8 @@ export function ImportHoldings({ account, directory, initial, onCancel, onSave }
           rows: initial.map((h, i) => ({
             line: i + 1,
             symbol: h.symbol,
-            quantity: h.quantity,
-            averageCost: h.averageCost,
+            quantity: decimalText(h.quantity),
+            averageCost: decimalText(h.averageCost),
             errors: [],
             skip: false,
           })),

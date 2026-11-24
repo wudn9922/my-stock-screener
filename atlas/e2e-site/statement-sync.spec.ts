@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
 import { accessEnvelope, installLineAccount, OWNER_USER_ID } from './account-fixture';
 
-async function ownerSite(page: Page, applyResult: Record<string, unknown>, options: { linkFailures?: number } = {}) {
+async function ownerSite(page: Page, applyResult: Record<string, unknown>, options: { linkFailures?: number; applied?: unknown[] } = {}) {
   let linkFailures = options.linkFailures ?? 0;
   await mockSite(page);
   await installLineAccount(page, OWNER_USER_ID);
@@ -27,6 +27,7 @@ async function ownerSite(page: Page, applyResult: Record<string, unknown>, optio
       return route.fulfill({ status: 503, json: { ok: false, error: '對帳單同步資料表尚未部署' } });
     }
     if (body.action === 'holdings.statement.link') {
+      if (options.applied) doc.accounts[0]!.holdings = options.applied.map((h) => ({ ...(h as object), accountId: body.accountId }));
       links.push({ accountId: body.accountId, broker: body.broker, market: body.market, pending: 0 });
       return route.fulfill({ json: { ok: true, data: applyResult } });
     }
@@ -46,7 +47,9 @@ async function ownerSite(page: Page, applyResult: Record<string, unknown>, optio
 }
 
 test('owner creates a Cathay US account linked to e-mail statements and sees its log', async ({ page }, info) => {
-  const { form, calls, panel } = await ownerSite(page, { status: 'ok', applied: 2 });
+  const { form, calls, panel } = await ownerSite(page, { status: 'ok', applied: 2 }, { applied: [{
+    id: '30000000-0000-4000-8000-000000000001', symbol: 'ZTS', market: 'US', quantity: '2.123456000000000000',
+    averageCost: '150.250000000000000000', costCurrency: 'USD', source: 'api', updatedAt: '2026-11-24T08:00:00Z' }] });
   await expect(form.getByRole('combobox', { name: '對帳單券商' }).getByRole('option', { name: /凱基/ })).toHaveAttribute('disabled', '');
   await form.getByRole('textbox', { name: '帳戶名稱' }).fill('國泰美股');
   await form.getByRole('button', { name: '建立並連結' }).click();
@@ -54,8 +57,13 @@ test('owner creates a Cathay US account linked to e-mail statements and sees its
   await expect(page.getByText('已建立並連結 Email 對帳單。已套用 2 筆成交。')).toBeVisible();
   await expect(panel.getByRole('list', { name: '最近處理的對帳單' })).toContainText('2026/11/19');
   await expect(panel).toContainText('PDF 密碼不正確');
+  // Quantities read from statements show two decimals; the correction form keeps the exact value.
+  await expect(page.getByRole('article', { name: 'ZTS 持股' })).toContainText('2.12 股');
   // Manual corrections stay available on a synced account.
   await expect(page.getByRole('button', { name: '修正持股', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '修正持股', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '第 1 列股數' })).toHaveValue('2.123456');
+  await expect(page.getByRole('textbox', { name: '第 1 列均價' })).toHaveValue('150.25');
   const actions = calls.map((c) => c.action);
   expect(actions.indexOf('holdings.replaceAccount')).toBeLessThan(actions.indexOf('holdings.statement.link'));
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);

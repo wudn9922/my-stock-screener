@@ -43,7 +43,9 @@ export function HoldingPosition({
   const quantity =
     holding.market === 'TW'
       ? decimalText(new Money(holding.quantity).div(1000)) + ' 張'
-      : holding.quantity + (holding.market === 'US' ? ' 股' : '');
+      : holding.market === 'US'
+        ? decimalText(new Money(holding.quantity).toDecimalPlaces(2)) + ' 股'
+        : decimalText(holding.quantity);
   return (
     <article className="holdings-position" aria-label={`${holding.symbol} 持股`}>
       <details>
