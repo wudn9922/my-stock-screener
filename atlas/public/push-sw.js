@@ -67,10 +67,12 @@ self.addEventListener('notificationclick', (event) => {
       try { return new URL(client.url).pathname.startsWith(atlasRoot.pathname); } catch { return false; }
     });
     if (open) {
-      // Prefer in-page routing to keep the active Atlas session and workspace.
+      // Prefer in-page routing to keep the active Atlas session and workspace. Focus can be refused
+      // (iOS Home Screen apps), so route the window whether or not focusing it worked.
+      let target = open;
+      try { target = (await open.focus()) || open; } catch { /* Route the unfocused window below. */ }
       try {
-        const focused = await open.focus();
-        if (await routeInWindow(focused || open, url)) return;
+        if (await routeInWindow(target, url)) return;
       } catch { /* Fall back to navigation with the actual stock URL. */ }
       try {
         const navigated = await open.navigate(url);
