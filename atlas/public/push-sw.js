@@ -45,6 +45,36 @@ self.addEventListener('push', (event) => {
   }));
 });
 
+// A tap is also kept in memory until the Atlas page asks for it. iOS resumes a backgrounded Home Screen app
+// without delivering a worker message sent while it was suspended (and may not list it as a client), so the
+// page pulls the tap when it returns to the foreground. Memory only: no storage outside the account policy.
+const PENDING_TAP_MS = 60 * 1000;
+const HOLD_TAP_MS = 30 * 1000;
+let pendingTap = null;
+
+function rememberTap(url) {
+  if (pendingTap) pendingTap.release();
+  let release;
+  const taken = new Promise((resolve) => { release = resolve; });
+  pendingTap = { url, at: Date.now(), release };
+  return taken;
+}
+
+function takeTap() {
+  const tap = pendingTap;
+  pendingTap = null;
+  if (!tap) return null;
+  tap.release();
+  return Date.now() - tap.at <= PENDING_TAP_MS ? tap.url : null;
+}
+
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  const port = event.ports && event.ports[0];
+  if (!data || data.type !== 'atlas-push-pull' || !port) return;
+  port.postMessage(takeTap());
+});
+
 function routeInWindow(client, url) {
   const channel = new MessageChannel();
   let timer;
@@ -61,6 +91,7 @@ function routeInWindow(client, url) {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = atlasURL(event.notification.data && event.notification.data.url);
+  const taken = rememberTap(url);
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const open = windows.find((client) => {
@@ -72,16 +103,21 @@ self.addEventListener('notificationclick', (event) => {
       let target = open;
       try { target = (await open.focus()) || open; } catch { /* Route the unfocused window below. */ }
       try {
-        if (await routeInWindow(target, url)) return;
+        if (await routeInWindow(target, url)) { takeTap(); return; }
       } catch { /* Fall back to navigation with the actual stock URL. */ }
       try {
         const navigated = await open.navigate(url);
         if (navigated) {
+          takeTap();
           await navigated.focus();
           return;
         }
       } catch { /* The original window may already have closed. */ }
     }
-    await self.clients.openWindow(url);
+    await self.clients.openWindow(url).catch(() => null);
+    // Stay alive until the page pulls the tap (or give up): an opened or resumed window asks on start/foreground.
+    let timer;
+    await Promise.race([taken, new Promise((resolve) => { timer = setTimeout(resolve, HOLD_TAP_MS); })]);
+    clearTimeout(timer);
   })());
 });
