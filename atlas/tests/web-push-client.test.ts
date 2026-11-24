@@ -424,6 +424,16 @@ describe('push-only worker', () => {
       postMessage: (_m, [port]) => { port.postMessage(url); port.close(); } }], routedFactory);
     await routed.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
     expect(await takeRecordedTap()).toBeNull();
+
+    // navigate() resolving is no proof the app moved (iOS lists a Home Screen app the user just left): keep the record.
+    const navigatedFactory = new IDBFactory();
+    vi.stubGlobal('indexedDB', navigatedFactory);
+    const navigated = worker([{
+      url: 'https://wudn9922.github.io/my-stock-screener/atlas/', focus: vi.fn(async () => undefined),
+      postMessage: (_m, [port]) => port.close(), navigate: async () => ({ focus: async () => undefined }) }], navigatedFactory);
+    await navigated.dispatch('notificationclick', { notification: { close: vi.fn(), data: { url } } });
+    expect(navigated.opened).toEqual([]);
+    expect(await takeRecordedTap()).toBe(url);
   });
 
   it('still routes the open window in place when focusing it is refused', async () => {
