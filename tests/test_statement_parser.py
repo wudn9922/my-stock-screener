@@ -1,8 +1,9 @@
 """Parser tests on synthetic PDFs laid out like 國泰「客戶日買賣報告書」(海外股票交易明細).
 
-The real report has two sub-rows per trade (currency/price/net over currency/rate/actual net) with
-the other cells vertically centred; the fixture reproduces that geometry. Names and amounts are
-invented.
+Geometry follows the real report: each trade is three text lines 24pt apart from the next trade —
+reference/product/currency/price/net on the first line, market/side/quantity/amount/fee/tax/date
+on the second, currency/rate/settled net on the third. What the client pays (a buy) is printed
+negative. Names and amounts are invented.
 """
 
 import io
@@ -28,7 +29,7 @@ COLUMNS = {"ref": 48, "product": 70, "market": 196, "type": 222, "ccy": 250, "qt
            "amount": 390, "fee": 430, "tax": 462, "net": 508, "date": 560}
 UHS = ("00007040", "UHS/Universal Health Servi", "美國", "賣出", "1.000000", "181.315200000", "181.320000", "0.15", "0.01", "181.16", "181.16")
 MMS = ("00008934", "MMS/Maximus Inc", "美國", "賣出", "4.000000", "62.159200000", "248.640000", "0.20", "0.01", "248.43", "248.43")
-BUY = ("00009001", "BRK.B/Berkshire Hathaway ETF", "美國", "買進", "2.000000", "100.000000000", "200.000000", "0.30", "0.00", "200.30", "200.30")
+BUY = ("00009001", "BRK.B/Berkshire Hathaway ETF", "美國", "買進", "2.000000", "100.000000000", "200.000000", "0.30", "0.00", "-200.30", "-200.30")
 
 
 def report(rows=(UHS, MMS), subtotal="429.59", extra_section=None, password="A123456789"):
@@ -46,16 +47,17 @@ def report(rows=(UHS, MMS), subtotal="429.59", extra_section=None, password="A12
     for key, label in (("ref", "交易序號"), ("product", "商品代號/名稱"), ("qty", "股數"), ("net", "應收付"), ("date", "交割日")):
         pdf.drawString(COLUMNS[key] - 10, y, label)
     y -= 30
-    pdf.setFont("CJK", 6.5)
+    pdf.setFont("CJK", 5.2)
     for ref, product, market, side, qty, price, amount, fee, tax, net, settled in rows:
-        pdf.drawCentredString(COLUMNS["ref"], y - 3, ref)
-        pdf.drawString(COLUMNS["product"], y - 3, product)
+        pdf.drawCentredString(COLUMNS["ref"], y, ref)
+        pdf.drawString(COLUMNS["product"], y, product)
+        for key, value in (("ccy", "USD"), ("price", price), ("net", net)):
+            pdf.drawCentredString(COLUMNS[key], y, value)
         for key, value in (("market", market), ("type", side), ("qty", qty), ("amount", amount), ("fee", fee), ("tax", tax), ("date", "2026/11/23")):
-            pdf.drawCentredString(COLUMNS[key], y - 3, value)
-        for key, top, bottom in (("ccy", "USD", "USD"), ("price", price, "1.0000"), ("net", net, settled)):
-            pdf.drawCentredString(COLUMNS[key], y + 4, top)
-            pdf.drawCentredString(COLUMNS[key], y - 10, bottom)
-        y -= 34
+            pdf.drawCentredString(COLUMNS[key], y - 5.7, value)
+        for key, value in (("ccy", "USD"), ("price", "1.0000"), ("net", settled)):
+            pdf.drawCentredString(COLUMNS[key], y - 12, value)
+        y -= 24
     pdf.setFont("CJK", 9)
     pdf.drawString(440, y, f"小計 Subtotal: USD {subtotal}")
     if extra_section:
@@ -86,9 +88,20 @@ class CathayDailyReportTests(unittest.TestCase):
         self.assertTrue(all(t.market == "US" and t.currency == "USD" for t in statement.trades))
 
     def test_buy_amount_includes_fees_and_class_shares_use_a_dash(self):
-        statement = parse_statement(report(rows=(BUY,), subtotal="200.30"), passwords=["A123456789"])
+        statement = parse_statement(report(rows=(BUY,), subtotal="-200.30"), passwords=["A123456789"])
         (trade,) = statement.trades
         self.assertEqual((trade.symbol, trade.side, trade.amount), ("BRK-B", "buy", Decimal("200.30")))
+
+    def test_mixed_buys_and_sells_check_the_signed_subtotal(self):
+        statement = parse_statement(report(rows=(UHS, BUY, MMS), subtotal="229.29"), passwords=["A123456789"])
+        self.assertEqual([t.side for t in statement.trades], ["sell", "buy", "sell"])
+        with self.assertRaises(StatementError) as caught:
+            parse_statement(report(rows=(UHS, BUY, MMS), subtotal="629.89"), passwords=["A123456789"])
+        self.assertEqual(caught.exception.detail, "subtotal")
+        positive_buy = BUY[:9] + ("200.30", "200.30")  # a buy must be printed as money paid
+        with self.assertRaises(StatementError) as caught:
+            parse_statement(report(rows=(positive_buy,), subtotal="200.30"), passwords=["A123456789"])
+        self.assertEqual(caught.exception.detail, "arithmetic")
 
     def test_wrong_password_and_unrelated_pdf(self):
         with self.assertRaises(StatementError) as caught:
