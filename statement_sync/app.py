@@ -36,6 +36,14 @@ def repository():
     return Repository(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))
 
 
+def save_layout(repo, owner, message, code, detail, pages):
+    """Diagnostics only: a failure here must never change how the e-mail is handled."""
+    try:
+        repo.save_layout(owner, message, code=code, detail=detail, pages=mask_layout(pages))
+    except RepositoryError:
+        print(json.dumps({"step": "layout", "code": "service"}), flush=True)
+
+
 @app.get("/health")
 def health():
     return jsonify(status="ok")
@@ -88,7 +96,7 @@ def ingest():
             repo.save_message(owner, message, broker=None, received_at=received, report_date=None,
                               status=code, detail=error.detail, trades=0)
             if code == "unrecognized" and pages:
-                repo.save_layout(owner, message, code=code, detail=error.detail, pages=mask_layout(pages))
+                save_layout(repo, owner, message, code, error.detail, pages)
             return jsonify(code=code, detail=error.detail, done=done)
         trades = len(statement.trades)
         repo.save_trades(owner, statement.broker, message, statement.trades)
@@ -103,7 +111,7 @@ def ingest():
         if statement.diagnostics:
             # Trades are kept and applied; the unread part is retried once the parser is fixed.
             code, done = ("partial" if code == "ok" else code), False
-            repo.save_layout(owner, message, code="partial", detail=statement.diagnostics, pages=mask_layout(pages))
+            save_layout(repo, owner, message, "partial", statement.diagnostics, pages)
         repo.save_message(owner, message, broker=statement.broker, received_at=received, report_date=statement.report_date,
                           status=code, detail=statement.account_hint, trades=trades)
         return jsonify(code=code, trades=trades, done=done)

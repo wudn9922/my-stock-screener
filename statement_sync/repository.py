@@ -48,7 +48,8 @@ class Repository:
         }], "resolution=ignore-duplicates,return=minimal")
 
     def save_layout(self, owner, message_id, *, code, detail, pages):
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        # No "+00:00" in a query string: "+" would arrive as a space.
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
         self._request("delete", f"atlas_statement_layouts?line_user_id=eq.{owner}&created_at=lt.{cutoff}")
         self._post("atlas_statement_layouts?on_conflict=line_user_id,message_id", [{
             "line_user_id": owner, "message_id": message_id, "code": code, "detail": detail or None, "pages": pages,
