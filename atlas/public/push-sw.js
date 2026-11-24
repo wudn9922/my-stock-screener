@@ -7,9 +7,12 @@
  *
  * Tap handoff: iOS runs the push/click handlers in a worker instance the page cannot reach, delivers no
  * message to a resumed Home Screen app, and openWindow does not move it. So a tap also records the chart
- * URL in a one-record IndexedDB store that the page takes (and deletes) when it comes to the foreground.
+ * URL in a small IndexedDB store that the page takes (and deletes) when it comes to the foreground.
+ * iOS may also bring the app forward without firing notificationclick at all (a tap while Atlas is open,
+ * or just after leaving it), so each push also records { id, url } of its notification: the iOS Home
+ * Screen app treats that notification disappearing within two minutes as a tap (see pushConfig.ts).
  * Push requires the account's cloud storage grant (user-settings checks it on every push request), and the
- * record is only a public chart URL that expires after a minute.
+ * records are only public chart URLs that expire within minutes.
  */
 const scopeURL = new URL(self.registration.scope);
 // The Atlas app root is the parent of this worker's push/ scope.
@@ -19,6 +22,7 @@ const badgeURL = new URL('badge-96.png', atlasRoot).href;
 const TAP_DB = 'atlas-push-tap';
 const TAP_STORE = 'tap';
 const TAP_KEY = 'latest';
+const PUSH_KEY = 'push';
 
 function atlasURL(value) {
   try {
@@ -45,7 +49,11 @@ function tapStore(mode, run) {
     };
   });
 }
-const saveTap = (url) => tapStore('readwrite', (store) => store.put({ url, at: Date.now() }, TAP_KEY)).catch(() => {});
+// A recorded tap replaces the push record: the page must not treat the same notification as tapped twice.
+const saveTap = (url) => tapStore('readwrite', (store) => {
+  store.put({ url, at: Date.now() }, TAP_KEY);
+  store.delete(PUSH_KEY);
+}).catch(() => {});
 const clearTap = () => tapStore('readwrite', (store) => store.delete(TAP_KEY)).catch(() => {});
 
 self.addEventListener('install', () => { self.skipWaiting(); });
@@ -60,17 +68,32 @@ self.addEventListener('push', (event) => {
   }
   // Every push must show a notification (iOS/Chrome revoke silent subscriptions).
   const title = String(message.title || 'Atlas 提醒').slice(0, 120);
-  event.waitUntil(self.registration.showNotification(title, {
-    body: String(message.body || '').slice(0, 500),
-    icon: iconURL,
-    badge: badgeURL,
-    tag: String(message.tag || 'atlas'),
-    renotify: true,
-    timestamp: Number(message.ts) || Date.now(),
-    data: { url: atlasURL(message.url) },
-    lang: 'zh-Hant',
-  }));
+  const url = atlasURL(message.url);
+  const pushId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  event.waitUntil((async () => {
+    await self.registration.showNotification(title, {
+      body: String(message.body || '').slice(0, 500),
+      icon: iconURL,
+      badge: badgeURL,
+      tag: String(message.tag || 'atlas'),
+      renotify: true,
+      timestamp: Number(message.ts) || Date.now(),
+      data: { url, pushId },
+      lang: 'zh-Hant',
+    });
+    await rememberPush(pushId, url);
+  })());
 });
+
+/** Record the shown notification; `listed` says whether this platform reports it in getNotifications(). */
+async function rememberPush(id, url) {
+  let listed = false;
+  try {
+    const shown = await self.registration.getNotifications();
+    listed = shown.some((notification) => notification.data && notification.data.pushId === id);
+  } catch { /* Without a listing the page never guesses a tap from this push. */ }
+  await tapStore('readwrite', (store) => store.put({ id, url, at: Date.now(), listed }, PUSH_KEY)).catch(() => {});
+}
 
 function routeInWindow(client, url) {
   const channel = new MessageChannel();
