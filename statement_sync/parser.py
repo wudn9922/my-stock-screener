@@ -236,6 +236,53 @@ def _sinopac_trade(anchor, row, report_date):
                  side=side, quantity=quantity, price=price, amount=net, currency="TWD"), gross
 
 
+INVENTORY_CODE = re.compile(r"^(\d{4,6}[A-Z]?)(?=$|[^\x00-\x7f])")
+INVENTORY_COLUMNS = ("集保", "融資", "融券")
+
+
+def _lines(words, tolerance=3):
+    lines = []
+    for word in sorted(words, key=lambda w: ((w["top"] + w["bottom"]) / 2, w["x0"])):
+        middle = (word["top"] + word["bottom"]) / 2
+        if lines and middle - lines[-1][0] <= tolerance:
+            lines[-1][1].append(word)
+        else:
+            lines.append((middle, [word]))
+    return [sorted(line, key=lambda w: w["x0"]) for _, line in lines]
+
+
+def _sinopac_inventory(words):
+    """(symbol, 集保+融資) for each 庫存明細 row: a line that starts with a stock code. A line that
+    starts with a code but does not carry the three quantities is an error, never skipped."""
+    centre = lambda w: (w["x0"] + w["x1"]) / 2
+    headers = {}
+    for label in INVENTORY_COLUMNS:
+        found = next((w for w in sorted(words, key=lambda w: w["top"]) if w["text"].startswith(label)), None)
+        if found:
+            headers[label] = centre(found)
+    for line in _lines(words):
+        start = next((i for i, w in enumerate(line[:2]) if INVENTORY_CODE.match(w["text"])), None)
+        if start is None:
+            continue
+        match = INVENTORY_CODE.match(line[start]["text"])
+        numbers = [w for w in line[start + 1:] if INTEGER.match(w["text"])]
+        if len(headers) == len(INVENTORY_COLUMNS):
+            picked = []
+            for label in INVENTORY_COLUMNS:
+                nearest = min(numbers, key=lambda w: abs(centre(w) - headers[label]), default=None)
+                if nearest is None or abs(centre(nearest) - headers[label]) > 45:
+                    raise StatementError("unrecognized", "inventory")
+                picked.append(nearest)
+            values = [_number(w["text"]) for w in picked]
+        elif len(numbers) >= 3:
+            values = [_number(w["text"]) for w in numbers[-3:]]
+        else:
+            raise StatementError("unrecognized", "inventory")
+        held, margin, _short = values
+        if held + margin > 0:
+            yield tw_symbol(match[1]), held + margin
+
+
 def parse_sinopac(pages):
     text = "\n".join(page[0] for page in pages)
     compact = re.sub(r"\s+", "", text)
@@ -246,6 +293,7 @@ def parse_sinopac(pages):
     inventory_date = re.search(r"庫存明細到(\d{4})/(\d{2})/(\d{2})", compact)
     hint = re.search(r"證券帳號\s*[:：]\s*([0-9A-Z*][0-9A-Z*\-]{4,20})", text)
     trades, totals, positions, dates = [], {"buy": Decimal(0), "sell": Decimal(0)}, {}, set()
+    in_inventory = False
     for _, words, width in pages:
         inventory_top = min((w["top"] for w in words if w["text"].startswith("庫存明細")), default=float("inf"))
         totals_top = min((w["top"] for w in words if "總計" in w["text"]), default=inventory_top)
@@ -257,19 +305,14 @@ def parse_sinopac(pages):
             trade, gross = _sinopac_trade(anchor, row, day)
             trades.append(trade)
             totals[trade.side] += gross
-        stock_rows = sorted((w for w in words if w["top"] > inventory_top and w["x0"] < width * 0.12
-                             and re.fullmatch(r"\d{4,6}[A-Z]?", w["text"])), key=lambda w: w["top"])
-        for anchor, row in _bands(words, stock_rows, float("inf"), 10):
-            code = anchor["text"]
-            values = [_number(w["text"]) for w in row if INTEGER.match(w["text"]) and w["x0"] > anchor["x1"]]
-            if len(values) < 3:
-                raise StatementError("unrecognized", "inventory")
-            held, margin, _short = values[-3:]
-            if held + margin > 0:
-                symbol = tw_symbol(code)
+        if inventory_top == float("inf") and in_inventory:
+            inventory_top = float("-inf")  # the list continues from the previous page
+        if inventory_top != float("inf"):
+            in_inventory = True
+            for symbol, quantity in _sinopac_inventory([w for w in words if w["top"] > inventory_top]):
                 if symbol in positions:
                     raise StatementError("unrecognized", "duplicate")
-                positions[symbol] = held + margin
+                positions[symbol] = quantity
     if inventory_date:
         report_date = f"{inventory_date[1]}-{inventory_date[2]}-{inventory_date[3]}"
         dates.add(report_date)
@@ -285,7 +328,8 @@ def parse_sinopac(pages):
     if not trades and not inventory_date:
         raise StatementError("unrecognized", "rows")
     report_date = dates.pop()
-    snapshot = {"market": "TW", "positions": positions} if inventory_date else None
+    # No position read is never taken as "holds nothing": without rows there is no snapshot to reconcile.
+    snapshot = {"market": "TW", "positions": positions} if inventory_date and positions else None
     return Statement("sinopac", report_date, hint[1] if hint else "", tuple(trades), snapshot)
 
 
