@@ -122,7 +122,8 @@ def _cathay_row(words, report_date):
     currencies = {t for t in texts if t in CURRENCIES}
     numbers = [((w["x0"] + w["x1"]) / 2, w["top"], _number(w["text"])) for w in words if NUMBER.match(w["text"])]
     columns = _columns(numbers)
-    if not (symbol and side and market and currencies == {"USD"}) or [len(c) for c in columns] != [1, 2, 1, 1, 1, 2]:
+    # Traded in USD; settled either in USD (rate 1) or in TWD (rate = TWD per USD).
+    if not (symbol and side and market and currencies in ({"USD"}, {"USD", "TWD"})) or [len(c) for c in columns] != [1, 2, 1, 1, 1, 2]:
         raise StatementError("unrecognized", "row")
     (quantity,), (price, rate), (amount,), (fee,), (tax,), (net, settled) = columns
     # 應收/付(-): a buy is money paid and printed negative; a sell is money received.
@@ -131,10 +132,11 @@ def _cathay_row(words, report_date):
     net, settled = abs(net), abs(settled)
     expected = amount - fee - tax if side == "sell" else amount + fee + tax
     if (
-        quantity <= 0 or rate != 1
+        quantity <= 0
         or not _close(quantity * price, amount, max(Decimal("0.01"), amount * Decimal("0.0005")))
         or not _close(expected, net, Decimal("0.011"))
-        or not _close(net, settled, Decimal("0.011"))
+        or (currencies == {"USD"} and (rate != 1 or not _close(net, settled, Decimal("0.011"))))
+        or (currencies == {"USD", "TWD"} and (rate <= 1 or not _close(net * rate, settled, max(Decimal("1"), settled * Decimal("0.001")))))
     ):
         raise StatementError("unrecognized", "arithmetic")
     reference = words[0]["text"]

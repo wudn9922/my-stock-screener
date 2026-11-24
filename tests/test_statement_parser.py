@@ -32,7 +32,7 @@ MMS = ("00008934", "MMS/Maximus Inc", "美國", "賣出", "4.000000", "62.159200
 BUY = ("00009001", "BRK.B/Berkshire Hathaway ETF", "美國", "買進", "2.000000", "100.000000000", "200.000000", "0.30", "0.00", "-200.30", "-200.30")
 
 
-def report(rows=(UHS, MMS), subtotal="429.59", extra_section=None, password="A123456789"):
+def report(rows=(UHS, MMS), subtotal="429.59", extra_section=None, password="A123456789", settle=None):
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     pdf.setFont("CJK", 9)
@@ -55,7 +55,8 @@ def report(rows=(UHS, MMS), subtotal="429.59", extra_section=None, password="A12
             pdf.drawCentredString(COLUMNS[key], y, value)
         for key, value in (("market", market), ("type", side), ("qty", qty), ("amount", amount), ("fee", fee), ("tax", tax), ("date", "2026/11/23")):
             pdf.drawCentredString(COLUMNS[key], y - 5.7, value)
-        for key, value in (("ccy", "USD"), ("price", "1.0000"), ("net", settled)):
+        ccy, rate = settle or ("USD", "1.0000")
+        for key, value in (("ccy", ccy), ("price", rate), ("net", settled)):
             pdf.drawCentredString(COLUMNS[key], y - 12, value)
         y -= 24
     pdf.setFont("CJK", 9)
@@ -91,6 +92,15 @@ class CathayDailyReportTests(unittest.TestCase):
         statement = parse_statement(report(rows=(BUY,), subtotal="-200.30"), passwords=["A123456789"])
         (trade,) = statement.trades
         self.assertEqual((trade.symbol, trade.side, trade.amount), ("BRK-B", "buy", Decimal("200.30")))
+
+    def test_settled_in_twd_keeps_the_usd_cost(self):
+        twd = BUY[:10] + ("-6,409.60",)  # 200.30 USD × 32.0
+        (trade,) = parse_statement(report(rows=(twd,), subtotal="-200.30", settle=("TWD", "32.0000")), passwords=["A123456789"]).trades
+        self.assertEqual((trade.amount, trade.currency), (Decimal("200.30"), "USD"))
+        wrong = BUY[:10] + ("-7,000.00",)
+        with self.assertRaises(StatementError) as caught:
+            parse_statement(report(rows=(wrong,), subtotal="-200.30", settle=("TWD", "32.0000")), passwords=["A123456789"])
+        self.assertEqual(caught.exception.detail, "arithmetic")
 
     def test_mixed_buys_and_sells_check_the_signed_subtotal(self):
         statement = parse_statement(report(rows=(UHS, BUY, MMS), subtotal="229.29"), passwords=["A123456789"])
