@@ -7,7 +7,6 @@ import {
   currentSubscription, disablePush, enablePush, fetchPushStatus, notificationPermission, pushSupport, removePushDevice,
   sendTestPush, webPushEnabled, type PushStatus,
 } from './webPush';
-import { armPushDiagnostics } from './pushConfig';
 import './pushPanel.css';
 
 const message = (error: unknown) => error instanceof Error && error.message ? error.message : '手機通知暫時無法使用，請稍後再試。';
@@ -105,7 +104,6 @@ export function PushPanel() {
     </label>}
     <button type="button" className="pwa-install-button push-test" disabled={busy || !status?.devices.length}
       onClick={() => { void run(async () => {
-        armPushDiagnostics();
         const result = await sendTestPush();
         if (!result.sent && result.failed) return '通知服務未接受這次推播，請稍後再試。';
         return result.sent ? `已傳送到 ${result.sent} 台裝置，請查看通知並點一下確認會開啟圖表。` : '沒有可接收的裝置，請先開啟通知。';
