@@ -56,7 +56,7 @@ class Statement:
 BROKER_MARKS = (("cathay", ("國泰綜合證券", "Cathay Securities")), ("sinopac", ("永豐金", "SinoPac", "sinotrade")), ("kgi", ("凱基證券", "KGI")))
 SENDER_DOMAINS = {"cathaysec.com.tw": "cathay", "sinopac.com": "sinopac", "sinotrade.com.tw": "sinopac",
                   "kgi.com": "kgi", "kgi.com.tw": "kgi"}
-NUMBER = re.compile(r"^[\d,]+\.\d+$")
+NUMBER = re.compile(r"^-?[\d,]+\.\d+$")  # 國泰 prints what the client pays as negative
 TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,9}$")
 SIDES = {"買進": "buy", "買入": "buy", "賣出": "sell"}
 MARKETS = {"美國": "US"}
@@ -125,6 +125,10 @@ def _cathay_row(words, report_date):
     if not (symbol and side and market and currencies == {"USD"}) or [len(c) for c in columns] != [1, 2, 1, 1, 1, 2]:
         raise StatementError("unrecognized", "row")
     (quantity,), (price, rate), (amount,), (fee,), (tax,), (net, settled) = columns
+    # 應收/付(-): a buy is money paid and printed negative; a sell is money received.
+    if (net < 0) != (side == "buy") or (settled < 0) != (side == "buy"):
+        raise StatementError("unrecognized", "arithmetic")
+    net, settled = abs(net), abs(settled)
     expected = amount - fee - tax if side == "sell" else amount + fee + tax
     if (
         quantity <= 0 or rate != 1
@@ -159,24 +163,22 @@ def parse_cathay(pages):
         stop = min((w["top"] for w in words if w["text"].startswith(("小計", "Subtotal"))), default=float("inf"))
         anchors = sorted((w for w in words if re.fullmatch(r"\d{8}", w["text"]) and w["x0"] < width * 0.2 and w["top"] < stop),
                          key=lambda w: w["top"])
-        if not anchors:
-            continue
-        middles = [(a["top"] + a["bottom"]) / 2 for a in anchors]
-        gaps = [b - a for a, b in zip(middles, middles[1:])]
-        half = (statistics.median(gaps) if gaps else 24) / 2
+        # The reference number sits on a row's first line; the row's other lines follow below it
+        # (price over exchange rate, net over settled amount) until the next reference number.
         for index, anchor in enumerate(anchors):
-            low = middles[index] - half
-            high = min(middles[index] + half, stop)
-            row = [anchor] + sorted((w for w in words if w is not anchor and low <= (w["top"] + w["bottom"]) / 2 < high),
-                                    key=lambda w: w["x0"])
+            low = anchor["top"] - 2
+            high = min(anchors[index + 1]["top"] - 2 if index + 1 < len(anchors) else stop, stop)
+            row = [anchor] + sorted((w for w in words if w is not anchor and low <= w["top"] < high), key=lambda w: w["x0"])
             trades.append(_cathay_row(row, report_date))
     if sections and not trades:
         raise StatementError("unrecognized", "rows")
     keys = [t.key for t in trades]
     if len(set(keys)) != len(keys):
         raise StatementError("unrecognized", "duplicate")
-    subtotal = re.search(r"Subtotal[:：]?USD([\d,]+\.\d+)", compact)
-    if subtotal and trades and len({t.side for t in trades}) == 1 and not _close(sum(t.amount for t in trades), _number(subtotal[1]), Decimal("0.011")):
+    # The subtotal is signed like the rows: money received minus money paid.
+    subtotal = re.search(r"Subtotal[:：]?USD(-?[\d,]+\.\d+)", compact)
+    signed = sum(t.amount if t.side == "sell" else -t.amount for t in trades)
+    if subtotal and trades and not _close(signed, _number(subtotal[1]), Decimal("0.011")):
         raise StatementError("unrecognized", "subtotal")
     return Statement("cathay", report_date, hint[1] if hint else "", tuple(trades))
 
@@ -298,7 +300,9 @@ def parse_sinopac(pages):
     trades, totals, positions, dates = [], {"buy": Decimal(0), "sell": Decimal(0)}, {}, set()
     in_inventory = False
     for _, words, width in pages:
-        inventory_top = min((w["top"] for w in words if w["text"].startswith("庫存明細")), default=float("inf"))
+        # The heading can come out as separate words (「庫」「存明細」), so look for it per line.
+        inventory_top = min((min(w["top"] for w in line) for line in _lines(words)
+                             if "庫存明細" in "".join(w["text"] for w in line)), default=float("inf"))
         totals_top = min((w["top"] for w in words if "總計" in w["text"]), default=inventory_top)
         anchors = sorted((w for w in words if re.fullmatch(r"20\d{6}", w["text"]) and w["x0"] < width * 0.3 and w["top"] < totals_top),
                          key=lambda w: w["top"])

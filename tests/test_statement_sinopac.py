@@ -53,7 +53,8 @@ def report(rows=(WARRANT,), buys="1,540", sells="0", stocks=STOCKS, currency="�
     pdf.setFont("CJK", 9)
     pdf.drawString(300, y, f"買進總計：${buys}")
     pdf.drawString(300, y - 14, f"賣出總計：${sells}")
-    pdf.drawString(40, y - 50, "庫存明細 到 2026/11/23股票庫存餘額")
+    pdf.drawString(40, y - 50, "庫")  # the real report splits the heading into separate words
+    pdf.drawString(53, y - 50, "存明細 到 2026/11/23股票庫存餘額")
     y -= 70
     if inventory_page_break:  # heading on page 1, the list on page 2
         pdf.showPage()
