@@ -11,22 +11,18 @@ Discord 提醒成功後，另外請 Supabase user-settings 函式（push.notify�
 import math
 import os
 import re
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 
 import requests
+from breakout_alert.atlas_links import atlas_chart_url
 
 PUSH_TIMEOUT_SECONDS = 5
-ATLAS_CHART_BASE_URL = "https://wudn9922.github.io/my-stock-screener/atlas/"
 TAG_UNSAFE = re.compile(r"[^A-Za-z0-9._:^=-]")
 
 
 def push_chart_url(symbol, timeframe="1D"):
     """Atlas 圖表網址（與 Discord 連結相同格式）；symbol 會 URL 編碼。"""
-    return (
-        f"{ATLAS_CHART_BASE_URL}?page=chart"
-        f"&tf={quote(str(timeframe or '1D'), safe='')}"
-        f"&symbol={quote(str(symbol).strip(), safe='')}"
-    )
+    return atlas_chart_url(symbol, timeframe or "1D")
 
 
 def push_tag(*parts):
@@ -138,9 +134,17 @@ class WebPushClient:
             if response.status_code != 200:
                 print(f"⚠️ 手機通知失敗，HTTP {response.status_code}")
                 return False
-            data = (response.json() or {}).get("data") or {}
-            if data.get("devices"):
-                print(f"📱 手機通知：{data.get('sent', 0)}/{data.get('devices', 0)} 台裝置")
+            envelope = response.json() or {}
+            data = envelope.get("data") or {}
+            sent = data.get("sent", 0)
+            devices = data.get("devices", 0)
+            if type(sent) is not int or type(devices) is not int or not 0 <= sent <= devices:
+                print("⚠️ 手機通知失敗：通知服務回覆格式不正確")
+                return False
+            if not envelope.get("ok") or not sent:
+                print(f"⚠️ 手機通知失敗：{sent}/{devices} 台裝置的推播服務接受")
+                return False
+            print(f"📱 手機通知：{sent}/{devices} 台裝置的推播服務接受")
             return True
         except Exception as exc:  # noqa: BLE001 - push must never break the alert loop
             print(f"⚠️ 手機通知失敗：{type(exc).__name__}")

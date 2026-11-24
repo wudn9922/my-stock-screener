@@ -24,6 +24,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TAG = /^[A-Za-z0-9._:^=-]{1,64}$/;
 const SEND_TIMEOUT_MS = 8000;
 const encoder = new TextEncoder();
+const VAPID_REFRESH_SECONDS = 11 * 3600; // The signed token expires after 12 hours.
+const vapidTokens = new Map<string, { refreshAt: number; jwt: Promise<string> }>();
+const APPLE_FAILURE_REASONS = new Set([
+  'BadTtl', 'BadUrgency', 'BadWebPushRequest', 'BadWebPushTopic', 'VapidPkHashMismatch',
+  'IdleTimeout', 'BadAuthorizationHeader', 'BadJwtToken', 'BadVapidPublicKey', 'BadPath',
+  'MethodNotAllowed', 'PayloadTooLarge', 'TooManyRequests',
+]);
 
 /** Browser push services only: no other host ever receives a server-side request (SSRF guard). */
 const PUSH_HOSTS = new Set(['fcm.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com']);
@@ -166,10 +173,28 @@ async function vapid(env: PushDeps['env']): Promise<VapidKeys> {
   }
 }
 
+/** Apple requires JWT reuse for at least an hour. Share the in-flight signature across sends. */
+async function pushAuthorization(keys: VapidKeys, endpoint: URL, nowSeconds: number) {
+  const cacheKey = JSON.stringify([endpoint.origin, keys.publicKeyText, keys.subject]);
+  let entry = vapidTokens.get(cacheKey);
+  if (!entry || entry.refreshAt <= nowSeconds) {
+    for (const [key, token] of vapidTokens) {
+      if (token.refreshAt <= nowSeconds) vapidTokens.delete(key);
+    }
+    const jwt = vapidJwt(keys, endpoint.href, nowSeconds).catch((error: unknown) => {
+      if (vapidTokens.get(cacheKey)?.jwt === jwt) vapidTokens.delete(cacheKey);
+      throw error;
+    });
+    entry = { refreshAt: nowSeconds + VAPID_REFRESH_SECONDS, jwt };
+    vapidTokens.set(cacheKey, entry);
+  }
+  return vapidAuthorization(await entry.jwt, keys);
+}
+
 type Outcome = 'ok' | 'gone' | 'failed';
 async function deliver(deps: PushDeps, keys: VapidKeys, target: Target, payload: Uint8Array, tag: string): Promise<Outcome> {
-  let endpoint: string;
-  try { endpoint = validateEndpoint(target.endpoint); } catch { return 'gone'; }
+  let endpoint: URL;
+  try { endpoint = new URL(validateEndpoint(target.endpoint)); } catch { return 'gone'; }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
   try {
@@ -179,7 +204,7 @@ async function deliver(deps: PushDeps, keys: VapidKeys, target: Target, payload:
       redirect: 'manual',
       signal: controller.signal,
       headers: {
-        Authorization: vapidAuthorization(await vapidJwt(keys, endpoint), keys),
+        Authorization: await pushAuthorization(keys, endpoint, Math.floor((deps.now?.() ?? Date.now()) / 1000)),
         'Content-Encoding': 'aes128gcm',
         'Content-Type': 'application/octet-stream',
         TTL: '3600',
@@ -188,10 +213,20 @@ async function deliver(deps: PushDeps, keys: VapidKeys, target: Target, payload:
       },
       body: body.slice().buffer as ArrayBuffer,
     });
-    await response.body?.cancel().catch(() => {});
-    if (response.status >= 200 && response.status < 300) return 'ok';
     // 404/410: the browser unsubscribed or the subscription expired; delete it.
-    if (response.status === 404 || response.status === 410) return 'gone';
+    if (response.ok || response.status === 404 || response.status === 410) {
+      await response.body?.cancel().catch(() => {});
+      return response.ok ? 'ok' : 'gone';
+    }
+    if (endpoint.hostname.endsWith('.push.apple.com')) {
+      const error = await response.json().catch(() => null) as { reason?: unknown } | null;
+      if (typeof error?.reason === 'string' && APPLE_FAILURE_REASONS.has(error.reason)) {
+        console.error('Web push delivery failed', response.status, error.reason);
+        return 'failed';
+      }
+    } else {
+      await response.body?.cancel().catch(() => {});
+    }
     console.error('Web push delivery failed', response.status);
     return 'failed';
   } catch (error) {

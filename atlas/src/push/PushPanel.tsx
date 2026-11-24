@@ -105,6 +105,7 @@ export function PushPanel() {
     <button type="button" className="pwa-install-button push-test" disabled={busy || !status?.devices.length}
       onClick={() => { void run(async () => {
         const result = await sendTestPush();
+        if (!result.sent && result.failed) return '通知服務未接受這次推播，請稍後再試。';
         return result.sent ? `已傳送到 ${result.sent} 台裝置，請查看通知並點一下確認會開啟圖表。` : '沒有可接收的裝置，請先開啟通知。';
       }); }}>傳送測試通知</button>
     {status && <section className="push-devices" aria-label="已開啟通知的裝置">

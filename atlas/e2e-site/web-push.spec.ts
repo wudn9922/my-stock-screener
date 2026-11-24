@@ -45,12 +45,12 @@ async function browser(page: Page, options: Browser) {
     Object.defineProperty(window, 'Notification', { configurable: true, value: Object.assign(function Notification() {}, {
       permission, requestPermission: async () => { state.pushLog.push('requestPermission'); return permission; },
     }) });
-    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: Object.assign(new EventTarget(), {
       getRegistration: async () => (current || state.pushLog.includes('register') ? registration : undefined),
       getRegistrations: async () => [],
       register: async () => { state.pushLog.push('register'); return registration; },
-      addEventListener: () => {}, startMessages: () => {},
-    } });
+      startMessages: () => {},
+    }) });
   }, { ua: options.ua, standalone: options.standalone ?? false, push: options.push ?? true, permission: options.permission ?? 'default',
     subscribed: options.subscribed ?? false, remembered: options.remembered ?? false, endpoint: ENDPOINT, token: TOKEN, user: DEVICE_USER_ID });
 }
@@ -139,4 +139,33 @@ test('installed app: device list, test notification and turning this device off'
   await expect(panel.getByRole('status')).toContainText('已關閉');
   expect(actions.find(action => action.action === 'push.unsubscribe')).toMatchObject({ endpoint: ENDPOINT });
   expect(await page.evaluate(() => (window as unknown as { pushLog: string[] }).pushLog)).toEqual(['unsubscribe', 'unregister']);
+});
+
+test('tapping a notification moves the signed-in Home Screen app to the requested stock', async ({ page }) => {
+  await browser(page, { ua: IPHONE_SAFARI, standalone: true, remembered: true });
+  await mockSite(page, { report: buildReport(20) });
+  const actions = cloudAccount(page, true);
+  await page.goto('./?page=watchlist');
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'watchlist');
+  const acknowledged = await page.evaluate(() => {
+    document.documentElement.dataset.originalPage = 'yes';
+    const scriptURL = new URL('push-sw.js', location.href).href;
+    const url = new URL('?page=chart&symbol=NVDA&tf=1D', location.href).href;
+    const { port1, port2 } = new MessageChannel();
+    return new Promise<boolean>(resolve => {
+      port1.onmessage = event => {
+        port1.close();
+        port2.close();
+        resolve(event.data === url);
+      };
+      navigator.serviceWorker.dispatchEvent(Object.assign(new Event('message'), {
+        source: { scriptURL }, data: { type: 'atlas-push-open', url }, ports: [port2],
+      }));
+    });
+  });
+  expect(acknowledged).toBe(true);
+  await expect(page.getByTestId('active-symbol')).toHaveText('NVDA');
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'chart');
+  await expect(page.locator('html')).toHaveAttribute('data-original-page', 'yes');
+  expect(actions.find(action => action.action === 'access.get')?.idToken).toBe(TOKEN);
 });

@@ -14,7 +14,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from breakout_alert.atlas_links import atlas_chart_url
+from breakout_alert.atlas_links import atlas_alert_links
 
 
 # 總開關：改成 False 即停用畫線警示（均線提醒不受影響）
@@ -796,11 +796,6 @@ def format_neighbour(level, price):
     )
 
 
-def build_chart_url(symbol, timeframe):
-    # 直接開 Atlas 網頁圖表；<> 讓 Discord 不產生網頁預覽卡片
-    return f"<{atlas_chart_url(symbol, timeframe)}>"
-
-
 def format_alert_block(
     *,
     ticker,
@@ -836,7 +831,7 @@ def format_alert_block(
         f"確認：連續 {CONFIRM_RUNS} 次\n"
         f"上方最近畫線 {format_neighbour(nearest_above, price)}｜"
         f"下方 {format_neighbour(nearest_below, price)}\n"
-        f"{build_chart_url(symbol, line.timeframe)}"
+        f"{atlas_alert_links(symbol, line.timeframe)}"
     )
 
 

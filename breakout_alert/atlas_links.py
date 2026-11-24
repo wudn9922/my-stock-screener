@@ -1,7 +1,9 @@
 """Atlas 圖表深連結：讓提醒訊息一點就開到該股票的 Atlas 圖表。"""
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 ATLAS_BASE_URL = "https://wudn9922.github.io/my-stock-screener/atlas/"
+# The Atlas LIFF endpoint is the parent of /atlas/. Keep the public ID in sync with lineLoginConfig.ts.
+ATLAS_LIFF_URL = "https://liff.line.me/2010330411-6JhrotT9/atlas/"
 ATLAS_LINK_LABEL = "開啟 Atlas 圖表"
 
 
@@ -23,9 +25,18 @@ def atlas_markdown_link(symbol, label=ATLAS_LINK_LABEL, timeframe="1D"):
     return f"[{label}](<{url}>)" if url else ""
 
 
-def append_atlas_link(text, symbol, limit):
+def atlas_alert_links(symbol, timeframe="1D"):
+    """Use LINE's app link when available and keep the regular chart URL as a fallback."""
+    web = atlas_markdown_link(symbol, timeframe=timeframe)
+    if not web:
+        return ""
+    query = urlsplit(atlas_chart_url(symbol, timeframe)).query
+    return f"[在 LINE 開啟 Atlas](<{ATLAS_LIFF_URL}?{query}>) · {web}"
+
+
+def append_atlas_link(text, symbol, limit, *, with_line=False):
     """文字超過 limit 時只截斷本文，連結一定保留在最後一行。"""
-    link = atlas_markdown_link(symbol)
+    link = atlas_alert_links(symbol) if with_line else atlas_markdown_link(symbol)
     if not link:
         return str(text)[:limit]
     link = f"📈 {link}"
