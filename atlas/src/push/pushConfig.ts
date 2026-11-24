@@ -13,7 +13,7 @@ export const pushScript = () => new URL('push-sw.js', base()).href;
 /** At most one worker update check per foreground return within this window. */
 const WORKER_REFRESH_MS = 10 * 60 * 1000;
 /** When a foregrounded app asks the push worker for a pending tap. */
-const TAP_PULL_DELAYS_MS = [0, 400, 1500];
+const TAP_PULL_DELAYS_MS = [0, 400, 1500, 3000, 6000, 10000];
 
 // TEMPORARY tap diagnostics (iPhone background tap investigation). Armed for a few minutes by the test button,
 // shows each step on screen, memory only. Remove once the background tap works.
@@ -95,10 +95,13 @@ export function startPushNavigation() {
       const channel = new MessageChannel();
       channel.port1.onmessage = (event: MessageEvent) => {
         channel.port1.close();
-        const reply = event.data as { url?: unknown; trace?: unknown } | string | null;
+        const reply = event.data as { url?: unknown; trace?: unknown; worker?: unknown; pushes?: unknown } | string | null;
         const url = reply && typeof reply === 'object' ? reply.url : reply;
         const steps = reply && typeof reply === 'object' && Array.isArray(reply.trace) ? reply.trace.map(String) : [];
-        diagnose(`頁面：取回${reason} → ${typeof url === 'string' ? '有通知' : '沒有待處理的通知'}${steps.length ? `\n  worker：${steps.join('\n  worker：')}` : ''}`);
+        const events = reply && typeof reply === 'object' && Array.isArray(reply.pushes) ? reply.pushes.map(String) : [];
+        const instance = reply && typeof reply === 'object' && typeof reply.worker === 'string' ? reply.worker : '?';
+        diagnose(`頁面：取回${reason} → ${typeof url === 'string' ? '有通知' : '沒有待處理的通知'}（worker ${instance}）`
+          + `${events.length ? `\n  事件：${events.join('\n  事件：')}` : ''}${steps.length ? `\n  步驟：${steps.join('\n  步驟：')}` : ''}`);
         accept(url);
       };
       worker.postMessage({ type: 'atlas-push-pull' }, [channel.port2]);
@@ -117,6 +120,8 @@ export function startPushNavigation() {
     document.addEventListener('visibilitychange', () => {
       diagnose(`頁面：visibilitychange → ${document.visibilityState}`);
       if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker?.getRegistration?.(pushScope()).then((registration) => registration?.getNotifications?.())
+        .then((shown) => { if (shown) diagnose(`頁面：通知中心還有 ${shown.length} 則 Atlas 通知`); }).catch(() => {});
       // The tap handler may still be running when the app comes forward: ask again shortly after.
       for (const delay of TAP_PULL_DELAYS_MS) setTimeout(() => pullTap(`（${delay}ms）`), delay);
       if (Date.now() - refreshedAt < WORKER_REFRESH_MS) return;
