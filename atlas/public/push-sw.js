@@ -25,6 +25,8 @@ self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
 
 self.addEventListener('push', (event) => {
+  recentPushes.push(`${clock(Date.now())} 收到推播（worker ${workerInstance}）`);
+  if (recentPushes.length > 5) recentPushes.shift();
   let message = {};
   try {
     message = event.data ? event.data.json() : {};
@@ -54,6 +56,11 @@ let pendingTap = null;
 // TEMPORARY tap diagnostics (iPhone background tap investigation): steps of the latest tap, sent with each pull.
 let tapTrace = [];
 const trace = (step) => { tapTrace.push(`${((Date.now() - (tapTrace.at || Date.now())) / 1000).toFixed(1)}s ${step}`); };
+// Which worker instance answers (a restart loses memory), when it started, and the pushes it received.
+const workerInstance = Math.random().toString(36).slice(2, 6);
+const workerStarted = Date.now();
+const recentPushes = [];
+const clock = (time) => new Date(time).toTimeString().slice(0, 8);
 
 function rememberTap(url) {
   if (pendingTap) pendingTap.release();
@@ -79,7 +86,7 @@ self.addEventListener('message', (event) => {
   if (!data || data.type !== 'atlas-push-pull' || !port) return;
   const url = takeTap();
   if (url) trace('pulled');
-  port.postMessage({ url, trace: tapTrace.slice() });
+  port.postMessage({ url, trace: tapTrace.slice(), worker: `${workerInstance} 啟動於 ${clock(workerStarted)}`, pushes: recentPushes.slice() });
 });
 
 function routeInWindow(client, url) {
@@ -96,6 +103,8 @@ function routeInWindow(client, url) {
 }
 
 self.addEventListener('notificationclick', (event) => {
+  recentPushes.push(`${clock(Date.now())} 收到點擊（worker ${workerInstance}）`);
+  if (recentPushes.length > 5) recentPushes.shift();
   event.notification.close();
   const url = atlasURL(event.notification.data && event.notification.data.url);
   const taken = rememberTap(url);
