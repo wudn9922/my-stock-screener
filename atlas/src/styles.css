@@ -1565,6 +1565,20 @@ h3 {
 .screener-row:hover {
   background: var(--surface-2);
 }
+.screener-row-link {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+.screener-row-link:focus-visible {
+  outline-offset: -2px;
+}
+.screener-growth-legend {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .row-id {
   min-width: 0;
   display: flex;
@@ -2478,13 +2492,18 @@ h3 {
     align-content: normal;
     max-height: none;
   }
-  .screener-page .row-mas > .metric-pill {
+  .screener-page .row-mas .metric-pill {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 11px;
     padding: 1px 5px;
+  }
+  .screener-page .row-mas > .growth-pill {
+    flex-direction: column;
+    gap: 1px;
+    min-height: 28px;
   }
   .row-ma-bar {
     display: flex;
@@ -2688,7 +2707,7 @@ h3 {
     grid-row: 1 / span 3;
     align-self: center;
   }
-  .screener-page .row-mas > .metric-pill {
+  .screener-page .row-mas > :is(.metric-pill, .growth-pill) {
     grid-column: 1;
   }
   .screener-page .row-mas > .ma-pill {

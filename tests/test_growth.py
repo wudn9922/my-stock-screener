@@ -586,6 +586,30 @@ if __name__ == "__main__":
 
 
 class EpsGradeTests(unittest.TestCase):
+    def test_quarterly_mask_flags_a_low_confidence_prior_period(self):
+        doc = document([q(2025, 2, 2, 100), q(2026, 2, 3, 115), q(2025, 3, 2, 100), q(2026, 3, 4, 120)])
+        doc["quarterly"]["epsQuality"] = [{"epsDiluted": "C", "epsBasic": "C"}]
+        result = row_of(doc)
+        self.assertEqual(result["gQ"], 0b10)
+        self.assertEqual(result["epsQ"], [100.0])
+        self.assertEqual(result["revQ"], [20.0, 15.0])
+
+    def test_quarterly_mask_skips_missing_values_and_usable_basic_eps(self):
+        doc = document([q(2025, 2, None, 100), q(2026, 2, 3, 115), q(2025, 3, 2, 100), q(2026, 3, 4, 120)])
+        doc["quarterly"]["epsQuality"] = [{}, {"epsDiluted": "C", "epsBasic": "C"}, {}, {"epsDiluted": "B"}]
+        result = row_of(doc)
+        self.assertEqual(result["gQ"], 0)
+        self.assertEqual(result["epsQ"], [100.0])
+
+    def test_quarterly_mask_flags_an_excluded_q4_and_keeps_its_slot(self):
+        doc = document([q(2024, 4, 2), q(2025, 4, 4), q(2024, 3, 2), q(2025, 3, 3)])
+        doc["quarterly"]["epsQuality"] = [{}, {"epsDiluted": "D", "epsBasic": "D"}]
+        result = row_of(doc, today=SPRING)
+        self.assertEqual(result["qEnd"], "2025-12-31")
+        self.assertEqual(result["gQ"], 0b01)
+        self.assertEqual(result["epsQ"], [None, 50.0])
+        self.assertEqual(growth.FIELDS[-1], "gQ")
+
     def test_c_b_and_d_never_count_for_us_filers(self):
         for grade in ("B", "C", "D"):
             self.assertFalse(growth.eps_usable(grade, us=True, q4=False))

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { GrowthProvider, growthKey, parseGrowthFile, parseGrowthRecord } from '../src/fundamentals/GrowthProvider';
+import { GrowthProvider, growthKey, mergeGrowth, parseGrowthFile, parseGrowthRecord, parseReportGrowth } from '../src/fundamentals/GrowthProvider';
 
 const fixtureText = readFileSync('tests/fixtures/screener/us-growth.json', 'utf8');
 
@@ -38,6 +38,7 @@ describe('us-growth.json', () => {
       originQ: { eps: 'us-growth', rev: 'us-growth' },
       originY: null,
       derivedQ: [],
+      excludedEpsQ: 0,
       quality: null,
     });
     expect(parseGrowthRecord([1])).toBeNull();
@@ -77,5 +78,27 @@ describe('us-growth.json', () => {
     expect(await new GrowthProvider('/', { fetcher: vi.fn(async () => response('nope', 404)) }).load()).toBeNull();
     expect(await new GrowthProvider('/', { fetcher: vi.fn(async () => response('<html>')) }).load()).toBeNull();
     expect(await new GrowthProvider('/', { fetcher: vi.fn(async () => { throw new TypeError('offline'); }) }).load()).toBeNull();
+  });
+});
+
+describe('quarterly EPS quality exclusions', () => {
+  const fields = ['symbol', 'qEnd', 'epsQ', 'revQ', 'src', 'gQ'];
+  const row = ['MSFT', '2026-06-30', [25, null, null], [5], 'sec', 0b110];
+
+  it('reads gQ by field name and defaults pre-gQ rows and files to zero', () => {
+    const read = (columns: string[], values: unknown[]) =>
+      parseReportGrowth({ version: 1, fields: columns, rows: [values] })!.items.get('MSFT')!;
+    expect(read(fields, row).excludedEpsQ).toBe(0b110);
+    expect(read(fields, row.slice(0, -1)).excludedEpsQ).toBe(0);
+    expect(read(fields.slice(0, -1), row).excludedEpsQ).toBe(0);
+  });
+
+  it('keeps the mask when only revenue is replaced and clears it when EPS comes from Yahoo', () => {
+    const report = parseReportGrowth({ version: 1, fields, rows: [row] });
+    const yahoo = (epsYoY: number[]) => parseGrowthFile({
+      version: 1, market: 'US', items: { MSFT: { latest: '2026-09-30', epsYoY, revYoY: [10] } },
+    });
+    expect(mergeGrowth(yahoo([]), report)?.items.get('MSFT')?.excludedEpsQ).toBe(0b110);
+    expect(mergeGrowth(yahoo([15]), report)?.items.get('MSFT')?.excludedEpsQ).toBe(0);
   });
 });

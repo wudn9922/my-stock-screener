@@ -5,7 +5,8 @@ import { SymbolSearch, type LocalSymbol, type SearchResult } from '../SymbolSear
 import { StockTabs, type StockView } from '../StockTabs';
 import { displayTicker } from '../format';
 import { adrRatioText, type TwAdrListing } from '../../fundamentals/adrListings';
-import { LEVEL_TEXT, issueText, revisionText } from './financialsView';
+import { issueText, revisionText } from './financialsView';
+import { LEVEL_TEXT } from './qualityLabels';
 import { FinancialNote } from './FinancialNote';
 import '../stockHeader.css';
 

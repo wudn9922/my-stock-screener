@@ -7,7 +7,8 @@ import { reportUrl } from '../report/loadReport';
  *   older files with 4 are still read: missing slots are simply unknown)
  *   and annual (up to 10 years; Taiwan and the SEC frames have fewer), aligned on the same period a year earlier. Each block says its source
  *   (`src` / `srcY`): SEC companyfacts or Yahoo financials files, the Taiwan official statements (MOPS), the
- *   Taiwan history from FinMind (republished MOPS data) or SEC XBRL frames; `dQ` flags the quarterly slots that compare a derived Q4 (full year − first three quarters).
+ *   Taiwan history from FinMind (republished MOPS data) or SEC XBRL frames; `dQ` flags quarterly slots comparing a derived Q4
+ *   (full year − first three quarters) and `gQ` flags EPS YoY missing because of a low-confidence EPS exclusion.
  * - `${BASE_URL}valuation/us-growth.json` (atlas/scripts/build_fundamentals_us.py, Yahoo Finance): quarterly,
  *   US only (the S&P 500 list), mostly 1 quarter of YoY.
  * growth.json comes first; us-growth only fills a quarterly metric growth.json has nothing for, or replaces the
@@ -46,6 +47,8 @@ export interface GrowthRecord {
   originY: GrowthOrigin | null;
   /** Per quarter slot: the pair compares a derived Q4 (full year − first three quarters). */
   derivedQ: boolean[];
+  /** Bit i is set when low-confidence EPS was excluded from the quarterly YoY at slot i. */
+  excludedEpsQ: number;
   /** Quality level of the financials file (growth.json rows built from one; null otherwise). */
   quality: 'good' | 'partial' | 'limited' | null;
 }
@@ -68,8 +71,9 @@ export const MAX_YEARS = 10;
 const yoyList = (value: unknown, max = MAX_QUARTERS): (number | null)[] =>
   Array.isArray(value) ? value.slice(0, max).map((entry) => toFinite(entry)) : [];
 /** Bit i of a mask → slot i (growth.json `tQ` / `tY`). */
+const maskBits = (mask: unknown) => typeof mask === 'number' && Number.isInteger(mask) && mask > 0 ? mask : 0;
 const maskFlags = (mask: unknown, length: number): boolean[] => {
-  const bits = typeof mask === 'number' && Number.isInteger(mask) && mask > 0 ? mask : 0;
+  const bits = maskBits(mask);
   return Array.from({ length }, (_, slot) => ((bits >> slot) & 1) === 1);
 };
 const dateText = (value: unknown) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null);
@@ -95,6 +99,7 @@ export function parseGrowthRecord(value: unknown): GrowthRecord | null {
     originQ: { eps: 'us-growth', rev: 'us-growth' },
     originY: null,
     derivedQ: [],
+    excludedEpsQ: 0,
     quality: null,
   };
 }
@@ -120,7 +125,7 @@ export function parseGrowthFile(data: unknown): GrowthFile | null {
 // ---------------------------------------------------------------- report/growth.json
 
 /** Column order of the contract; used when a file omits `fields`. */
-export const REPORT_GROWTH_FIELDS = ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ'] as const;
+export const REPORT_GROWTH_FIELDS = ['symbol', 'lv', 'src', 'qEnd', 'yEnd', 'epsQ', 'revQ', 'epsY', 'revY', 'tQ', 'tY', 'srcY', 'dQ', 'gQ'] as const;
 const QUALITY_LEVELS = ['good', 'partial', 'limited'] as const;
 
 /** One `rows` entry of growth.json → [symbol, record]; null for a row without a usable symbol. */
@@ -158,6 +163,7 @@ export function parseReportGrowthRow(row: unknown, fields: readonly string[] = R
       originQ: { eps: quarterOrigin, rev: quarterOrigin },
       originY: annualOrigin,
       derivedQ: maskFlags(get('dQ'), MAX_QUARTERS),
+      excludedEpsQ: maskBits(get('gQ')) & ((1 << MAX_QUARTERS) - 1),
       quality: level,
     },
   ];
@@ -225,6 +231,7 @@ export function mergeGrowth(yahoo: GrowthFile | null | undefined, financials: Gr
       epsYoY: useEps ? y.epsYoY : f.epsYoY,
       epsTurn: useEps ? y.epsTurn : f.epsTurn,
       epsTurnQ: useEps ? y.epsTurnQ : f.epsTurnQ,
+      excludedEpsQ: useEps ? y.excludedEpsQ : f.excludedEpsQ,
       revYoY: useRev ? y.revYoY : f.revYoY,
       basis: useEps ? y.basis : f.basis,
       latest: (useEps && useRev) || newer ? (y.latest ?? f.latest) : (f.latest ?? y.latest),
