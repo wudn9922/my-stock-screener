@@ -36,7 +36,8 @@ test('growth grades and sources can be read by tapping a growth value', async ({
   await expect(dialog).toContainText('來源：季度 SEC XBRL frames');
   await dialog.getByRole('button', { name: '關閉' }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(row.getByRole('link', { name: /RIVN.*圖表/ })).toBeVisible();
+  await row.getByRole('link', { name: /RIVN.*圖表/ }).click();
+  await expect(page).toHaveURL(/page=chart&symbol=RIVN/);
 });
 
 test('temporary filters reset across groups and markets, start from the URL on fresh visits, survive a nav round trip and reset on a repeated nav tap', async ({ page }) => {

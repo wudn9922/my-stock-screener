@@ -42,7 +42,7 @@ async function swipe(target: Locator, dx: number) {
 
 test('a filtered screener result steps through its stocks in order on the chart, keeping timeframe and view', async ({ page }, info) => {
   await screener(page, 'vol:59000000');
-  const rows = page.locator('.screener-row-link');
+  const rows = page.locator('.screener-row');
   await expect(rows).toHaveCount(11);
   const symbols = await rowSymbols(rows);
   expect(new Set(symbols).size).toBe(11);
@@ -142,7 +142,7 @@ test('a filtered screener result steps through its stocks in order on the chart,
 
 test('a chart opened from search has no list bar, and financials of a listed stock keep it', async ({ page }) => {
   await screener(page, 'vol:59000000');
-  const rows = page.locator('.screener-row-link');
+  const rows = page.locator('.screener-row');
   const symbols = await rowSymbols(rows);
   await rows.nth(4).click();
   await expectChart(page, symbols[4]!);
@@ -176,7 +176,7 @@ test('a filtered, scrolled screener survives the chart and Back, then a repeated
   await page.locator('#main').evaluate((main) => { main.scrollTop = main.scrollHeight; });
   await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(4000);
   const pageScroll = await mainScroll(page);
-  const visibleRow = page.locator('.screener-row-link').filter({ visible: true }).nth(3);
+  const visibleRow = page.locator('.screener-row').filter({ visible: true }).nth(3);
   const symbol = new URL((await visibleRow.getAttribute('href'))!, page.url()).searchParams.get('symbol')!;
   // A plain click would first scroll the row into view; the positions above are what must come back.
   await visibleRow.dispatchEvent('click');
@@ -191,7 +191,7 @@ test('a filtered, scrolled screener survives the chart and Back, then a repeated
   await expect(page.locator('.result-count')).toContainText('301');
   expect(await list.evaluate((element) => element.scrollTop)).toBe(4000);
   expect(await mainScroll(page)).toBe(pageScroll);
-  await expect(page.locator(`.screener-row-link[href*="symbol=${encodeURIComponent(symbol)}"]`)).toBeVisible();
+  await expect(page.locator(`.screener-row[href*="symbol=${encodeURIComponent(symbol)}"]`)).toBeVisible();
 
   // Through the bottom bar: away to the chart and back to 選股 restores the same view.
   await primary(page).getByRole('button', { name: '個股', exact: true }).click();

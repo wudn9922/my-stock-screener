@@ -1,6 +1,6 @@
 import { PageFooterNote } from '../ui/PageFooterNote';
 import { screenerCsv, screenerCsvName } from './screenerCsv';
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type UIEvent } from 'react';
 import { ArrowDownUp, ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
@@ -249,41 +249,42 @@ function Row({
       .filter(Boolean)
       .join(' · ')
     : '';
-  return (
-    <div
-      className={status === 'matched' ? 'screener-row' : `screener-row is-${status}`}
-      style={{ transform: `translateY(${top}px)` }}
-      title={compactTitle || undefined}
-    >
-      <a
-        className="screener-row-link"
-        aria-label={`開啟 ${displayTicker(item.symbol)} ${item.name} 圖表`}
-        href={serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' })}
-        onClick={(event) => {
-          if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-          event.preventDefault();
-          onOpen();
-        }}
-      />
-      <span className="row-id">
-        {status === 'matched' ? (
-          ticker
-        ) : (
-          <span className="row-sym">
-            {ticker}
-            <span className={`status-badge ${status}`} title={status === 'failed' ? '沒有取得行情' : '有行情，但未符合均線條件'}>
-              {STATUS_BADGE_LABELS[status]}
-            </span>
+  const rowProps = {
+    className: status === 'matched' ? 'screener-row' : `screener-row is-${status}`,
+    style: { transform: `translateY(${top}px)` },
+    title: compactTitle || undefined,
+  };
+  const linkProps = {
+    href: serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' }),
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+      event.preventDefault();
+      onOpen();
+    },
+  };
+  const identity = (
+    <span className="row-id">
+      {status === 'matched' ? (
+        ticker
+      ) : (
+        <span className="row-sym">
+          {ticker}
+          <span className={`status-badge ${status}`} title={status === 'failed' ? '沒有取得行情' : '有行情，但未符合均線條件'}>
+            {STATUS_BADGE_LABELS[status]}
           </span>
-        )}
-        <EarningsBadge symbol={item.symbol} />
-        <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
-        {marketDate && item.asOf !== marketDate && (
-          <small className="row-observation-date" title={`市場資料日 ${marketDate}；本列未與其他日期直接比較`}>
-            {item.asOf ? `資料日 ${item.asOf}` : '資料日不明'}
-          </small>
-        )}
-      </span>
+        </span>
+      )}
+      <EarningsBadge symbol={item.symbol} />
+      <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
+      {marketDate && item.asOf !== marketDate && (
+        <small className="row-observation-date" title={`市場資料日 ${marketDate}；本列未與其他日期直接比較`}>
+          {item.asOf ? `資料日 ${item.asOf}` : '資料日不明'}
+        </small>
+      )}
+    </span>
+  );
+  const cells = (
+    <>
       <span className={shownPills.length ? 'row-mas has-metrics' : 'row-mas'}>
         {shownPills.map(({ key, pill }) => pill.growth ? (
           <button
@@ -335,6 +336,14 @@ function Row({
         <span className="change-pill"><i className="change-sign">{changeSign}</i>{changeSign ? change.slice(1) : change}</span>
       </span>
       {!compact && <ChevronRight size={16} className="row-chevron" aria-hidden="true" />}
+    </>
+  );
+  if (!shownPills.some(({ pill }) => pill.growth)) return <a {...rowProps} {...linkProps}>{identity}{cells}</a>;
+  // Keep the chart link and the growth details buttons separate interactive targets.
+  return (
+    <div {...rowProps}>
+      <a {...linkProps} className="screener-row-link" aria-label={`開啟 ${displayTicker(item.symbol)} ${item.name} 圖表`}>{identity}</a>
+      {cells}
       {growthDetail && (
         <ConsoleDialog title={`${displayTicker(item.symbol)} 成長率資料`} onClose={() => setGrowthDetail(undefined)}>
           {growthDetail.details.map((line, index) => <p key={index}>{line}</p>)}
