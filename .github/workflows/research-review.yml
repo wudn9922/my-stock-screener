@@ -6,6 +6,7 @@ on:
       - 'scripts/**'
       - 'kline_integrity.py'
       - 'main.py'
+      - 'tpex_otc.py'
       - 'report_metrics.py'
       - 'docs/report/research/**'
       - 'tests/**'

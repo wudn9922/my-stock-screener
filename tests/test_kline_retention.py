@@ -31,7 +31,7 @@ class KLineRetentionTest(unittest.TestCase):
 
     def test_failed_atomic_update_preserves_the_existing_k_line_csv(self):
         import pandas as pd
-        source = Path(__file__).resolve().parents[1] / "main.py"
+        source = Path(__file__).resolve().parents[1] / "tpex_otc.py"
         tree = ast.parse(source.read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "write_ohlcv_csv_atomic")
         import kline_integrity
