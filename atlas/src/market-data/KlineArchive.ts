@@ -103,8 +103,8 @@ export class KlineArchive {
     owner?.addEventListener('pagehide', leave, { once: true });
     const signal = AbortSignal.any([navigation.signal, AbortSignal.timeout(this.options.timeoutMs ?? 8000)]);
     try {
-      // The raw branch's index and CSV URLs have independent CDN caches. A new
-      // URL also bypasses the CDN when a browser cache reload alone is insufficient.
+      // The raw branch's index and CSV can be cached separately. Reload the
+      // browser cache and give intermediaries a distinct URL on the retry.
       const url = this.base + path + (reload ? `?archive-reload=${this.now()}` : '');
       const response = await this.fetcher(url, reload ? { signal, cache: 'reload' } : { signal });
       const value = await read(response);

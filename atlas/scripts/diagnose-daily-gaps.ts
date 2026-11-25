@@ -126,7 +126,7 @@ const recentInput = recentFile && recentFile !== '-' ? recentFile : undefined;
 const live = recentInput ? normalizeLive(JSON.parse(read(recentInput)), traceSymbol, Date.now() / 1000) : null;
 if (recentInput && !live) print({ stage: 'normalizeLive', error: 'recent Yahoo response rejected' });
 const localLines = existsSync(local) ? read(local).trimEnd().split(/\r?\n/).slice(1) : [];
-const recent = live?.bars ?? parseRecent(localLines, traceSymbol, recentCutoff(expected.at(-1)!));
+const recent = live ? [...live.bars] : parseRecent(localLines, traceSymbol, recentCutoff(expected.at(-1)!));
 const merged = mergeArchiveDaily(complete.bars, recent, traceSymbol, undefined, new Set(complete.closedSessions));
 print({ stage: live ? 'provided normalizeLive / mergeArchiveDaily' : 'snapshot mergeArchiveDaily', recent: recent.length, splitMismatch: merged.splitMismatch });
 trace('merged usableBarResult', usableBarResult({ ...complete, bars: merged.bars }, traceSymbol, '1D'));
