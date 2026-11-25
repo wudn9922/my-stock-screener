@@ -235,7 +235,7 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.remote("main"), self.base)
 
     def test_legacy_main_publisher_keeps_committing_csvs_with_switch_off(self):
-        function = next(n for n in ast.parse((REPO / "main.py").read_text(encoding="utf-8-sig")).body
+        function = next(n for n in ast.parse((REPO / "git_publish.py").read_text(encoding="utf-8-sig")).body
                         if isinstance(n, ast.FunctionDef) and n.name == "push_report_to_github")
 
         def run_git_command(command):
@@ -245,7 +245,7 @@ class GeneratedStorageTests(unittest.TestCase):
             return subprocess.run(command, capture_output=True).returncode
 
         namespace = {"os": os, "subprocess": subprocess, "run_git_command": run_git_command}
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "main.py", "exec"), namespace)
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "git_publish.py", "exec"), namespace)
         self.git("branch", "--set-upstream-to=origin/main", "main")
         self.write("data/AAPL.csv", b"updated retained K-line")
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
@@ -695,11 +695,11 @@ class InventoryTests(unittest.TestCase):
     def test_main_embedded_publisher_cannot_push_when_switch_is_enabled(self):
         # Execute the actual publisher without importing main's network clients.
         import ast
-        tree = ast.parse((REPO / "main.py").read_text(encoding="utf-8-sig"))
+        tree = ast.parse((REPO / "git_publish.py").read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "push_report_to_github")
         sentinel = RuntimeError("legacy git path reached")
         namespace = {"os": os, "run_git_command": lambda *a: (_ for _ in ()).throw(sentinel)}
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "main.py", "exec"), namespace)
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "git_publish.py", "exec"), namespace)
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": "1"}):
             self.assertTrue(namespace["push_report_to_github"]())
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
