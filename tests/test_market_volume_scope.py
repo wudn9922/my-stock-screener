@@ -10,6 +10,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import main
+import screener_config
 
 
 class MarketVolumeScopeTest(unittest.TestCase):
@@ -51,7 +52,7 @@ class MarketVolumeScopeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             for symbol, frame in frames.items():
                 frame.iloc[:-2].to_csv(Path(directory) / f'{symbol}.csv')
-            with patch.object(main, 'DATA_DIR', directory), \
+            with patch.object(screener_config, 'DATA_DIR', directory), \
                  patch.object(main, 'download_market_data', return_value=frames['LOW']) as download, \
                  patch.object(main, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
                  patch.object(main, 'build_stock_data', return_value={}), \
@@ -73,7 +74,7 @@ class MarketVolumeScopeTest(unittest.TestCase):
         )
         symbols = ['1101.TW', '6488.TWO']
         with tempfile.TemporaryDirectory() as directory:
-            with patch.object(main, 'DATA_DIR', directory), \
+            with patch.object(screener_config, 'DATA_DIR', directory), \
                  patch.object(main, 'download_market_data', return_value=frame) as download, \
                  patch.object(main, 'extract_yfinance_data', return_value=frame), \
                  patch('sys.stdout', new_callable=io.StringIO):
@@ -94,7 +95,7 @@ class MarketVolumeScopeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             for symbol, frame in frames.items():
                 frame.iloc[:-2].to_csv(Path(directory) / f'{symbol}.csv')
-            with patch.object(main, 'DATA_DIR', directory), \
+            with patch.object(screener_config, 'DATA_DIR', directory), \
                  patch.object(main, 'download_market_data', return_value=frames['2330.TW']), \
                  patch.object(main, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
                  patch.object(main, 'build_stock_data', return_value={}), \

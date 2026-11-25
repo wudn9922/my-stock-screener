@@ -18,6 +18,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+import screener_config  # noqa: E402
+
 
 def import_main():
     if "main" in sys.modules:
@@ -57,16 +59,16 @@ class ProcessCustomGroupsTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.saved = {
-            name: getattr(self.main, name)
-            for name in ("DATA_DIR", "download_custom_stock")
+            (target, name): getattr(target, name)
+            for target, name in ((screener_config, "DATA_DIR"), (self.main, "download_custom_stock"))
         }
-        self.main.DATA_DIR = self.tmp.name
+        screener_config.DATA_DIR = self.tmp.name
         self.frames = {"AAA": FLAT, "BBB": RISING, "DDD": FALLING}
         self.main.download_custom_stock = self.fake_download
 
     def tearDown(self):
-        for name, value in self.saved.items():
-            setattr(self.main, name, value)
+        for (target, name), value in self.saved.items():
+            setattr(target, name, value)
 
     def fake_download(self, raw_ticker, group_key=None, group_market=None):
         if raw_ticker == "BOOM":
@@ -212,9 +214,9 @@ class FailedRecordHardeningTest(unittest.TestCase):
         self.main = import_main()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.saved_dir = self.main.DATA_DIR
-        self.main.DATA_DIR = self.tmp.name
-        self.addCleanup(setattr, self.main, "DATA_DIR", self.saved_dir)
+        self.saved_dir = screener_config.DATA_DIR
+        screener_config.DATA_DIR = self.tmp.name
+        self.addCleanup(setattr, screener_config, "DATA_DIR", self.saved_dir)
 
     def test_garbage_ma_list_does_not_raise(self):
         out = []

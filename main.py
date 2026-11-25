@@ -29,61 +29,25 @@ from tpex_otc import (
 )
 
 
-# =========================================================================
-# 全域核心參數
-# =========================================================================
-# 僅供每日 LINE 報告 tw_all 清單；行情下載與 CSV 更新不設成交股數門檻。
-# tw_all 另需 MA20 上彎，並依 RS 百分位排序（見 _market_scan_report 的 latent_rules）。
-TW_MIN_VOLUME = 1_000_000
-
-HTTP_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
-
-DATA_DIR = "data"
-REPORT_NON_TRADING_DATES = {"TW": frozenset(), "US": frozenset()}
-DOCS_DIR = "docs"
-# 252 根可算 52 週高點；新 CSV 初始化下載 250d，既有 CSV 每天累積一根
-MAX_DAYS = 260
-
-# 少於此根數的 CSV 由 backfill_short_csvs 下載 1 年日 K 補齊（預設不啟用）
-BACKFILL_ENABLED = False
-BACKFILL_MIN_ROWS = 240
-BACKFILL_MAX_PER_RUN = 200
-
-# data/*.csv 是永久 K 線紀錄，不再依日期或掃描名單刪除。
-
-
-# =========================================================================
-# Atlas 報告 JSON（docs/report/，網址 /my-stock-screener/report/）
-# =========================================================================
-REPORT_DIR = os.path.join(DOCS_DIR, "report")
-REPORT_SERIES_DIR = os.path.join(REPORT_DIR, "series")
-REPORT_JSON_VERSION = 1
-
-# =========================================================================
-# LIFF、報告與畫線同步
-# =========================================================================
-
-# 圖表報告專用 LIFF
-REPORT_LIFF_ID = "2010330411-6JhrotT9"
-REPORT_LIFF_URL = (
-    "https://liff.line.me/"
-    f"{REPORT_LIFF_ID}"
-)
-
-# 舊 LIFF ID 保留供既有捷徑辨識；新報告入口直接開啟 Atlas 內的控制台。
-SETTING_LIFF_ID = "2010330411-SbwvRXRN"
-SETTING_LIFF_URL = f"{REPORT_LIFF_URL}?page=console"
-
-# 原本另一套控制台，保持不變
-BITGET_SETTING_URL = (
-    "https://liff.line.me/"
-    "2010535859-y3CoAWaC"
+import screener_config
+from screener_config import (
+    TW_MIN_VOLUME,
+    HTTP_HEADERS,
+    DATA_DIR,
+    REPORT_NON_TRADING_DATES,
+    DOCS_DIR,
+    MAX_DAYS,
+    BACKFILL_ENABLED,
+    BACKFILL_MIN_ROWS,
+    BACKFILL_MAX_PER_RUN,
+    REPORT_DIR,
+    REPORT_SERIES_DIR,
+    REPORT_JSON_VERSION,
+    REPORT_LIFF_ID,
+    REPORT_LIFF_URL,
+    SETTING_LIFF_ID,
+    SETTING_LIFF_URL,
+    BITGET_SETTING_URL,
 )
 
 # =========================================================================
@@ -99,30 +63,11 @@ from sector_weekly import (
 
 from screener_common import TW_STOCK_NAMES
 
-# =========================================================================
-# 自訂群組篩選設定
-# =========================================================================
-
-# True：Supabase 自訂群組只要可下載就顯示
-# False：套用均線距離條件
-CUSTOM_GROUP_TEST_MODE = (
-    os.environ.get(
-        "CUSTOM_GROUP_TEST_MODE",
-        "false"
-    )
-    .strip()
-    .lower()
-    in {
-        "1",
-        "true",
-        "yes",
-        "on"
-    }
+from screener_config import (
+    CUSTOM_GROUP_TEST_MODE,
+    CUSTOM_MA_MIN_RATIO,
+    CUSTOM_MA_MAX_RATIO,
 )
-
-# 股價位於均線下方 3% 至上方 1%
-CUSTOM_MA_MIN_RATIO = 0.97
-CUSTOM_MA_MAX_RATIO = 1.01
 
 
 # =========================================================================
@@ -1245,7 +1190,7 @@ def _scan_analysis_frames(tickers):
     for ticker in tickers:
         market = "TW" if ticker.endswith((".TW", ".TWO")) else "US"
         requested_markets.add(market)
-        path = os.path.join(DATA_DIR, f"{ticker}.csv")
+        path = os.path.join(screener_config.DATA_DIR, f"{ticker}.csv")
         if not os.path.exists(path):
             continue
         try:
@@ -1277,7 +1222,7 @@ def scan_market(tickers, report_min_volume=0, **report_options):
 def collect_market_frames(tickers):
     """下載／更新所有 tickers 的 CSV（不設成交股數門檻），回傳報告分析用的日 K（_scan_analysis_frames）。"""
     os.makedirs(
-        DATA_DIR,
+        screener_config.DATA_DIR,
         exist_ok=True
     )
 
@@ -1291,7 +1236,7 @@ def collect_market_frames(tickers):
     # -----------------------------------------------------------------
     for ticker in tickers:
         csv_path = os.path.join(
-            DATA_DIR,
+            screener_config.DATA_DIR,
             f"{ticker}.csv"
         )
 
@@ -1397,7 +1342,7 @@ def collect_market_frames(tickers):
                 )
 
                 csv_path = os.path.join(
-                    DATA_DIR,
+                    screener_config.DATA_DIR,
                     f"{ticker}.csv"
                 )
 
@@ -1540,7 +1485,7 @@ def collect_market_frames(tickers):
                     continue
 
                 csv_path = os.path.join(
-                    DATA_DIR,
+                    screener_config.DATA_DIR,
                     f"{ticker}.csv"
                 )
 
@@ -1787,7 +1732,7 @@ def report_rs_rank_of(metrics_lookup):
 def backfill_short_csvs(
     tickers,
     max_per_run=BACKFILL_MAX_PER_RUN,
-    data_dir=DATA_DIR
+    data_dir=screener_config.DATA_DIR
 ):
     """
     少於 BACKFILL_MIN_ROWS 根的 CSV 下載 1 年日 K 合併（同日期以本地資料為準），
@@ -1999,7 +1944,7 @@ def _failed_stock_symbol(
     for candidate in candidates:
         if os.path.exists(
             os.path.join(
-                DATA_DIR,
+                screener_config.DATA_DIR,
                 f"{candidate}.csv"
             )
         ):
@@ -2217,7 +2162,7 @@ def process_custom_groups(
     )
 
     os.makedirs(
-        DATA_DIR,
+        screener_config.DATA_DIR,
         exist_ok=True
     )
 
@@ -2280,7 +2225,7 @@ def process_custom_groups(
                 continue
 
             csv_path = os.path.join(
-                DATA_DIR,
+                screener_config.DATA_DIR,
                 f"{actual_ticker}.csv"
             )
 
@@ -2889,7 +2834,7 @@ from git_publish import run_git_command, get_csv_last_date, push_report_to_githu
 
 
 def prune_stale_csv(
-    data_dir=DATA_DIR,
+    data_dir=screener_config.DATA_DIR,
     max_age_days=None
 ):
     """K 線 CSV 是 owner 永久保留的紀錄；保留呼叫介面，但永不刪檔。
@@ -3014,16 +2959,7 @@ INDEX_TREND_ICON_MAP = {
 }
 
 
-def round_report_number(value, digits=2):
-    number = safe_float(value, None)
-
-    if number is None:
-        return None
-
-    if number != 0 and abs(number) < 1:
-        digits = max(digits, 4)
-
-    return round(number, digits)
+from screener_common import round_report_number
 
 
 def parse_index_trend_text(text):
@@ -4012,7 +3948,7 @@ def write_report_json(
 def build_report_universe(
     tw_tickers,
     us_tickers,
-    data_dir=DATA_DIR,
+    data_dir=screener_config.DATA_DIR,
     downloader=None,
     report_dir=REPORT_DIR
 ):
