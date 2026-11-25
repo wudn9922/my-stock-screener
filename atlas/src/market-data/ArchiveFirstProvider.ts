@@ -1,4 +1,4 @@
-import { ARCHIVE_SOURCE, KlineArchive, klineArchive, mergeArchiveDaily } from './KlineArchive';
+import { archiveSource, KlineArchive, klineArchive, mergeArchiveDaily } from './KlineArchive';
 import { aggregateBars } from './StaticSeriesProvider';
 import { calendarPeriodStart, filterBarsByRange, getMarketProfile, type BarResult, type CorporateEventsResult,
   type MarketDataProvider, type MarketRange, type Quote, type Timeframe } from './MarketDataProvider';
@@ -32,8 +32,8 @@ export function archiveQuote(symbol: string, result: BarResult): Quote {
     market: profile, source: result.source, dataState: 'delayed', retrievedAt: result.asOf };
 }
 
-export function archiveUnavailableSource(lastDate: string): string {
-  return `${ARCHIVE_SOURCE} · 即時報價暫時無法取得，顯示至 ${lastDate} 收盤`;
+export function archiveUnavailableSource(lastDate: string, incomplete?: boolean): string {
+  return `${archiveSource(incomplete)} · 即時報價暫時無法取得，顯示至 ${lastDate} 收盤`;
 }
 
 export function archivePeriod(daily: BarResult, symbol: string, timeframe: Timeframe, range?: MarketRange): BarResult {
@@ -168,11 +168,12 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
   const daily = await archive.getDaily(value.symbol);
   if (!daily) return current;
   const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol,undefined,new Set([...(daily.closedSessions ?? []),...closed]));
+  const dailyArchive = daily.archive ?? current.archive!;
   const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote: value.quote,
     source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格'
-      : value.source?.includes(TWSE_MIS_SOURCE) ? `${ARCHIVE_SOURCE} · 缺少交易日由 Yahoo／MIS 補上`
-      : `${ARCHIVE_SOURCE} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
-    archive: { lastDate: current.archive!.lastDate, status: merged.splitMismatch ? 'split' : 'live' } };
+      : value.source?.includes(TWSE_MIS_SOURCE) ? `${archiveSource(dailyArchive.incomplete)} · 缺少交易日由 Yahoo／MIS 補上`
+      : `${archiveSource(dailyArchive.incomplete)} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
+    archive: { ...dailyArchive, status: merged.splitMismatch ? 'split' : 'live' } };
   const period = archivePeriod(base, value.symbol, timeframe);
   // Keep optional pre-archive weekly/monthly history unless its adjustment basis changed.
   if (!merged.splitMismatch && (timeframe === '1W' || timeframe === '1M'))

@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { dailyBars, mockSite } from './mocks';
 
 const archiveRoot = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
-async function archived(page: Page, symbol = 'AAPL') {
+async function archived(page: Page, symbol = 'AAPL', staleYear?: number) {
   await mockMarketLogin(page); // market-chart (live quotes, Yahoo fallback) needs a LINE login
   await mockSite(page);
   const bars = dailyBars(symbol, 150);
@@ -17,14 +17,29 @@ async function archived(page: Page, symbol = 'AAPL') {
   const requested: string[] = [];
   await page.route(archiveRoot + '**', route => {
     const path = route.request().url().slice(archiveRoot.length); requested.push(path);
-    if (path.startsWith('index/') && !path.endsWith('/'+encodeURIComponent(encodeURIComponent(symbol))+'.json')) return route.fulfill({status:404});
+    const [pathname, reload] = path.split('?');
+    if (path.startsWith('index/') && !pathname!.endsWith('/'+encodeURIComponent(encodeURIComponent(symbol))+'.json')) return route.fulfill({status:404});
     if (path.startsWith('index/')) return route.fulfill({json:archiveIndexFixture(symbol,
       Object.fromEntries([...byYear].map(([year,rows])=>[year,'Date,Open,High,Low,Close,Volume\n'+rows.join('\n')+'\n'])))});
-    const rows = byYear.get(Number(path.match(/(\d{4})\.csv/)?.[1]));
+    const year = Number(path.match(/(\d{4})\.csv/)?.[1]);
+    const stored = byYear.get(year);
+    const rows = year === staleYear && !reload ? stored?.slice(0, -1) : stored;
     return route.fulfill(rows ? { contentType:'text/csv',body:'Date,Open,High,Low,Close,Volume\n'+rows.join('\n')+'\n' } : {status:404});
   });
   return requested;
 }
+
+test('ZTS daily reloads a stale annual CSV without switching away from the archive', async ({ page }) => {
+  const requests = await archived(page, 'ZTS', 2026);
+  await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502 }));
+  await page.goto('./?page=chart&symbol=ZTS&tf=1D');
+  const source = page.getByTestId('source-label');
+  await expect(source).toContainText('GitHub 永久封存');
+  await expect(source).toContainText('顯示至 2026-10-08 收盤');
+  await expect(source).not.toContainText('部分年度暫時無法讀取');
+  expect(requests.filter(path => path.startsWith('index/us/ZTS.json?archive-reload='))).toHaveLength(1);
+  expect(requests.filter(path => path.startsWith('us/ZTS/2026.csv?archive-reload='))).toHaveLength(1);
+});
 
 for (const failure of ['502','timeout','invalid'] as const) test(`C1/C2 archive daily, weekly and monthly survive Yahoo ${failure}`, async ({page}, info) => {
   const archiveRequests = await archived(page);

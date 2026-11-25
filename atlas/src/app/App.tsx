@@ -701,7 +701,7 @@ export function App({
           const split = current.archive.status === 'split';
           const next: BarResult = { ...current,
             archive: { ...current.archive, status: split ? 'split' : 'unavailable' },
-            source: split ? `${current.source} · 即時報價暫時無法取得` : archiveUnavailableSource(current.archive.lastDate) };
+            source: split ? `${current.source} · 即時報價暫時無法取得` : archiveUnavailableSource(current.archive.lastDate, current.archive.incomplete) };
           engine.current?.refreshSource(next); liveState.current.result = next; setResult(next);
         }
       } });
