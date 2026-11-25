@@ -2,6 +2,7 @@ import unittest
 
 try:
     import main
+    import line_messaging
 except ImportError:  # main.py needs yfinance and friends
     main = None
 
@@ -44,12 +45,12 @@ class CombinedLineMessagesTest(unittest.TestCase):
             sent.append(message)
             return 200
 
-        original = main.send_line_message
-        main.send_line_message = fake_send
+        original = line_messaging.send_line_message
+        line_messaging.send_line_message = fake_send
         try:
             count = main.send_line_messages_combined(messages, "t", "U1", **kwargs)
         finally:
-            main.send_line_message = original
+            line_messaging.send_line_message = original
         return count, sent
 
     def test_short_messages_become_one(self):
