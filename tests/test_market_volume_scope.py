@@ -10,6 +10,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import main
+import market_scan
 import screener_config
 
 
@@ -53,9 +54,9 @@ class MarketVolumeScopeTest(unittest.TestCase):
             for symbol, frame in frames.items():
                 frame.iloc[:-2].to_csv(Path(directory) / f'{symbol}.csv')
             with patch.object(screener_config, 'DATA_DIR', directory), \
-                 patch.object(main, 'download_market_data', return_value=frames['LOW']) as download, \
-                 patch.object(main, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
-                 patch.object(main, 'build_stock_data', return_value={}), \
+                 patch.object(market_scan, 'download_market_data', return_value=frames['LOW']) as download, \
+                 patch.object(market_scan, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
+                 patch.object(market_scan, 'build_stock_data', return_value={}), \
                  patch('sys.stdout', new_callable=io.StringIO):
                 matches = main.scan_market(tw_symbols, report_min_volume=main.TW_MIN_VOLUME)
                 matches += main.scan_market(us_symbols)
@@ -75,8 +76,8 @@ class MarketVolumeScopeTest(unittest.TestCase):
         symbols = ['1101.TW', '6488.TWO']
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(screener_config, 'DATA_DIR', directory), \
-                 patch.object(main, 'download_market_data', return_value=frame) as download, \
-                 patch.object(main, 'extract_yfinance_data', return_value=frame), \
+                 patch.object(market_scan, 'download_market_data', return_value=frame) as download, \
+                 patch.object(market_scan, 'extract_yfinance_data', return_value=frame), \
                  patch('sys.stdout', new_callable=io.StringIO):
                 self.assertEqual(main.scan_market(symbols, report_min_volume=main.TW_MIN_VOLUME), [])
             download.assert_called_once_with(symbols, '250d')
@@ -96,9 +97,9 @@ class MarketVolumeScopeTest(unittest.TestCase):
             for symbol, frame in frames.items():
                 frame.iloc[:-2].to_csv(Path(directory) / f'{symbol}.csv')
             with patch.object(screener_config, 'DATA_DIR', directory), \
-                 patch.object(main, 'download_market_data', return_value=frames['2330.TW']), \
-                 patch.object(main, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
-                 patch.object(main, 'build_stock_data', return_value={}), \
+                 patch.object(market_scan, 'download_market_data', return_value=frames['2330.TW']), \
+                 patch.object(market_scan, 'extract_yfinance_data', side_effect=lambda _data, symbol: frames[symbol]), \
+                 patch.object(market_scan, 'build_stock_data', return_value={}), \
                  patch('sys.stdout', new_callable=io.StringIO):
                 matches = main.scan_market(list(frames), report_min_volume=main.TW_MIN_VOLUME)
             self.assertEqual({item['ticker'] for item in matches}, {'2330.TW'})
