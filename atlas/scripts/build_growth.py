@@ -55,7 +55,8 @@ Output (compact, rows sorted by symbol; keys as in the financials file names):
   src (sec|yahoo|mops|frames|finmind: of the quarterly block, else of the annual one), qEnd, yEnd (period end
   of slot 0 for quarterly / annual), epsQ (up to 12), revQ (up to 12), epsY (up to 10), revY (up to 10),
   tQ, tY (bit i set = EPS turnaround in slot i of quarterly / annual), srcY (source of the annual block,
-  null without one), dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays
+  null without one), dQ (bit i set = quarterly slot i compares a derived Q4), gQ (bit i set = the EPS YoY
+  in quarter i is missing because low-confidence EPS was excluded). Trailing nulls of the arrays
   are cut, so a row carries as many quarters as its source has (a file written with the old 4-slot horizon
   is still valid: its arrays are just shorter). A symbol without any usable value gets no row. The market
   is the symbol's suffix (.TW / .TWO = Taiwan). The file is only rewritten when its content changes, so
@@ -81,7 +82,7 @@ import tw_stock_dividends as stock_dividends
 
 VERSION = 1
 SOURCE = "financials+official"
-FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ"]
+FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ", "gQ"]
 # Quarterly YoY values per row: the newest 12 quarters (each needs the same quarter a year earlier, so 16 quarters of history).
 QUARTER_SLOTS = 12
 # Annual YoY values per row from the financials files (each needs the year before it: 11 fiscal years for 10 values).
@@ -169,12 +170,14 @@ def read_periods(section, quarterly, market=None):
             continue
         grade = eps_quality[i] if i < len(eps_quality) and isinstance(eps_quality[i], dict) else {}
         us, q4 = market != "TW", bool(quarterly and fq == 4)
-        gated = False
+        gated = {}
         if us and not eps_usable(grade.get("epsDiluted"), us, q4):
-            gated = gated or eps_d[i] is not None
+            if eps_d[i] is not None:
+                gated["epsD"] = eps_d[i]
             eps_d[i] = None
         if us and not eps_usable(grade.get("epsBasic"), us, q4):
-            gated = gated or eps_b[i] is not None
+            if eps_b[i] is not None:
+                gated["epsB"] = eps_b[i]
             eps_b[i] = None
         src = srcs[i] if i < len(srcs) and isinstance(srcs[i], str) else "yahoo"
         periods.append({
@@ -182,6 +185,7 @@ def read_periods(section, quarterly, market=None):
             "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i], "ni": income[i],
             # a gated Q4 still anchors this filing block's recency (dropping it could switch to a shorter block)
             "gatedQ4Eps": bool(gated and q4),
+            "gatedEps": gated,
             "src": src if src in ("sec", "finmind") else "yahoo",
         })
     return periods
@@ -298,7 +302,7 @@ def trim(values):
 
 def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     """
-    → block {eps, rev, mask, end, src, derived} over `slots` periods (newest first, trailing nulls cut),
+    → block {eps, rev, mask, end, src, derived, excluded} over `slots` periods (newest first, trailing nulls cut),
     or None when nothing is computable or the newest period is stale. `pair(current, base)` →
     (EPS yoy, turnaround, revenue yoy) (default: default_pair with the split events). A period dict
     with "derived": True sets the slot's bit in `derived`.
@@ -312,7 +316,7 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     by_number = index_periods(periods, quarterly)
     top = period_number(latest, quarterly)
     step = 4 if quarterly else 1
-    eps, rev, mask, derived = [], [], 0, 0
+    eps, rev, mask, derived, excluded = [], [], 0, 0, 0
     for slot in range(slots):
         current, base = by_number.get(top - slot), by_number.get(top - slot - step)
         if current is None or base is None or not same_period(current, base):
@@ -321,6 +325,13 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
             continue
         if pair is None:
             value, turn, revenue = default_pair(current, base, events)
+            if quarterly and value is None and not turn and (current.get("gatedEps") or base.get("gatedEps")):
+                # Restore excluded values only for attribution. The published numbers and block choice stay gated.
+                raw_current = {**current, **current.get("gatedEps", {})}
+                raw_base = {**base, **base.get("gatedEps", {})}
+                raw_value, _ = eps_pair(raw_current, raw_base, events)
+                if raw_value is not None:
+                    excluded |= 1 << slot
         else:
             value, turn, revenue = pair(current, base)
         eps.append(value)
@@ -332,7 +343,8 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     eps, rev = trim(eps), trim(rev)
     if not (eps or rev or mask):
         return None
-    return {"eps": eps, "rev": rev, "mask": mask, "end": latest["end"], "src": latest["src"], "derived": derived}
+    return {"eps": eps, "rev": rev, "mask": mask, "end": latest["end"], "src": latest["src"],
+            "derived": derived, "excluded": excluded}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -346,7 +358,7 @@ def make_row(key, level, quarterly, annual):
     return [
         key, level, (quarterly or annual)["src"], q.get("end"), y.get("end"),
         q.get("eps", []), q.get("rev", []), y.get("eps", []), y.get("rev", []),
-        q.get("mask", 0), y.get("mask", 0), y.get("src"), q.get("derived", 0),
+        q.get("mask", 0), y.get("mask", 0), y.get("src"), q.get("derived", 0), q.get("excluded", 0),
     ]
 
 

@@ -418,12 +418,6 @@ export function averageText(average: { value: number | null; count: number } | n
 
 // ------------------------------------------------------------------ notes
 
-export const LEVEL_TEXT: Record<'good' | 'partial' | 'limited', string> = {
-  good: '資料完整',
-  partial: '部分缺漏',
-  limited: '資料有限',
-};
-
 /** Plain-Chinese explanations of quality.issues codes. */
 export const ISSUE_TEXT: Record<string, string> = {
   'mixed-basis': '部分欄位未在重編申報中提供，保留既有數值；同列包含不同申報基準。',

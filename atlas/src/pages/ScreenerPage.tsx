@@ -1,12 +1,14 @@
 import { PageFooterNote } from '../ui/PageFooterNote';
 import { screenerCsv, screenerCsvName } from './screenerCsv';
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type UIEvent } from 'react';
 import { ArrowDownUp, ChevronRight, Globe2, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { PageProps } from './pageProps';
 import { ReportGate } from './ReportGate';
 import { itemStatusOf, type GroupItem, type Report, type ReportGroup } from '../report/schema';
 import { getPeFigures, getScreenerPeFigures, type PeFigures, type ScreenerPeFigures } from '../app/dataSources';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
+import { ConsoleDialog } from '../ui/ConsoleDialog';
+import { LEVEL_TEXT } from '../ui/financials/qualityLabels';
 import { usePageActive } from '../app/pageActivity';
 import { chartList } from '../app/listContext';
 import { ScreenerChanges } from '../ui/ScreenerChanges';
@@ -22,6 +24,7 @@ import {
   STATUS_VIEW_LABELS,
   filterAndSortItems,
   gateForPill,
+  isGrowthPill,
   isRedundantRowNote,
   itemsForView,
   metricPill,
@@ -29,6 +32,7 @@ import {
   rowMetricPills,
   statusCounts,
   type MetricPill,
+  type PillContent,
   type SortMode,
   type StatusView,
 } from './screenerItems';
@@ -220,6 +224,7 @@ function Row({
   compact?: boolean;
   barScale?: number;
 }) {
+  const [growthDetail, setGrowthDetail] = useState<PillContent['growth']>();
   const tone = toneClass(item.changePct);
   const status = itemStatusOf(item);
   const ticker = <b>{displayTicker(item.symbol)}</b>;
@@ -235,46 +240,69 @@ function Row({
   const note = item.note && !isRedundantRowNote(item.note) ? item.note : '';
   const change = formatPercent(item.changePct);
   const changeSign = /^[+-]/.test(change) ? change[0] : '';
-  const shownPills = compact ? metricPills.slice(0, 2) : metricPills;
+  const shownPills = compact
+    ? [...metricPills.filter(({ pill }) => pill.growth), ...metricPills.filter(({ pill }) => !pill.growth)].slice(0, 2)
+    : metricPills;
   const hasPe = !!pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss);
   const compactTitle = compact
     ? [distances.length ? `距 ${distances.map(({ period, distance }) => `MA${period} ${formatPercent(distance, 1)}`).join('、')}` : '', note]
       .filter(Boolean)
       .join(' · ')
     : '';
-  return (
-    <a
-      className={status === 'matched' ? 'screener-row' : `screener-row is-${status}`}
-      style={{ transform: `translateY(${top}px)` }}
-      title={compactTitle || undefined}
-      href={serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' })}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-        event.preventDefault();
-        onOpen();
-      }}
-    >
-      <span className="row-id">
-        {status === 'matched' ? (
-          ticker
-        ) : (
-          <span className="row-sym">
-            {ticker}
-            <span className={`status-badge ${status}`} title={status === 'failed' ? '沒有取得行情' : '有行情，但未符合均線條件'}>
-              {STATUS_BADGE_LABELS[status]}
-            </span>
+  const rowProps = {
+    className: status === 'matched' ? 'screener-row' : `screener-row is-${status}`,
+    style: { transform: `translateY(${top}px)` },
+    title: compactTitle || undefined,
+  };
+  const linkProps = {
+    href: serializeRoute({ page: 'chart', symbol: item.symbol, tf: '1D' }),
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+      event.preventDefault();
+      onOpen();
+    },
+  };
+  const identity = (
+    <span className="row-id">
+      {status === 'matched' ? (
+        ticker
+      ) : (
+        <span className="row-sym">
+          {ticker}
+          <span className={`status-badge ${status}`} title={status === 'failed' ? '沒有取得行情' : '有行情，但未符合均線條件'}>
+            {STATUS_BADGE_LABELS[status]}
           </span>
-        )}
-        <EarningsBadge symbol={item.symbol} />
-        <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
-        {marketDate && item.asOf !== marketDate && (
-          <small className="row-observation-date" title={`市場資料日 ${marketDate}；本列未與其他日期直接比較`}>
-            {item.asOf ? `資料日 ${item.asOf}` : '資料日不明'}
-          </small>
-        )}
-      </span>
+        </span>
+      )}
+      <EarningsBadge symbol={item.symbol} />
+      <small>{item.name !== item.symbol ? item.name : getMarketProfile(item.symbol).market === 'TW' ? '台股' : '美股'}</small>
+      {marketDate && item.asOf !== marketDate && (
+        <small className="row-observation-date" title={`市場資料日 ${marketDate}；本列未與其他日期直接比較`}>
+          {item.asOf ? `資料日 ${item.asOf}` : '資料日不明'}
+        </small>
+      )}
+    </span>
+  );
+  const cells = (
+    <>
       <span className={shownPills.length ? 'row-mas has-metrics' : 'row-mas'}>
-        {shownPills.map(({ key, pill }) => (
+        {shownPills.map(({ key, pill }) => pill.growth ? (
+          <button
+            key={key}
+            type="button"
+            className="growth-pill"
+            aria-label={[pill.text, ...pill.growth.marks, '資料說明'].join(' ')}
+            aria-haspopup="dialog"
+            onClick={() => setGrowthDetail(pill.growth)}
+          >
+            <span className={`metric-pill ${pill.tone}`} title={pill.title}>{pill.text}</span>
+            {pill.growth.marks.length > 0 && (
+              <span className="growth-pill-marks">
+                {pill.growth.marks.map((mark) => <span key={mark}>{mark}</span>)}
+              </span>
+            )}
+          </button>
+        ) : (
           <span key={key} className={`metric-pill ${pill.tone}`} title={pill.title}>
             {pill.text}
           </span>
@@ -307,9 +335,22 @@ function Row({
         {/* Phone and tablet draw ▲/▼ before the unsigned value; the signed text stays on wider screens. */}
         <span className="change-pill"><i className="change-sign">{changeSign}</i>{changeSign ? change.slice(1) : change}</span>
       </span>
-      {/* The whole row is the link; phones and tablets drop the chevron column. */}
       {!compact && <ChevronRight size={16} className="row-chevron" aria-hidden="true" />}
-    </a>
+    </>
+  );
+  if (!shownPills.some(({ pill }) => pill.growth)) return <a {...rowProps} {...linkProps}>{identity}{cells}</a>;
+  // Keep the chart link and the growth details buttons separate interactive targets.
+  return (
+    <div {...rowProps}>
+      <a {...linkProps} className="screener-row-link" aria-label={`開啟 ${displayTicker(item.symbol)} ${item.name} 圖表`}>{identity}</a>
+      {cells}
+      {growthDetail && (
+        <ConsoleDialog title={`${displayTicker(item.symbol)} 成長率資料`} onClose={() => setGrowthDetail(undefined)}>
+          {growthDetail.details.map((line, index) => <p key={index}>{line}</p>)}
+          <button type="button" className="ghost-button" onClick={() => setGrowthDetail(undefined)}>關閉</button>
+        </ConsoleDialog>
+      )}
+    </div>
   );
 }
 
@@ -790,6 +831,9 @@ function ScreenerView({
         aria-pressed={charts} onClick={() => setCharts(value => !value)}>
         {charts ? '返回股票清單' : `連續看全部股票圖表（${items.length} 檔）`}
       </button>}
+      {!charts && growth && pills.some(isGrowthPill) && (
+        <p className="screener-growth-legend">推＝含推算第 4 季，低＝低信心 EPS 排除，{LEVEL_TEXT.partial}／{LEVEL_TEXT.limited}＝財報品質。點成長率查看來源。</p>
+      )}
       {!charts && (compact ? (
         <div className="screener-head" aria-hidden="true">
           <span>代號／名稱</span>

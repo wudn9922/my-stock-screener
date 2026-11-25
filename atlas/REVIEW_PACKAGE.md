@@ -1611,3 +1611,6 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 ### 台股分割／面額變更 (fix/tw-split-events) — no independent review
 - FinMind `TaiwanStockSplitPrice` / `TaiwanStockParValueChange` per stock → `twSplits`; applied as dated split events (TS `epsBasis.ts`, Python `build_growth.py` via `tw_splits.py`); without an event a clean near-integer implied-share step is inferred (11 TW files on main, 5904.TWO included). Field values not verified live (API blocked in sandbox).
+
+- 選股成長率用 `gQ` 標示低信心 EPS 排除，手機可點成長率看來源及缺值明細。[390px WebKit 截圖（測試資料）](docs/screener-data-grade-390.png)
+- 未獨立審查。測試比較有無 `gQ` 的篩選名單和排序，並逐欄核對 6,663 筆重建結果的既有資料。

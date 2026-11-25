@@ -169,6 +169,36 @@
   color: var(--down-text);
   background: var(--down-soft);
 }
+.growth-pill {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.growth-pill:focus-visible {
+  outline-offset: -1px;
+}
+.growth-pill-marks {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1.2;
+}
+.growth-pill-marks > span {
+  padding: 0 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+}
 /* Rows with extra pills can run out of room (full-market rows add RS and 52-week-high pills to three MA pills):
    wrap and hide the second line so whole pills drop off instead of being cut in half. */
 .row-mas.has-metrics {
