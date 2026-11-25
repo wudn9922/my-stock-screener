@@ -226,3 +226,15 @@ def calculate_return(
     return (
         (current_value / previous_value) - 1
     ) * 100
+
+
+def round_report_number(value, digits=2):
+    number = safe_float(value, None)
+
+    if number is None:
+        return None
+
+    if number != 0 and abs(number) < 1:
+        digits = max(digits, 4)
+
+    return round(number, digits)

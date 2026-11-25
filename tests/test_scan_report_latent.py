@@ -14,6 +14,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
 import main  # noqa: E402
+import screener_config  # noqa: E402
 import report_metrics  # noqa: E402
 
 END = "2026-10-20"
@@ -222,7 +223,7 @@ class WiringTest(unittest.TestCase):
 
             tickers = list(frames_by_symbol)
 
-            with patch.object(main, "DATA_DIR", str(data_dir)), \
+            with patch.object(screener_config, "DATA_DIR", str(data_dir)), \
                  patch.dict(main.INDEX_HISTORY_CACHE, {"^TWII": {"df": bench, "source": "test"}}), \
                  patch.dict(main.REPORT_NON_TRADING_DATES, clear=True), \
                  patch.object(main, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
