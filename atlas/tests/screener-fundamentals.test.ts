@@ -770,6 +770,19 @@ describe('growth terms in the link: periods, threshold and 成長佔比 P', () =
     expect(metricPill(row('MSFT'), 'eps', file)?.growth?.marks).toEqual([]);
   });
 
+  it('shows an empty EPS pill only when the latest quarter was excluded', () => {
+    const file = parseReportGrowth({
+      version: 1,
+      fields: ['symbol', 'epsQ', 'gQ'],
+      rows: [
+        ['LATEST', [null, 30, 20], 0b001],
+        ['OLDER', [null, 30, null], 0b100],
+      ],
+    })!;
+    expect(metricPill(plain('LATEST'), 'eps', file)).toMatchObject({ text: 'EPS —', growth: { marks: ['低'] } });
+    expect(metricPill(plain('OLDER'), 'eps', file)).toBeNull();
+  });
+
   it('counts the rows with every year a streak of N needs (a gap or a short history leaves them out)', () => {
     expect(streakCoverage(TW, reportGrowth, 3, true)).toBeGreaterThan(0);
     expect(streakCoverage(TW, reportGrowth, 1, true)).toBeGreaterThanOrEqual(streakCoverage(TW, reportGrowth, 3, true));
