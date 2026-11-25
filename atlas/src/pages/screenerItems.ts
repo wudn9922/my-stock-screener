@@ -234,7 +234,7 @@ export function metricPill(
       const tally = tallies[0] ?? null;
       const tallyText = tally ? ` 成${tally.growth}／衰${tally.decline}` : '';
       const isTurn = latest === null && turns[0];
-      if (latest === null && !isTurn && (annual || !excluded)) return null;
+      if (latest === null && !isTurn && (annual || !(excluded & 1))) return null;
       if (isTurn) details.unshift(`${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。`);
       details.push(...tallies.map((entry) => entry.text));
       return {

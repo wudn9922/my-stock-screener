@@ -1,3 +1,6 @@
+## 2026-11-25 Screener EPS pill
+Primary self-review. 103 related Vitest cases, 123 Python tests, lint and build passed.
+
 ## 2026-11-24 Chart loupe and opening quote
 Primary self-review. 85 related Vitest cases, 9 mobile Playwright regressions, lint and build passed.
 
