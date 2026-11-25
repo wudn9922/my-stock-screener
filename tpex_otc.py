@@ -8,6 +8,8 @@ from datetime import datetime
 import pandas as pd
 import requests
 import kline_integrity as kline
+from market_data import TPEX_INDEX_HISTORY_LEGACY_URL, TPEX_OTC_SYMBOL, write_kline_csv
+from screener_common import clean_ohlcv_dataframe
 
 
 HTTP_HEADERS = {
@@ -21,17 +23,9 @@ HTTP_HEADERS = {
 DATA_DIR = "data"
 
 
-def _bind_ohlcv_helpers(clean, write):
-    """Use the shared OHLCV helpers supplied by the report entry point."""
-    global clean_ohlcv_dataframe, write_kline_csv
-    clean_ohlcv_dataframe = clean
-    write_kline_csv = write
-
-
 # =========================================================================
 # 櫃買指數（^TWOII）：Yahoo 沒有可用資料，改用櫃買中心官方日資料
 # =========================================================================
-TPEX_OTC_SYMBOL = "^TWOII"
 TPEX_OTC_NAME = "櫃買指數"
 TPEX_SOURCE_LABEL = "TPEx 櫃買中心"
 # analyze_index_trend 需要至少 750 根日 K，約 37 個月，初次建檔抓 42 個月
@@ -51,11 +45,6 @@ TPEX_STALE_DAYS = 10
 # 新版網站（tables/fields/data 格式，日期參數為西元 YYYY/MM/01）
 TPEX_INDEX_HISTORY_URL = (
     "https://www.tpex.org.tw/www/zh-tw/indexInfo/inxh"
-)
-# 舊版網站（aaData 格式，日期參數為民國 YYY/MM）
-TPEX_INDEX_HISTORY_LEGACY_URL = (
-    "https://www.tpex.org.tw/web/stock/iNdex_info/"
-    "inxh/Inx_result.php"
 )
 # 成交量值（選用，用來補 Volume；失敗不影響指數）
 TPEX_TRADING_INDEX_URL = (
