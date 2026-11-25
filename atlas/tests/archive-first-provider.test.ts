@@ -143,6 +143,17 @@ describe('archive-first chart C2', () => {
     const updated = await mergeArchivedLive(full, { ...value, bars: [split] }, '1D', archive);
     expect(updated.bars).toEqual(fullBars); // later live ticks must not discard restored Yahoo history
   });
+  it('preserves the partial archive status and source when live data arrives', async () => {
+    const { archive, fallback } = make();
+    const current = await new ArchiveFirstProvider(fallback, archive).getBars('AAPL', '1D');
+    vi.spyOn(archive, 'getDaily').mockResolvedValue({ ...current, archive: { ...current.archive!, incomplete: true } });
+    const last = current.bars.at(-1)!;
+    const newer = { ...last, time: last.time + 86400 };
+    const result = await mergeArchivedLive(current, { symbol: 'AAPL', bars: [newer], retrievedAt: 1800000000 }, '1D', archive);
+    expect(result.bars).toHaveLength(3);
+    expect(result.archive).toMatchObject({ status: 'live', incomplete: true });
+    expect(result.source).toContain('部分年度暫時無法讀取');
+  });
   it('archive quotes report the actual TW/US close (including daylight saving) rather than midnight', () => {
     const sample = (iso: string): BarResult => ({ bars: [{ time: Date.parse(iso)/1000, open:100,high:101,low:99,close:100,volume:1 }], source:'archive',session:'regular',delayed:true,adjusted:true });
     expect(new Date(archiveQuote('AAPL',sample('2026-01-05')).asOf*1000).toISOString()).toBe('2026-01-05T21:00:00.000Z');

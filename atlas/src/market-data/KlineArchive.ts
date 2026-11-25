@@ -7,8 +7,12 @@ import { closedMarketDates, loadMarketClosures, withoutClosedDates } from './Mar
 
 export const ARCHIVE_BASE = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
 export const ARCHIVE_SOURCE = 'GitHub 永久封存';
+const PARTIAL_ARCHIVE = ' · 部分年度暫時無法讀取';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = 86400;
+class ArchiveYearHashError extends Error {}
+
+export const archiveSource = (incomplete?: boolean) => ARCHIVE_SOURCE + (incomplete ? PARTIAL_ARCHIVE : '');
 export interface ArchiveEntry {
   version: 1; symbol: string; market: 'tw' | 'us'; path: string; firstDate: string; lastDate: string;
   years: Record<string, { sha256: string; firstDate: string; lastDate: string; rows: number; csvBytes: number }>;
@@ -88,7 +92,7 @@ export class KlineArchive {
     this.now = options.now ?? Date.now;
     this.base = options.baseUrl ?? ARCHIVE_BASE;
   }
-  private async request<T>(path: string, read: (response: Response) => Promise<T>): Promise<T> {
+  private async request<T>(path: string, read: (response: Response) => Promise<T>, reload = false): Promise<T> {
     const owner = this.options.page ?? (typeof window === 'undefined' ? undefined : window);
     const navigation = new AbortController();
     const leave = () => navigation.abort();
@@ -99,7 +103,10 @@ export class KlineArchive {
     owner?.addEventListener('pagehide', leave, { once: true });
     const signal = AbortSignal.any([navigation.signal, AbortSignal.timeout(this.options.timeoutMs ?? 8000)]);
     try {
-      const response = await this.fetcher(this.base + path, { signal });
+      // The raw branch's index and CSV URLs have independent CDN caches. A new
+      // URL also bypasses the CDN when a browser cache reload alone is insufficient.
+      const url = this.base + path + (reload ? `?archive-reload=${this.now()}` : '');
+      const response = await this.fetcher(url, reload ? { signal, cache: 'reload' } : { signal });
       const value = await read(response);
       signal.throwIfAborted();
       return value;
@@ -112,11 +119,12 @@ export class KlineArchive {
       owner?.removeEventListener('pagehide', leave);
     }
   }
-  private loadIndex(symbol: string): Promise<ArchiveEntry | null> {
+  private loadIndex(symbol: string, rejectedIndex?: Promise<ArchiveEntry | null>): Promise<ArchiveEntry | null> {
     const day = new Date(this.now()).toISOString().slice(0, 10), key = `${day}:${symbol}`;
     if (this.indexDay !== day) { this.indexes.clear(); this.indexDay = day; }
     let pending = this.indexes.get(key);
-    if (!pending) {
+    const reload = rejectedIndex !== undefined && (pending === rejectedIndex || !pending);
+    if (!pending || reload) {
       const market = getMarketProfile(symbol).market === 'TW' ? 'tw' : 'us';
       const load = async () => {
         // Index filenames are encoded on disk; encode '%' again for HTTP.
@@ -125,7 +133,7 @@ export class KlineArchive {
           if (response.status === 404) return null;
           if (!response.ok) throw new Error(`永久封存 index 讀取失敗（HTTP ${response.status}）`);
           return parseArchiveIndex(await response.json(), symbol);
-        });
+        }, reload);
       };
       if (this.options.cache === false) pending = load();
       else {
@@ -134,14 +142,13 @@ export class KlineArchive {
           getQuote: async (): Promise<Quote> => { throw new Error('Index has no quote'); } };
         const cached = new CachedMarketDataProvider(provider, { ...this.options.cache, now: this.now,
           ttlMs: Date.parse(day + 'T00:00:00Z') + DAY * 1000 - this.now(), maxEntries: this.options.cache?.maxEntries ?? 10000 });
-        pending = cached.getDocument(symbol, load, value => parseArchiveIndex(value, symbol))
+        pending = cached.getDocument(symbol, load, value => parseArchiveIndex(value, symbol), reload)
           .finally(() => cached.close().catch(() => undefined));
       }
       this.indexes.set(key, pending);
-      // A cancelled navigation can leave this document in use. Its next read
-      // must retry, rather than reusing the rejected shared index promise.
-      void pending.catch(error => {
-        if (error?.name === 'AbortError' && this.indexes.get(key) === pending) this.indexes.delete(key);
+      // An aborted or failed read can be retried on this same document.
+      void pending.catch(() => {
+        if (this.indexes.get(key) === pending) this.indexes.delete(key);
       });
       // Covers the complete public TW/US catalog, including visitors without IDB.
       while (this.indexes.size > 10000) this.indexes.delete(this.indexes.keys().next().value!);
@@ -151,18 +158,32 @@ export class KlineArchive {
   async getDaily(symbolInput: string, range?: MarketRange, signal?: AbortSignal): Promise<BarResult | null> {
     const symbol = normalizeSymbol(symbolInput);
     signal?.throwIfAborted();
-    const entry = await this.loadIndex(symbol);
+    const index = this.loadIndex(symbol);
+    const entry = await index;
     signal?.throwIfAborted();
     if (!entry) return null;
     const policyRequest = loadMarketClosures(this.fetcher,this.now());
-    const first = Math.max(Number(entry.firstDate.slice(0, 4)), range?.from === undefined ? 0 : new Date(range.from * 1000).getUTCFullYear());
-    const last = Math.min(Number(entry.lastDate.slice(0, 4)), range?.to === undefined ? 9999 : new Date(range.to * 1000).getUTCFullYear());
-    const needed = Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => first + i)
-      .filter(year => Object.hasOwn(entry.years, String(year)));
-    const results = await Promise.allSettled(needed.map(year => this.loadYear(symbol, year, entry)));
-    signal?.throwIfAborted();
-    const aborted = results.find(result => result.status === 'rejected' && result.reason?.name === 'AbortError');
-    if (aborted?.status === 'rejected') throw aborted.reason;
+    const loadYears = async (snapshot: ArchiveEntry, reload = false) => {
+      const first = range?.from === undefined ? 0 : new Date(range.from * 1000).getUTCFullYear();
+      const last = range?.to === undefined ? 9999 : new Date(range.to * 1000).getUTCFullYear();
+      const years = Object.keys(snapshot.years).map(Number).filter(year => year >= first && year <= last).sort((a, b) => a - b);
+      const results = await Promise.allSettled(years.map(year => this.loadYear(symbol, year, snapshot, reload)));
+      signal?.throwIfAborted();
+      const aborted = results.find(result => result.status === 'rejected' && result.reason?.name === 'AbortError');
+      if (aborted?.status === 'rejected') throw aborted.reason;
+      return results;
+    };
+    let results = await loadYears(entry);
+    if (results.some(result => result.status === 'rejected' && result.reason instanceof ArchiveYearHashError)) {
+      // Either side can be stale. Refresh the index once, then trust only years
+      // matching it. Already verified years are reused by their hash-keyed cache.
+      const refreshed = await this.loadIndex(symbol, index).catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') throw error;
+        return null;
+      });
+      signal?.throwIfAborted();
+      if (refreshed) results = await loadYears(refreshed, true);
+    }
     const valid = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
     if (!valid.length) throw new Error('此代號的封存年度檔暫時無法讀取');
     const policy = await policyRequest;
@@ -176,12 +197,12 @@ export class KlineArchive {
     const incomplete = results.some(result => result.status === 'rejected');
     return usableBarResult({ ...valid[0]!, bars, missingVolumeAt: missing, asOf: this.now() / 1000, closedSessions: [...closed],
       archive: { lastDate: new Date(bars.at(-1)!.time * 1000).toISOString().slice(0, 10), status: 'archive', incomplete },
-      source: ARCHIVE_SOURCE + (incomplete ? ' · 部分年度暫時無法讀取' : '') + (projected.length < all.length ? ' · 已排除全市場休市日' : '') }, symbol, '1D');
+      source: archiveSource(incomplete) + (projected.length < all.length ? ' · 已排除全市場休市日' : '') }, symbol, '1D');
   }
-  private loadYear(symbol: string, year: number, entry: ArchiveEntry): Promise<BarResult> {
+  private loadYear(symbol: string, year: number, entry: ArchiveEntry, reload: boolean): Promise<BarResult> {
     const current = year >= new Date(this.now()).getUTCFullYear();
-    const sha = entry.years?.[String(year)]?.sha256;
-    const version = `${sha ?? 'legacy-v1'}${current ? ':' + new Date(this.now()).toISOString().slice(0, 10) : ''}`;
+    const sha = entry.years[String(year)]!.sha256;
+    const version = `${sha}${current ? ':' + new Date(this.now()).toISOString().slice(0, 10) : ''}`;
     const key = `${symbol}:${year}:${version}`;
     let pending = this.years.get(key);
     if (!pending) {
@@ -189,11 +210,9 @@ export class KlineArchive {
         const text = await this.request(`${entry.path}/${year}.csv`, async response => {
           if (!response.ok) throw new Error(`永久封存讀取失敗（HTTP ${response.status}）`);
           return response.text();
-        });
-        if (sha) {
-          const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-          if (hash !== sha) throw new Error('封存年度檔 SHA-256 不符');
-        }
+        }, reload);
+        const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        if (hash !== sha) throw new ArchiveYearHashError('封存年度檔 SHA-256 不符');
         return { ...parseArchiveCsv(text, symbol, year), asOf: this.now() / 1000 };
       };
       const provider = { id: 'kline-archive-year', cacheVersion: `market-closure-source-v2:${year}:${version}`, supportedTimeframes: ['1D'] as const,
@@ -207,7 +226,7 @@ export class KlineArchive {
           .finally(() => cached.close().catch(() => undefined));
       }
       this.years.set(key, pending);
-      void pending.catch(() => this.years.delete(key));
+      void pending.catch(() => { if (this.years.get(key) === pending) this.years.delete(key); });
       while (this.years.size > 400) this.years.delete(this.years.keys().next().value!);
     }
     return pending;

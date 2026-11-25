@@ -31,6 +31,7 @@ const DEFAULT_MAX_ENTRIES = 150;
 type CacheKind = 'bars' | 'quote' | 'events' | 'document';
 interface PublicDocument { symbol: string; document: unknown }
 type CacheValue = BarResult | Quote | CorporateEventsResult | PublicDocument;
+const incompleteArchive = (value: CacheValue): boolean => 'bars' in value && value.archive?.incomplete === true;
 
 interface NormalizedRange {
   from: number | null;
@@ -375,9 +376,9 @@ export class CachedMarketDataProvider implements MarketDataProvider {
   }
 
   /** Small public archive indexes share the existing account-scoped database and grant rules. */
-  async getDocument<T>(symbol: string, load: () => Promise<unknown>, parse: (value: unknown) => T): Promise<T> {
+  async getDocument<T>(symbol: string, load: () => Promise<unknown>, parse: (value: unknown) => T, reload = false): Promise<T> {
     const identity = makeIdentity(this.cacheIdentity, symbol, 'document', '1D', { from: null, to: null });
-    const result = await this.request(identity, async () => ({ symbol: identity.symbol, document: parse(await load()) }));
+    const result = await this.request(identity, async () => ({ symbol: identity.symbol, document: parse(await load()) }), undefined, reload);
     return parse((result as PublicDocument).document);
   }
 
@@ -400,7 +401,7 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     const fresh = labelValue(usableBarResult(raw, identity.symbol, timeframe), 'fresh');
     try {
       await this.write(identity, fresh, context);
-      if (fresh.quote) {
+      if (fresh.quote && !incompleteArchive(fresh)) {
         await this.write(makeIdentity(this.cacheIdentity, identity.symbol, 'quote', '1D', { from: null, to: null }), fresh.quote, context);
       }
     } catch {
@@ -458,11 +459,12 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     identity: CacheIdentity,
     load: () => Promise<CacheValue>,
     signal?: AbortSignal,
+    reload = false,
   ): Promise<CacheValue> {
     const context = this.ensureContext();
     let cached: MarketCacheEntry | undefined;
     try {
-      cached = await this.read(identity, context);
+      if (!reload) cached = await this.read(identity, context);
     } catch (error) {
       if (error instanceof MarketCacheCorruptionError) throw error;
     }
@@ -514,10 +516,12 @@ export class CachedMarketDataProvider implements MarketDataProvider {
     this.assertContext(context);
     if (!entry) return undefined;
     assertIdentity(entry, identity);
+    if (incompleteArchive(entry.value)) return undefined;
     return clone(entry);
   }
 
   private async write(identity: CacheIdentity, value: CacheValue, context: string): Promise<void> {
+    if (incompleteArchive(value)) return;
     const db = await this.database(context);
     this.assertContext(context);
     const createdAt = this.now();

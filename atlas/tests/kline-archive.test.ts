@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto';
 import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { KlineArchive, mergeArchiveDaily, parseArchiveCsv } from '../src/market-data/KlineArchive';
+import { ArchiveFirstProvider } from '../src/market-data/ArchiveFirstProvider';
+import { CachedMarketDataProvider } from '../src/market-data/CachedMarketDataProvider';
 import { TimeMapper, regularSessionOpen } from '../src/chart/TimeMapper';
 import { getMarketProfile } from '../src/market-data/MarketProfile';
 
@@ -104,12 +106,13 @@ describe('archive reader C1', () => {
     const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, '0')).join('');
     const m = archiveIndexFixture('^TWII', {2026:body});
     expect(m.years[2026].sha256).toBe(sha256);
-    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(String(url).endsWith('.json') ? JSON.stringify(m) : body)) as typeof fetch;
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => new Response(new URL(String(url), 'https://archive.test/').pathname.endsWith('.json') ? JSON.stringify(m) : body)) as typeof fetch;
     expect((await new KlineArchive({ fetcher, cache: false, now }).getDaily('^TWII'))?.bars).toHaveLength(1);
     expect(vi.mocked(fetcher).mock.calls.map(call => String(call[0]))).toContain('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/tw/%5ETWII/2026.csv');
     expect(vi.mocked(fetcher).mock.calls.map(call => String(call[0]))).toContain('https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/index/tw/%255ETWII.json');
     m.years[2026].sha256 = '0'.repeat(64);
     await expect(new KlineArchive({ fetcher, cache: false, now }).getDaily('^TWII')).rejects.toThrow('年度檔');
+    expect(vi.mocked(fetcher).mock.calls.filter(([url]) => String(url).includes('/2026.csv?archive-reload='))).toHaveLength(1);
   });
   it('keeps partial available history when an older year is missing; retries failed files', async () => {
     let fail = true;
@@ -120,6 +123,49 @@ describe('archive reader C1', () => {
     expect(first?.bars).toHaveLength(1); expect(first?.source).toContain('部分年度');
     fail = false;
     expect((await archive.getDaily('AAPL'))?.bars).toHaveLength(3);
+  });
+  it.each(['index', 'csv'] as const)('recovers the ZTS year when the branch %s is from a different revision', async stale => {
+    // Equivalent to the 2026-11-23 / 2026-11-24 publication: the old revision lacks the newest session.
+    const olderCsv = 'Date,Open,High,Low,Close,Volume\n2026-11-23,79.67,80.12,79.11,79.94,3029400\n';
+    const latestCsv = olderCsv + '2026-11-24,80.04,82.36,79.85,81.47,3285400\n';
+    const oldIndex = archiveIndexFixture('ZTS', { 2025: csv(2025), 2026: olderCsv });
+    const latestIndex = archiveIndexFixture('ZTS', { 2025: csv(2025), 2026: latestCsv });
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), 'https://archive.test/').pathname;
+      if (path.endsWith('market-closures.json')) return new Response(null, { status: 404 });
+      const refreshed = init?.cache === 'reload';
+      if (path.endsWith('.json')) return Response.json(stale === 'index' && !refreshed ? oldIndex : latestIndex);
+      return new Response(path.endsWith('2025.csv') ? csv(2025) : stale === 'csv' && !refreshed ? olderCsv : latestCsv);
+    });
+    const options = { fetcher, now, cache: { dbName: `archive-zts-${crypto.randomUUID()}` } };
+    const archive = new KlineArchive(options);
+    const result = await archive.getDaily('ZTS');
+    expect(result?.bars).toHaveLength(3);
+    expect(result?.archive).toEqual({ lastDate: '2026-11-24', status: 'archive', incomplete: false });
+    const reloads = fetcher.mock.calls.filter(([, init]) => init?.cache === 'reload');
+    expect(reloads.map(([input]) => new URL(String(input)).pathname.split('/').at(-1))).toEqual(['ZTS.json', '2026.csv']);
+    expect(reloads.every(([input]) => new URL(String(input)).search.length > 0)).toBe(true);
+    fetcher.mockClear();
+    expect((await new KlineArchive(options).getDaily('ZTS'))?.bars).toHaveLength(3);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('does not cache a partial chart when an annual file is temporarily unavailable', async () => {
+    let unavailable = true;
+    const fetcher: typeof fetch = async input => {
+      const path = new URL(String(input), 'https://archive.test/').pathname;
+      if (path.endsWith('market-closures.json')) return new Response(null, { status: 404 });
+      if (path.endsWith('.json')) return Response.json(index);
+      if (unavailable && path.endsWith('/2026.csv')) return new Response(null, { status: 503 });
+      return new Response(csv(Number(path.match(/(\d{4})\.csv/)![1])));
+    };
+    const archive = new KlineArchive({ fetcher, now, cache: false });
+    const unexpected = async () => { throw new Error('Unexpected fallback'); };
+    const provider = new ArchiveFirstProvider({ id: 'archive-test', supportedTimeframes: ['1D'], getBars: unexpected, getQuote: unexpected }, archive);
+    const cache = new CachedMarketDataProvider(provider, { dbName: `archive-chart-${crypto.randomUUID()}`, now, ttlMs: 86400_000 });
+    expect((await cache.getBars('AAPL', '1D')).archive?.incomplete).toBe(true);
+    unavailable = false;
+    expect((await cache.getBars('AAPL', '1D')).bars).toHaveLength(3);
+    await cache.close();
   });
   it('rejects bad dates, year mismatch and headers, distinguishes unknown from zero shares', () => {
     expect(parseArchiveCsv(csv(2026, 100, ''), 'AAPL', 2026).missingVolumeAt).toHaveLength(1);
