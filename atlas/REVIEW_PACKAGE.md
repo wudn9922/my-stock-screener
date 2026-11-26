@@ -1,3 +1,6 @@
+## 2026-11-26 Holdings display
+Primary self-review only; currency defaults and compact average cost. Related Vitest, mobile WebKit, lint/build and 390px screenshot pending.
+
 ## 2026-11-25 日 K 封存重試
 自我審查。用兩版 ZTS 封存重現 226 根日 K 缺口，確認重抓後恢復 1,481 根且保留 SHA-256 驗證。全市場掃描可用 `scripts/diagnose-daily-gaps.ts` 重播。
 

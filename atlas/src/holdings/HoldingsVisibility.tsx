@@ -11,7 +11,7 @@ import {
 } from './visibility';
 
 const storageNote: Record<StorageMode, string> = {
-  none: '隱藏設定只在本次瀏覽有效，重新開啟就會恢復顯示全部。',
+  none: '隱藏設定只在本次瀏覽有效，重新開啟就會恢復預設隱藏設定。',
   device: '隱藏設定保存在此裝置的帳號空間，不會上傳。',
   cloud: '隱藏設定保存在此裝置的帳號空間（只有帳戶與商品代號，不含數量或成本），不會上傳，也不會同步到其他裝置。',
 };
@@ -19,7 +19,7 @@ const storageNote: Record<StorageMode, string> = {
 /** Per-account rules; the threshold is in this account's own currency. */
 export function VisibilitySettings({
   account,
-  rules = defaultRules(),
+  rules = defaultRules(account.currency),
   storageMode,
   onChange,
 }: {
@@ -121,7 +121,7 @@ const reasonText = (reason: HiddenReason, rules: AccountVisibilityRules, currenc
 export function HiddenHoldings({
   account,
   rows,
-  rules = defaultRules(),
+  rules = defaultRules(account.currency),
   onUnhide,
 }: {
   account: HoldingAccount;

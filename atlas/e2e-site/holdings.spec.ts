@@ -275,6 +275,8 @@ test('six compact stock rows precede totals and operations, with full details on
   const rows = panel(page).locator('.holdings-position');
   await expect(rows).toHaveCount(6);
   await expect(rows.first().locator('details:has(> summary.holding-compact-row)')).not.toHaveAttribute('open');
+  await expect(rows.first().locator('summary.holding-compact-row').getByText('均價 100.00', { exact: true })).toBeVisible();
+  await layout(page);
   await panel(page).evaluate(el => { for (let parent: HTMLElement | null = el as HTMLElement; parent; parent = parent.parentElement) parent.scrollTop = 0; window.scrollTo(0, 0); });
   const boxes = await rows.evaluateAll(nodes => nodes.map(node => { const r=node.getBoundingClientRect(); return { bottom:r.bottom, height:r.height }; }));
   expect(boxes.every(b => b.height <= 72)).toBe(true);
