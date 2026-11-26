@@ -14,8 +14,10 @@ import {
   SESSION_CLOSE_SOURCE_QUALIFIER,
 } from './MarketDataProvider';
 import { calendarDate, type MarketProfile } from './MarketProfile';
-import { isQuarantinedBar } from './KlineIntegrity';
-const prices = z.array(z.number().finite().nullable());
+import { isQuarantinedBar, validKline } from './KlineIntegrity';
+// Keep malformed cells distinct from missing ones so normalization can reject
+// their row without treating an invalid close or volume as a Yahoo null.
+const prices = z.array(z.number().finite().nullable().catch(NaN));
 const dividendSchema = z.object({
   amount: z.number().finite(),
   date: z.number().int().positive(),
@@ -139,7 +141,13 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   }
   const byTime = new Map<number, Bar>();
   const missingVolumeAt = new Set<number>();
-  const originalTimes = new Map<number, number>();
+  const periodStarts = new Map<number, number>();
+  if (timeframe === '1W' || timeframe === '1M') {
+    for (const time of result.timestamp) {
+      const period = calendarPeriodStart(time, timeframe, market);
+      periodStarts.set(period, Math.min(time, periodStarts.get(period) ?? Infinity));
+    }
+  }
   const sessionCloseEligibility = new Map<number, boolean>();
   const canMarkSessionClose = market.market === 'TW' &&
     ['5m', '15m', '30m', '1H', '4H'].includes(timeframe ?? '');
@@ -152,6 +160,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   }
   let healedDailyClose: BarNormalization['healedDailyClose'];
   let liveBarBounds: BarNormalization['liveBarBounds'];
+  let firstInvalidTime: number | undefined;
   for (let i = 0; i < result.timestamp.length; i++) {
     if (canonicalSymbol && isQuarantinedBar(canonicalSymbol, result.timestamp[i]!, timeframe)) continue;
     const open = q.open[i],
@@ -205,7 +214,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
       rowLow = low;
     // Right after the open Yahoo's still-forming daily row already carries the live price while its
     // high/low lag behind (e.g. close 100.7 above high 100.5). Only that row of the live session is
-    // widened to its own open/close; any other inconsistent row still fails the response.
+    // widened to its own open/close; any other inconsistent row is discarded.
     if (
       timeframe === '1D' &&
       i === latestDailyIndex &&
@@ -226,26 +235,19 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
         liveBarBounds = { method: 'live-session-open-close', time: rowTime, quoteAsOf: metaTime };
       }
     }
-    if (
-      open <= 0 ||
-      high <= 0 ||
-      low <= 0 ||
-      close <= 0 ||
-      volume < 0 ||
-      rowHigh < Math.max(open, close) ||
-      rowLow > Math.min(open, close)
-    ) {
-      throw new Error(`Invalid Yahoo OHLCV values at ${result.timestamp[i]}`);
-    }
     const originalTime = result.timestamp[i];
-    const time = timeframe === '1M' || timeframe === '1W'
-      ? calendarPeriodStart(originalTime, timeframe, market)
-      : originalTime;
+    if (!validKline({ time: originalTime, open, high: rowHigh, low: rowLow, close, volume })) {
+      firstInvalidTime ??= originalTime;
+      // Do not publish healing provenance for a row that was discarded.
+      if (healedDailyClose?.time === originalTime) healedDailyClose = undefined;
+      if (liveBarBounds?.time === originalTime) liveBarBounds = undefined;
+      continue;
+    }
+    const time = timeframe === '1M' || timeframe === '1W' ? calendarPeriodStart(originalTime, timeframe, market) : originalTime;
     // Native weekly/monthly responses append a latest-session row after the
-    // aggregate. Keep the earliest source timestamp for a period: summing or
-    // replacing it would double count or lose the aggregate's OHLC/volume.
-    if ((timeframe === '1M' || timeframe === '1W') && (originalTimes.get(time) ?? Infinity) < originalTime) continue;
-    originalTimes.set(time, originalTime);
+    // aggregate. If the aggregate is invalid, never present the appended
+    // single session as the whole period.
+    if ((periodStarts.get(time) ?? originalTime) < originalTime) continue;
     if (q.volume?.[i] == null) missingVolumeAt.add(time); else missingVolumeAt.delete(time);
     byTime.set(time, {
       time,
@@ -261,7 +263,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     );
   }
   const bars = [...byTime.values()].sort((a, b) => a.time - b.time);
-  if (!bars.length) throw new Error('No valid bars');
+  if (!bars.length) throw new Error(firstInvalidTime === undefined ? 'No valid bars' : `Invalid Yahoo OHLCV values at ${firstInvalidTime}`);
   const sessionCloseObservations = bars
     .filter(bar => sessionCloseEligibility.get(bar.time))
     .map(bar => bar.time);
@@ -472,10 +474,18 @@ export function normalizeYahooCalendarResponse(
   const firstDaily = currentBars[0];
   const lastDaily = currentBars.at(-1)!;
   const nativeQuote = nativeResult.indicators.quote[0];
-  const nativeBucketSource = nativeResult.timestamp
+  const nativeCurrentRows = nativeResult.timestamp
     .map((time, index) => ({ time, index }))
     .filter(({ time }) => calendarPeriodStart(time, timeframe, market) === periodStart)
-    .sort((a, b) => a.time - b.time)[0];
+    .sort((a, b) => a.time - b.time);
+  for (const { time, index } of nativeCurrentRows) {
+    if (isQuarantinedBar(symbol, time, timeframe)) continue;
+    const { open, high, low, close, volume } = nativeQuote;
+    const o = open[index], h = high[index], l = low[index], c = close[index];
+    if (o != null && h != null && l != null && c != null && !validKline({ time, open:o, high:h, low:l, close:c, volume: volume?.[index] ?? 0 }))
+      throw new Error(`Yahoo native row has invalid current-period OHLCV at ${time}`);
+  }
+  const nativeBucketSource = nativeCurrentRows[0];
   const nativeCandidate = native.bars.find((bar) => bar.time === periodStart);
   const nativeOpen = nativeBucketSource ? nativeQuote.open[nativeBucketSource.index] : undefined;
   const nativeHigh = nativeBucketSource ? nativeQuote.high[nativeBucketSource.index] : undefined;
@@ -541,6 +551,7 @@ export function normalizeYahooCalendarResponse(
   return {
     ...native,
     bars,
+    missingVolumeAt: native.missingVolumeAt?.filter(time => time !== periodStart),
     source: `${native.source} · current period derived from daily OHLCV (${periodLabel})`,
     ...(daily.quote ? { quote: daily.quote } : {}),
     normalization,

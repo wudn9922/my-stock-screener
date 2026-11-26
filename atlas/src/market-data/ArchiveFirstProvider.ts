@@ -1,4 +1,4 @@
-import { archiveSource, KlineArchive, klineArchive, mergeArchiveDaily } from './KlineArchive';
+import { archiveSource, consistentSplitRatio, KlineArchive, klineArchive, mergeArchiveDaily, samePriceBasis } from './KlineArchive';
 import { aggregateBars } from './StaticSeriesProvider';
 import { calendarPeriodStart, filterBarsByRange, getMarketProfile, type BarResult, type CorporateEventsResult,
   type MarketDataProvider, type MarketRange, type Quote, type Timeframe } from './MarketDataProvider';
@@ -119,32 +119,41 @@ export class ArchiveFirstProvider implements MarketDataProvider {
     this.checkActive(signal);
     return this.fallback.getSymbolTimeframes?.(symbol, signal) ?? this.supportedTimeframes;
   }
+  private async splitHistory(yahoo: EdgeYahooProvider, symbol: string, timeframe: Timeframe, current: BarResult, signal?: AbortSignal): Promise<BarResult> {
+    try {
+      const daily = await yahoo.getBars(symbol, '1D', undefined, signal);
+      return archivePeriod({ ...daily, archive: { ...current.archive!, status: 'split' }, closedSessions: current.closedSessions,
+        source: 'Yahoo 延遲行情 · 與封存價格基準不一致，整段採用 Yahoo 分割調整資料' }, symbol, timeframe);
+    } catch {
+      signal?.throwIfAborted();
+      return { ...current, source: `${current.source} · 較長 Yahoo 歷史暫時無法取得` };
+    }
+  }
   async getOlderBars(symbol: string, timeframe: Timeframe, current: BarResult, signal?: AbortSignal): Promise<BarResult> {
     this.checkActive(signal);
     if (!current.archive || !this.yahoo) return current;
-    if (current.archive.status === 'split') {
-      try {
-        const daily = await this.yahoo.getBars(symbol, '1D', undefined, signal);
-        return archivePeriod({ ...daily, archive: current.archive, closedSessions: current.closedSessions,
-          source: 'Yahoo 延遲行情 · 與封存價格差異超過 2%，整段採用 Yahoo 分割調整資料' }, symbol, timeframe);
-      } catch (error) {
-        signal?.throwIfAborted(); void error;
-        return { ...current, source: `${current.source} · 較長 Yahoo 歷史暫時無法取得` };
-      }
-    }
+    if (current.archive.status === 'split') return this.splitHistory(this.yahoo, symbol, timeframe, current, signal);
     if (timeframe !== '1W' && timeframe !== '1M') return current;
     try {
       const older = await this.yahoo.getArchiveHistory(symbol, timeframe, signal);
       const profile = getMarketProfile(symbol);
       const latest = calendarPeriodStart(current.bars.at(-1)!.time, timeframe, profile);
       const archiveCloses = new Map(current.bars.map(bar => [calendarPeriodStart(bar.time, timeframe, profile), bar.close]));
-      const mismatch = older.bars.some(bar => {
+      const ratios = new Map<number, number>();
+      for (const bar of older.bars) {
         const period = calendarPeriodStart(bar.time, timeframe, profile), close = archiveCloses.get(period);
-        return period < latest && close && Math.abs(bar.close / close - 1) > 0.02;
-      });
-      if (mismatch) return this.getOlderBars(symbol, timeframe, { ...current, archive: { ...current.archive, status: 'split' } }, signal);
+        if (period < latest && close) ratios.set(period, Math.log(bar.close / close));
+      }
+      if (consistentSplitRatio([...ratios.values()]))
+        return this.splitHistory(this.yahoo, symbol, timeframe, current, signal);
       const first = current.bars[0]!.time;
-      const bars = [...older.bars.filter(bar => bar.time < first), ...current.bars];
+      const earlier = older.bars.filter(bar => bar.time < first);
+      if (!earlier.length) return current;
+      // Compare at the historical join, not at an arbitrary later outlier.
+      const joinRatio = ratios.get(Math.min(...ratios.keys()));
+      if (joinRatio === undefined || !samePriceBasis(joinRatio))
+        return { ...current, source: `${current.source} · 更早期間的價格基準待確認，保留封存範圍` };
+      const bars = [...earlier, ...current.bars];
       return usableBarResult({ ...current, bars, source: `${current.source} · 更早期間 Yahoo` }, symbol, timeframe);
     } catch (error) {
       signal?.throwIfAborted(); void error;
@@ -169,8 +178,10 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
   if (!daily) return current;
   const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol,undefined,new Set([...(daily.closedSessions ?? []),...closed]));
   const dailyArchive = daily.archive ?? current.archive!;
-  const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote: value.quote,
-    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格'
+  const quote = merged.withheldRecent ? undefined : value.quote;
+  const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote,
+    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 重疊日收盤價呈一致倍率差異，暫用 Yahoo 以免混用分割前後價格'
+      : merged.withheldRecent ? `${archiveSource(dailyArchive.incomplete)} · 部分即時日 K 的價格基準待確認`
       : value.source?.includes(TWSE_MIS_SOURCE) ? `${archiveSource(dailyArchive.incomplete)} · 缺少交易日由 Yahoo／MIS 補上`
       : `${archiveSource(dailyArchive.incomplete)} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
     archive: { ...dailyArchive, status: merged.splitMismatch ? 'split' : 'live' } };
@@ -178,5 +189,5 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
   // Keep optional pre-archive weekly/monthly history unless its adjustment basis changed.
   if (!merged.splitMismatch && (timeframe === '1W' || timeframe === '1M'))
     period.bars = [...current.bars.filter(bar => bar.time < period.bars[0]!.time), ...period.bars];
-  return applyLiveQuoteMetadata(period, value.quote, value.source);
+  return applyLiveQuoteMetadata(period, quote, value.source);
 }
