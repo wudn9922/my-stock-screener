@@ -756,6 +756,7 @@ test('conservative PE explains eligibility and both inertia calculations at 390p
   const section = page.locator('[data-group="conservative-pe"]');
   await expect(section).toContainText('符合適用條件');
   await openFold(section);
+  await expect(section).toContainText(/估值參考（日 K 收盤）：USD .* · 2026-10-08 · Yahoo/);
   await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('下一期年增率 40%');
   await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('本益比分母 EPS 64');
   await expect(section.getByRole('region', { name: '年度慣性本益比' })).toContainText('本益比分母 EPS 10');
@@ -763,5 +764,5 @@ test('conservative PE explains eligibility and both inertia calculations at 390p
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
   await section.scrollIntoViewIfNeeded();
   if (info.project.name.includes('webkit') && process.env.ATLAS_CONSERVATIVE_PE_SCREENSHOT === '1')
-    await page.screenshot({ path: info.outputPath('conservative-pe-390.png') });
+    await page.screenshot({ path: info.outputPath('conservative-pe-390.png'), scale: 'css' });
 });

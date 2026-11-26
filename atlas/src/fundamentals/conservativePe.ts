@@ -1,5 +1,8 @@
 import type { FinancialHistory, PeriodKind } from './FinancialHistory';
 import { epsAdjustments, reportedEpsAt, restatedEps } from './epsBasis';
+import type { BarResult } from '../market-data/MarketDataProvider';
+import { calendarDate, getMarketProfile } from '../market-data/MarketProfile';
+import { barEndTime } from '../market-data/MarketTiming';
 
 export interface EpsObservation {
   end: string;
@@ -24,6 +27,38 @@ const consecutive = (rows: EpsObservation[]) =>
   rows.every((row, i) => row.period !== null && (i === 0 || row.period === rows[i - 1]!.period! + 1));
 const valid = (row: EpsObservation): row is EpsObservation & { eps: number } =>
   row.eps !== null && Number.isFinite(row.eps);
+const samePeriod = (current: EpsObservation, base: EpsObservation) => {
+  const days = (Date.parse(current.end) - Date.parse(base.end)) / 86_400_000;
+  return days >= 335 && days <= 395;
+};
+
+export function conservativePePriceIssue(history: FinancialHistory): string | null {
+  const currency = getMarketProfile(history.symbol).currency;
+  if (history.currency !== currency) return `財報幣別（${history.currency}）與股價幣別（${currency}）不同`;
+  if (history.quality.issues.includes('currency-changed')) return '財報幣別曾變更，EPS 口徑需確認';
+  const foreignReporter = history.foreignReporter || history.quality.issues.includes('foreign-filer');
+  if (foreignReporter && !history.adrRatio) return 'ADR 價格與 EPS 股數基準不明';
+  return null;
+}
+
+export function conservativePeClose(symbol: string, result: BarResult, now = Date.now() / 1000) {
+  if (result.dataState === 'simulated' || result.priceBasis !== 'split-adjusted') return null;
+  const market = result.market ?? getMarketProfile(symbol);
+  // A cached snapshot taken during trading still contains a partial bar after the session ends.
+  const observedAt = Math.min(now, result.asOf ?? now);
+  for (let i = result.bars.length - 1; i >= 0; i--) {
+    const bar = result.bars[i]!;
+    if (!Number.isFinite(bar.time) || !Number.isFinite(bar.close) || bar.close <= 0 || barEndTime(bar.time, '1D', market) > observedAt) continue;
+    return {
+      value: bar.close,
+      date: calendarDate(bar.time, market),
+      currency: market.currency,
+      source: result.source,
+      stale: result.cacheStatus === 'stale',
+    };
+  }
+  return null;
+}
 
 /** Same default grading policy as build_growth.py eps_usable (Q4_EPS_STRICT off). */
 export function epsGradeUsable(grade: string | undefined, q4: boolean): boolean {
@@ -53,7 +88,8 @@ export function conservativeEps(history: FinancialHistory, kind: PeriodKind): Ep
 export function assessEligibility(annual: EpsObservation[]): Eligibility {
   const rows = annual.slice(-15);
   if (rows.length < 10) return { applicable: false, reason: `年度 EPS 年數不足（${rows.length} 年，至少 10 年）` };
-  if (!consecutive(rows)) return { applicable: false, reason: '年度財報期別不連續或不明' };
+  if (!consecutive(rows) || rows.slice(1).some((row, i) => !samePeriod(row, rows[i]!)))
+    return { applicable: false, reason: '年度財報期別不連續或不明' };
   for (const row of rows) {
     if (!valid(row)) return { applicable: false, reason: `${row.end} EPS 缺值、低信心或無法還原` };
     if (row.eps <= 0) return { applicable: false, reason: `${row.end} EPS 非正值（${row.eps}）` };
@@ -89,8 +125,7 @@ export function forecastInertia(observations: EpsObservation[], kind: PeriodKind
   const rates: number[] = [];
   for (let i = 0; i < 3; i++) {
     const base = rows[i]!, current = rows[i + step]!;
-    const days = (Date.parse(current.end) - Date.parse(base.end)) / 86400000;
-    if (days < 335 || days > 395) return bad('年增率比較期別非相隔一年');
+    if (!samePeriod(current, base)) return bad('年增率比較期別非相隔一年');
     if (base.eps! <= 0) return bad(`${base.end} 基期 EPS ≤ 0`);
     rates.push((current.eps! / base.eps! - 1) * 100);
   }
@@ -101,6 +136,6 @@ export function forecastInertia(observations: EpsObservation[], kind: PeriodKind
   const denominator = quarterly ? projectedEps + rows.slice(-3).reduce((sum, row) => sum + row.eps!, 0) : projectedEps;
   if (!Number.isFinite(projectedEps) || !Number.isFinite(denominator) || projectedEps <= 0 || denominator <= 0)
     return bad('預估 EPS ≤ 0 或數值無效', inertia);
-  const pe = price !== null && Number.isFinite(price) && price > 0 ? price / denominator : null;
-  return { applicable: true, inertia, inputs: rows, base, projectedEps, denominator, pe };
+  const pe = price !== null && price > 0 ? price / denominator : null;
+  return { applicable: true, inertia, inputs: rows, base, projectedEps, denominator, pe: Number.isFinite(pe) ? pe : null };
 }
