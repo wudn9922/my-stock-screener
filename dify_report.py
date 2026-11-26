@@ -50,7 +50,6 @@ from news_screenshots import (
     is_blocked_page as is_blocked_page,
     detect_blocked_page as detect_blocked_page,
     get_wayback_snapshot as get_wayback_snapshot,
-    news_key as news_key,
     file_sha256 as file_sha256,
     load_news_state as load_news_state,
     save_news_state as save_news_state,

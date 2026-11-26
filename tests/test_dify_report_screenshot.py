@@ -180,7 +180,7 @@ class WaybackSnapshotTest(unittest.TestCase):
             return FakeResponse(cdx_payload(captures, now=self.now))
 
         with mock.patch.object(
-            dify_report.requests, "get", side_effect=fake_get,
+            news_screenshots.requests, "get", side_effect=fake_get,
         ):
             return dify_report.get_wayback_snapshot(
                 "wsj.com", "https://www.wsj.com/", max_age_hours=36
@@ -218,7 +218,7 @@ class WaybackSnapshotTest(unittest.TestCase):
             (2, "200", "application/pdf"),
         ]
         with mock.patch.object(
-            dify_report.requests, "get",
+            news_screenshots.requests, "get",
             return_value=FakeResponse(cdx_payload(captures, now=self.now)),
         ) as get, mock.patch("builtins.print") as log:
             url, snapshot_time = dify_report.get_wayback_snapshot(
@@ -249,7 +249,7 @@ class WaybackSnapshotTest(unittest.TestCase):
     def test_capture_at_max_age_is_accepted(self):
         with mock.patch.object(news_screenshots, "WAYBACK_MAX_AGE_HOURS", 12):
             with mock.patch.object(
-                dify_report.requests, "get",
+                news_screenshots.requests, "get",
                 return_value=FakeResponse(cdx_payload(
                     [(12, "200", "text/html")], now=self.now
                 )),
@@ -262,13 +262,13 @@ class WaybackSnapshotTest(unittest.TestCase):
 
     def test_cdx_error_retries_then_falls_back_to_available(self):
         with mock.patch.object(
-            dify_report.requests, "get", side_effect=[
+            news_screenshots.requests, "get", side_effect=[
                 FakeResponse(status=503),
-                dify_report.requests.Timeout("CDX timeout"),
+                news_screenshots.requests.Timeout("CDX timeout"),
                 FakeResponse(status=503),
                 FakeResponse(snapshot_payload(5, now=self.now)),
             ],
-        ) as get, mock.patch.object(dify_report.time, "sleep") as sleep:
+        ) as get, mock.patch.object(news_screenshots.time, "sleep") as sleep:
             url, snapshot_time = dify_report.get_wayback_snapshot(
                 "wsj.com", "https://www.wsj.com/", max_age_hours=36
             )
@@ -286,11 +286,11 @@ class WaybackSnapshotTest(unittest.TestCase):
 
     def test_cdx_retry_success_does_not_call_available(self):
         with mock.patch.object(
-            dify_report.requests, "get", side_effect=[
+            news_screenshots.requests, "get", side_effect=[
                 FakeResponse(status=503),
                 FakeResponse(cdx_payload([(2, "200", "text/html")], now=self.now)),
             ],
-        ) as get, mock.patch.object(dify_report.time, "sleep") as sleep:
+        ) as get, mock.patch.object(news_screenshots.time, "sleep") as sleep:
             _, snapshot_time = dify_report.get_wayback_snapshot(
                 "wsj.com", "https://www.wsj.com/", max_age_hours=36
             )
@@ -334,11 +334,11 @@ class CaptureFlowTest(unittest.TestCase):
         with mock.patch.object(
             news_screenshots, "sync_playwright", fake_playwright(page)
         ), mock.patch.object(
-            dify_report.requests, "get",
+            news_screenshots.requests, "get",
             return_value=FakeResponse(cdx_payload([(2, "200", "text/html")])),
         ), mock.patch.object(
             news_screenshots, "publish_screenshots"
-        ) as publish, mock.patch.object(dify_report.os, "makedirs"):
+        ) as publish, mock.patch.object(news_screenshots.os, "makedirs"):
             captured, failures = dify_report.capture_and_upload_screenshots()
 
         return captured, failures, publish
