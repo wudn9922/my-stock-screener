@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import splitSnapshots from './fixtures/market/split-misdetection-snapshots.json';
 import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { KlineArchive, mergeArchiveDaily, parseArchiveCsv } from '../src/market-data/KlineArchive';
@@ -185,6 +186,18 @@ describe('archive reader C1', () => {
     expect(mergeArchiveDaily(old, [split], 'AAPL')).toEqual({ bars: old, splitMismatch: false });
     const next = { ...old[0]!, time: old[0]!.time + 86400 };
     expect(mergeArchiveDaily(old, [next], 'AAPL').bars).toHaveLength(2);
+  });
+  it.each(splitSnapshots.symbols)('retains the full overlapping archive for real $symbol snapshot rows', ({ symbol, archive, local }) => {
+    const archived = parseArchiveCsv(archive, symbol, 2026).bars;
+    const recent = parseArchiveCsv(local, symbol, 2026).bars;
+    expect(archived.length).toBeGreaterThanOrEqual(20);
+    const oldByTime = new Map(archived.map(bar => [bar.time, bar]));
+    const oldRule = recent.some(bar => {
+      const baseline = oldByTime.get(bar.time);
+      return baseline && (['open', 'high', 'low', 'close'] as const).some(field => Math.abs(bar[field] / baseline[field] - 1) > 0.02);
+    });
+    expect(oldRule).toBe(true);
+    expect(mergeArchiveDaily(archived, recent, symbol, undefined, new Set())).toEqual({ bars: archived, splitMismatch: false });
   });
   // Synthetic OHLC fixtures reproduce the rounded close-ratio clusters from
   // the #348 pinned 11/24–25 archive/local snapshot comparison, not live data.
