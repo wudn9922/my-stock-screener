@@ -225,7 +225,7 @@ describe('archive reader C1', () => {
     if (symbol === '6282.TW') recent[0]!.low *= 0.979198;
     expect(mergeArchiveDaily(old, recent, symbol, undefined, new Set())).toEqual({ bars: old, splitMismatch: false });
   });
-  it.each([0.5, 10])('replaces the whole history for consistent %sx splits despite one noisy session', ratio => {
+  it.each([0.5, 10, 1.15, 1 / 1.15])('replaces the whole history for consistent %sx splits despite one noisy session', ratio => {
     const old = sample(5);
     const recent = old.map(bar => scale(bar, ratio));
     recent[4] = old[4]!;

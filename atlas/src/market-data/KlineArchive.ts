@@ -237,9 +237,10 @@ export class KlineArchive {
 // sessions, a >= 1.15x basis difference and 80% agreement within a 1.02x band.
 // Log ratios make forward and reverse splits symmetric.
 const PRICE_BASIS_TOLERANCE = Math.log(1.02);
+const RATIO_ROUNDING = 4 * Number.EPSILON;
 
 export function samePriceBasis(logRatio: number): boolean {
-  return Math.abs(logRatio) <= PRICE_BASIS_TOLERANCE;
+  return Math.abs(logRatio) <= PRICE_BASIS_TOLERANCE + RATIO_ROUNDING;
 }
 
 export function consistentSplitRatio(ratios: number[]): boolean {
@@ -247,7 +248,7 @@ export function consistentSplitRatio(ratios: number[]): boolean {
   ratios.sort((a, b) => a - b);
   const middle = Math.floor(ratios.length / 2);
   const median = (ratios[middle]! + ratios[Math.floor((ratios.length - 1) / 2)]!) / 2;
-  if (Math.abs(median) < Math.log(1.15)) return false;
+  if (Math.abs(median) + RATIO_ROUNDING < Math.log(1.15)) return false;
   const agreement = ratios.filter(ratio => samePriceBasis(ratio - median)).length;
   return agreement >= Math.ceil(ratios.length * 0.8);
 }
@@ -270,7 +271,7 @@ export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar
     const baseline = day <= cutoff ? old.get(day) : undefined;
     if (!baseline || !Number.isFinite(baseline.close) || baseline.close <= 0
       || !Number.isFinite(bar.close) || bar.close <= 0) continue;
-    ratios.set(day, Math.log(bar.close) - Math.log(baseline.close));
+    ratios.set(day, Math.log(bar.close / baseline.close));
   }
   const splitMismatch = consistentSplitRatio([...ratios.values()]);
   if (splitMismatch) return { bars: [...recent], splitMismatch: true };
