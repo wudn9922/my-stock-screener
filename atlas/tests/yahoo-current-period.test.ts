@@ -92,16 +92,45 @@ it('widens only the live session row whose high/low lag behind its own open/clos
   expect(normalized.normalization?.liveBarBounds).toEqual({ method: 'live-session-open-close', time: dailyCloseTime, quoteAsOf: quoteTime });
   expect(normalized.bars.slice(0, -1)).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.slice(0, -1));
 
-  // A row from an earlier session stays a hard failure.
+  // A row from an earlier session is dropped, never widened.
   const historical = fixture('SMCI-current-1d.json');
   const previous = historical.chart.result[0].timestamp.length - 2;
   historical.chart.result[0].indicators.quote[0].close[previous] = 50;
-  expect(() => normalizeYahooResponse(historical, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+  const historicalResult = normalizeYahooResponse(historical, asOf, '1D', 'SMCI');
+  const historicalTime = historical.chart.result[0].timestamp[previous];
+  expect(historicalResult.bars).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.filter(bar => bar.time !== historicalTime));
+  expect(historicalResult.normalization?.liveBarBounds).toBeUndefined();
 
   // Without same-session market metadata the latest row is not treated as live.
   const stale = liveCloseAboveHigh().raw;
   stale.chart.result[0].meta.regularMarketTime = Date.parse('2026-10-06T20:00:00Z') / 1000;
-  expect(() => normalizeYahooResponse(stale, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+  const staleResult = normalizeYahooResponse(stale, asOf, '1D', 'SMCI');
+  expect(staleResult.bars).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.slice(0, -1));
+  expect(staleResult.normalization?.liveBarBounds).toBeUndefined();
+});
+
+it('discards malformed cells and clears healing metadata for a rejected live row', () => {
+  const { raw, last } = liveCloseAboveHigh();
+  const entry = raw.chart.result[0], q = entry.indicators.quote[0];
+  q.volume[last] = 'invalid';
+  q.low[0] = 'invalid';
+  const normalized = normalizeYahooResponse(raw, asOf, '1D', 'SMCI');
+  expect(normalized.bars.map(bar => bar.time)).toEqual(entry.timestamp.slice(1, last));
+  expect(normalized.normalization).toBeUndefined();
+  expect(normalized.missingVolumeAt).toBeUndefined();
+  q.volume.fill('invalid');
+  expect(() => normalizeYahooResponse(raw, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+});
+
+it.each(['1W', '1M'] as const)('%s never promotes an appended daily row after discarding a native aggregate', timeframe => {
+  const { native, daily } = currentRows(timeframe);
+  const entry = native.chart.result[0];
+  const periodDate = new Date(expected[timeframe].time * 1000).toISOString().slice(0, 10);
+  const index = entry.timestamp.findIndex((time: number) => new Date(time * 1000).toISOString().startsWith(periodDate));
+  expect(index).toBeGreaterThanOrEqual(0);
+  entry.indicators.quote[0].high[index] = 1;
+  expect(normalizeYahooResponse(native, asOf, timeframe, 'SMCI').bars.some(bar => bar.time === expected[timeframe].time)).toBe(false);
+  expect(() => normalizeYahooCalendarResponse(native, daily, asOf, timeframe, 'SMCI')).toThrow(/invalid current-period OHLCV/);
 });
 
 it('keeps the current week buildable when the live daily row was widened', () => {
