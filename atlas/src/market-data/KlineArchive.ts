@@ -236,13 +236,19 @@ export class KlineArchive {
 // Conservative candidate thresholds: a minimum of five distinct overlapping
 // sessions, a >= 1.15x basis difference and 80% agreement within a 1.02x band.
 // Log ratios make forward and reverse splits symmetric.
-function consistentDailySplitRatio(ratios: number[]): boolean {
+const PRICE_BASIS_TOLERANCE = Math.log(1.02);
+
+export function samePriceBasis(logRatio: number): boolean {
+  return Math.abs(logRatio) <= PRICE_BASIS_TOLERANCE;
+}
+
+export function consistentSplitRatio(ratios: number[]): boolean {
   if (ratios.length < 5) return false;
   ratios.sort((a, b) => a - b);
   const middle = Math.floor(ratios.length / 2);
   const median = (ratios[middle]! + ratios[Math.floor((ratios.length - 1) / 2)]!) / 2;
   if (Math.abs(median) < Math.log(1.15)) return false;
-  const agreement = ratios.filter(ratio => Math.abs(ratio - median) <= Math.log(1.02)).length;
+  const agreement = ratios.filter(ratio => samePriceBasis(ratio - median)).length;
   return agreement >= Math.ceil(ratios.length * 0.8);
 }
 
@@ -250,7 +256,7 @@ function consistentDailySplitRatio(ratios: number[]): boolean {
  * Existing archive rows win; only absent sessions are appended. A split uses Yahoo's whole segment.
  */
 export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar[], symbol: string, archivedThrough?: string,
-  closed: ReadonlySet<string> = closedMarketDates(symbol)): { bars: Bar[]; splitMismatch: boolean } {
+  closed: ReadonlySet<string> = closedMarketDates(symbol)): { bars: Bar[]; splitMismatch: boolean; withheldRecent?: true } {
   archived = withoutClosedDates(archived,symbol,closed);
   recent = withoutClosedDates(recent,symbol,closed);
   const market = getMarketProfile(symbol);
@@ -266,14 +272,27 @@ export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar
       || !Number.isFinite(bar.close) || bar.close <= 0) continue;
     ratios.set(day, Math.log(bar.close) - Math.log(baseline.close));
   }
-  const splitMismatch = consistentDailySplitRatio([...ratios.values()]);
+  const splitMismatch = consistentSplitRatio([...ratios.values()]);
   if (splitMismatch) return { bars: [...recent], splitMismatch: true };
+  const overlaps = [...ratios].sort(([a], [b]) => a.localeCompare(b));
+  let withheldRecent = false;
   for (const bar of recent) {
     const day = calendarDate(bar.time, market);
-    if (!old.has(day) || day > cutoff) old.set(day, bar);
+    if (old.has(day) && day <= cutoff) continue;
+    // Inconclusive evidence never justifies replacing the archive. Check the
+    // overlap adjacent to each insertion so a split inside the window cannot
+    // mix two bases on either side of the join.
+    const after = overlaps.findIndex(([date]) => date > day);
+    const left = after < 0 ? overlaps.at(-1) : overlaps[after - 1];
+    const right = after < 0 ? undefined : overlaps[after];
+    if ((left && !samePriceBasis(left[1])) || (right && !samePriceBasis(right[1]))) {
+      withheldRecent = true;
+      continue;
+    }
+    old.set(day, bar);
   }
   const merged = [...old.values()].sort((a, b) => a.time - b.time);
-  return { bars: merged, splitMismatch: false };
+  return { bars: merged, splitMismatch: false, ...(withheldRecent ? { withheldRecent: true } : {}) };
 }
 
 let shared: KlineArchive | undefined;

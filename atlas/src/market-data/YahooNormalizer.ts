@@ -15,7 +15,9 @@ import {
 } from './MarketDataProvider';
 import { calendarDate, type MarketProfile } from './MarketProfile';
 import { isQuarantinedBar, validKline } from './KlineIntegrity';
-const prices = z.array(z.number().finite().nullable());
+// Keep malformed cells distinct from missing ones so normalization can reject
+// their row without treating an invalid close or volume as a Yahoo null.
+const prices = z.array(z.number().finite().nullable().catch(NaN));
 const dividendSchema = z.object({
   amount: z.number().finite(),
   date: z.number().int().positive(),
@@ -139,7 +141,13 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   }
   const byTime = new Map<number, Bar>();
   const missingVolumeAt = new Set<number>();
-  const originalTimes = new Map<number, number>();
+  const periodStarts = new Map<number, number>();
+  if (timeframe === '1W' || timeframe === '1M') {
+    for (const time of result.timestamp) {
+      const period = calendarPeriodStart(time, timeframe, market);
+      periodStarts.set(period, Math.min(time, periodStarts.get(period) ?? Infinity));
+    }
+  }
   const sessionCloseEligibility = new Map<number, boolean>();
   const canMarkSessionClose = market.market === 'TW' &&
     ['5m', '15m', '30m', '1H', '4H'].includes(timeframe ?? '');
@@ -235,14 +243,11 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
       if (liveBarBounds?.time === originalTime) liveBarBounds = undefined;
       continue;
     }
-    const time = timeframe === '1M' || timeframe === '1W'
-      ? calendarPeriodStart(originalTime, timeframe, market)
-      : originalTime;
+    const time = timeframe === '1M' || timeframe === '1W' ? calendarPeriodStart(originalTime, timeframe, market) : originalTime;
     // Native weekly/monthly responses append a latest-session row after the
-    // aggregate. Keep the earliest source timestamp for a period: summing or
-    // replacing it would double count or lose the aggregate's OHLC/volume.
-    if ((timeframe === '1M' || timeframe === '1W') && (originalTimes.get(time) ?? Infinity) < originalTime) continue;
-    originalTimes.set(time, originalTime);
+    // aggregate. If the aggregate is invalid, never present the appended
+    // single session as the whole period.
+    if ((periodStarts.get(time) ?? originalTime) < originalTime) continue;
     if (q.volume?.[i] == null) missingVolumeAt.add(time); else missingVolumeAt.delete(time);
     byTime.set(time, {
       time,
@@ -469,10 +474,18 @@ export function normalizeYahooCalendarResponse(
   const firstDaily = currentBars[0];
   const lastDaily = currentBars.at(-1)!;
   const nativeQuote = nativeResult.indicators.quote[0];
-  const nativeBucketSource = nativeResult.timestamp
+  const nativeCurrentRows = nativeResult.timestamp
     .map((time, index) => ({ time, index }))
     .filter(({ time }) => calendarPeriodStart(time, timeframe, market) === periodStart)
-    .sort((a, b) => a.time - b.time)[0];
+    .sort((a, b) => a.time - b.time);
+  for (const { time, index } of nativeCurrentRows) {
+    if (isQuarantinedBar(symbol, time, timeframe)) continue;
+    const { open, high, low, close, volume } = nativeQuote;
+    const o = open[index], h = high[index], l = low[index], c = close[index];
+    if (o != null && h != null && l != null && c != null && !validKline({ time, open:o, high:h, low:l, close:c, volume: volume?.[index] ?? 0 }))
+      throw new Error(`Yahoo native row has invalid current-period OHLCV at ${time}`);
+  }
+  const nativeBucketSource = nativeCurrentRows[0];
   const nativeCandidate = native.bars.find((bar) => bar.time === periodStart);
   const nativeOpen = nativeBucketSource ? nativeQuote.open[nativeBucketSource.index] : undefined;
   const nativeHigh = nativeBucketSource ? nativeQuote.high[nativeBucketSource.index] : undefined;
@@ -538,6 +551,7 @@ export function normalizeYahooCalendarResponse(
   return {
     ...native,
     bars,
+    missingVolumeAt: native.missingVolumeAt?.filter(time => time !== periodStart),
     source: `${native.source} · current period derived from daily OHLCV (${periodLabel})`,
     ...(daily.quote ? { quote: daily.quote } : {}),
     normalization,

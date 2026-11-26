@@ -108,20 +108,36 @@ describe('archive-first chart C2', () => {
     expect(new URL(urls[0]!, 'https://example.test').searchParams.get('interval')).toBe('1mo');
     expect(new URL(urls[0]!, 'https://example.test').searchParams.get('events')).toBe('1');
   });
-  it('does not join older Yahoo periods on a different split basis; ignores the still-forming period for this check',async()=>{
-    const {archive,fallback}=make();
-    const yahoo=new EdgeYahooProvider('https://edge.test/market-chart');
-    const provider=new ArchiveFirstProvider(fallback,archive,yahoo);
-    const current=await provider.getBars('AAPL','1W');
-    const half=(bar:typeof current.bars[number])=>({...bar,open:bar.open/2,high:bar.high/2,low:bar.low/2,close:bar.close/2});
-    const native=vi.spyOn(yahoo,'getArchiveHistory').mockResolvedValue({...current,bars:current.bars.map((bar,i)=>i===current.bars.length-1?half(bar):bar)});
-    const full=vi.spyOn(yahoo,'getBars').mockResolvedValue({...current,bars:(await archive.getDaily('AAPL'))!.bars.map(half)});
-    expect((await provider.getOlderBars('AAPL','1W',current)).archive?.status).toBe('archive');
+  it.each(['1W', '1M'] as const)('%s ignores period outliers and requires consistent evidence or a matching historical join', async timeframe => {
+    const { archive, fallback } = make();
+    const yahoo = new EdgeYahooProvider('https://edge.test/market-chart');
+    const provider = new ArchiveFirstProvider(fallback, archive, yahoo);
+    const daily = (await archive.getDaily('AAPL'))!;
+    const sample = daily.bars[0]!;
+    const dates = Array.from({ length: 7 }, (_, i) => Date.UTC(2026, i, 7, 16) / 1000);
+    const periods = aggregateBars(dates.map(time => ({ ...sample, time })), timeframe, getMarketProfile('AAPL'));
+    const [earlier, ...overlap] = periods;
+    const current = { ...daily, bars: overlap };
+    const half = (bar: typeof sample) => ({ ...bar, open: bar.open / 2, high: bar.high / 2, low: bar.low / 2, close: bar.close / 2 });
+    const native = vi.spyOn(yahoo, 'getArchiveHistory');
+    const full = vi.spyOn(yahoo, 'getBars').mockResolvedValue({ ...daily, bars: daily.bars.map(half) });
+    native.mockResolvedValue({ ...current, bars: periods.map((bar, i) => i === 3 || i === periods.length - 1 ? half(bar) : bar) });
+    expect((await provider.getOlderBars('AAPL', timeframe, current)).bars).toEqual(periods);
     expect(full).not.toHaveBeenCalled();
-    native.mockResolvedValue({...current,bars:current.bars.map(half)});
-    const result=await provider.getOlderBars('AAPL','1W',current);
-    expect(result.archive?.status).toBe('split');expect(result.bars.every(bar=>bar.close<60)).toBe(true);
+    native.mockResolvedValue({ ...current, bars: [half(earlier!), half(overlap[0]!), ...overlap.slice(1)] });
+    const held = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(held.bars).toEqual(overlap);
+    expect(held.source).toContain('價格基準待確認');
+    expect(full).not.toHaveBeenCalled();
+    native.mockResolvedValue({ ...current, bars: periods.map(half) });
+    const result = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(result.archive?.status).toBe('split');
+    expect(result.bars.every(bar => bar.close < 60)).toBe(true);
     expect(full).toHaveBeenCalledTimes(1);
+    full.mockRejectedValueOnce(new Error('Yahoo unavailable'));
+    const unavailable = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(unavailable.archive?.status).toBe('archive');
+    expect(unavailable.bars).toBe(current.bars);
   });
   it('merges missing dates, retains same-date archive values, and replaces a split price basis as a whole', async () => {
     const { archive, fallback } = make();

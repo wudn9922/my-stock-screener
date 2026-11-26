@@ -242,6 +242,20 @@ describe('archive reader C1', () => {
     const old = sample(10);
     expect(mergeArchiveDaily(old, old.map(bar => scale(bar, 0.92)), 'AAPL', undefined, new Set()).splitMismatch).toBe(false);
   });
+  it.each([[4, 0.5], [10, 1.1], [10, 1 / 1.1]])('withholds an incompatible continuation with %i overlaps at %sx', (count, ratio) => {
+    const bars = sample(count + 1);
+    const old = bars.slice(0, -1);
+    const recent = bars.map(bar => scale(bar, ratio));
+    expect(mergeArchiveDaily(old, recent, 'AAPL', undefined, new Set())).toEqual({ bars: old, splitMismatch: false, withheldRecent: true });
+  });
+  it('does not fill across two different bases when the overlap straddles a split', () => {
+    const bars = sample(12);
+    const recent = bars.map((bar, i) => scale(bar, i < 6 ? 0.5 : 1));
+    const old = bars.slice(0, -1).filter((_, i) => i !== 3 && i !== 8);
+    expect(mergeArchiveDaily(old, recent, 'AAPL', undefined, new Set())).toEqual({
+      bars: bars.filter((_, i) => i !== 3), splitMismatch: false, withheldRecent: true,
+    });
+  });
   it('symbol index unavailable fails explicitly; aborting one consumer leaves shared requests usable', async () => {
     const archive = new KlineArchive({ fetcher: async () => new Response('', { status: 503 }), cache: false });
     await expect(archive.getDaily('AAPL')).rejects.toThrow('HTTP 503');
