@@ -182,6 +182,19 @@ describe('EdgeYahooProvider', () => {
     await expect(new EdgeYahooProvider(PROXY).getBars('bad symbol!', '1D')).rejects.toThrow('請輸入有效的股票或指數代號');
   });
 
+  it('retains valid daily bars on both sides of an invalid historical Yahoo row', async () => {
+    const raw = { chart: { result: [{
+      meta: { symbol: 'AAPL', currency: 'USD' },
+      timestamp: ['2026-10-01', '2026-10-02', '2026-10-05'].map(day => Date.parse(day + 'T13:30:00Z') / 1000),
+      indicators: { quote: [{ open: [100, 100, 102], high: [102, 99, 104], low: [99, 98, 101], close: [101, 100, 103], volume: [10, 20, 30] }] },
+    }] } };
+    const { fetcher } = edgeFetch({ '1d': raw });
+    const provider = new EdgeYahooProvider(PROXY, { fetcher, now: () => asOfMs });
+    const result = await provider.getBars('AAPL', '1D');
+    expect(result.bars.map(bar => bar.time)).toEqual([raw.chart.result[0]!.timestamp[0], raw.chart.result[0]!.timestamp[2]]);
+    expect(result.bars.map(bar => bar.close)).toEqual([101, 103]);
+  });
+
   it('wraps payloads that fail validation (e.g. symbol mismatch) with the symbol', async () => {
     const { fetcher } = edgeFetch();
     const provider = new EdgeYahooProvider(PROXY, { fetcher, now: () => asOfMs });

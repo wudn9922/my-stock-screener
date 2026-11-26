@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import splitSnapshots from './fixtures/market/split-misdetection-snapshots.json';
 import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { KlineArchive, mergeArchiveDaily, parseArchiveCsv } from '../src/market-data/KlineArchive';
@@ -181,9 +182,79 @@ describe('archive reader C1', () => {
     const shifted = { ...old[0]!, time: Date.parse('2026-01-02T00:00:00Z')/1000, close: 100.01 };
     expect(mergeArchiveDaily(old, [shifted], 'AAPL')).toEqual({ bars: old, splitMismatch: false });
     const split = { ...shifted, open: 50, high: 51, low: 49, close: 50 };
-    expect(mergeArchiveDaily(old, [split], 'AAPL')).toEqual({ bars: [split], splitMismatch: true });
+    // A single overlap, even with a large price change, is not enough evidence.
+    expect(mergeArchiveDaily(old, [split], 'AAPL')).toEqual({ bars: old, splitMismatch: false });
     const next = { ...old[0]!, time: old[0]!.time + 86400 };
     expect(mergeArchiveDaily(old, [next], 'AAPL').bars).toHaveLength(2);
+  });
+  it.each(splitSnapshots.symbols)('retains the full overlapping archive for real $symbol snapshot rows', ({ symbol, archive, local }) => {
+    const archived = parseArchiveCsv(archive, symbol, 2026).bars;
+    const recent = parseArchiveCsv(local, symbol, 2026).bars;
+    expect(archived.length).toBeGreaterThanOrEqual(20);
+    const oldByTime = new Map(archived.map(bar => [bar.time, bar]));
+    const oldRule = recent.some(bar => {
+      const baseline = oldByTime.get(bar.time);
+      return baseline && (['open', 'high', 'low', 'close'] as const).some(field => Math.abs(bar[field] / baseline[field] - 1) > 0.02);
+    });
+    expect(oldRule).toBe(true);
+    expect(mergeArchiveDaily(archived, recent, symbol, undefined, new Set())).toEqual({ bars: archived, splitMismatch: false });
+  });
+  // Synthetic OHLC fixtures reproduce the rounded close-ratio clusters from
+  // the #348 pinned 11/24–25 archive/local snapshot comparison, not live data.
+  const sessions = Array.from({ length: 40 }, (_, i) => new Date(Date.UTC(2026, 9, 12 + i, 12)))
+    .filter(day => day.getUTCDay() !== 0 && day.getUTCDay() !== 6);
+  const sample = (count: number) => sessions.slice(0, count).map((day, i) => {
+    const close = 100 + i;
+    return { time: day.getTime() / 1000, open: close, high: close * 1.02, low: close * 0.98, close, volume: 1000 };
+  });
+  const scale = (bar: ReturnType<typeof sample>[number], ratio: number) => ({
+    ...bar, open: bar.open * ratio, high: bar.high * ratio, low: bar.low * ratio, close: bar.close * ratio,
+  });
+  it.each([
+    ['AAPL', 22, 0, 1], ['SNDK', 23, 8, 8],
+    ['1808.TW', 21, 7, 1.25], ['2025.TW', 22, 1, 0.95771], ['2063.TWO', 21, 13, 0.90909],
+    ['3714.TW', 20, 7, 1.84485], ['4207.TWO', 20, 6, 1.05263], ['4534.TWO', 20, 7, 1.26167],
+    ['5355.TWO', 20, 6, 2.14352], ['5475.TWO', 22, 5, 0.97637],
+    ['6225.TW', 22, 0, 1], ['6282.TW', 22, 0, 1], ['8176.TWO', 20, 6, 1.19901],
+    ['ZTS', 22, 0, 1],
+  ] as const)('keeps archive for %s snapshot-shaped discrepancies', (symbol, count, changed, ratio) => {
+    const old = sample(count);
+    const recent = old.map((bar, i) => scale(bar, i < changed ? ratio : 1));
+    if (symbol === 'AAPL') recent[0]!.low *= 0.976632;
+    if (symbol === '6225.TW') recent[0]!.high *= 1.020151;
+    if (symbol === '6282.TW') recent[0]!.low *= 0.979198;
+    expect(mergeArchiveDaily(old, recent, symbol, undefined, new Set())).toEqual({ bars: old, splitMismatch: false });
+  });
+  it.each([0.5, 10, 1.15, 1 / 1.15])('replaces the whole history for consistent %sx splits despite one noisy session', ratio => {
+    const old = sample(5);
+    const recent = old.map(bar => scale(bar, ratio));
+    recent[4] = old[4]!;
+    expect(mergeArchiveDaily(old, recent, 'AAPL', undefined, new Set())).toEqual({ bars: recent, splitMismatch: true });
+  });
+  it('does not count repeated intraday updates as independent sessions or compare beyond the archive cutoff', () => {
+    const old = sample(5), recent = old.map(bar => scale(bar, 0.5));
+    const duplicate = Array.from({ length: 5 }, (_, i) => ({ ...recent[0]!, time: recent[0]!.time + i * 60 }));
+    expect(mergeArchiveDaily(old, duplicate, 'AAPL', undefined, new Set()).splitMismatch).toBe(false);
+    expect(mergeArchiveDaily(old, recent, 'AAPL', '2026-10-15', new Set()).splitMismatch).toBe(false);
+    expect(mergeArchiveDaily(old, recent.slice(0, 4), 'AAPL', undefined, new Set()).splitMismatch).toBe(false);
+  });
+  it('does not mistake a widespread but small dividend adjustment for a split', () => {
+    const old = sample(10);
+    expect(mergeArchiveDaily(old, old.map(bar => scale(bar, 0.92)), 'AAPL', undefined, new Set()).splitMismatch).toBe(false);
+  });
+  it.each([[4, 0.5], [10, 1.1], [10, 1 / 1.1]])('withholds an incompatible continuation with %i overlaps at %sx', (count, ratio) => {
+    const bars = sample(count + 1);
+    const old = bars.slice(0, -1);
+    const recent = bars.map(bar => scale(bar, ratio));
+    expect(mergeArchiveDaily(old, recent, 'AAPL', undefined, new Set())).toEqual({ bars: old, splitMismatch: false, withheldRecent: true });
+  });
+  it('does not fill across two different bases when the overlap straddles a split', () => {
+    const bars = sample(12);
+    const recent = bars.map((bar, i) => scale(bar, i < 6 ? 0.5 : 1));
+    const old = bars.slice(0, -1).filter((_, i) => i !== 3 && i !== 8);
+    expect(mergeArchiveDaily(old, recent, 'AAPL', undefined, new Set())).toEqual({
+      bars: bars.filter((_, i) => i !== 3), splitMismatch: false, withheldRecent: true,
+    });
   });
   it('symbol index unavailable fails explicitly; aborting one consumer leaves shared requests usable', async () => {
     const archive = new KlineArchive({ fetcher: async () => new Response('', { status: 503 }), cache: false });
