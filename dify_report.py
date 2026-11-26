@@ -612,11 +612,7 @@ def capture_prepare_and_publish(now=None):
     return send_items, no_news
 
 
-from trending_stocks import (
-    get_yahoo_chart_metadata as get_yahoo_chart_metadata,
-    is_us_listed_stock as is_us_listed_stock,
-    fetch_yahoo_realtime_trending,
-)
+from trending_stocks import fetch_yahoo_realtime_trending
 
 # 讀取環境變數（包含 FRED API Key 與備援設定）
 FRED_API_KEY = os.getenv("FRED_API_KEY")
