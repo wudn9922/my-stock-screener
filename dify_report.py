@@ -1149,10 +1149,7 @@ def insert_rates_below_trending(report_text, rates_report):
     )
 
 
-from dify_client import (
-    upload_image_to_dify as upload_image_to_dify,
-    run_dify_workflow,
-)
+from dify_client import run_dify_workflow
 
 def split_line_text(text, max_length=4900):
     """避免超過 LINE 單則文字訊息 5000 字元限制。"""
