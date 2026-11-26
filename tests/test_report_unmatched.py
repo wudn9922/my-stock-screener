@@ -56,15 +56,17 @@ class ProcessCustomGroupsTest(unittest.TestCase):
         cls.main = import_main()
 
     def setUp(self):
+        import custom_groups
+
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.saved = {
             (target, name): getattr(target, name)
-            for target, name in ((screener_config, "DATA_DIR"), (self.main, "download_custom_stock"))
+            for target, name in ((screener_config, "DATA_DIR"), (custom_groups, "download_custom_stock"))
         }
         screener_config.DATA_DIR = self.tmp.name
         self.frames = {"AAA": FLAT, "BBB": RISING, "DDD": FALLING}
-        self.main.download_custom_stock = self.fake_download
+        custom_groups.download_custom_stock = self.fake_download
 
     def tearDown(self):
         for (target, name), value in self.saved.items():
