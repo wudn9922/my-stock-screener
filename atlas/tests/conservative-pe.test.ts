@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assessEligibility, conservativeEps, conservativePeClose, conservativePePriceIssue, epsGradeUsable, extrapolateGrowth, forecastInertia, type EpsObservation } from '../src/fundamentals/conservativePe';
 import { parseFinancials } from '../src/fundamentals/FinancialHistory';
 import type { BarResult } from '../src/market-data/MarketDataProvider';
+import { normalizeYahooResponse, YAHOO_SOURCE } from '../src/market-data/YahooNormalizer';
 import adr from './fixtures/financials/adr-rescaled.json';
 import split from './fixtures/financials/tw-8422-split.json';
 import us from './fixtures/financials/us-full.json';
@@ -99,5 +100,25 @@ describe('conservative PE inertia', () => {
     expect(conservativePeClose('AAPL', result, now)).toEqual({ value: 100, date: '2026-11-23', currency: 'USD', source: '封存日 K', stale: true });
     expect(conservativePeClose('AAPL', { ...result, asOf: now }, now)).toMatchObject({ value: 110, date: '2026-11-24' });
     expect(conservativePeClose('AAPL', { ...result, dataState: 'simulated' }, now)).toBeNull();
+  });
+  it('attributes a Taiwan close to the provider of that session when the response carries an MIS overlay', () => {
+    const seconds = (date: string) => Date.parse(date) / 1000;
+    const now = seconds('2026-11-25T06:00:00Z');
+    const snapshot = (overlay: 'atlasLiveSource' | 'atlasOhlcSource', quoteTime: string) => normalizeYahooResponse({
+      chart: { result: [{
+        meta: { symbol: '2330.TW', currency: 'TWD', exchangeTimezoneName: 'Asia/Taipei',
+          regularMarketTime: seconds(quoteTime), regularMarketPrice: 2100, [overlay]: 'twse-mis' },
+        timestamp: [seconds('2026-11-24T01:00:00Z'), seconds('2026-11-25T01:00:00Z')],
+        indicators: { quote: [{ open: [2000, 2100], high: [2000, 2100], low: [2000, 2100], close: [2000, 2100] }] },
+      }] },
+    }, now, '1D', '2330.TW');
+    const intraday = snapshot('atlasLiveSource', '2026-11-25T04:00:00Z');
+    expect(intraday.source).toContain('今日來源：證交所即時');
+    expect(conservativePeClose('2330.TW', intraday, now)).toMatchObject({ value: 2000, date: '2026-11-24', source: YAHOO_SOURCE });
+    const partial = snapshot('atlasOhlcSource', '2026-11-25T04:00:00Z');
+    expect(partial.source).toContain('今日開高低／量：證交所即時');
+    expect(conservativePeClose('2330.TW', partial, now)).toMatchObject({ value: 2000, date: '2026-11-24', source: YAHOO_SOURCE });
+    const closed = snapshot('atlasLiveSource', '2026-11-25T05:30:00Z');
+    expect(conservativePeClose('2330.TW', closed, now)).toMatchObject({ value: 2100, date: '2026-11-25', source: '證交所 MIS（非官方 API）' });
   });
 });

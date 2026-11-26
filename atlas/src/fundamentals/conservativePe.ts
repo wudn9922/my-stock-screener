@@ -46,14 +46,24 @@ export function conservativePeClose(symbol: string, result: BarResult, now = Dat
   const market = result.market ?? getMarketProfile(symbol);
   // A cached snapshot taken during trading still contains a partial bar after the session ends.
   const observedAt = Math.min(now, result.asOf ?? now);
+  // YahooNormalizer appends the Taiwan MIS overlay to the history source for that session only.
+  const historySource = result.source.split(/ · 今日(?:來源|開高低／量)：/, 1)[0]!;
+  const overlayQuote = historySource !== result.source ? result.quote : undefined;
+  const overlayDate = overlayQuote && calendarDate(overlayQuote.asOf, market);
   for (let i = result.bars.length - 1; i >= 0; i--) {
     const bar = result.bars[i]!;
-    if (!Number.isFinite(bar.time) || !Number.isFinite(bar.close) || bar.close <= 0 || barEndTime(bar.time, '1D', market) > observedAt) continue;
+    if (!Number.isFinite(bar.time) || !Number.isFinite(bar.close) || bar.close <= 0) continue;
+    const closesAt = barEndTime(bar.time, '1D', market);
+    if (!(closesAt <= observedAt)) continue;
+    const date = calendarDate(bar.time, market);
+    const quote = date === overlayDate ? overlayQuote : undefined;
+    if (quote && quote.asOf < closesAt) continue;
+    const misClose = quote?.dataState === 'live' && quote.price === bar.close;
     return {
       value: bar.close,
-      date: calendarDate(bar.time, market),
+      date,
       currency: market.currency,
-      source: result.source,
+      source: (misClose ? quote.source?.replace('證交所即時', '證交所 MIS') : null) ?? historySource,
       stale: result.cacheStatus === 'stale',
     };
   }
