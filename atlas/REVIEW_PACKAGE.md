@@ -1620,3 +1620,6 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 - 選股成長率用 `gQ` 標示低信心 EPS 排除，手機可點成長率看來源及缺值明細。[390px WebKit 截圖（測試資料）](docs/screener-data-grade-390.png)
 - 未獨立審查。測試比較有無 `gQ` 的篩選名單和排序，並逐欄核對 6,663 筆重建結果的既有資料。
+
+## 2026-11-26 Conservative PE inertia
+Primary self-review only; EPS eligibility and inertia card. Related tests, lint/build, mobile WebKit and 390px screenshot pending.
