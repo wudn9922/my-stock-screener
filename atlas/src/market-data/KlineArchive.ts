@@ -233,6 +233,19 @@ export class KlineArchive {
   }
 }
 
+// Conservative candidate thresholds: a minimum of five distinct overlapping
+// sessions, a >= 1.15x basis difference and 80% agreement within a 1.02x band.
+// Log ratios make forward and reverse splits symmetric.
+function consistentDailySplitRatio(ratios: number[]): boolean {
+  if (ratios.length < 5) return false;
+  ratios.sort((a, b) => a - b);
+  const middle = Math.floor(ratios.length / 2);
+  const median = (ratios[middle]! + ratios[Math.floor((ratios.length - 1) / 2)]!) / 2;
+  if (Math.abs(median) < Math.log(1.15)) return false;
+  const agreement = ratios.filter(ratio => Math.abs(ratio - median) <= Math.log(1.02)).length;
+  return agreement >= Math.ceil(ratios.length * 0.8);
+}
+
 /** Compare the same session date, independent of each provider's daily timestamp convention.
  * Existing archive rows win; only absent sessions are appended. A split uses Yahoo's whole segment.
  */
@@ -243,11 +256,17 @@ export function mergeArchiveDaily(archived: readonly Bar[], recent: readonly Bar
   const market = getMarketProfile(symbol);
   const old = new Map(archived.map(bar => [calendarDate(bar.time, market), bar]));
   const cutoff = archivedThrough ?? (archived.at(-1) ? calendarDate(archived.at(-1)!.time, market) : '');
-  const splitMismatch = recent.some(bar => {
+  // A split-adjustment mismatch changes the price basis across sessions, not
+  // just a single high/low. Count each overlapping session at most once.
+  const ratios = new Map<string, number>();
+  for (const bar of recent) {
     const day = calendarDate(bar.time, market);
     const baseline = day <= cutoff ? old.get(day) : undefined;
-    return baseline && (['open', 'high', 'low', 'close'] as const).some(field => Math.abs(bar[field] / baseline[field] - 1) > 0.02);
-  });
+    if (!baseline || !Number.isFinite(baseline.close) || baseline.close <= 0
+      || !Number.isFinite(bar.close) || bar.close <= 0) continue;
+    ratios.set(day, Math.log(bar.close) - Math.log(baseline.close));
+  }
+  const splitMismatch = consistentDailySplitRatio([...ratios.values()]);
   if (splitMismatch) return { bars: [...recent], splitMismatch: true };
   for (const bar of recent) {
     const day = calendarDate(bar.time, market);

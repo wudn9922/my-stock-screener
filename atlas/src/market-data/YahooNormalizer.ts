@@ -14,7 +14,7 @@ import {
   SESSION_CLOSE_SOURCE_QUALIFIER,
 } from './MarketDataProvider';
 import { calendarDate, type MarketProfile } from './MarketProfile';
-import { isQuarantinedBar } from './KlineIntegrity';
+import { isQuarantinedBar, validKline } from './KlineIntegrity';
 const prices = z.array(z.number().finite().nullable());
 const dividendSchema = z.object({
   amount: z.number().finite(),
@@ -152,6 +152,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
   }
   let healedDailyClose: BarNormalization['healedDailyClose'];
   let liveBarBounds: BarNormalization['liveBarBounds'];
+  let firstInvalidTime: number | undefined;
   for (let i = 0; i < result.timestamp.length; i++) {
     if (canonicalSymbol && isQuarantinedBar(canonicalSymbol, result.timestamp[i]!, timeframe)) continue;
     const open = q.open[i],
@@ -205,7 +206,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
       rowLow = low;
     // Right after the open Yahoo's still-forming daily row already carries the live price while its
     // high/low lag behind (e.g. close 100.7 above high 100.5). Only that row of the live session is
-    // widened to its own open/close; any other inconsistent row still fails the response.
+    // widened to its own open/close; any other inconsistent row is discarded.
     if (
       timeframe === '1D' &&
       i === latestDailyIndex &&
@@ -226,18 +227,14 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
         liveBarBounds = { method: 'live-session-open-close', time: rowTime, quoteAsOf: metaTime };
       }
     }
-    if (
-      open <= 0 ||
-      high <= 0 ||
-      low <= 0 ||
-      close <= 0 ||
-      volume < 0 ||
-      rowHigh < Math.max(open, close) ||
-      rowLow > Math.min(open, close)
-    ) {
-      throw new Error(`Invalid Yahoo OHLCV values at ${result.timestamp[i]}`);
-    }
     const originalTime = result.timestamp[i];
+    if (!validKline({ time: originalTime, open, high: rowHigh, low: rowLow, close, volume })) {
+      firstInvalidTime ??= originalTime;
+      // Do not publish healing provenance for a row that was discarded.
+      if (healedDailyClose?.time === originalTime) healedDailyClose = undefined;
+      if (liveBarBounds?.time === originalTime) liveBarBounds = undefined;
+      continue;
+    }
     const time = timeframe === '1M' || timeframe === '1W'
       ? calendarPeriodStart(originalTime, timeframe, market)
       : originalTime;
@@ -261,7 +258,7 @@ export function normalizeYahooResponse(raw: unknown, asOf = Date.now() / 1000, t
     );
   }
   const bars = [...byTime.values()].sort((a, b) => a.time - b.time);
-  if (!bars.length) throw new Error('No valid bars');
+  if (!bars.length) throw new Error(firstInvalidTime === undefined ? 'No valid bars' : `Invalid Yahoo OHLCV values at ${firstInvalidTime}`);
   const sessionCloseObservations = bars
     .filter(bar => sessionCloseEligibility.get(bar.time))
     .map(bar => bar.time);

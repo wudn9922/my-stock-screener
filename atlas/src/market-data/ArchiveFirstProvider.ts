@@ -126,7 +126,7 @@ export class ArchiveFirstProvider implements MarketDataProvider {
       try {
         const daily = await this.yahoo.getBars(symbol, '1D', undefined, signal);
         return archivePeriod({ ...daily, archive: current.archive, closedSessions: current.closedSessions,
-          source: 'Yahoo 延遲行情 · 與封存價格差異超過 2%，整段採用 Yahoo 分割調整資料' }, symbol, timeframe);
+          source: 'Yahoo 延遲行情 · 與封存價格基準不一致，整段採用 Yahoo 分割調整資料' }, symbol, timeframe);
       } catch (error) {
         signal?.throwIfAborted(); void error;
         return { ...current, source: `${current.source} · 較長 Yahoo 歷史暫時無法取得` };
@@ -170,7 +170,7 @@ export async function mergeArchivedLive(current: BarResult, value: LiveDaily, ti
   const merged = mergeArchiveDaily(daily.bars, value.bars, value.symbol,undefined,new Set([...(daily.closedSessions ?? []),...closed]));
   const dailyArchive = daily.archive ?? current.archive!;
   const base: BarResult = { ...daily, bars: merged.bars, asOf: value.retrievedAt, quote: value.quote,
-    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 與封存價格差異超過 2%，暫用 Yahoo 以免混用分割前後價格'
+    source: merged.splitMismatch ? 'Yahoo 延遲行情 · 重疊日收盤價呈一致倍率差異，暫用 Yahoo 以免混用分割前後價格'
       : value.source?.includes(TWSE_MIS_SOURCE) ? `${archiveSource(dailyArchive.incomplete)} · 缺少交易日由 Yahoo／MIS 補上`
       : `${archiveSource(dailyArchive.incomplete)} · 今日與缺少交易日由 Yahoo 延遲報價補上`,
     archive: { ...dailyArchive, status: merged.splitMismatch ? 'split' : 'live' } };

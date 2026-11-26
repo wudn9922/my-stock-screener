@@ -92,16 +92,21 @@ it('widens only the live session row whose high/low lag behind its own open/clos
   expect(normalized.normalization?.liveBarBounds).toEqual({ method: 'live-session-open-close', time: dailyCloseTime, quoteAsOf: quoteTime });
   expect(normalized.bars.slice(0, -1)).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.slice(0, -1));
 
-  // A row from an earlier session stays a hard failure.
+  // A row from an earlier session is dropped, never widened.
   const historical = fixture('SMCI-current-1d.json');
   const previous = historical.chart.result[0].timestamp.length - 2;
   historical.chart.result[0].indicators.quote[0].close[previous] = 50;
-  expect(() => normalizeYahooResponse(historical, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+  const historicalResult = normalizeYahooResponse(historical, asOf, '1D', 'SMCI');
+  const historicalTime = historical.chart.result[0].timestamp[previous];
+  expect(historicalResult.bars).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.filter(bar => bar.time !== historicalTime));
+  expect(historicalResult.normalization?.liveBarBounds).toBeUndefined();
 
   // Without same-session market metadata the latest row is not treated as live.
   const stale = liveCloseAboveHigh().raw;
   stale.chart.result[0].meta.regularMarketTime = Date.parse('2026-10-06T20:00:00Z') / 1000;
-  expect(() => normalizeYahooResponse(stale, asOf, '1D', 'SMCI')).toThrow(/Invalid Yahoo OHLCV/);
+  const staleResult = normalizeYahooResponse(stale, asOf, '1D', 'SMCI');
+  expect(staleResult.bars).toEqual(normalizeYahooResponse(fixture('SMCI-current-1d.json'), asOf, '1D', 'SMCI').bars.slice(0, -1));
+  expect(staleResult.normalization?.liveBarBounds).toBeUndefined();
 });
 
 it('keeps the current week buildable when the live daily row was widened', () => {

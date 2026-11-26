@@ -113,7 +113,7 @@ export function quotesUrl(proxyUrl: string, symbols: readonly string[]): string 
   return `${proxyUrl}${separator}quotes=${symbols.map(encodeURIComponent).join(',')}`;
 }
 
-/** Normalizes one symbol of a batch with the same validation as the chart; invalid rows give null. */
+/** Normalizes one symbol of a batch with the same validation as the chart; returns null when no usable response remains. */
 export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number): LiveDaily | null {
   try {
     const result: BarResult = normalizeYahooResponse(raw, retrievedAt, '1D', symbol);
