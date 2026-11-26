@@ -1076,16 +1076,14 @@ class CoexistenceTest(unittest.TestCase):
         self.assertEqual(universes["TW"]["records"][0]["metrics"]["rsRank"], 50)
 
     def test_main_write_report_universe_keeps_full(self):
-        from test_report_metrics import import_main
-
-        main = import_main()
+        import report_universe
         with tempfile.TemporaryDirectory() as out:
             report_metrics.write_universe_json(self.existing(), out)
             universes = {
                 "TW": {"benchmark": "^TWII", "asOf": "2026-10-14", "records": []},
                 "US": {"benchmark": "SPY", "asOf": "2026-10-14", "records": []},
             }
-            main.write_report_universe(universes, "2026-10-14", report_dir=out)
+            report_universe.write_report_universe(universes, "2026-10-14", report_dir=out)
             document = report_metrics.read_universe_json(out)
             self.assertEqual(document["markets"]["US"]["scope"], "full")
             self.assertEqual(len(document["markets"]["US"]["rows"]), 12)

@@ -2,6 +2,8 @@ import os
 import subprocess
 from datetime import datetime
 
+import screener_config
+
 
 def run_git_command(command):
     result = subprocess.run(
@@ -164,3 +166,15 @@ def push_report_to_github():
 
     print("❌ git push 失敗")
     return False
+
+
+def prune_stale_csv(
+    data_dir=screener_config.DATA_DIR,
+    max_age_days=None
+):
+    """K 線 CSV 是 owner 永久保留的紀錄；保留呼叫介面，但永不刪檔。
+
+    掉出名單、下市、過期或損壞的 CSV 仍留在 main 與完整 git 歷史中。
+    data_dir／max_age_days 只為既有呼叫相容而保留，不再用於清理。
+    """
+    return 0

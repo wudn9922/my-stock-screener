@@ -2,13 +2,12 @@
 F2 screener metrics: report_metrics.py and the main.py report plumbing.
 
 Run: python3 -m unittest discover -s tests
-Synthetic prices only; yfinance is stubbed before main is imported.
+Synthetic prices only; downloaders are injected or replaced by fixtures.
 """
 import json
 import os
 import sys
 import tempfile
-import types
 import unittest
 
 import pandas as pd
@@ -17,7 +16,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+import index_history  # noqa: E402
+import market_scan  # noqa: E402
+import report_json  # noqa: E402
 import report_metrics  # noqa: E402
+import report_universe  # noqa: E402
+import screener_config  # noqa: E402
 
 UNIVERSE_FIELDS = [
     "symbol", "name", "close", "changePct", "volume", "r5", "r21", "r63",
@@ -684,21 +688,7 @@ class UniverseTest(unittest.TestCase):
         self.assertIsNone(lookup(""))
         strict_json(custom)
 
-
-def import_main():
-    if "main" in sys.modules:
-        return sys.modules["main"]
-    sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
-    import main  # noqa: E402
-
-    return main
-
-
 class MainPlumbingTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.main = import_main()
-
     def item(self):
         candles = [
             {"time": "2026-10-08", "open": 9, "high": 10, "low": 9, "close": 10},
@@ -719,11 +709,11 @@ class MainPlumbingTest(unittest.TestCase):
         }
 
     def test_constants(self):
-        self.assertEqual(self.main.MAX_DAYS, 260)
-        self.assertIs(self.main.BACKFILL_ENABLED, False)
+        self.assertEqual(screener_config.MAX_DAYS, 260)
+        self.assertIs(screener_config.BACKFILL_ENABLED, False)
 
     def test_group_item_without_lookup_is_unchanged(self):
-        result = self.main.build_report_group_item(self.item(), "TW")
+        result = report_json.build_report_group_item(self.item(), "TW")
         self.assertEqual(
             result,
             {
@@ -746,14 +736,14 @@ class MainPlumbingTest(unittest.TestCase):
             seen.append(symbol)
             return {"bars": 5}
 
-        result = self.main.build_report_group_item(self.item(), "TW", metrics_lookup=lookup)
+        result = report_json.build_report_group_item(self.item(), "TW", metrics_lookup=lookup)
         self.assertEqual(seen, ["2330.TW"])
         self.assertEqual(result["metrics"], {"bars": 5})
 
         def broken(symbol):
             raise ValueError("boom")
 
-        result = self.main.build_report_group_item(self.item(), "TW", metrics_lookup=broken)
+        result = report_json.build_report_group_item(self.item(), "TW", metrics_lookup=broken)
         self.assertIn("metrics", result)
         self.assertIsNone(result["metrics"])
 
@@ -772,10 +762,10 @@ class MainPlumbingTest(unittest.TestCase):
             {},
             {},
         )
-        plain = self.main.build_report_payload(*args, analyze=analyze)
+        plain = report_json.build_report_payload(*args, analyze=analyze)
         self.assertNotIn("metrics", plain["groups"][0]["items"][0])
 
-        payload = self.main.build_report_payload(
+        payload = report_json.build_report_payload(
             *args, analyze=analyze, metrics_lookup=lambda symbol: {"bars": 1}
         )
         self.assertEqual(payload["groups"][0]["items"][0]["metrics"], {"bars": 1})
@@ -786,10 +776,10 @@ class MainPlumbingTest(unittest.TestCase):
                 write_csv(data_dir, f"{2301 + i}.TW", make_prices(geometric(50, 1.001 + i / 1000, 260)))
             write_csv(data_dir, "AAPL", make_prices(geometric(100, 1.001, 260)))
             tw_index = make_prices(geometric(20000, 1.0005, 500))
-            original_cache = dict(self.main.INDEX_HISTORY_CACHE)
-            self.main.INDEX_HISTORY_CACHE["^TWII"] = {"df": tw_index, "source": "Yahoo"}
+            original_cache = dict(index_history.INDEX_HISTORY_CACHE)
+            index_history.INDEX_HISTORY_CACHE["^TWII"] = {"df": tw_index, "source": "Yahoo"}
             try:
-                universes, lookup = self.main.build_report_universe(
+                universes, lookup = report_universe.build_report_universe(
                     [f"{2301 + i}.TW" for i in range(12)],
                     ["AAPL"],
                     data_dir=data_dir,
@@ -797,13 +787,13 @@ class MainPlumbingTest(unittest.TestCase):
                     report_dir=out,
                 )
             finally:
-                self.main.INDEX_HISTORY_CACHE.clear()
-                self.main.INDEX_HISTORY_CACHE.update(original_cache)
+                index_history.INDEX_HISTORY_CACHE.clear()
+                index_history.INDEX_HISTORY_CACHE.update(original_cache)
 
             self.assertEqual(len(universes["TW"]["records"]), 12)
             self.assertIsNotNone(lookup("2301.TW")["rs63"])
             self.assertIsNotNone(lookup("AAPL")["rs63"])
-            path = self.main.write_report_universe(universes, "2026-10-09", report_dir=out)
+            path = report_universe.write_report_universe(universes, "2026-10-09", report_dir=out)
             with open(path, encoding="utf-8") as file:
                 document = json.load(file)
             self.assertEqual(document["reportDate"], "2026-10-09")
@@ -811,9 +801,6 @@ class MainPlumbingTest(unittest.TestCase):
             self.assertEqual(len(document["markets"]["US"]["rows"]), 1)
 
     def test_backfill_short_csvs(self):
-        import market_scan
-
-        main = self.main
         with tempfile.TemporaryDirectory() as data_dir:
             write_csv(data_dir, "SHORT", make_prices([10.0] * 50))
             write_csv(data_dir, "SHORTER", make_prices([10.0] * 20))
@@ -830,7 +817,7 @@ class MainPlumbingTest(unittest.TestCase):
             original = market_scan.download_market_data
             market_scan.download_market_data = fake_download
             try:
-                updated = main.backfill_short_csvs(
+                updated = market_scan.backfill_short_csvs(
                     ["SHORT", "SHORTER", "FULL", "MISSING"], max_per_run=1, data_dir=data_dir
                 )
             finally:
@@ -840,7 +827,7 @@ class MainPlumbingTest(unittest.TestCase):
             self.assertEqual(requested, [(["SHORTER"], "1y")])
             self.assertEqual(updated, ["SHORTER"])
             df = pd.read_csv(os.path.join(data_dir, "SHORTER.csv"), index_col=0, parse_dates=True)
-            self.assertEqual(len(df), main.MAX_DAYS)
+            self.assertEqual(len(df), screener_config.MAX_DAYS)
             self.assertFalse(df.index.duplicated().any())
             # Local rows win over downloaded rows for the same date
             self.assertEqual(df["Close"].iloc[-1], 10.0)

@@ -1,295 +1,46 @@
-# =========================================================================
-# main.py 完整整合版
-# 第 1 部分：Imports、全域設定、共用工具、Supabase 動態群組
-# =========================================================================
-import io
-import json
-import math
 import os
-import re
-import tempfile
-import time
-from datetime import datetime, timezone
+from datetime import datetime
 
-import pandas as pd
-import requests
-import yfinance as yf
 import kline_integrity as kline
-from breakout_alert.supabase_store import FIXED_STOCK_GROUP_ID, fixed_parameter_map, parameter_ticker_key
-from breakout_alert.account_permissions import is_public_report_owner, storage_mode
-from tpex_otc import (
-    TPEX_INDEX_HISTORY_LEGACY_URL,
-    TPEX_OTC_NAME,
-    TPEX_OTC_SYMBOL,
-    TPEX_RUNTIME,
-    TPEX_SOURCE_LABEL,
-    get_tpex_otc_full_history,
-    get_tpex_otc_history,
-    update_tpex_otc_index_history,
-)
-
-
-import screener_config
+from breakout_alert.account_permissions import is_public_report_owner
+from tpex_otc import update_tpex_otc_index_history
 from screener_config import (
     TW_MIN_VOLUME,
-    HTTP_HEADERS,
-    DATA_DIR,
     REPORT_NON_TRADING_DATES,
-    DOCS_DIR,
-    MAX_DAYS,
     BACKFILL_ENABLED,
-    BACKFILL_MIN_ROWS,
-    BACKFILL_MAX_PER_RUN,
-    REPORT_DIR,
-    REPORT_SERIES_DIR,
-    REPORT_JSON_VERSION,
-    REPORT_LIFF_ID,
     REPORT_LIFF_URL,
-    SETTING_LIFF_ID,
-    SETTING_LIFF_URL,
-    BITGET_SETTING_URL,
 )
-
-# =========================================================================
-# 類股設定
-# =========================================================================
-
-from sector_weekly import (
-    SECTOR_WEEKLY_MA_LIST,
-    SECTOR_BENCHMARK,
-    SECTOR_CHART_WEEKS,
-    SECTOR_CONFIGS,
-)
-
-from screener_common import TW_STOCK_NAMES
-
-from screener_config import (
-    CUSTOM_GROUP_TEST_MODE,
-    CUSTOM_MA_MIN_RATIO,
-    CUSTOM_MA_MAX_RATIO,
-)
-
-
-# =========================================================================
-# 共用工具
-# =========================================================================
-from screener_common import (
-    safe_int,
-    safe_float,
-    clean_json_value,
-    register_tw_stock_name,
-    get_tw_stock_name,
-)
-
-
-from market_data import (
-    _extract_yfinance_data,
-    refetch_kline_once,
-    extract_yfinance_data,
-    write_kline_csv,
-)
-
-
-from screener_common import (
-    clean_ohlcv_dataframe,
-    calculate_return,
-)
-
-
 from group_config import (
-    normalize_group_name,
-    detect_group_market,
     get_custom_group_number,
-    normalize_custom_ticker,
-    get_group_ma_list,
-    get_stock_ma_list,
-    get_supabase_settings,
-    get_default_index_configs,
-    get_default_group_metadata,
     load_configs_from_supabase,
+    get_sorted_custom_group_keys,
 )
-
-
-# =========================================================================
-# 第 1 部分結束
-# 下一部分將從 LINE Messaging API、台美股清單開始
-# =========================================================================
-# =========================================================================
-# 第 2 部分：LINE、股票清單、圖表、全市場與自訂群組
-# =========================================================================
-
-
-from line_messaging import send_line_message, send_line_messages_combined
-
-
+from line_messaging import send_line_messages_combined
 from ticker_lists import get_tw_tickers, get_us_tickers
-
-
-# =========================================================================
-# Plotly 圖表資料
-# =========================================================================
-
-from chart_data import build_stock_data
-
-
-
-from market_data import (
-    download_single_ticker_with_retry,
-    download_market_data,
-)
-
 from market_scan import (
-    _report_analysis_prices,
-    _scan_analysis_frames,
     scan_market,
     collect_market_frames,
     _market_scan_report,
-    _rs_rank_or_none,
     report_rs_rank_of,
     backfill_short_csvs,
 )
-
-from custom_groups import (
-    get_ticker_candidates,
-    download_custom_stock,
-    _failed_stock_symbol,
-    _record_failed_stock,
-    _record_unmatched_stock,
-    process_custom_groups,
+from index_charts import (
+    process_index_charts,
+    build_index_map,
+    INDEX_LINE_LEGEND,
+    append_index_market_report,
 )
-
-
-# =========================================================================
-# 第 2 部分結束
-# 下一部分：全球指數、美股類股週 K、大盤趨勢分析
-# =========================================================================
-
-# =========================================================================
-# 第 3 部分：全球指數、類股週 K、大盤趨勢分析
-# =========================================================================
-
-
-# =========================================================================
-# 大盤參數與指數圖表
-# =========================================================================
-from group_config import get_ma_list_from_item, is_config_enabled
-
-
-from index_charts import process_index_charts
-
-
-# =========================================================================
-# 美股 11 大類股週 K
-# =========================================================================
 from sector_weekly import (
-    convert_daily_to_weekly,
-    determine_sector_price_volume_status,
-    determine_sector_trend,
     process_sector_weekly_charts,
     build_sector_line_message,
     build_sector_monday_message,
 )
-
-
-from index_trend import (
-    DOW_SWING_PIVOT_BARS,
-    DOW_TREND_PIVOT_BARS,
-    DOW_TREND_NEW_HIGH_BARS,
-    compute_dow_states,
-    analyze_index_trend,
-)
-
-
-# =========================================================================
-# 第 3 部分結束
-# 下一部分：HTML、動態群組頁籤、LIFF 與畫線同步
-# =========================================================================
-
-from group_config import get_sorted_custom_group_keys
-
-
-# =========================================================================
-# 第 6 部分：GitHub Pages 推送與主程式
-# =========================================================================
-
-
-# =========================================================================
-# Git 指令工具
-# =========================================================================
-from git_publish import run_git_command, get_csv_last_date, push_report_to_github
-
-
-def prune_stale_csv(
-    data_dir=screener_config.DATA_DIR,
-    max_age_days=None
-):
-    """K 線 CSV 是 owner 永久保留的紀錄；保留呼叫介面，但永不刪檔。
-
-    掉出名單、下市、過期或損壞的 CSV 仍留在 main 與完整 git 歷史中。
-    data_dir／max_age_days 只為既有呼叫相容而保留，不再用於清理。
-    """
-    return 0
-
-
-from index_history import INDEX_HISTORY_CACHE, download_index_history
-
-
-from report_json import (
-    REPORT_MARKETS,
-    REPORT_EXTRA_INDEX_MA_LIST,
-    WORLD_EXTRA_INDEX_CONFIGS,
-    REPORT_CORE_INDEX_NAMES,
-    REPORT_SCAN_GROUP_NAMES,
-    INDEX_TREND_ICON_MAP,
-    parse_index_trend_text,
-    build_index_snapshot,
-    build_index_status,
-    analyze_index_for_report,
-    build_report_indices,
-    _chart_last_ma_values,
-    _chart_close_change,
-    _strip_title_parentheses,
-    build_report_group_item,
-    build_report_unmatched_item,
-    build_report_groups,
-    build_report_sectors,
-    build_report_payload,
-    _json_default,
-    write_json_atomic,
-    write_report_json,
-)
-
-from screener_common import round_report_number
-
-
-from report_universe import (
-    build_report_universe,
-    write_report_universe,
-    build_series_payload,
-    write_report_series,
-    write_tpex_otc_series,
-)
-
-
-# =========================================================================
-# 主程式共用工具
-# =========================================================================
+from git_publish import push_report_to_github, prune_stale_csv
+from report_json import build_report_payload, write_report_json
+from report_universe import build_report_universe, write_report_universe, write_tpex_otc_series
 from custom_groups import process_group_for_data_dict
 
 
-from index_charts import (
-    build_index_map,
-    INDEX_SHORT_NAMES,
-    INDEX_LINE_LEGEND,
-    INDEX_MA_SYMBOLS,
-    build_index_line_short,
-    append_index_market_report,
-)
-
-
-# =========================================================================
-# 主程式
-# =========================================================================
 def main():
     access_token = os.environ.get(
         "LINE_ACCESS_TOKEN"
@@ -881,8 +632,3 @@ def main():
 if __name__ == "__main__":
     with kline.batched_journal():
         main()
-
-
-# =========================================================================
-# 完整 main.py 結束
-# =========================================================================
