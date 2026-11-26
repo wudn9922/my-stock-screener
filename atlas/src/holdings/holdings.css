@@ -216,6 +216,11 @@
 .holdings-symbol { padding: 0; line-height: 16px; min-height: 44px; font-size: 14px; justify-self: start; width: auto; max-width: 100%; }
 .holding-identity small { margin-top: -8px; pointer-events: none; }
 .holding-number { text-align: right; align-content: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 480px) {
+  .holding-compact-row { grid-template-columns: minmax(76px, 1fr) repeat(3, minmax(0, max-content)); }
+  .holding-identity > .holdings-symbol { display: block; }
+  .holding-number > * { display: block; overflow: hidden; text-overflow: ellipsis; }
+}
 .holdings-position dl { margin: 8px 0; padding: 8px; }
 .holdings-retained { margin: 0 0 4px; color: var(--text-3); font-size: 11px; }
 .portfolio-total-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }

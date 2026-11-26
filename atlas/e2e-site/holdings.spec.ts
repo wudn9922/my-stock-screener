@@ -292,6 +292,43 @@ test('six compact stock rows precede totals and operations, with full details on
   await layout(page);
 });
 
+test('compact holding rows contain long symbols and extreme average costs at 390px', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await create(page, 'mexc');
+  await paste(page, [
+    'Symbol,Quantity,Avg Cost',
+    'LONGESTCOINTICKER123/USDT,1000,0.0000000012345',
+    'BTC/USDT,999999999999999,999999999999999',
+    'ETH/USDT,1,3000',
+  ].join('\n'));
+  await save(page);
+
+  const rows = panel(page).locator('.holding-compact-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.getByText('均價 0.000000001235', { exact: true })).toBeVisible();
+  await expect(rows.getByText('均價 999,999,999,999,999.00', { exact: true })).toBeVisible();
+  await layout(page);
+  const boxes = await rows.evaluateAll(elements => elements.map(row => ({
+    height: row.getBoundingClientRect().height,
+    overflow: row.scrollWidth - row.clientWidth,
+    identityWidth: row.firstElementChild!.getBoundingClientRect().width,
+  })));
+  expect(boxes.every(box => box.height <= 71 && box.overflow <= 0 && box.identityWidth > 0)).toBe(true);
+
+  if (info.project.name === 'iphone-webkit') {
+    await panel(page).evaluate(el => {
+      for (let parent: HTMLElement | null = el as HTMLElement; parent; parent = parent.parentElement) parent.scrollTop = 0;
+      window.scrollTo(0, 0);
+    });
+    await page.screenshot({ path: info.outputPath('holdings-compact-390.png'), scale: 'css' });
+  }
+
+  const btc = panel(page).getByRole('article', { name: 'BTC/USDT 持股' });
+  await btc.locator('summary.holding-compact-row').click();
+  await expect(btc.locator('dd[title="999999999999999"]').first()).toHaveText('999,999,999,999,999.00');
+});
+
 
 test('account creation offers CSV markets and only supported API connections', async ({ page }, info) => {
   // SinoPac API sync is offered to the administrator only (sinopac.spec covers everyone else).
