@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'scripts'))
 import main
+import market_scan
 import screener_config
 import report_metrics as rm
 import build_breadth as bb
@@ -132,7 +133,7 @@ class MarketSessionTest(unittest.TestCase):
             paths = list(Path(directory).glob('*.csv'))
             hashes = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
             with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, clear=True), \
-                 patch.object(main, 'get_tw_stock_name', side_effect=lambda s: s), \
+                 patch.object(market_scan, 'get_tw_stock_name', side_effect=lambda s: s), \
                  contextlib.redirect_stdout(io.StringIO()):
                 projected = main._scan_analysis_frames(symbols)
                 matches = main._market_scan_report(symbols, projected, main.TW_MIN_VOLUME)
@@ -154,7 +155,7 @@ class MarketSessionTest(unittest.TestCase):
             a.to_csv(Path(directory) / '2330.TW.csv')
             b.to_csv(Path(directory) / '6488.TWO.csv')
             with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, {'TW': frozenset(), 'US': frozenset(['2026-10-20'])}, clear=True), \
-                 patch.object(main, 'get_tw_stock_name', side_effect=lambda s: s), contextlib.redirect_stdout(io.StringIO()):
+                 patch.object(market_scan, 'get_tw_stock_name', side_effect=lambda s: s), contextlib.redirect_stdout(io.StringIO()):
                 projected = main._scan_analysis_frames(['2330.TW', '6488.TWO'])
                 matches = main._market_scan_report(list(projected), projected, main.TW_MIN_VOLUME)
                 self.assertEqual([item['ticker'] for item in matches], ['6488.TWO'])

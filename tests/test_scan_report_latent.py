@@ -14,6 +14,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
 import main  # noqa: E402
+import market_scan  # noqa: E402
 import screener_config  # noqa: E402
 import report_metrics  # noqa: E402
 
@@ -32,8 +33,8 @@ def frame(closes, volume=2_000_000, end=END):
 
 
 def scan(frames, **options):
-    with patch.object(main, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
-         patch.object(main, "build_stock_data", return_value={}), \
+    with patch.object(market_scan, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
+         patch.object(market_scan, "build_stock_data", return_value={}), \
          contextlib.redirect_stdout(io.StringIO()):
         return main._market_scan_report(list(frames), frames, **options)
 
@@ -227,7 +228,8 @@ class WiringTest(unittest.TestCase):
                  patch.dict(main.INDEX_HISTORY_CACHE, {"^TWII": {"df": bench, "source": "test"}}), \
                  patch.dict(main.REPORT_NON_TRADING_DATES, clear=True), \
                  patch.object(main, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
-                 patch.object(main, "build_stock_data", return_value={}), \
+                 patch.object(market_scan, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
+                 patch.object(market_scan, "build_stock_data", return_value={}), \
                  contextlib.redirect_stdout(io.StringIO()):
                 frames = main._scan_analysis_frames(tickers)
                 universes, lookup = main.build_report_universe(

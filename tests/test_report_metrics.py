@@ -811,6 +811,8 @@ class MainPlumbingTest(unittest.TestCase):
             self.assertEqual(len(document["markets"]["US"]["rows"]), 1)
 
     def test_backfill_short_csvs(self):
+        import market_scan
+
         main = self.main
         with tempfile.TemporaryDirectory() as data_dir:
             write_csv(data_dir, "SHORT", make_prices([10.0] * 50))
@@ -825,14 +827,14 @@ class MainPlumbingTest(unittest.TestCase):
                     frames[ticker] = make_prices([9.0] * 300, end="2026-10-08")
                 return pd.concat(frames, axis=1).swaplevel(0, 1, axis=1)
 
-            original = main.download_market_data
-            main.download_market_data = fake_download
+            original = market_scan.download_market_data
+            market_scan.download_market_data = fake_download
             try:
                 updated = main.backfill_short_csvs(
                     ["SHORT", "SHORTER", "FULL", "MISSING"], max_per_run=1, data_dir=data_dir
                 )
             finally:
-                main.download_market_data = original
+                market_scan.download_market_data = original
 
             # Shortest first, limited by max_per_run, full and missing CSVs ignored
             self.assertEqual(requested, [(["SHORTER"], "1y")])
