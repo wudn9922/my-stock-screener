@@ -802,12 +802,6 @@ def fetch_yahoo_realtime_trending(limit=5):
 
 
 from us_rates_report import (
-    create_retry_session as create_retry_session,
-    fetch_latest_fred_api_value as fetch_latest_fred_api_value,
-    _handle_fallback as _handle_fallback,
-    fetch_federal_funds_target_range as fetch_federal_funds_target_range,
-    fetch_yahoo_us10y as fetch_yahoo_us10y,
-    fetch_us10y_with_fallback as fetch_us10y_with_fallback,
     fetch_us_rates_report,
     insert_rates_below_trending,
 )
