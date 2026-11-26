@@ -1558,8 +1558,6 @@ def run_dify_workflow(captured_items, trending_stocks):
 
 
 from report_line_messages import (
-    split_line_text as split_line_text,
-    build_image_flex_message as build_image_flex_message,
     build_line_messages,
     push_line_messages,
 )
