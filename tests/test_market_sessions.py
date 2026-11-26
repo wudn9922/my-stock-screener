@@ -15,7 +15,6 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'scripts'))
-import main
 import market_scan
 import screener_config
 import report_metrics as rm
@@ -96,9 +95,9 @@ class MarketSessionTest(unittest.TestCase):
             loaded = {s: bb.load_daily_bars(Path(directory) / f'{s}.csv') for s in frames}
             self.assertNotIn('2026-10-23', non_trading_dates(loaded))
             self.assertIn('2026-10-23T00:00:00', loaded['6488.TWO'].attrs[rm.UNKNOWN_VOLUME_DATES])
-            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, clear=True):
-                projected = main._scan_analysis_frames(list(frames))
-                self.assertNotIn('2026-10-23', main.REPORT_NON_TRADING_DATES['TW'])
+            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(screener_config.REPORT_NON_TRADING_DATES, clear=True):
+                projected = market_scan._scan_analysis_frames(list(frames))
+                self.assertNotIn('2026-10-23', screener_config.REPORT_NON_TRADING_DATES['TW'])
                 self.assertEqual(projected['2330.TW'].index[-1], pd.Timestamp('2026-10-23'))
                 self.assertIsNone(rm.compute_stock_metrics(projected['6488.TWO'])['volumeAvg20'])
 
@@ -132,11 +131,11 @@ class MarketSessionTest(unittest.TestCase):
                 closure(frame).to_csv(Path(directory) / f'{symbol}.csv')
             paths = list(Path(directory).glob('*.csv'))
             hashes = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
-            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, clear=True), \
+            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(screener_config.REPORT_NON_TRADING_DATES, clear=True), \
                  patch.object(market_scan, 'get_tw_stock_name', side_effect=lambda s: s), \
                  contextlib.redirect_stdout(io.StringIO()):
-                projected = main._scan_analysis_frames(symbols)
-                matches = main._market_scan_report(symbols, projected, main.TW_MIN_VOLUME)
+                projected = market_scan._scan_analysis_frames(symbols)
+                matches = market_scan._market_scan_report(symbols, projected, screener_config.TW_MIN_VOLUME)
                 actual = rm.build_universe(symbols, 'TW', directory, {'symbol': '^TWII'})
             self.assertEqual({item['ticker'] for item in matches}, set(symbols))
             self.assertTrue(all(item['volume'] == 4_000_000 for item in matches))
@@ -154,12 +153,12 @@ class MarketSessionTest(unittest.TestCase):
             b.loc[pd.Timestamp('2026-10-23'), 'Volume'] = 2_000_000
             a.to_csv(Path(directory) / '2330.TW.csv')
             b.to_csv(Path(directory) / '6488.TWO.csv')
-            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(main.REPORT_NON_TRADING_DATES, {'TW': frozenset(), 'US': frozenset(['2026-10-20'])}, clear=True), \
+            with patch.object(screener_config, 'DATA_DIR', directory), patch.dict(screener_config.REPORT_NON_TRADING_DATES, {'TW': frozenset(), 'US': frozenset(['2026-10-20'])}, clear=True), \
                  patch.object(market_scan, 'get_tw_stock_name', side_effect=lambda s: s), contextlib.redirect_stdout(io.StringIO()):
-                projected = main._scan_analysis_frames(['2330.TW', '6488.TWO'])
-                matches = main._market_scan_report(list(projected), projected, main.TW_MIN_VOLUME)
+                projected = market_scan._scan_analysis_frames(['2330.TW', '6488.TWO'])
+                matches = market_scan._market_scan_report(list(projected), projected, screener_config.TW_MIN_VOLUME)
                 self.assertEqual([item['ticker'] for item in matches], ['6488.TWO'])
-                self.assertEqual(main.REPORT_NON_TRADING_DATES['US'], frozenset(['2026-10-20']))
+                self.assertEqual(screener_config.REPORT_NON_TRADING_DATES['US'], frozenset(['2026-10-20']))
 
 
 class SnapshotRecoveryTest(unittest.TestCase):

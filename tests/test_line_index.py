@@ -1,10 +1,10 @@
 import unittest
 
 try:
-    import main
+    import index_charts
     import line_messaging
-except ImportError:  # main.py needs yfinance and friends
-    main = None
+except ImportError:  # index_charts needs yfinance and friends
+    index_charts = None
 
 
 def trend_text(label, score, total, macro, micro):
@@ -15,10 +15,10 @@ def trend_text(label, score, total, macro, micro):
     )
 
 
-@unittest.skipIf(main is None, "main.py dependencies not installed")
+@unittest.skipIf(index_charts is None, "index_charts dependencies not installed")
 class LineIndexSummaryTest(unittest.TestCase):
     def line(self, label, score, total, macro="多頭", micro="多頭"):
-        return main.build_index_line_short("^GSPC", "x", trend_text(label, score, total, macro, micro))
+        return index_charts.build_index_line_short("^GSPC", "x", trend_text(label, score, total, macro, micro))
 
     def test_five_ma_levels(self):
         cases = [("看多", 4, "▲▲"), ("偏多", 2, "▲"), ("多空不明", 0, "－"), ("偏空", -1, "▼"), ("看空", -4, "▼▼")]
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-@unittest.skipIf(main is None, "main.py dependencies not installed")
+@unittest.skipIf(index_charts is None, "index_charts dependencies not installed")
 class CombinedLineMessagesTest(unittest.TestCase):
     def send(self, messages, **kwargs):
         sent = []
@@ -48,7 +48,7 @@ class CombinedLineMessagesTest(unittest.TestCase):
         original = line_messaging.send_line_message
         line_messaging.send_line_message = fake_send
         try:
-            count = main.send_line_messages_combined(messages, "t", "U1", **kwargs)
+            count = line_messaging.send_line_messages_combined(messages, "t", "U1", **kwargs)
         finally:
             line_messaging.send_line_message = original
         return count, sent
