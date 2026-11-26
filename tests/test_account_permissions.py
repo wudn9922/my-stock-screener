@@ -215,6 +215,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             writer = main_functions(
                 "write_report_json",
+                source_path="report_json.py",
                 REPORT_DIR=directory,
                 is_public_report_owner=is_public_report_owner,
                 os=os,
@@ -232,6 +233,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
             )
             writer = main_functions(
                 "write_report_json",
+                source_path="report_json.py",
                 REPORT_DIR=directory,
                 is_public_report_owner=is_public_report_owner,
                 os=os,
