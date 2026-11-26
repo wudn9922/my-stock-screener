@@ -21,6 +21,7 @@ on:
       - "Taiwan stock dividends backfill"
       - "Market trading calendar"
       - "IPO and extended quotes"
+      - "Taiwan warrant data"
       - "Q4 EPS from 8-K (manual)"
       - "Refresh US Rates"
       - "Research public data"

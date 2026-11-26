@@ -162,6 +162,31 @@ export function validateQuotesRequest(value: string): QuotesValidation {
   return { ok: true, symbols };
 }
 
+export const DEFAULT_WARRANT_QUOTE_LIMIT = 20;
+const WARRANT_SYMBOL = /^\d{5}[0-9A-Z]\.(?:TW|TWO)$/;
+
+export function validateWarrantQuotesRequest(params: URLSearchParams): QuotesValidation |
+  { ok: false; status: 400; code: 'invalid_limit' | 'ambiguous_request'; message: string } {
+  if (params.has('quotes') || params.has('symbol') || params.getAll('warrantQuotes').length !== 1 ||
+      params.getAll('limit').length > 1) {
+    return { ok: false, status: 400, code: 'ambiguous_request', message: 'Use one warrantQuotes parameter with an optional limit' };
+  }
+  const rawLimit = params.get('limit');
+  const limit = rawLimit === null ? DEFAULT_WARRANT_QUOTE_LIMIT : Number(rawLimit);
+  if (rawLimit !== null && (!/^\d{1,2}$/.test(rawLimit) || limit < 1 || limit > MAX_QUOTE_SYMBOLS)) {
+    return { ok: false, status: 400, code: 'invalid_limit', message: `Limit must be 1 to ${MAX_QUOTE_SYMBOLS}` };
+  }
+  const validation = validateQuotesRequest(params.get('warrantQuotes') ?? '');
+  if (!validation.ok) return validation;
+  if (validation.symbols.some(symbol => !WARRANT_SYMBOL.test(symbol))) {
+    return { ok: false, status: 400, code: 'invalid_symbol', message: 'Use Taiwan warrant codes with .TW or .TWO' };
+  }
+  if (validation.symbols.length > limit) {
+    return { ok: false, status: 400, code: 'too_many_symbols', message: `At most ${limit} warrant symbols for this limit` };
+  }
+  return validation;
+}
+
 export function quoteChartRequest(symbol: string): ChartRequest {
   return { symbol, interval: QUOTE_INTERVAL, range: QUOTE_RANGE, events: false };
 }

@@ -112,7 +112,8 @@ export function parseMisRow(
   const open = positive(row.o),
     high = positive(row.h),
     low = positive(row.l);
-  let price = positive(row.z), priceTime: number | null = price === null ? null : time;
+  let price = positive(row.z),
+    priceTime: number | null = price === null ? null : time;
   if (
     open === null || high === null || low === null || high < open ||
     low > open || high < low ||
@@ -146,6 +147,98 @@ export function parseMisRow(
   };
 }
 
+type WarrantStatus =
+  | "available"
+  | "no_book"
+  | "no_quote"
+  | "stale"
+  | "source_unavailable";
+type WarrantBook = {
+  bid: number | null;
+  bidSize: number | null;
+  ask: number | null;
+  askSize: number | null;
+  quoteTime: number | null;
+  status: WarrantStatus;
+};
+
+const WARRANT_MAX_AGE_SECONDS = 60;
+const emptyBook = (
+  status: WarrantStatus,
+  quoteTime: number | null = null,
+): WarrantBook => ({
+  status,
+  bid: null,
+  bidSize: null,
+  ask: null,
+  askSize: null,
+  quoteTime,
+});
+
+function warrantLevel(
+  prices: string,
+  sizes: unknown,
+): [number | null, number | null] {
+  const levels = prices.split("_");
+  const amounts = typeof sizes === "string" ? sizes.split("_") : [];
+  for (const [index, level] of levels.entries()) {
+    const price = positive(level);
+    if (price !== null) return [price, positive(amounts[index])];
+  }
+  return [null, null];
+}
+
+function warrantBook(raw: unknown, now: number): WarrantBook {
+  if (typeof raw !== "object" || raw === null) return emptyBook("no_quote");
+  const row = raw as Record<string, unknown>;
+  // The MIS warrant rows identify the underlying in rch, including t00 for the TAIEX.
+  if (typeof row.rch !== "string" || !row.rch.trim()) {
+    return emptyBook("no_quote");
+  }
+  if (
+    typeof row.d !== "string" || !/^\d{8}$/.test(row.d) ||
+    typeof row.t !== "string" || !/^\d{2}:\d{2}:\d{2}$/.test(row.t) ||
+    row.t < "09:00:00" || row.t > "13:30:00"
+  ) return emptyBook("no_quote");
+  const date = `${row.d.slice(0, 4)}-${row.d.slice(4, 6)}-${row.d.slice(6)}`;
+  const timestamp = Date.parse(`${date}T${row.t}+08:00`);
+  if (
+    !Number.isFinite(timestamp) || timestamp > now ||
+    new Date(timestamp + TAIPEI_OFFSET * 1000).toISOString().slice(0, 19) !==
+      `${date}T${row.t}` ||
+    (row.tlong !== undefined &&
+      Math.floor((number(row.tlong) ?? -1) / 1000) !== timestamp / 1000)
+  ) {
+    return emptyBook("no_quote");
+  }
+  const quoteTime = timestamp / 1000;
+  if (
+    date !== taipeiDate(now) ||
+    (inMisSession(now)
+      ? now - timestamp > WARRANT_MAX_AGE_SECONDS * 1000
+      : row.t !== "13:30:00")
+  ) return emptyBook("stale", quoteTime);
+  if (typeof row.a !== "string" && typeof row.b !== "string") {
+    return emptyBook("no_quote", quoteTime);
+  }
+  const [bid, bidSize] = warrantLevel(
+    typeof row.b === "string" ? row.b : "",
+    row.g,
+  );
+  const [ask, askSize] = warrantLevel(
+    typeof row.a === "string" ? row.a : "",
+    row.f,
+  );
+  if (bid === null && ask === null) {
+    const noOrders = [row.a, row.b].every((value) =>
+      value === undefined ||
+      (typeof value === "string" && value.split("_").every(empty))
+    );
+    return emptyBook(noOrders ? "no_book" : "no_quote", quoteTime);
+  }
+  return { status: "available", bid, bidSize, ask, askSize, quoteTime };
+}
+
 interface MisOptions {
   fetcher?: typeof fetch;
   now?: () => number;
@@ -166,6 +259,10 @@ export class TwseMisClient {
     string,
     { date: string; price: number; time: number; priceTime: number }
   >();
+  private readonly warrantCache = new Map<
+    string,
+    { at: number; raw?: unknown; failed: boolean }
+  >();
   private day = "";
   private queue: Promise<void> = Promise.resolve();
   private lastRequest = -Infinity;
@@ -175,27 +272,142 @@ export class TwseMisClient {
     this.sleep = options.sleep ??
       ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
+  private async queued<T>(fallback: T, work: () => Promise<T>): Promise<T> {
+    const enqueuedAt = this.now();
+    let expired = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const waiting = new Promise<T>((resolve) => {
+      timer = setTimeout(() => {
+        expired = true;
+        resolve(fallback);
+      }, MAX_QUEUE_WAIT_MS);
+    });
+    const run = async () => {
+      clearTimeout(timer);
+      if (expired || this.now() - enqueuedAt > MAX_QUEUE_WAIT_MS) {
+        return fallback;
+      }
+      return await work();
+    };
+    const result = this.queue.then(run);
+    this.queue = result.then(() => undefined, () => undefined);
+    return await Promise.race([result, waiting]).finally(() =>
+      clearTimeout(timer)
+    );
+  }
+
+  private async requestRows(
+    symbols: readonly string[],
+    allowed = () => true,
+  ): Promise<unknown[] | null> {
+    const pause = MIN_REQUEST_GAP_MS - (this.now() - this.lastRequest);
+    if (pause > 0) await this.sleep(pause);
+    if (!allowed()) return null;
+    this.lastRequest = this.now();
+    try {
+      const url = new URL("https://mis.twse.com.tw/stock/api/getStockInfo.jsp");
+      url.search = new URLSearchParams({
+        ex_ch: symbols.map((s) => misChannel(s)!).join("|"),
+        json: "1",
+        delay: "0",
+      }).toString();
+      const response = await this.fetcher(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        await response.body?.cancel();
+        return null;
+      }
+      const payload = await response.json() as {
+        msgArray?: unknown;
+        rtcode?: unknown;
+      } | null;
+      return (payload?.rtcode === undefined || payload.rtcode === "0000") &&
+          Array.isArray(payload?.msgArray)
+        ? payload.msgArray
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getWarrantQuotes(symbols: readonly string[]) {
+    const entries = await this.queued(
+      new Map<string, WarrantBook>(),
+      async () => {
+        const missing = symbols.filter((symbol) => {
+          const entry = this.warrantCache.get(symbol);
+          return !entry || this.now() - entry.at >= MIS_CACHE_MS;
+        });
+        if (missing.length) {
+          const rows = await this.requestRows(missing);
+          const byChannel = new Map<string, unknown>();
+          for (const raw of rows ?? []) {
+            if (typeof raw !== "object" || raw === null) continue;
+            const row = raw as Record<string, unknown>;
+            if (
+              (row.ex !== "tse" && row.ex !== "otc") ||
+              typeof row.c !== "string"
+            ) continue;
+            const channel = `${row.ex}_${row.c.toUpperCase()}.tw`;
+            const existing = byChannel.get(channel);
+            if (
+              !existing ||
+              (warrantBook(raw, this.now()).quoteTime ?? -1) >
+                (warrantBook(existing, this.now()).quoteTime ?? -1)
+            ) {
+              byChannel.set(channel, raw);
+            }
+          }
+          for (const symbol of missing) {
+            this.warrantCache.set(symbol, {
+              at: this.now(),
+              raw: byChannel.get(misChannel(symbol)!),
+              failed: rows === null,
+            });
+          }
+        }
+        while (this.warrantCache.size > MAX_CACHE_ENTRIES) {
+          this.warrantCache
+            .delete(this.warrantCache.keys().next().value!);
+        }
+        return new Map(symbols.map((symbol) => {
+          const entry = this.warrantCache.get(symbol);
+          return [
+            symbol,
+            !entry || entry.failed
+              ? emptyBook("source_unavailable")
+              : warrantBook(entry.raw, this.now()),
+          ];
+        }));
+      },
+    );
+    const now = this.now();
+    return {
+      asOf: Math.floor(now / 1000),
+      source: "twse-mis" as const,
+      session: inMisSession(now) ? "regular" as const : "closed" as const,
+      results: Object.fromEntries(
+        symbols.map(
+          (symbol) => [
+            symbol,
+            entries.get(symbol) ?? emptyBook("source_unavailable"),
+          ],
+        ),
+      ),
+    };
+  }
+
   async get(symbols: readonly string[]): Promise<Map<string, MisSnapshot>> {
     if (!inMisSession(this.now())) return new Map();
     const requested = [
       ...new Set(symbols.filter((symbol) => misChannel(symbol) !== null)),
     ];
     if (!requested.length) return new Map();
-    const enqueuedAt = this.now();
-    let expired = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const waiting = new Promise<Map<string, MisSnapshot>>((resolve) => {
-      timer = setTimeout(() => {
-        expired = true;
-        resolve(new Map());
-      }, MAX_QUEUE_WAIT_MS);
-    });
-    const run = async () => {
-      clearTimeout(timer);
+    return await this.queued(new Map<string, MisSnapshot>(), async () => {
       const now = this.now();
-      if (
-        expired || !inMisSession(now) || now - enqueuedAt > MAX_QUEUE_WAIT_MS
-      ) return new Map<string, MisSnapshot>();
+      if (!inMisSession(now)) return new Map();
       const date = taipeiDate(now);
       if (this.day !== date) {
         this.cache.clear();
@@ -207,65 +419,40 @@ export class TwseMisClient {
       );
       for (let i = 0; i < missing.length; i += MAX_SYMBOLS) {
         const chunk = missing.slice(i, i + MAX_SYMBOLS);
-        const pause = MIN_REQUEST_GAP_MS - (this.now() - this.lastRequest);
-        if (pause > 0) await this.sleep(pause);
-        if (!inMisSession(this.now()) || taipeiDate(this.now()) !== date) break;
-        this.lastRequest = this.now();
+        const allowed = () =>
+          inMisSession(this.now()) && taipeiDate(this.now()) === date;
+        const rows = await this.requestRows(chunk, allowed);
+        if (!rows && !allowed()) break;
         const found = new Map<string, MisSnapshot>();
-        try {
-          const url = new URL(
-            "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
-          );
-          url.search = new URLSearchParams({
-            ex_ch: chunk.map((s) => misChannel(s)!).join("|"),
-            json: "1",
-            delay: "0",
-          }).toString();
-          const response = await this.fetcher(url, {
-            headers: { Accept: "application/json" },
-            signal: AbortSignal.timeout(this.options.timeoutMs ?? TIMEOUT_MS),
-          });
-          if (response.ok) {
-            const payload = await response.json() as {
-              msgArray?: unknown;
-              rtcode?: unknown;
-            };
-            if (
-              (payload?.rtcode === undefined || payload.rtcode === "0000") &&
-              Array.isArray(payload?.msgArray)
-            ) {
-              for (const raw of payload.msgArray) {
-                // An unlabelled ambiguous venue cannot be attributed to either symbol.
-                const matches = chunk.map((symbol) =>
-                  parseMisRow(raw, symbol, this.now())
-                ).filter((row): row is MisSnapshot => row !== null);
-                if (matches.length !== 1) continue;
-                const row = matches[0]!;
-                const previous = this.prices.get(row.symbol);
-                if (
-                  row.price !== null && (!previous || row.time >= previous.time)
-                ) {
-                  this.prices.set(row.symbol, {
-                    date: row.date,
-                    price: row.price,
-                    time: row.time,
-                    priceTime: row.priceTime ?? row.time,
-                  });
-                } else if (
-                  previous?.date === row.date && previous.time <= row.time &&
-                  previous.price <= row.high && previous.price >= row.low
-                ) {
-                  row.price = previous.price;
-                  row.priceTime = previous.priceTime;
-                }
-                if (
-                  !found.has(row.symbol) ||
-                  row.time > found.get(row.symbol)!.time
-                ) found.set(row.symbol, row);
-              }
-            }
-          } else await response.body?.cancel();
-        } catch { /* Any MIS failure retains the unmodified Yahoo path. */ }
+        for (const raw of rows ?? []) {
+          // An unlabelled ambiguous venue cannot be attributed to either symbol.
+          const matches = chunk.map((symbol) =>
+            parseMisRow(raw, symbol, this.now())
+          ).filter((row): row is MisSnapshot => row !== null);
+          if (matches.length !== 1) continue;
+          const row = matches[0]!;
+          const previous = this.prices.get(row.symbol);
+          if (
+            row.price !== null && (!previous || row.time >= previous.time)
+          ) {
+            this.prices.set(row.symbol, {
+              date: row.date,
+              price: row.price,
+              time: row.time,
+              priceTime: row.priceTime ?? row.time,
+            });
+          } else if (
+            previous?.date === row.date && previous.time <= row.time &&
+            previous.price <= row.high && previous.price >= row.low
+          ) {
+            row.price = previous.price;
+            row.priceTime = previous.priceTime;
+          }
+          if (
+            !found.has(row.symbol) ||
+            row.time > found.get(row.symbol)!.time
+          ) found.set(row.symbol, row);
+        }
         for (const symbol of chunk) {
           this.cache.set(symbol, {
             at: this.now(),
@@ -286,12 +473,7 @@ export class TwseMisClient {
           ? [[s, entry.value] as const]
           : [];
       }));
-    };
-    const result = this.queue.then(run);
-    this.queue = result.then(() => undefined, () => undefined);
-    return await Promise.race([result, waiting]).finally(() =>
-      clearTimeout(timer)
-    );
+    });
   }
 }
 

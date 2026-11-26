@@ -51,7 +51,7 @@ function fakeQuotaDatabase() {
   return { rpc, rpcCalls, counts, fail: (value: boolean) => { failing = value; } };
 }
 
-function harness(options: { now?: number; fail?: string; fill?: boolean; limits?: QuotaLimits; env?: Record<string, string> } = {}) {
+function harness(options: { now?: number; fail?: string; fill?: boolean; limits?: QuotaLimits; env?: Record<string, string>; warrants?: unknown[] } = {}) {
   let now = options.now ?? MIS_NOW;
   let fail = options.fail;
   let serve!: (request: Request) => Promise<Response>;
@@ -70,7 +70,7 @@ function harness(options: { now?: number; fail?: string; fill?: boolean; limits?
       if (fail === 'json') return new Response('{');
       if (fail === 'shape') return Response.json({ msgArray: {} });
       if (fail === 'api') return Response.json({ rtcode: '5000', msgArray: misRows() });
-      return Response.json({ msgArray: misRows().map(row => fail === 'stale' ? { ...row, d: '20261104' } : row) });
+      return Response.json({ msgArray: options.warrants ?? misRows().map(row => fail === 'stale' ? { ...row, d: '20261104' } : row) });
     }
     if (!validation.YAHOO_HOSTS.includes(url.hostname as typeof validation.YAHOO_HOSTS[number])) throw new Error('Unexpected network in offline fixture');
     const symbol = decodeURIComponent(url.pathname.split('/').at(-1)!);
@@ -114,6 +114,94 @@ function harness(options: { now?: number; fail?: string; fill?: boolean; limits?
     },
     misCalls: () => calls.filter(url => url.hostname === 'mis.twse.com.tw') };
 }
+
+describe('market-chart warrant book endpoint', () => {
+  const close = Date.parse('2026-11-26T13:30:00+08:00');
+  const row = { d: '20261126', t: '13:30:00', tlong: String(close), ex: 'tse', rch: '2454' };
+  const captured = [
+    { ...row, c: '066186', b: '0.6800_', g: '10_', a: '0.6900_', f: '10_' },
+    { ...row, c: '04917T', b: '2.0700_', g: '10_', a: '-', f: '-', z: '-', v: '0' },
+    { ...row, c: '714060', ex: 'otc', b: '0.4500_', g: '10_', a: '0.7000_', f: '10_', trade: { t: '09:23:39', z: '0.4400' } },
+  ];
+
+  it('uses the shared gate for login and quota before touching MIS', async () => {
+    const h = harness({ now: close, warrants: captured, limits: { user: { window: 1, daily: 5 }, cloud: { window: 3, daily: 5 }, siteDaily: 10 } });
+    const path = 'warrantQuotes=066186.TW';
+    expect(await (await h.request(path, null)).json()).toMatchObject({ ok: false, code: 'LOGIN_REQUIRED' });
+    expect(h.misCalls()).toHaveLength(0);
+    expect((await h.request(path)).status).toBe(200);
+    const limited = await h.request(path);
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('120');
+    expect(await limited.json()).toMatchObject({ ok: false, code: 'USER_WINDOW' });
+    expect(h.misCalls()).toHaveLength(1);
+  });
+
+  it('validates warrant symbols and uses 20 by default with an explicit hard cap of 40', async () => {
+    const h = harness({ now: close, warrants: [] });
+    const codes = Array.from({ length: 41 }, (_, i) => `06${String(i).padStart(4, '0')}.TW`);
+    for (const path of [
+      'warrantQuotes=2330.TW', 'warrantQuotes=066186.TW&quotes=AAPL', 'warrantQuotes=066186.TW&limit=41',
+      `warrantQuotes=${codes.slice(0, 21).join(',')}`, `warrantQuotes=${codes.join(',')}&limit=40`,
+    ]) expect((await h.request(path)).status, path).toBe(400);
+    expect(h.misCalls()).toHaveLength(0);
+    const response = await h.request(`warrantQuotes=${codes.slice(0, 40).join(',')}&limit=40`);
+    expect(response.status).toBe(200);
+    expect(Object.keys((await response.json()).results)).toHaveLength(40);
+    expect(h.misCalls()[0]!.searchParams.get('ex_ch')!.split('|')).toHaveLength(40);
+  });
+
+  it('uses the actual book timestamp and labels the recorded after-close snapshot as closed', async () => {
+    const h = harness({ now: close + 41 * 60_000, warrants: captured });
+    const response = await h.request('warrantQuotes=066186.tw,04917t.tw,714060.TWO,066186.TW');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await response.json()).toEqual({
+      asOf: close / 1000 + 41 * 60, session: 'closed', source: 'twse-mis',
+      results: {
+        '066186.TW': { status: 'available', bid: 0.68, bidSize: 10, ask: 0.69, askSize: 10, quoteTime: close / 1000 },
+        '04917T.TW': { status: 'available', bid: 2.07, bidSize: 10, ask: null, askSize: null, quoteTime: close / 1000 },
+        '714060.TWO': { status: 'available', bid: 0.45, bidSize: 10, ask: 0.7, askSize: 10, quoteTime: close / 1000 },
+      },
+    });
+    expect(h.misCalls()[0]!.searchParams.get('ex_ch')).toBe('tse_066186.tw|tse_04917T.tw|otc_714060.tw');
+    expect(h.calls.every(call => call.hostname === 'mis.twse.com.tw' || call.href === lineIdToken.LINE_VERIFY_URL)).toBe(true);
+  });
+
+  it('separates ask-only, no book, mismatched venue, malformed time and stale quotes', async () => {
+    const h = harness({ now: close + 1000, warrants: [
+      { ...row, c: '066186', a: '-_0.6900_', f: '0_18_', b: '-' },
+      { ...row, c: '066187', a: '-_', b: '-' },
+      { ...row, c: '066188', ex: 'otc', a: '1.10' },
+      { ...row, c: '066189', t: '13:29:00', a: '1.10' },
+      { ...row, c: '066190', d: '20261125', tlong: String(close - 86400000), a: '1.10' },
+      { ...row, c: '009999', rch: undefined, a: '1.10' },
+    ] });
+    const body = await (await h.request('warrantQuotes=066186.TW,066187.TW,066188.TW,066189.TW,066190.TW,009999.TW')).json();
+    expect(body.results['066186.TW']).toMatchObject({ status: 'available', bid: null, ask: 0.69, askSize: 18 });
+    expect(body.results['066187.TW']).toMatchObject({ status: 'no_book', bid: null, ask: null });
+    expect(body.results['066188.TW']).toMatchObject({ status: 'no_quote', quoteTime: null });
+    expect(body.results['066189.TW']).toMatchObject({ status: 'no_quote', quoteTime: null });
+    expect(body.results['066190.TW']).toMatchObject({ status: 'stale', quoteTime: close / 1000 - 86400, bid: null, ask: null });
+    expect(body.results['009999.TW']).toMatchObject({ status: 'no_quote', quoteTime: null });
+  });
+
+  it('ages regular-session records out even within the shared adapter cache', async () => {
+    const bookTime = close - 10 * 60_000;
+    const h = harness({ now: bookTime + 59_000, warrants: [{ ...row, c: '066186', t: '13:20:00', tlong: String(bookTime), a: '1.10' }] });
+    const path = 'warrantQuotes=066186.TW';
+    expect(await (await h.request(path)).json()).toMatchObject({ session: 'regular', results: { '066186.TW': { status: 'available', ask: 1.1 } } });
+    h.advance(2000);
+    expect(await (await h.request(path)).json()).toMatchObject({ session: 'regular', results: { '066186.TW': { status: 'stale', ask: null } } });
+    expect(h.misCalls()).toHaveLength(1);
+  });
+
+  it.each(['network', 'timeout', 'http', 'json', 'shape', 'api'])('returns source_unavailable on MIS %s', async (fail) => {
+    const h = harness({ now: close, fail });
+    expect(await (await h.request('warrantQuotes=066186.TW')).json()).toMatchObject({ results: {
+      '066186.TW': { status: 'source_unavailable', bid: null, ask: null, quoteTime: null },
+    } });
+  });
+});
 
 describe('market-chart endpoint MIS integration (all upstreams are fake)', () => {
   it('uses one MIS batch for mixed TW/US requests and supplies the otherwise absent OTC index', async () => {
