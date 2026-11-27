@@ -95,4 +95,8 @@ Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal�
 
 ### 保守本益比 AI 情境
 
-預設停用；確認公開個股分析會間接揭露 owner 所選代號後，才設定 `CONSERVATIVE_PE_AI_ENABLED=1`、`ADMIN_LINE_USER_ID`（必須與 `SUPABASE_USER_ID` 相同）、免費層 `GEMINI_API_KEY` / `GROQ_API_KEY` secrets 與既有 `SEC_USER_AGENT`。模型預設 Gemini 3.8 Flash / Groq Qwen 3.8 27B，可用 repo variables 改成已確認免費模型；不自動開通付費。只讀 owner 明確 cloud 授權的台美股持股與自選；不送出帳號、清單名稱、數量、成本或選股來源。W6 同一 TS eligibility 篩選；每次至多 20 檔，可用 `CONSERVATIVE_PE_AI_LIMIT` 調低；七日內成功檔略過。Google News RSS 只提供標題，SEC 10-K 分部表為候選證據，台灣 MOPS 分部來源待確認，缺證據強制低信心；無合理盈餘比例不發布。模型僅輸出情境和證據，程式計算情境 EPS，財務頁用 W6 可比較收盤價計算倍數。輸出 `docs/report/conservative-pe/<KEY>.json`，generated owner `conservativePeAi`。失敗保留既有發布。PR 僅假資料，不接正式帳戶或 AI。
+週排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`，並以 `CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS` 明確列出同意發布的代號（逗號或空白分隔）。`ADMIN_LINE_USER_ID`、`SUPABASE_USER_ID` 與 Supabase 的 `atlas_storage_owner_id()` 必須一致，且 owner 需有明示的 `cloud` 授權。私有持股與自選只用來選取已允許公開的股票。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，移除代號或停用排程後，既有報告和 Git 歷史仍可能可見。
+
+僅使用已確認提供免費層的 `gemini-3.8-flash` 和 `qwen/qwen3.8-27b`。設定 `CONSERVATIVE_PE_AI_FREE_TIER=1` 前，請確認兩個提供者專案的金鑰均屬免費層且未啟用付費。API 金鑰無法查證帳務層級。使用既有 `SEC_USER_AGENT` 讀取官方財報。429、503、逾時或網路錯誤才會使用一次備援，提供者各自遵守 `Retry-After`。每 UTC ISO 週最多預留 20 檔，`CONSERVATIVE_PE_AI_LIMIT` 可調低。輪替游標從上次的位置繼續，基期相同的報告可重用七天。預留額度先寫入 generated owner `conservativePeAiBudget`，只保留週次、用量及游標，避免中斷或重跑超額。
+
+AI 情境採用 W6 同一組適用條件及 EPS 口徑。Google News RSS 僅採用可由標題確認與公司相關的近期財經消息。SEC 10-K 分部營業利益須與基期對應的財報期間及幣別相符，且只用於約束盈餘損失假設。缺少可核對的分部盈餘證據（包括目前的台灣 MOPS 樣本）時保留低信心說明，估值欄留空。程式從基期 EPS 計算情境 EPS，財務頁採用 W6 有日期的可比較日 K 收盤價。報告存放於 `docs/report/conservative-pe/<KEY>.json`，generated owner 為 `conservativePeAi`。個別失敗後仍發布成功報告，再發送失敗通知。PR 驗證使用假資料。

@@ -41,7 +41,7 @@ jobs:
       - run: npx vitest run tests/conservative-pe-ai.test.ts
         working-directory: atlas
   refresh:
-    if: github.event_name != 'pull_request' && vars.GENERATED_BRANCH_MODE == '1' && vars.CONSERVATIVE_PE_AI_ENABLED == '1'
+    if: github.event_name != 'pull_request' && vars.GENERATED_BRANCH_MODE == '1' && vars.CONSERVATIVE_PE_AI_ENABLED == '1' && vars.CONSERVATIVE_PE_AI_FREE_TIER == '1'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     permissions:
@@ -63,6 +63,7 @@ jobs:
         working-directory: atlas
       - run: python scripts/generated_branch.py restore
       - name: Analyze eligible public-owner symbols
+        id: analyze
         run: python -u scripts/build_conservative_pe.py --selector /tmp/conservative-pe-selector.mjs
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -75,7 +76,13 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GROQ_MODEL: ${{ vars.GROQ_MODEL }}
           CONSERVATIVE_PE_AI_LIMIT: ${{ vars.CONSERVATIVE_PE_AI_LIMIT }}
+          CONSERVATIVE_PE_AI_ENABLED: ${{ vars.CONSERVATIVE_PE_AI_ENABLED }}
+          CONSERVATIVE_PE_AI_FREE_TIER: ${{ vars.CONSERVATIVE_PE_AI_FREE_TIER }}
+          CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS: ${{ vars.CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS }}
       - run: python scripts/generated_branch.py publish conservativePeAi
+      - name: Report partial analysis failure after publishing successful results
+        if: steps.analyze.outputs.failed != '' && steps.analyze.outputs.failed != '0'
+        run: exit 1
   notify-system-failure:
     needs: ["verify", "refresh"]
     if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}

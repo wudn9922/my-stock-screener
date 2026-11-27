@@ -41,7 +41,11 @@ jobs:
   deploy:
     if: >-
       vars.GENERATED_BRANCH_MODE == '1' &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.head_branch == 'main')
+      (github.event_name != 'workflow_run' || (
+        github.event.workflow_run.head_branch == 'main' &&
+        (github.event.workflow_run.name != 'Conservative PE AI' ||
+          (vars.CONSERVATIVE_PE_AI_ENABLED == '1' && vars.CONSERVATIVE_PE_AI_FREE_TIER == '1'))
+      ))
     runs-on: ubuntu-latest
     environment:
       name: github-pages

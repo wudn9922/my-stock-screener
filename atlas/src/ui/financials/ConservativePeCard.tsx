@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { assessEligibility, conservativeEps, conservativePeClose, conservativePePriceIssue, forecastInertia, type Forecast } from '../../fundamentals/conservativePe';
+import { conservativePeScenarioBaseline } from '../../fundamentals/conservativePeAi';
 import { ConservativePeAiPanel } from './ConservativePeAiPanel';
 import { FoldCard } from './FoldCard';
 
@@ -25,6 +26,7 @@ export function ConservativePeCard({ history }: { history: FinancialHistory }) {
   const annual = useMemo(() => conservativeEps(history, 'annual'), [history]);
   const quarterly = useMemo(() => conservativeEps(history, 'quarterly'), [history]);
   const eligibility = useMemo(() => assessEligibility(annual), [annual]);
+  const scenarioBaseline = useMemo(() => conservativePeScenarioBaseline(history), [history]);
   const symbol = history.symbol;
   const priceIssue = conservativePePriceIssue(history);
   useEffect(() => {
@@ -46,7 +48,7 @@ export function ConservativePeCard({ history }: { history: FinancialHistory }) {
       <ForecastDetail title="年度慣性本益比" result={forecastInertia(annual, 'annual', priceValue)} />
     </> : <p>不適用：{eligibility.reason}</p>}
     <h3>方法二：市場擔憂情境</h3>
-    <ConservativePeAiPanel symbol={symbol} eligible={eligibility.applicable} price={priceValue} />
+    <ConservativePeAiPanel symbol={symbol} baseline={scenarioBaseline} price={priceIssue ? null : price} />
     <p>盈餘慣性為數學外推，不保證為最差情況；僅供研究參考。</p>
   </FoldCard>;
 }
