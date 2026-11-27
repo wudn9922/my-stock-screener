@@ -224,10 +224,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-dir", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--mode", choices=("missing", "audit-filled", "scale-outliers"), default="missing")
     parser.add_argument("--report", type=Path, help="Optional JSON artifact outside permanent data")
     args = parser.parse_args()
-    report = run(ROOT, args.archive_dir, args.apply)
-    print(markdown(report))
+    if args.mode == "missing":
+        report = run(ROOT, args.archive_dir, args.apply)
+        print(markdown(report))
+    else:
+        from scripts import repair_scale_outliers as scale
+        if args.mode == "audit-filled":
+            if args.apply:
+                parser.error("audit-filled is read-only")
+            report = scale.audit_filled(ROOT, args.archive_dir)
+        else:
+            report = scale.plan_scale(ROOT, args.archive_dir)
+            report["apply"] = args.apply
+            if args.apply:
+                scale.apply_scale(ROOT, args.archive_dir, report)
+        print(scale.markdown(report))
     if args.report:
         args.report.write_text(json.dumps(report, allow_nan=False, indent=2) + "\n")
 
