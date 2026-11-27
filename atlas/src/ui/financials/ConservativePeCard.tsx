@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FinancialHistory } from '../../fundamentals/FinancialHistory';
 import { assessEligibility, conservativeEps, conservativePeClose, conservativePePriceIssue, forecastInertia, type Forecast } from '../../fundamentals/conservativePe';
+import { ConservativePeAiPanel } from './ConservativePeAiPanel';
 import { FoldCard } from './FoldCard';
 
 const number = (value: number) => value.toLocaleString('zh-TW', { maximumFractionDigits: 4 });
@@ -45,7 +46,7 @@ export function ConservativePeCard({ history }: { history: FinancialHistory }) {
       <ForecastDetail title="年度慣性本益比" result={forecastInertia(annual, 'annual', priceValue)} />
     </> : <p>不適用：{eligibility.reason}</p>}
     <h3>方法二：市場擔憂情境</h3>
-    <p>尚未產生</p>
+    <ConservativePeAiPanel symbol={symbol} eligible={eligibility.applicable} price={priceValue} />
     <p>盈餘慣性為數學外推，不保證為最差情況；僅供研究參考。</p>
   </FoldCard>;
 }

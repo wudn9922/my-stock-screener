@@ -23,6 +23,7 @@ on:
       - Refresh US Rates
       - MA Recommendations
       - TW Margin Temperature
+      - Conservative PE AI
       - Squash generated snapshot
     types: [completed]
 

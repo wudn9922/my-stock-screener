@@ -22,6 +22,7 @@ on:
       - "Market trading calendar"
       - "IPO and extended quotes"
       - "Taiwan warrant data"
+      - "Conservative PE AI"
       - "Q4 EPS from 8-K (manual)"
       - "Refresh US Rates"
       - "Research public data"

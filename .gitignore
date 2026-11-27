@@ -72,3 +72,4 @@ docs/report/**/*.tmp
 /docs/report/ipo-watch.json
 /docs/report/extended-quotes/*.json
 /docs/report/warrants/*.json
+/docs/report/conservative-pe/

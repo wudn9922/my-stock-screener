@@ -18,7 +18,7 @@
 
 ### Pages 組裝的上游
 
-Daily Stock Screener、Atlas Research Terminal、Financial Statement History、Official Fundamentals (TW / US)、Taiwan stock dividends backfill、Full-Market Universe、Research public data、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Taiwan Chips、Taiwan Theme Rotation、Refresh US Rates、MA Recommendations、TW Margin Temperature、Squash generated snapshot。
+Daily Stock Screener、Atlas Research Terminal、Financial Statement History、Official Fundamentals (TW / US)、Taiwan stock dividends backfill、Full-Market Universe、Research public data、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Conservative PE AI、Taiwan Chips、Taiwan Theme Rotation、Refresh US Rates、MA Recommendations、TW Margin Temperature、Squash generated snapshot。
 
 ## 定期資料更新
 
@@ -30,6 +30,7 @@ Daily Stock Screener、Atlas Research Terminal、Financial Statement History、O
 | [`market-calendar.yml`](../.github/workflows/market-calendar.yml) | Market trading calendar | 定期資料更新 | cron `20 0 * * *`（每日 08:20）；手動 | 產生並發布未來台美股交易日曆。 | 是 |
 | [`market-extras.yml`](../.github/workflows/market-extras.yml) | IPO and extended quotes | 定期資料更新 | cron `41 12,13,21,22,1 * * 1-6`（週一～週六 09:41、20:41、21:41，週二～週日 05:41、06:41）；手動 | 在美股交易日更新 IPO 和盤前盤後報價快照。 | 是 |
 | [`warrant-data.yml`](../.github/workflows/warrant-data.yml) | Taiwan warrant data | 定期資料更新 | 每日 20:24（台北時間）、手動、PR 驗證 | 讀取 TWSE、TPEx 與 MOPS，按標的產出權證清單。使用 generated 分支的 `warrants` owner 發布。 | 是（發布工作） |
+| [`conservative-pe-ai.yml`](../.github/workflows/conservative-pe-ai.yml) | Conservative PE AI | 定期資料更新 | 週日 10:35（台北）、手動、PR 驗證 | 只在明確啟用時產生公開 owner 的市場擔憂情境。 | 是（發布工作） |
 | [`refresh-us-rates.yml`](../.github/workflows/refresh-us-rates.yml) | Refresh US Rates | 定期資料更新 | push `main` 的 `.github/workflows/refresh-us-rates.yml`、`scripts/build_rates.py`、`scripts/rates_analytics.py`、`scripts/rates_config.py`、`tests/test_rates.py`、`scripts/build_bond_research.py`、`tests/test_bond_research.py`、`atlas/data/yield-band-params.json`；手動 | 重建美國公債利率與債券研究報告。 | 是 |
 | [`research-data.yml`](../.github/workflows/research-data.yml) | Research public data | 定期資料更新 | cron `23 11 * * 1-5`（週一～週五 19:23）、`23 5 * * 2-6`（週二～週六 13:23）；push `main` 的 `scripts/*research*.py`、`scripts/build_sec_radar.py`、`scripts/build_world_assets.py`、`.github/workflows/research-data.yml`；手動 | 更新法人動向、成交量、警示、全球資產與 SEC 研究資料。 | 是 |
 | [`tw-chips.yml`](../.github/workflows/tw-chips.yml) | Taiwan Chips | 定期資料更新 | cron `41 11 * * 1-5`（週一～週五 19:41）；手動 | 更新台股籌碼資料，包含外資持股。 | 是 |
@@ -82,7 +83,7 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 
 ### 故障通知備援的上游
 
-Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Taiwan Chips、Full-Market Universe、TW Margin Temperature。
+Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Conservative PE AI、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Taiwan Chips、Full-Market Universe、TW Margin Temperature。
 
 ### 每日權證清單
 
@@ -91,3 +92,7 @@ Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal�
 每個 `docs/report/warrants/<underlying>.json` 有 `version: 1`、`underlying`、`asOf: {TWSE, TPEx}`（ISO 日期）及 `warrants` 陣列。每筆有 `code`、`symbol`、`name`、`type`（`call` 或 `put`）、`strikePrice`、`exerciseRatio`（每單位權證）、`expiryDate`、`lastTradingDate`、`issuer` 和 `market`（`TWSE` 或 `TPEx`）。履約價、行使比例及無法核對的發行商允許 `null`。
 
 發行來源日期倒退或整批資料無效時，建置會失敗並保留上次發布。此 workflow 在 PR 執行離線測試與 Deno 型別檢查。排程與手動發布沿用 generated 分支及共用故障通知。 [權證報價 API](../supabase/functions/market-chart/README.md)
+
+### 保守本益比 AI 情境
+
+預設停用；確認公開個股分析會間接揭露 owner 所選代號後，才設定 `CONSERVATIVE_PE_AI_ENABLED=1`、`ADMIN_LINE_USER_ID`（必須與 `SUPABASE_USER_ID` 相同）、免費層 `GEMINI_API_KEY` / `GROQ_API_KEY` secrets 與既有 `SEC_USER_AGENT`。模型預設 Gemini 3.8 Flash / Groq Qwen 3.8 27B，可用 repo variables 改成已確認免費模型；不自動開通付費。只讀 owner 明確 cloud 授權的台美股持股與自選；不送出帳號、清單名稱、數量、成本或選股來源。W6 同一 TS eligibility 篩選；每次至多 20 檔，可用 `CONSERVATIVE_PE_AI_LIMIT` 調低；七日內成功檔略過。Google News RSS 只提供標題，SEC 10-K 分部表為候選證據，台灣 MOPS 分部來源待確認，缺證據強制低信心；無合理盈餘比例不發布。模型僅輸出情境和證據，程式計算情境 EPS，財務頁用 W6 可比較收盤價計算倍數。輸出 `docs/report/conservative-pe/<KEY>.json`，generated owner `conservativePeAi`。失敗保留既有發布。PR 僅假資料，不接正式帳戶或 AI。
