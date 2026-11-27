@@ -11,7 +11,7 @@ const horizon = z.object({
 });
 const window = z.object({
   samples: count, horizons: z.object({ '1': horizon, '5': horizon, '20': horizon }),
-  mfe: number, mae: number,
+  mfe: number, mae: number, unavailable: count.optional(),
 }).refine(w => Object.values(w.horizons).every(h => h.mature + h.pending === w.samples));
 const signal = z.object({
   startDate: day, lastSignalDate: day, capturedSessions: count,

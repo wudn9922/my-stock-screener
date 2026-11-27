@@ -43,6 +43,7 @@ export function SignalOutcomesCard({ market }: { market: UniverseMarketKey }) {
             <h3>{NAMES[kind]}</h3>
             <p className="bo-note">自 {signal.startDate} 開始累積 · 最近紀錄 {signal.lastSignalDate} · {signal.capturedSessions} 個已記錄交易日</p>
             <p className="bo-ratio"><strong>{result.samples.toLocaleString()}</strong> 筆訊號</p>
+            {!!result.unavailable && <p className="bo-note">另有 {result.unavailable.toLocaleString()} 筆因停牌、零成交或缺少 K 線而未計入。</p>}
             {HORIZONS.map(n => {
               const h = result.horizons[n];
               const insufficient = h.insufficient || h.mature < data.minSample;

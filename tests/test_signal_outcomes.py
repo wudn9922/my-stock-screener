@@ -82,6 +82,8 @@ class SignalOutcomesTests(unittest.TestCase):
         self.assertEqual(report["horizons"]["20"]["winRate"], 100.)
         self.assertIsNone(so.summarize([full])["horizons"]["20"]["winRate"])
         del stock[dates[2]]
+        self.assertIsNone(so.evaluate(stamp, "AAPL", dates, dates[20], bars, "^GSPC"))
+        del index[dates[2]]
         with self.assertRaises(OutputRejected):
             so.evaluate(stamp, "AAPL", dates, dates[20], bars, "^GSPC")
 
@@ -106,6 +108,25 @@ class SignalOutcomesTests(unittest.TestCase):
             self.assertEqual(result["markets"]["US"]["signals"]["ambush-v1"]["windows"]["3"]["samples"], 1)
             output = report / "signal-outcomes.json"
             old = output.read_bytes()
+            # A single stock without a needed bar is left out and counted, not fatal.
+            dump(ledger / f"US-{stamp}-daily-scan-v1.json", {"version": 1, "market": "US", "signalType": "daily-scan-v1",
+                                                            "triggerDate": stamp, "rows": [["AAPL", 100]]})
+            for symbol in ("MSFT",) + tuple(f"S{i:02d}" for i in range(19)):
+                path = archive / "us" / symbol / "2026.csv"
+                path.parent.mkdir(parents=True)
+                path.write_text("Date,Open,High,Low,Close,Volume\n" +
+                                "".join(f"{d},50.0000,55.0000,49.0000,50.0000,100\n" for d in dates))
+            rows = [[s, 100] for s in ["AAPL", "MSFT"] + [f"S{i:02d}" for i in range(19)]]
+            dump(ledger / name, {"version": 1, "market": "US", "signalType": "ambush-v1",
+                                 "triggerDate": stamp, "rows": rows})
+            path = archive / "us/MSFT/2026.csv"
+            lines = path.read_text().splitlines()
+            path.write_text("\n".join(lines[:2] + lines[3:]) + "\n")
+            result = so.build(root, archive)
+            window = result["markets"]["US"]["signals"]["ambush-v1"]["windows"]["3"]
+            self.assertEqual((window["samples"], window["unavailable"]), (20, 1))
+            old = output.read_bytes()
+            # A broad gap (AAPL is in both cohorts: 3 of 22 signals, over 5%) keeps the previous report.
             path = archive / "us/AAPL/2026.csv"
             lines = path.read_text().splitlines()
             path.write_text("\n".join(lines[:2] + lines[3:]) + "\n")

@@ -22,6 +22,10 @@ MARKETS = {"TW": "^TWII", "US": "^GSPC"}
 TYPES = ("ambush-v1", "daily-scan-v1")
 HORIZONS = (1, 5, 20)
 MIN_SAMPLE = 20
+# Individual signals can lack bars for ordinary reasons (trading halts, zero-volume days excluded
+# from the archive, quarantined bars, delistings). Those signals are left out and counted; only a
+# broad gap, which points to an archive or ledger problem, keeps the previous report.
+MAX_UNAVAILABLE_SHARE = .05
 NAME = re.compile(r"(TW|US)-(\d{4}-\d{2}-\d{2})-(ambush-v1|daily-scan-v1)\.json")
 SYMBOL = re.compile(r"[A-Z0-9][A-Z0-9.^=-]{0,31}")
 LABEL = "signal outcomes"
@@ -169,15 +173,16 @@ def archive_reader(archive, start, end):
 
 
 def evaluate(stamp, symbol, dates, through, bars, benchmark):
-    """Mature only at the exact exchange session; never jump over a missing bar."""
+    """Mature only at the exact exchange session; None when the stock lacks a needed bar."""
     future = dates[dates.index(stamp) + 1:][:20]
     due = [d for d in future if d <= through]
     if not due:
         return {}
     stock, index = bars(symbol), bars(benchmark)
     needed = [stamp, *due]
-    require(all(d in stock for d in needed), LABEL, f"{symbol} missing/quarantined bars for {stamp}")
     require(all(d in index for d in needed), LABEL, f"{benchmark} missing bars for {stamp}")
+    if not all(d in stock for d in needed):
+        return None  # never jump over a missing bar; the caller counts it as unavailable
     base, ref = stock[stamp][3], index[stamp][3]
     result = {}
     for n in HORIZONS:
@@ -253,6 +258,7 @@ def build(root, archive):
         require(anchor in dates, LABEL, "non-session report anchor")
         cutoffs = {str(m): months_before(day(anchor), m).isoformat() for m in (1, 3, 6)}
         types = {}
+        evaluated = unavailable = 0
         for kind in TYPES:
             batches = cohorts.get((market, kind), [])
             if not batches:
@@ -264,10 +270,16 @@ def build(root, archive):
                 require(stamp in dates, LABEL, "signal date is not a market session")
                 for symbol, _observed_close in rows:
                     results.append((stamp, evaluate(stamp, symbol, dates, through, bars, benchmark)))
+            missing = [stamp for stamp, r in results if r is None]
+            evaluated += len(results)
+            unavailable += len(missing)
             types[kind] = {"startDate": batches[0][0], "lastSignalDate": batches[-1][0],
                            "capturedSessions": len(batches),
-                           "windows": {m: summarize([r for stamp, r in results if stamp >= cutoff])
+                           "windows": {m: dict(summarize([r for stamp, r in results if stamp >= cutoff and r is not None]),
+                                               unavailable=sum(stamp >= cutoff for stamp in missing))
                                        for m, cutoff in cutoffs.items()}}
+        require(unavailable <= MAX_UNAVAILABLE_SHARE * evaluated, LABEL,
+                f"{market} {unavailable}/{evaluated} signals lack archive bars (over {MAX_UNAVAILABLE_SHARE:.0%})")
         markets[market] = {"observedThrough": through, "asOf": anchor, "benchmark": benchmark, "signals": types}
     require(bool(markets) and set(previous.get("markets", {})) <= set(markets), LABEL, "market coverage lost")
     document = {"version": 1, "generatedAt": datetime.now(timezone.utc).isoformat(), "minSample": MIN_SAMPLE,
