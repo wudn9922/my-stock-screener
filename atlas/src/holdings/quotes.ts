@@ -3,6 +3,7 @@ import { loadUniverse } from '../report/universe';
 import { fetchResearch, researchUrl, worldAssetsSchema } from '../report/research';
 import { researchBars } from '../report/researchCandles';
 import { sessionDate, getMarketProfile } from '../market-data/MarketDataProvider';
+import { barEndTime } from '../market-data/MarketTiming';
 import type { ImportSymbol } from './import';
 import type { FxRate, HoldingQuote } from './model';
 
@@ -33,19 +34,23 @@ export async function loadHoldingQuotes(
         try {
           const result = await getDailyBarResult(symbol);
           if (signal.aborted || result.dataState === 'simulated') continue;
+          const profile = result.market ?? getMarketProfile(symbol);
+          const observed = Math.min(Date.now() / 1000, result.asOf ?? Date.now() / 1000);
+          const historySource = result.source.split(/ · 今日(?:來源|開高低／量)：/, 1)[0]!;
+          const overlay = historySource !== result.source ? result.quote : undefined;
           const bars = result.bars
-            .filter((bar) => Number.isFinite(bar.close) && bar.close > 0)
+            .filter((bar) => Number.isFinite(bar.close) && bar.close > 0 && barEndTime(bar.time, '1D', profile) <= observed
+              && (!overlay || sessionDate(overlay.asOf, profile) !== sessionDate(bar.time, profile) || overlay.asOf >= barEndTime(bar.time, '1D', profile)))
             .sort((a, b) => a.time - b.time);
           const latest = bars.at(-1);
           if (!latest) continue;
-          const profile = result.market ?? getMarketProfile(symbol);
           const latestDate = sessionDate(latest.time, profile);
           const previous = [...bars].reverse().find((bar) => sessionDate(bar.time, profile) < latestDate);
           quotes[symbol] = {
             price: String(latest.close),
             previous: previous ? String(previous.close) : null,
             asOf: latestDate,
-            source: result.source,
+            source: overlay && sessionDate(overlay.asOf, profile) === latestDate ? overlay.source ?? historySource : historySource,
           };
         } catch {
           /* Quote failures never reveal private inputs or replace a missing quote with zero. */
