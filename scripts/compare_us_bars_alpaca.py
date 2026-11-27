@@ -1,5 +1,6 @@
 """Read-only Yahoo/Alpaca comparison; never edits the source CSVs."""
 import argparse
+from collections import defaultdict, Counter
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -22,6 +23,44 @@ def distribution(values):
                 p95=float(data.quantile(.95)), maximum=float(data.max()))
 
 
+def symbol_details(details):
+    groups = defaultdict(list)
+    counts = Counter()
+    for item in details:
+        counts[item["symbol"]] += 1
+        if max(item["differencePct"].values()) > 1:
+            groups[item["symbol"]].append(item)
+    result = []
+    for symbol, items in groups.items():
+        ratios = [item["yahoo"]["Close"] / item["alpaca"]["Close"] for item in items]
+        med = float(pd.Series(ratios).median())
+        # Isolated takes priority: one observation cannot establish a constant scale.
+        if len(items) <= 3 and counts[symbol] > len(items):
+            kind = "isolated"
+        elif len(items) > 3 and max(ratios) / min(ratios) <= 1.005:
+            kind = "constant-scale"
+        else:
+            kind = "mixed"
+        result.append(dict(symbol=symbol, count=len(items), compared=counts[symbol],
+                           median=med, minimum=min(ratios), maximum=max(ratios),
+                           first=min(i["date"] for i in items), last=max(i["date"] for i in items),
+                           classification=kind))
+    return sorted(result, key=lambda item: (-item["count"], item["symbol"]))
+
+
+def largest_details(details):
+    counts = Counter()
+    result = []
+    for item in sorted(details, key=lambda d: (-max(d["differencePct"].values()), d["symbol"], d["date"])):
+        if counts[item["symbol"]] >= 2:
+            continue
+        result.append(item)
+        counts[item["symbol"]] += 1
+        if len(result) == 20:
+            break
+    return result
+
+
 def compare(root, samples=200, days=250):
     if samples < 1 or days < 1:
         raise ValueError("Sample size and trading days must be positive")
@@ -42,7 +81,7 @@ def compare(root, samples=200, days=250):
     if not dates:
         raise ValueError("No completed Yahoo trading dates in sample")
     start, end = dates[0], dates[-1]
-    if alpaca.prefetch(frames, start, end) is None:
+    if alpaca.prefetch(frames, start, end, adjustment=alpaca.MAIN_ADJUSTMENT) is None:
         raise RuntimeError("Alpaca batch fetch failed; comparison is incomplete")
     diffs = {name: [] for name in k.FIELDS[:4]}
     volume = []
@@ -54,7 +93,7 @@ def compare(root, samples=200, days=250):
         for stamp in interval:
             day = stamp.date().isoformat()
             row = frame.loc[stamp] if stamp in frame.index else None
-            result = alpaca.alpaca_bar(symbol, day)
+            result = alpaca.alpaca_bar(symbol, day, adjustment=alpaca.MAIN_ADJUSTMENT)
             if result is None:
                 if row is not None:
                     yahoo_only.append([symbol, day])
@@ -79,14 +118,15 @@ def compare(root, samples=200, days=250):
     stats = {name: distribution(values) | {"over1pct": sum(v > 1 for v in values)}
              for name, values in diffs.items()}
     return dict(sampleRequested=samples, sampleActual=len(frames), tradingDays=len(dates),
-                start=start, end=end, pricesPct=stats, volumeRatio=distribution(volume),
+                start=start, end=end, adjustment=alpaca.MAIN_ADJUSTMENT, pricesPct=stats, volumeRatio=distribution(volume),
                 yahooOnly=yahoo_only, alpacaOnly=alpaca_only, invalidAlpaca=invalid_alpaca,
-                largest20=sorted(details, key=lambda d: max(d["differencePct"].values()), reverse=True)[:20])
+                bySymbol=symbol_details(details), largest20=largest_details(details))
 
 
 def markdown(report):
     lines = ["# Yahoo / Alpaca daily comparison", "",
              f"Sample: {report['sampleActual']} stocks; {report['start']} to {report['end']}",
+             f"Alpaca adjustment: {report['adjustment']} (main CSV nominal historical basis; mixed legacy rows possible)",
              "", "| Field | Count | Median | P95 | Max | >1% |", "|---|---:|---:|---:|---:|---:|"]
     for name, stats in report["pricesPct"].items():
         lines.append("| " + " | ".join(map(str, [name + " (%)", stats["count"], stats["median"],
@@ -95,7 +135,14 @@ def markdown(report):
     lines.append(f"| Volume Yahoo / Alpaca | {v['count']} | {v['median']} | {v['p95']} | {v['maximum']} | n/a |")
     for key in ("yahooOnly", "alpacaOnly", "invalidAlpaca"):
         lines.extend(["", f"{key}: {len(report[key])} (full list in artifact)"])
-    lines.extend(["", "## Largest 20 price differences", "", "| Symbol | Date | Open % | High % | Low % | Close % |",
+    lines.extend(["", f"## Symbols with >1% differences ({len(report['bySymbol'])}; first 100)",
+                  "Ratios use discrepant rows only; classifications are screening hints, not proof.",
+                  "", "| Symbol | >1% bars / compared | Median ratio | Min | Max | First | Last | Class |",
+                  "|---|---:|---:|---:|---:|---|---|---|"])
+    for item in report["bySymbol"][:100]:
+        lines.append(f"| {item['symbol']} | {item['count']} / {item['compared']} | {item['median']:.6g} | "
+                     f"{item['minimum']:.6g} | {item['maximum']:.6g} | {item['first']} | {item['last']} | {item['classification']} |")
+    lines.extend(["", "## Largest 20 price differences (max 2 per symbol)", "", "| Symbol | Date | Open % | High % | Low % | Close % |",
                   "|---|---|---:|---:|---:|---:|"])
     for item in report["largest20"]:
         lines.append("| " + " | ".join([item["symbol"], item["date"]]
