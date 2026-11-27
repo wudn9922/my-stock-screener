@@ -1,0 +1,11 @@
+.upcoming-events { min-width: 0; max-width: 100%; }
+.upcoming-events > summary { cursor: pointer; padding: 6px 0; font-weight: 650; }
+.upcoming-events-body { display: grid; gap: 10px; min-width: 0; }
+.upcoming-events-body p { margin: 0; overflow-wrap: anywhere; }
+.upcoming-event-day h3 { font-size: 13px; margin: 0 0 6px; color: var(--text-2); }
+.upcoming-event-day ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.upcoming-event-day li { padding: 10px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; font-size: 12px; }
+.upcoming-event-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-bottom: 5px; }
+.upcoming-event-head b { min-width: 0; overflow-wrap: anywhere; }
+.upcoming-event-head span { color: var(--text-2); white-space: nowrap; }
+.upcoming-move { padding-top: 5px; font-variant-numeric: tabular-nums; }

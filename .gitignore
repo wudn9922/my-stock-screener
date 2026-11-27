@@ -70,6 +70,7 @@ docs/report/**/*.tmp
 /docs/report/screener-history/*.json
 /docs/report/signal-ledger/*.json
 /docs/report/signal-outcomes.json
+/docs/report/upcoming-events.json
 # Public display-only IPO/extended-session snapshots (generated owner: marketExtras).
 /docs/report/ipo-watch.json
 /docs/report/extended-quotes/*.json
