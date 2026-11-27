@@ -25,6 +25,7 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from build_valuation_us import (
     ANNUAL_DELAY,
@@ -38,7 +39,12 @@ from build_valuation_us import (
     write_atomic,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.output_guard import finite, retain_keys, unique_keys
+
 MIN_TW_SYMBOLS = 500
+ANNUAL_RETENTION = .85
+ANNUAL_ANCHORS = ("2330.TW", "2317.TW", "2454.TW")
 CURRENCY = "TWD"
 # 基本每股盈餘 is what the exchanges publish, so basic EPS comes first
 PREFER = ("annualBasicEPS", "annualDilutedEPS")
@@ -74,6 +80,14 @@ def build_entry(annual, previous, today_iso):
     return entry
 
 
+def validate_output(items, previous):
+    def usable(records):
+        return {key for key, entry in records.items()
+                if isinstance(entry, dict) and finite(entry.get("epsAnnual"))}
+    retain_keys(usable(items), usable(previous), "tw-annual.json",
+                min_share=ANNUAL_RETENTION, anchors=ANNUAL_ANCHORS)
+
+
 def main():
     directory_path = os.environ.get("ATLAS_DIRECTORY_PATH") or "public/symbols/directory.json"
     out_dir = os.environ.get("ATLAS_VALUATION_OUT_DIR") or "public/valuation"
@@ -81,6 +95,7 @@ def main():
     out_path = os.path.join(out_dir, "tw-annual.json")
 
     symbols = tw_symbols_from_directory(read_json(directory_path))
+    unique_keys(symbols, "Taiwan annual EPS directory")
     if len(symbols) < MIN_TW_SYMBOLS:
         raise RuntimeError(f"directory has only {len(symbols)} Taiwan symbols")
     previous_items = (read_json(out_path) or {}).get("items") or {}
@@ -140,6 +155,7 @@ def main():
         ),
         "items": items,
     }
+    validate_output(items, previous_items)
     size = write_atomic(out_path, document)
     print(json.dumps({
         "market": "TW-annual",
