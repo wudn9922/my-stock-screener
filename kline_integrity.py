@@ -289,8 +289,22 @@ def alpaca_replacement_reason(values, old, frame, day):
     return "close-mismatch-25pct" if abs(float(values["Close"]) / close - 1) > 0.25 + 1e-12 else None
 
 
+def retained_bar(path, stamp):
+    """Only consulted on an enabled fallback; a good existing date takes precedence."""
+    if path is None or not Path(path).exists():
+        return None
+    retained = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP)
+    if stamp in retained.index:
+        row = retained.loc[stamp]
+        if not isinstance(row, pd.Series):
+            raise ValueError("Duplicate permanent date")
+        if not violation(row):
+            return bar_values(row)
+    return None
+
+
 def accept_frame(frame, symbol, *, refetch=None, official=official_bar, us_source=alpaca_bars.alpaca_bar, source_url=None,
-                 fetched_at=None, now=None, zone=None, log_path=None):
+                 fetched_at=None, now=None, zone=None, log_path=None, retained_path=None):
     """Validate raw new inputs; refetch the latest invalid session at most once.
 
     A known quarantine is never silently released by an unrelated new download.
@@ -336,6 +350,15 @@ def accept_frame(frame, symbol, *, refetch=None, official=official_bar, us_sourc
                 if (candidate is None and us_source and alpaca_bars.alpaca_symbol(symbol)
                         and (us_source is not alpaca_bars.alpaca_bar or alpaca_bars.enabled())):
                     try:
+                        preserved = retained_bar(retained_path, stamp)
+                        if preserved is not None:
+                            # The raw observation was rejected, but there is no
+                            # reason to replace previously accepted evidence.
+                            log_event(symbol, day, "rejected", old=old, source_url=source_url,
+                                      fetched_at=fetched_at, reason=reason + "; alpaca:retained-valid-bar",
+                                      log_path=log_path)
+                            rows.append((stamp, pd.Series(preserved)))
+                            continue
                         alternative = us_source(symbol, day)
                         if alternative is None:
                             reason += "; alpaca:no-bar"
@@ -367,6 +390,7 @@ def write_csv(path, frame, *, symbol=None, source_url=None, fetched_at=None, log
     """Permanent union merge, validated writes, atomic file and correction audit."""
     path = Path(path)
     symbol = symbol or path.stem
+    kwargs.setdefault('retained_path', path)
     accepted = accept_frame(frame[FIELDS], symbol, source_url=source_url,
                             fetched_at=fetched_at, log_path=log_path, **kwargs)
     retained = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP) if path.exists() else pd.DataFrame(columns=FIELDS)
