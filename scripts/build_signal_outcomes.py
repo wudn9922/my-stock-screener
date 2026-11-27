@@ -152,7 +152,7 @@ def archive_reader(archive, start, end):
         if symbol not in cache:
             rows = symbol_rows(archive, symbol, years=years)
             cache[symbol] = {row[0]: tuple(float(v) for v in row[1:5]) for row in rows
-                             if row[0] not in blocked[symbol] and row[5] != "0"}
+                             if row[0] not in blocked[symbol] and (symbol in MARKETS.values() or row[5] != "0")}
         return cache[symbol]
     return bars
 
@@ -271,9 +271,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--archive-dir", type=Path, default=ROOT / ".cache/kline-archive")
-    parser.add_argument("--capture-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--capture-only", action="store_true")
+    mode.add_argument("--outcomes-only", action="store_true")
     args = parser.parse_args(argv)
-    print(f"Signal shards added: {capture(args.root)}")
+    if not args.outcomes_only:
+        print(f"Signal shards added: {capture(args.root)}")
     if not args.capture_only:
         build(args.root, args.archive_dir)
     return 0
