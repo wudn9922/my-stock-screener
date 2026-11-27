@@ -23,7 +23,7 @@ class UpcomingEventsTests(unittest.TestCase):
         self.assertNotIn("2026-07-03", sessions)
         bars = {d: (100., 110., 90., 100.) for d in sessions}
         bars["2026-07-02"] = (105., 110., 100., 102.)
-        bars["2026-07-06"] = (112.2, 120., 100., 91.8)
+        bars["2026-07-06"] = (112.2, 120., 90., 91.8)
         bmo = ue.earnings_moves({"2026-07-02": "bmo"}, bars, sessions, end)
         self.assertEqual((bmo["samples"], bmo["gapPct"], bmo["dayPct"], bmo["last"]),
                          (1, 5., 2., "2026-07-02"))
@@ -73,3 +73,57 @@ class UpcomingEventsTests(unittest.TestCase):
             with self.assertRaises(OutputRejected):
                 ue.build(root, root / "archive", datetime(2026, 11, 28, tzinfo=timezone.utc))
             self.assertEqual(target.read_bytes(), previous)
+
+    def test_complete_fixture_replay_and_missing_bar_retains_good_report(self):
+        from scripts.build_market_calendar import build as build_calendar
+        now = datetime(2026, 11, 28, 12, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            archive = root / "archive"
+
+            def put(relative, value):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(value), encoding="utf-8")
+
+            put("docs/atlas/valuation/us-events.json", {
+                "version": 1, "market": "US", "generatedAt": now.isoformat(),
+                "items": {"AAPL": {"earningsDate": "2026-12-02", "estimate": False, "session": "amc"}},
+                "history": {"AAPL": {"2026-11-25": "bmo"}},
+            })
+            put("docs/report/market-calendar.json", build_calendar(now))
+            put("docs/report/research/alerts.json", {
+                "version": 1, "generatedAt": now.isoformat(),
+                "sources": {f"{m}:{k}": {"status": "ok"}
+                            for m in ("TW", "TWO") for k in ("notice", "disposal")},
+                "events": [{"market": "TW", "kind": "disposal", "symbol": "2330.TW",
+                            "date": "2026-11-27", "start": "2026-11-30", "end": "2026-12-10"}],
+            })
+            put("docs/report/financials/2330.TW.json", {"stockDividends": {
+                "events": [{"exDate": "2026-12-01", "perShare": 1.5}],
+                "cashEvents": [{"exDate": "2026-12-01", "perShare": 3.5}],
+            }})
+            put("config/fomc-decisions.json", {
+                "version": 1, "validThrough": "2027-12-31", "dates": ["2026-12-09"],
+                "source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+            })
+            put(str(Path("archive") / ue.LOG), {"version": 1, "quarantined": [], "events": []})
+            price = archive / "us/AAPL/2026.csv"
+            price.parent.mkdir(parents=True)
+            price.write_text("Date,Open,High,Low,Close,Volume\n"
+                             "2026-11-24,50.0000,52.0000,49.0000,50.0000,100\n"
+                             "2026-11-25,55.0000,56.0000,52.0000,54.0000,100\n")
+            doc = ue.build(root, archive, now)
+            self.assertEqual(doc["moves"]["AAPL"]["samples"], 1)
+            self.assertEqual(doc["moves"]["AAPL"]["gapPct"], 10)
+            self.assertEqual(doc["moves"]["AAPL"]["dayPct"], 8)
+            kinds = {row["kind"] for row in doc["events"]}
+            self.assertTrue({"earnings", "stock-dividend", "cash-dividend",
+                             "disposal-start", "disposal-end", "fomc"} <= kinds)
+            report = root / "docs/report/upcoming-events.json"
+            old = report.read_bytes()
+            price.write_text("Date,Open,High,Low,Close,Volume\n"
+                             "2026-11-24,50.0000,52.0000,49.0000,50.0000,100\n")
+            with self.assertRaises(OutputRejected):
+                ue.build(root, archive, now)
+            self.assertEqual(report.read_bytes(), old)
