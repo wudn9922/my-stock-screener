@@ -117,6 +117,18 @@ class AcceptanceTest(unittest.TestCase):
         self.accept(frame(Low=15), refetch=lambda: frame(), us_source=self.source)
         self.source.assert_not_called()
 
+    def test_previously_accepted_bar_is_not_replaced_by_alpaca(self):
+        path = self.root / "AAPL.csv"
+        original = "Date,Open,High,Low,Close,Volume\n2026-10-22,10,12,8,10.9,105\n"
+        path.write_text(original)
+        raw = frame(Low=15)
+        result = self.accept(raw, retained_path=path, us_source=self.source)
+        self.assertEqual(result.iloc[0].Close, 10.9)
+        k.write_csv(path, raw, symbol="AAPL", now=NOW, official=None,
+                    us_source=self.source, log_path=self.log)
+        self.assertEqual(path.read_text(), original)
+        self.source.assert_not_called()
+
     def test_disabled_default_preserves_reason(self):
         with patch.dict(os.environ, KEYS | {"ALPACA_API_KEY_ID": ""}), patch("requests.get") as http:
             self.assertTrue(self.accept(frame(Low=15)).empty)
