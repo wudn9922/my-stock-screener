@@ -684,8 +684,11 @@ def evidence_for(public, session, sec, current):
     public = dict(public, companyName=name)
     try:
         news = news_items(session, public["symbol"], public["market"], name, current.date())
-    except Invalid:
-        raise Skipped("Public news unavailable") from None
+    except Invalid as error:
+        # A malformed/failed upstream response is not the same as a valid empty RSS.
+        if str(error) == "Public company name unavailable":
+            raise Skipped("Public company name unavailable") from None
+        raise
     if not news:
         raise Skipped("No recent public evidence")
     return public, news, sec.segments(public, current.date())
@@ -782,7 +785,9 @@ def main():
     env = os.environ
     if env.get("CONSERVATIVE_PE_AI_ENABLED") != "1" or env.get("CONSERVATIVE_PE_AI_FREE_TIER") != "1":
         raise Invalid("Explicit free-tier analysis opt-in required")
-    deadline = time.monotonic() + RUN_SECONDS
+    # Also account for time consumed by checkout/npm before the analysis step.
+    job_started = int(env.get("CONSERVATIVE_PE_AI_JOB_STARTED") or time.time())
+    deadline = time.monotonic() + min(RUN_SECONDS, max(0, 55 * 60 - (time.time() - job_started)))
     cap = analysis_limit(env)
     # Only repository public financial records are read; no user data or Supabase key (ADR-031).
     eligible = public_symbols(FINANCIALS)
@@ -799,6 +804,9 @@ def main():
     if args.mode == "probe":
         summary(env, probe(selected, news_session, sec, providers))
         return
+    if output := env.get("GITHUB_OUTPUT"):
+        with open(output, "a", encoding="utf-8") as stream:
+            stream.write("publish_reports=true\n")
     OUTPUT.mkdir(parents=True, exist_ok=True)
     chosen = plan_reports(selected, state, cap, OUTPUT, current)
     counts = refresh_reports(chosen, OUTPUT, state, news_session, sec, providers, publish_budget)
