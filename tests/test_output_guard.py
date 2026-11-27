@@ -104,14 +104,14 @@ class AnnualPublicationTests(unittest.TestCase):
             out.write_text(json.dumps({"version": 1, "items": prior}))
             original = out.read_bytes()
 
-            def cli(listed):
+            def cli(listed, annual=(2.0, "2025-12-31")):
                 directory.write_text(json.dumps({"items": [[s, s, "TWSE"] for s in listed]}))
                 with patch.dict(os.environ, {"ATLAS_DIRECTORY_PATH": str(directory),
                                              "ATLAS_VALUATION_OUT_DIR": tmp,
                                              "YAHOO_TW_ANNUAL_BUDGET_SECONDS": "600"}), \
                      patch.object(valuation, "Yahoo") as yahoo, \
                      patch.object(valuation, "needs_annual", side_effect=lambda item, today: item is None or item.get("epsAnnual") == 1.0), \
-                     patch.object(valuation, "parse_annual", return_value=(2.0, "2025-12-31")), \
+                     patch.object(valuation, "parse_annual", return_value=annual), \
                      patch("time.sleep"):
                     yahoo.return_value.get_json.return_value = {}
                     runpy.run_path(str(ROOT / "atlas/scripts/build_valuation_tw_annual.py"), run_name="__main__")
@@ -129,6 +129,11 @@ class AnnualPublicationTests(unittest.TestCase):
             # A successful-looking directory with all identities replaced is not a safe rebuild.
             with self.assertRaises(SystemExit) as exc:
                 cli([f"OTHER{i}.TW" for i in range(600)])
+            self.assertEqual(exc.exception.code, 1)
+            self.assertEqual(out.read_bytes(), good)
+            # The directory itself is large, but all upstream EPS values are absent.
+            with self.assertRaises(SystemExit) as exc:
+                cli([f"OTHER{i}.TW" for i in range(600)], annual=None)
             self.assertEqual(exc.exception.code, 1)
             self.assertEqual(out.read_bytes(), good)
 
