@@ -1,8 +1,9 @@
 import { openListActions } from './archive-fixture';
 import { expect, test, type Page } from '@playwright/test';
 import { mockSite } from './mocks';
-import { accessEnvelope, installLineAccount, mockDeviceAccount, mockMarketLogin } from './account-fixture';
+import { accessEnvelope, accountPreference, installLineAccount, mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { researchFixtureBody } from './research-fixtures';
+import { overlayMis, parseMisRow } from '../../supabase/functions/market-chart/twse-mis';
 
 const panel = (page: Page) => page.getByRole('region', { name: '持股', exact: true });
 const importer = (page: Page) => panel(page).getByRole('region', { name: '匯入持股', exact: true });
@@ -19,7 +20,7 @@ async function selectHoldings(page: Page) {
     await page.getByRole('group', { name: '自選檢視' }).getByRole('button', { name: '持股', exact: true }).click();
   }
 }
-async function open(page: Page) {
+async function open(page: Page, afterMocks?: () => Promise<unknown>) {
   await mockSite(page, { fundamentals: true });
   await page.route('**/report/research/**', (route) =>
     route.fulfill({
@@ -27,6 +28,7 @@ async function open(page: Page) {
       body: researchFixtureBody(new URL(route.request().url()).pathname.split('/research/')[1]!).toString(),
     }),
   );
+  await afterMocks?.();
   await page.goto('./?page=watchlist');
   await selectHoldings(page);
   await expect(panel(page)).toBeVisible();
@@ -353,4 +355,214 @@ test('account creation offers CSV markets and only supported API connections', a
   await expect(panel(page).getByRole('article', { name: 'AAPL 持股' })).toBeVisible();
   const saved = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.endsWith(':holdings:v1')).map(([, value]) => JSON.parse(value)));
   expect(saved[0].accounts[0].account).toMatchObject({ broker: 'other', kind: 'us-broker', currency: 'USD', name: '永豐美股' });
+});
+
+const liveStart = Date.parse('2026-11-27T11:43:03+08:00');
+const finalClose = Date.parse('2026-11-27T13:30:00+08:00');
+const previousCloses = { '2330.TW': 2145, '6488.TWO': 518 };
+type LiveSymbol = keyof typeof previousCloses;
+
+async function seedHoldings(page: Page, accounts: { name: string; positions: [LiveSymbol, string, string][] }[]) {
+  const uuid = (index: number) => '10000000-0000-4000-8000-' + String(index).padStart(12, '0');
+  const entries = accounts.map(({ name, positions }, index) => {
+    const accountId = uuid(index + 1);
+    return {
+      account: { id: accountId, name, kind: 'tw-broker', broker: 'other', currency: 'TWD' }, revision: 1,
+      holdings: positions.map(([symbol, quantity, averageCost], n) => ({
+        id: uuid(101 + index * 100 + n), accountId, symbol, quantity, averageCost, market: 'TW',
+        costCurrency: 'TWD', source: 'manual', updatedAt: '2026-11-26T09:00:00Z',
+      })),
+    };
+  });
+  await page.addInitScript(({ key, document }) => localStorage.setItem(key, JSON.stringify(document)), {
+    key: accountPreference('holdings:v1'), document: { version: 1, accounts: entries },
+  });
+}
+
+function dailyPayload(symbol: LiveSymbol) {
+  const previous = previousCloses[symbol];
+  const close = [previous - 5, previous];
+  return { chart: { result: [{
+    meta: { symbol, currency: 'TWD', exchangeTimezoneName: 'Asia/Taipei', gmtoffset: 28800,
+      regularMarketPrice: previous, regularMarketTime: Date.parse('2026-11-26T13:30:00+08:00') / 1000 },
+    timestamp: ['2026-11-25', '2026-11-26'].map(date => Date.parse(`${date}T09:00:00+08:00`) / 1000),
+    indicators: { quote: [{ open: close, high: close, low: close, close, volume: [100, 100] }] },
+  }], error: null } };
+}
+
+function recordedMis(symbol: LiveSymbol, phase: 'first' | 'second') {
+  // Nested trades from the official Nov 27 11:43 and 11:44 MIS batches.
+  const raw = symbol === '2330.TW'
+    ? { c: '2330', ex: 'tse', o: '2145', h: '2175', l: '2135', y: '2145', v: '16465',
+        trade: { z: phase === 'first' ? '2165' : '2170', t: phase === 'first' ? '11:40:45' : '11:43:20' } }
+    : { c: '6488', ex: 'otc', o: '517', h: '526', l: '505', y: '518', v: '3627',
+        trade: { z: '506', t: '11:35:33' } };
+  const t = phase === 'first' ? '11:42:05' : '11:44:05';
+  const row = parseMisRow({ ...raw, t, d: '20261127', z: '-' }, symbol,
+    liveStart + (phase === 'first' ? 0 : 79_000))!;
+  return overlayMis(dailyPayload(symbol), row);
+}
+
+function recordedClosingPrice() {
+  // Regular-market Yahoo response collected after the Nov 27 session, when the proxy no longer uses MIS.
+  const payload = dailyPayload('2330.TW');
+  const result = payload.chart.result[0]!;
+  const quote = result.indicators.quote[0]!;
+  const closingBar = { open: 2145, high: 2180, low: 2135, close: 2180, volume: 38_980_378 };
+  result.meta.regularMarketPrice = closingBar.close;
+  result.meta.regularMarketTime = finalClose / 1000 + 2;
+  result.timestamp.push(Date.parse('2026-11-27T09:00:00+08:00') / 1000);
+  for (const key of Object.keys(closingBar) as (keyof typeof closingBar)[]) quote[key] = [...quote[key], closingBar[key]];
+  return payload;
+}
+
+test('received MIS prints update holding, account and market totals and preserve the final close', async ({ page }, info) => {
+  await page.clock.install({ time: liveStart });
+  await mockDeviceAccount(page);
+  await seedHoldings(page, [{ name: '測試台股', positions: [['2330.TW', '1000', '2000']] }]);
+  const accountChoice = panel(page).getByRole('combobox', { name: '持股帳戶' });
+  let phase: 'first' | 'second' | 'close' = 'first';
+  let release!: () => void;
+  const received = new Promise<void>(resolve => { release = resolve; });
+  let requests = 0;
+  await open(page, () => page.route('https://edge.test/functions/v1/market-chart**', async route => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get('symbol') === '2330.TW' && params.get('interval') === '1d')
+      return route.fulfill({ json: dailyPayload('2330.TW') });
+    if (!params.get('quotes')?.split(',').includes('2330.TW')) return route.fallback();
+    requests++;
+    await received;
+    const result = phase === 'close' ? recordedClosingPrice() : recordedMis('2330.TW', phase);
+    return route.fulfill({ json: { results: { '2330.TW': result }, errors: {} } });
+  }));
+  await accountChoice.selectOption({ label: '測試台股 · TWD' });
+  const position = panel(page).getByRole('article', { name: '2330.TW 持股' });
+  await position.locator('summary.holding-compact-row').click();
+  const account = panel(page).locator('details').filter({ has: page.locator('summary', { hasText: /^帳戶小計$/ }) });
+  const market = panel(page).getByTestId('holdings-spot-subtotals');
+  const total = panel(page).getByRole('region', { name: '台股總計' });
+  try {
+    await expect.poll(() => requests).toBeGreaterThan(0);
+    await expect(position.getByText('2,145.00', { exact: true })).toBeVisible();
+    await expect(position).toContainText('非即時');
+    release();
+    await expect(position.getByText('2,165.00', { exact: true })).toBeVisible();
+    await expect(position).toContainText('證交所即時');
+    await expect(position).toContainText('+165,000.00');
+    await expect(position).toContainText('+20,000.00');
+    await expect(total).toContainText('2,165,000.00 TWD');
+    await expect(total).toContainText('165,000.00 TWD');
+    await account.locator('summary').click();
+    await expect(account).toContainText('TWD 市值 2,165,000.00');
+    await expect(account).toContainText('今日損益 +20,000.00');
+    await market.locator('summary').click();
+    await expect(market).toContainText('未實現損益 +165,000.00');
+    await expect(market).toContainText('今日損益 +20,000.00');
+    phase = 'second';
+    await page.clock.fastForward(80_000);
+    await expect(position.getByText('2,170.00', { exact: true })).toBeVisible();
+    await expect(position).toContainText('+170,000.00');
+    await expect(total).toContainText('2,170,000.00 TWD');
+    await expect(account).toContainText('今日損益 +25,000.00');
+    await expect(market).toContainText('未實現損益 +170,000.00');
+    if (info.project.name === 'iphone-webkit' && process.env.ATLAS_HOLDINGS_LIVE_SCREENSHOT) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await position.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: process.env.ATLAS_HOLDINGS_LIVE_SCREENSHOT, scale: 'css' });
+    }
+    await page.clock.fastForward(32 * 60_000);
+    await expect(position).toContainText('非即時');
+    await expect(total).toContainText('2,145,000.00 TWD');
+    phase = 'close';
+    await page.clock.fastForward(finalClose - (liveStart + 80_000 + 32 * 60_000) + 10 * 60_000);
+    await expect(total).toContainText('2,180,000.00 TWD');
+    await expect(position).toContainText(/2026-11-27 · Yahoo 延遲行情.*（非即時）/);
+    await expect(account).toContainText('今日損益 +35,000.00');
+    await page.clock.fastForward(31 * 60_000);
+    await expect(total).toContainText('2,180,000.00 TWD');
+  } finally { release(); }
+});
+
+test('holdings poll only visible positions in the active account and stop when backgrounded, left, or signed out', async ({ page }) => {
+  await page.clock.install({ time: liveStart });
+  await mockDeviceAccount(page);
+  await seedHoldings(page, [
+    { name: '帳戶甲', positions: [['6488.TWO', '100', '500'], ['2330.TW', '0.0464', '2000']] },
+    { name: '帳戶乙', positions: [['2330.TW', '1', '2000']] },
+  ]);
+  const batches: LiveSymbol[][] = [];
+  await open(page, () => page.route('https://edge.test/functions/v1/market-chart**', route => {
+    const params = new URL(route.request().url()).searchParams;
+    const symbol = params.get('symbol') as LiveSymbol;
+    if (Object.hasOwn(previousCloses, symbol) && params.get('interval') === '1d')
+      return route.fulfill({ json: dailyPayload(symbol) });
+    const symbols = (params.get('quotes') ?? '').split(',').filter((item): item is LiveSymbol => Object.hasOwn(previousCloses, item));
+    if (!symbols.length) return route.fallback();
+    batches.push(symbols);
+    const results = Object.fromEntries(symbols.map(item => [item, recordedMis(item, 'first')]));
+    return route.fulfill({ json: { results, errors: {} } });
+  }));
+
+  const position = (symbol: LiveSymbol) => panel(page).getByRole('article', { name: `${symbol} 持股` });
+  const choice = panel(page).getByRole('combobox', { name: '持股帳戶' });
+  const hidden = panel(page).getByRole('region', { name: '已隱藏持股', exact: true });
+  const navigation = page.getByRole('navigation', { name: '主要頁面' }).filter({ visible: true });
+  const goto = (name: string) => navigation.getByRole('button', { name, exact: true }).click();
+  await expect(position('6488.TWO')).toBeVisible();
+  await expect(position('2330.TW')).toHaveCount(1);
+  await position('2330.TW').locator('summary.holding-compact-row').click();
+  await expect(position('2330.TW')).toContainText('證交所即時');
+  // The 0.0464-share lot crosses TWD 100 at the live price but not at the confirmed close.
+  await expect(panel(page).getByRole('region', { name: '帳戶甲 帳戶損益' }).getByRole('article')).toHaveCount(1);
+
+  const pollOnce = async () => {
+    const start = batches.length;
+    await page.clock.fastForward(65_000);
+    await expect.poll(() => batches.length).toBeGreaterThan(start);
+    return batches.slice(start).flat();
+  };
+  const noPoll = async () => {
+    const start = batches.length;
+    await page.clock.fastForward(65_000);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+    expect(batches).toHaveLength(start);
+  };
+
+  await choice.selectOption({ label: '帳戶甲 · TWD' });
+  await expect(position('2330.TW')).toHaveCount(0);
+  await expect(hidden.locator('summary')).toHaveText('已隱藏 1 檔');
+  expect(new Set(await pollOnce())).toEqual(new Set(['6488.TWO']));
+  await position('6488.TWO').locator('summary.holding-compact-row').click();
+  await expect(position('6488.TWO')).toContainText('證交所即時');
+  await position('6488.TWO').getByRole('button', { name: '隱藏', exact: true }).click();
+  await expect(panel(page).getByRole('article')).toHaveCount(0);
+  await noPoll();
+  await hidden.locator('summary').click();
+  await hidden.getByRole('listitem', { name: '6488.TWO 已隱藏' }).getByRole('button', { name: '取消隱藏' }).click();
+  await position('6488.TWO').locator('summary.holding-compact-row').click();
+  await expect(position('6488.TWO')).toContainText('證交所即時');
+
+  const setHidden = (value: boolean) => page.evaluate(background => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: background });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, value);
+  await setHidden(true);
+  await expect(position('6488.TWO')).toContainText('非即時');
+  await noPoll();
+  await setHidden(false);
+  await expect(position('6488.TWO')).toContainText('證交所即時');
+
+  await goto('我的');
+  await expect(panel(page)).not.toBeVisible();
+  await noPoll();
+  await goto('自選');
+  if (!await panel(page).isVisible()) await selectHoldings(page);
+  await expect(position('6488.TWO')).toBeVisible();
+  expect(await pollOnce()).toContain('6488.TWO');
+  await goto('我的');
+  await page.getByRole('button', { name: '登出 Atlas', exact: true }).click();
+  await goto('自選');
+  if (!await panel(page).isVisible()) await selectHoldings(page);
+  await expect(panel(page)).toContainText('尚未匯入持股');
+  await noPoll();
 });
