@@ -1,12 +1,19 @@
 name: Conservative PE AI
 on:
   schedule:
-    - cron: '35 2 * * 0'
+    - cron: '17 3 * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [normal, probe]
+        default: normal
   pull_request:
     branches: [main]
     paths:
       - 'scripts/build_conservative_pe.py'
+      - 'config/conservative-pe-providers.json'
+      - 'atlas/src/ui/financials/ConservativePeAiPanel.tsx'
       - 'tests/test_conservative_pe_ai.py'
       - 'atlas/scripts/select-conservative-pe.ts'
       - 'atlas/src/fundamentals/conservativePe*.ts'
@@ -17,7 +24,7 @@ env:
 permissions:
   contents: read
 concurrency:
-  group: conservative-pe-ai-${{ github.event.pull_request.number || 'weekly' }}
+  group: conservative-pe-ai-${{ github.event.pull_request.number || 'daily' }}
   cancel-in-progress: false
 jobs:
   verify:
@@ -43,7 +50,7 @@ jobs:
   refresh:
     if: github.event_name != 'pull_request' && vars.GENERATED_BRANCH_MODE == '1' && vars.CONSERVATIVE_PE_AI_ENABLED == '1' && vars.CONSERVATIVE_PE_AI_FREE_TIER == '1'
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -62,22 +69,24 @@ jobs:
       - run: npx esbuild scripts/select-conservative-pe.ts --bundle --platform=node --format=esm --define:import.meta.env='{}' --outfile=/tmp/conservative-pe-selector.mjs
         working-directory: atlas
       - run: python scripts/generated_branch.py restore
-      - name: Analyze eligible public-owner symbols
+      - name: Analyze eligible public financial records
         id: analyze
-        run: python -u scripts/build_conservative_pe.py --selector /tmp/conservative-pe-selector.mjs
+        run: python -u scripts/build_conservative_pe.py --selector /tmp/conservative-pe-selector.mjs --mode "$ANALYSIS_MODE"
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          GROQ_MODEL: ${{ vars.GROQ_MODEL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ANALYSIS_MODE: ${{ inputs.mode || 'normal' }}
           CONSERVATIVE_PE_AI_LIMIT: ${{ vars.CONSERVATIVE_PE_AI_LIMIT }}
           CONSERVATIVE_PE_AI_ENABLED: ${{ vars.CONSERVATIVE_PE_AI_ENABLED }}
           CONSERVATIVE_PE_AI_FREE_TIER: ${{ vars.CONSERVATIVE_PE_AI_FREE_TIER }}
-          CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS: ${{ vars.CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS }}
-      - run: python scripts/generated_branch.py publish conservativePeAi
+      - name: Publish completed reports even after a partial failure
+        if: always() && !cancelled() && inputs.mode != 'probe' && steps.analyze.outcome != 'skipped'
+        run: python scripts/generated_branch.py publish conservativePeAi
       - name: Report partial analysis failure after publishing successful results
-        if: steps.analyze.outputs.failed != '' && steps.analyze.outputs.failed != '0'
+        if: always() && !cancelled() && steps.analyze.outputs.failure_threshold_exceeded == 'true'
         run: exit 1
   notify-system-failure:
     needs: ["verify", "refresh"]
