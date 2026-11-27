@@ -1,0 +1,129 @@
+name: Alpaca US missing daily bars repair
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write only after reviewing a dry-run and the comparison report'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: kline-archive-publish
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      changed: ${{ steps.repair.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Verify both checkouts and plan repair
+        id: repair
+        env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+          REPAIR_APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/alpaca-repair
+          archive=.cache/kline-archive
+          output=.cache/alpaca-repair
+          git rev-parse HEAD > "$output/main-base"
+          git -C "$archive" rev-parse HEAD > "$output/archive-base"
+          python scripts/kline_archive.py verify --archive-dir "$archive"
+          args=(--archive-dir "$archive" --report "$output/report.json")
+          if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
+          python -u scripts/repair_us_bars_alpaca.py "${args[@]}" | tee "$output/report.md" "$GITHUB_STEP_SUMMARY"
+          if [ "$REPAIR_APPLY" = true ]; then
+            python scripts/kline_archive.py verify --archive-dir "$archive" --base "$(cat "$output/archive-base")"
+            git add -- data docs/report/kline-corrections.json
+            git -C "$archive" add -A
+            git diff --cached --binary > "$output/main.patch"
+            git -C "$archive" diff --cached --binary > "$output/archive.patch"
+            if [ -s "$output/main.patch" ] || [ -s "$output/archive.patch" ]; then
+              echo changed=true >> "$GITHUB_OUTPUT"
+            fi
+          else
+            test -z "$(git status --porcelain --untracked-files=no)"
+            test -z "$(git -C "$archive" status --porcelain)"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && !cancelled()
+        with:
+          name: alpaca-us-repair-${{ github.run_id }}
+          path: .cache/alpaca-repair/
+          if-no-files-found: error
+          retention-days: 30
+  publish:
+    needs: prepare
+    if: inputs.apply && needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: kline-archive
+          path: .cache/kline-archive
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas
+      - uses: actions/download-artifact@v4
+        with:
+          name: alpaca-us-repair-${{ github.run_id }}
+          path: .cache/alpaca-repair
+      - name: Apply exact prepared patches and validate before atomic publication
+        run: |
+          set -euo pipefail
+          archive=.cache/kline-archive
+          output="$GITHUB_WORKSPACE/.cache/alpaca-repair"
+          test "$(cat "$output/main-base")" = "$(git rev-parse HEAD)"
+          test "$(cat "$output/archive-base")" = "$(git -C "$archive" rev-parse HEAD)"
+          if [ -s "$output/main.patch" ]; then
+            git apply --index --check "$output/main.patch"
+            git apply --index "$output/main.patch"
+          fi
+          if [ -s "$output/archive.patch" ]; then
+            git -C "$archive" apply --index --check "$output/archive.patch"
+            git -C "$archive" apply --index "$output/archive.patch"
+          fi
+          python scripts/kline_archive.py verify --archive-dir "$archive" --base "$(cat "$output/archive-base")"
+          python - <<'PY'
+          import subprocess
+          from scripts.kline_archive_git import assert_archive
+          assert_archive('.cache/kline-archive')
+          paths = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
+          assert all(p == 'docs/report/kline-corrections.json' or
+                     (p.startswith('data/') and p.endswith('.csv')) for p in paths), paths
+          PY
+          for repo in . "$archive"; do
+            git -C "$repo" config user.name 'github-actions[bot]'
+            git -C "$repo" config user.email 'github-actions[bot]@users.noreply.github.com'
+            if ! git -C "$repo" diff --cached --quiet; then
+              git -C "$repo" commit -m "Fill verified rejected US daily bars from Alpaca"
+            fi
+          done
+          git fetch "$GITHUB_WORKSPACE/$archive" HEAD
+          archive_head=$(git -C "$archive" rev-parse HEAD)
+          # Either both permanent copies publish or neither does. No force/rebase.
+          git push --atomic origin HEAD:refs/heads/main "$archive_head:refs/heads/kline-archive"
