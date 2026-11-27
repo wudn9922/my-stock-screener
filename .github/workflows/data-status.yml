@@ -72,6 +72,9 @@ jobs:
       - name: Calculate public signal outcomes
         if: always() && !cancelled() && steps.signal_capture.outcome == 'success' && steps.signal_archive.outcome == 'success'
         run: python scripts/build_signal_outcomes.py --outcomes-only
+      - name: Build public upcoming events and earnings moves (offline)
+        if: always() && !cancelled() && steps.signal_archive.outcome == 'success'
+        run: python scripts/build_upcoming_events.py
       - name: Publish only status-owned outputs
         # The existing publisher rebases ONLY this owner's delta onto each fresh
         # generated tip and retries non-force pushes; other owners are preserved.
