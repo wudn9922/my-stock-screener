@@ -51,6 +51,9 @@ jobs:
       - name: Build industry comparison without changing daily bars
         run: python scripts/build_industry_rotation.py
       - name: Capture public screener inputs for date comparisons
+        # Independent of industry rotation: a rejected rotation keeps its previous
+        # file, but must not skip today's 10-day rolling screener snapshot.
+        if: always() && !cancelled() && steps.inputs.outcome == 'success'
         run: python scripts/build_screener_history.py
       - name: Publish only status-owned outputs
         # The existing publisher rebases ONLY this owner's delta onto each fresh
