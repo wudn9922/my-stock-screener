@@ -354,3 +354,28 @@ test('account creation offers CSV markets and only supported API connections', a
   const saved = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.endsWith(':holdings:v1')).map(([, value]) => JSON.parse(value)));
   expect(saved[0].accounts[0].account).toMatchObject({ broker: 'other', kind: 'us-broker', currency: 'USD', name: '永豐美股' });
 });
+
+test('visible holdings use the shared quote batch and stop polling after leaving holdings', async ({ page }) => {
+  await mockMarketLogin(page);
+  await open(page);
+  const batches: string[][] = [];
+  await page.route('https://edge.test/functions/v1/market-chart**', async route => {
+    const symbols = new URL(route.request().url()).searchParams.get('quotes');
+    if (!symbols) return route.fallback();
+    batches.push(symbols.split(','));
+    return route.fulfill({ json: { results: {}, errors: {} } });
+  });
+  await create(page);
+  await paste(page, '代號,股數,平均成本\n2330,1000,100');
+  await save(page);
+  await expect.poll(() => batches.some(batch => batch.includes('2330.TW'))).toBe(true);
+  const position = panel(page).getByRole('article', { name: '2330.TW 持股' });
+  await expect(position).toContainText('非即時');
+  await position.locator('summary.holding-compact-row').click();
+  await position.getByRole('button', { name: '隱藏', exact: true }).click();
+  await expect(position).toHaveCount(0);
+  const before = batches.length;
+  await page.clock.install();
+  await page.clock.fastForward(130000);
+  expect(batches.length).toBe(before);
+});
