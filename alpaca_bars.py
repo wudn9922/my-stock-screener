@@ -7,8 +7,6 @@ import time
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-import requests
-
 URL = "https://data.alpaca.markets/v2/stocks/bars"
 NY = ZoneInfo("America/New_York")
 MIN_DAY = date(2016, 1, 1)
@@ -38,6 +36,7 @@ def _request(params):
     global _last_request
     if not enabled():
         return None
+    import requests
     headers = {"APCA-API-KEY-ID": os.environ["ALPACA_API_KEY_ID"],
                "APCA-API-SECRET-KEY": os.environ["ALPACA_API_SECRET_KEY"]}
     for attempt in range(4):
