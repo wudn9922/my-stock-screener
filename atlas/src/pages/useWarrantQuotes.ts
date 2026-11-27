@@ -5,6 +5,11 @@ import { isMarketLoginRequired, isMarketQuotaError, marketProxyAccess } from '..
 import { loadWarrantQuotes, waitForWarrantRefresh, WARRANT_BATCH, type WarrantQuoteSample, type WarrantQuotes } from '../report/warrants';
 
 const taiwan = getMarketProfile('^TWII');
+/**
+ * Larger result sets are scanned once and then only on request: repeating a scan of hundreds of
+ * warrants all session would spend most of the shared daily quote quota and keep loading TWSE MIS.
+ */
+export const WARRANT_AUTO_REFRESH_MAX = WARRANT_BATCH * 10;
 const documentVisible = () => !document.hidden;
 const subscribeVisibility = (listener: () => void) => {
   document.addEventListener('visibilitychange', listener);
@@ -101,6 +106,7 @@ export function useWarrantQuotes(active: boolean, key: string) {
       while (!signal.aborted) {
         const session = await scanAll();
         if (signal.aborted || marketProxyAccess.getSnapshot().until === Infinity) return;
+        if (symbols.length > WARRANT_AUTO_REFRESH_MAX) return;
         // Larger scans spend more time idle between rounds to leave room for the daily quota.
         await waitForWarrantRefresh(Math.max(30_000, Math.ceil(symbols.length / WARRANT_BATCH) * 8_000), signal);
         if (session === 'closed') {
@@ -113,5 +119,9 @@ export function useWarrantQuotes(active: boolean, key: string) {
     return () => scope.abort();
   }, [enabled, key, attempt]);
 
-  return { access, now, scan: enabled && scan?.key === key ? scan : null, refresh: () => setAttempt(value => value + 1) };
+  return {
+    access, now, scan: enabled && scan?.key === key ? scan : null,
+    autoRefresh: key.split(',').length <= WARRANT_AUTO_REFRESH_MAX,
+    refresh: () => setAttempt(value => value + 1),
+  };
 }

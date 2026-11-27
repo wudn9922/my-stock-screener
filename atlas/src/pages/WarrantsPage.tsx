@@ -3,7 +3,7 @@ import { usePageActive } from '../app/pageActivity';
 import type { PageProps } from './pageProps';
 import { SymbolSearch } from '../ui/SymbolSearch';
 import { currentWarrantQuotes, filterWarrants, loadWarrants, sortWarrants, spreadPercent, underlyingPattern, warrantDate, WARRANT_BATCH, type WarrantFile, type WarrantQuote } from '../report/warrants';
-import { useWarrantQuotes } from './useWarrantQuotes';
+import { useWarrantQuotes, WARRANT_AUTO_REFRESH_MAX } from './useWarrantQuotes';
 import './warrants.css';
 
 const amount = (value: number | null | undefined) => value == null ? '—' : String(value);
@@ -35,7 +35,7 @@ export default function WarrantsPage({ symbol = '2330.TW', navigate }: PageProps
   const today = warrantDate(Date.now());
   const filtered = useMemo(() => filterWarrants(file?.warrants ?? [], type, from, to, today), [file, type, from, to, today]);
   const key = useMemo(() => filtered.map(row => row.symbol).join(','), [filtered]);
-  const { access, now, scan, refresh } = useWarrantQuotes(active, key);
+  const { access, now, scan, autoRefresh, refresh } = useWarrantQuotes(active, key);
   const quotes = useMemo(() => currentWarrantQuotes(scan?.samples ?? {}, now), [scan, now]);
   const comparable = useMemo(() => Object.values(quotes).filter(quote => spreadPercent(quote) !== null).length, [quotes]);
   const ranked = useMemo(() => sortWarrants(filtered, quotes), [filtered, quotes]);
@@ -72,6 +72,7 @@ export default function WarrantsPage({ symbol = '2330.TW', navigate }: PageProps
           </>}
         </div>
         {scan?.lastAsOf && <p className="muted">證交所 MIS · {scan.session === 'regular' ? '末批交易時段' : '末批非交易時段／收盤快照'} · 取得時間 {timeText(scan.firstAsOf)}{scan.firstAsOf !== scan.lastAsOf ? ` 至 ${timeText(scan.lastAsOf)}` : ''}</p>}
+        {access.status === 'ready' && scan && !scan.loading && !autoRefresh && <p className="muted">超過 {WARRANT_AUTO_REFRESH_MAX} 檔時只查詢一次，不自動更新；縮小篩選範圍或按「重新整理報價」取得最新價格。</p>}
         {access.status === 'ready' && scan && !scan.loading && <button className="ghost-button" onClick={refresh}>重新整理報價</button>}
       </div>}
       <div className="warrant-paging">
