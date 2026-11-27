@@ -23,7 +23,7 @@ def read_main(path):
 
 def archive_frame(rows):
     return pd.DataFrame([dict(zip(k.FIELDS, r[1:])) for r in rows],
-                        index=pd.to_datetime([r[0] for r in rows]), columns=k.FIELDS)
+                        index=pd.to_datetime([r[0] for r in rows]), columns=k.FIELDS).apply(pd.to_numeric, errors="coerce")
 
 
 def neighbor_reason(frame, day, values, blocked):
@@ -122,7 +122,7 @@ def plan(root, archive_dir):
             skipped.append(dict(symbol=symbol, date=day, reason=reason))
         else:
             operations.append(dict(symbol=symbol, date=day, destinations=missing,
-                                   values=values, sourceUrl=url, fetchedAt=fetched))
+                                   values=k.bar_values(values), sourceUrl=url, fetchedAt=fetched))
     return dict(candidates=len(events), operations=operations, skipped=skipped)
 
 
