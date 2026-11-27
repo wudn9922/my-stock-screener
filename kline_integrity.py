@@ -439,31 +439,75 @@ def _write_preserving_lines(path, updates):
 SCALE_FACTORS = tuple(f for n in (2, 3, 4, 5, 8, 10) for f in (n, 1 / n))
 
 
-def isolated_scale(previous, current, following):
-    """A single common split-like jump which immediately reverses."""
+def scale_run(previous, currents, following):
+    """One to three consecutive bars at one common split-like scale."""
+    if not 1 <= len(currents) <= 3:
+        return False
     try:
-        a, x, z = map(float, (previous, current, following))
+        a, *xs, z = map(float, (previous, *currents, following))
     except (TypeError, ValueError):
         return False
-    if not all(math.isfinite(v) and v > 0 for v in (a, x, z)):
+    if not all(math.isfinite(v) and v > 0 for v in (a, *xs, z)):
         return False
     if max(a, z) / min(a, z) > 1.08 + 1e-12:
         return False
-    return any(abs(x / a / factor - 1) <= .08 + 1e-12 and
-               abs(x / z / factor - 1) <= .08 + 1e-12 for factor in SCALE_FACTORS)
+    return any(all(abs(x / a / factor - 1) <= .08 + 1e-12 and
+                   abs(x / z / factor - 1) <= .08 + 1e-12 for x in xs)
+               for factor in SCALE_FACTORS)
 
 
-def scale_replacement_reason(previous, current, following, new):
-    if any(violation(row) for row in (previous, current, following)):
+def isolated_scale(previous, current, following):
+    """Preserve the single-bar predicate as a special case."""
+    return scale_run(previous, [current], following)
+
+
+def scale_run_bounds(closes):
+    """Inclusive positional bounds, preferring a multi-bar run over its inverse edge.
+
+    A return to A immediately before a real split can look like a singleton
+    in the opposite direction (e.g. 611, 63, 63, 635, 65).
+    The return is a witness of the longer run, not an independent candidate.
+    Other competing runs are retained for the ambiguity guard.
+    """
+    runs = []
+    for start in range(1, len(closes) - 1):
+        try:
+            a, x = float(closes[start-1]), float(closes[start])
+        except (TypeError, ValueError):
+            continue
+        if not (math.isfinite(a) and math.isfinite(x) and a > 0 and x > 0):
+            continue
+        if not any(abs(x / a / factor - 1) <= .08 + 1e-12 for factor in SCALE_FACTORS):
+            continue
+        for end in range(start, min(start + 3, len(closes) - 1)):
+            if scale_run(a, closes[start:end+1], closes[end+1]):
+                runs.append((start, end))
+    inverse_edges = {edge for start, end in runs if start < end
+                     for edge in (start-1, end+1)}
+    return [(start, end) for start, end in runs
+            if start != end or start not in inverse_edges]
+
+
+def scale_run_original_reason(previous, currents, following):
+    if any(violation(row) for row in (previous, *currents, following)):
         return "invalid-original-or-neighbor"
-    if not isolated_scale(previous["Close"], current["Close"], following["Close"]):
+    if not scale_run(previous["Close"], [row["Close"] for row in currents], following["Close"]):
         return "not-isolated-scale"
+    return None
+
+
+def scale_source_reason(previous, following, new):
     if violation(new):
         return "invalid-source-bar"
     if any(abs(float(new["Close"]) / float(row["Close"]) - 1) > .25 + 1e-12
            for row in (previous, following)):
         return "neighbor-close-mismatch-25pct"
     return None
+
+
+def scale_replacement_reason(previous, current, following, new):
+    return (scale_run_original_reason(previous, [current], following)
+            or scale_source_reason(previous, following, new))
 
 
 def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None,
