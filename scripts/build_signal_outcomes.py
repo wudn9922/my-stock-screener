@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 from scripts.output_guard import require, finite, unique_keys
-from scripts.market_sessions import exchange_sessions, verified_closures, read_policy
+from scripts.market_sessions import exchange_sessions as calendar_sessions, verified_closures, read_policy
 from scripts.kline_archive import symbol_rows, market_of, LOG
 import kline_integrity as ki
 from scripts.build_screener_history import write
@@ -34,6 +34,12 @@ def load(path):
 def day(value):
     require(isinstance(value, str) and date.fromisoformat(value).isoformat() == value, LABEL, "invalid day")
     return date.fromisoformat(value)
+
+
+def exchange_sessions(market, start, end):
+    # The shared helper deliberately pads its requested interval for other callers.
+    # Signal horizons and test fixtures require the exact inclusive interval.
+    return {stamp for stamp in calendar_sessions(market, start, end) if start <= stamp <= end}
 
 
 def valid_symbol(symbol, market):
