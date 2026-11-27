@@ -1,0 +1,46 @@
+[
+  {
+    "id": "gemini-hydrogen",
+    "type": "gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "model": "gemini-4-hydrogen",
+    "secret": "GEMINI_API_KEY",
+    "daily_limit": 10,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 8192,
+    "thinking_level": "LOW"
+  },
+  {
+    "id": "gemini-flash",
+    "type": "gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "model": "gemini-3.8-flash",
+    "secret": "GEMINI_API_KEY",
+    "daily_limit": 18,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 4096,
+    "thinking_level": "MINIMAL"
+  },
+  {
+    "id": "groq-qwen",
+    "type": "openai-compatible",
+    "base_url": "https://api.groq.com/openai/v1",
+    "model": "qwen/qwen3.8-27b",
+    "secret": "GROQ_API_KEY",
+    "daily_limit": 35,
+    "min_interval_seconds": 60,
+    "max_output_tokens": 1400,
+    "reasoning_effort": "none"
+  },
+  {
+    "id": "cloudflare-qwen",
+    "type": "openai-compatible",
+    "base_url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+    "model": "@cf/qwen/qwen3.8-27b",
+    "secret": "CLOUDFLARE_API_TOKEN",
+    "daily_limit": 13,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 1400,
+    "reasoning_effort": "none"
+  }
+]
