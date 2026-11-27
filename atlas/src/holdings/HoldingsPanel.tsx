@@ -2,7 +2,7 @@ import { getStorageContextKey } from '../auth/storage';
 import { SinopacPanel } from './SinopacPanel';
 import { STATEMENT_BROKERS, StatementPanel, applyText, marketLabel, type StatementStatus } from './StatementPanel';
 import { holdingsContextApi } from './contextApi';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { chartList } from '../app/listContext';
 import type { PageProps } from '../pages/pageProps';
 import { accessState } from '../auth/access';
@@ -187,31 +187,38 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       })
       .map((connection) => connection.accountId),
   );
-  const closeQuote = (holding: Holding) => {
+  const context = getStorageContextKey();
+  const [closingBook, setClosingBook] = useState<{ context: string; quotes: Record<string, HoldingQuote> }>({ context, quotes: {} });
+  const updateClose = useCallback((symbol: string, close: HoldingQuote) => {
+    setClosingBook(current => {
+      const quotes = current.context === context ? current.quotes : {};
+      const previous = quotes[symbol];
+      if (previous && (previous.asOf > close.asOf || previous.asOf === close.asOf && previous.price === close.price
+        && previous.previous === close.previous && previous.source === close.source)) return current;
+      return { context, quotes: { ...quotes, [symbol]: close } };
+    });
+  }, [context]);
+  const confirmedCloses = closingBook.context === context ? closingBook.quotes : {};
+  const closeQuote = (holding: Holding): HoldingQuote | undefined => {
     const connection = mexcSnapshot.state.connections.find((entry) => entry.accountId === holding.accountId);
-    return connection ? connection.quotes[holding.symbol] : quotes[holding.symbol];
+    const fallback = connection ? connection.quotes[holding.symbol] : quotes[holding.symbol];
+    const close = confirmedCloses[holding.symbol];
+    return holding.market !== 'CRYPTO' && close && (!fallback || close.asOf > fallback.asOf) ? close : fallback;
   };
+  const closingRows = document.accounts.flatMap(entry => entry.holdings.map(holding => {
+    const quote = closeQuote(holding);
+    const result = valueHolding(holding, quote, costs);
+    return { holding, quote, result, hidden: hiddenReason(holding, entry.account, result.value, visibilityPreferences) };
+  }));
   // Determine subscriptions from the existing close-based visibility rules. Keeping this membership
   // stable during a live tick prevents a dust holding from oscillating between subscribe/unsubscribe.
-  const liveSymbols = [...new Set((selected ? [selected] : document.accounts).flatMap(entry =>
-    entry.holdings.filter(holding => holding.market !== 'CRYPTO'
-      && hiddenReason(holding, entry.account, valueHolding(holding, closeQuote(holding), costs).value, visibilityPreferences) === null)
-      .map(holding => holding.symbol)))].sort().join(',');
-  const live = useHoldingLiveQuotes(liveSymbols);
-  const holdingQuote = (holding: Holding) => {
-    if (holding.market === 'CRYPTO') return closeQuote(holding);
-    return live[holding.symbol] ?? closeQuote(holding);
-  };
-  const evaluated = document.accounts.flatMap((entry) =>
-    entry.holdings.map((holding) => {
-      const result = valueHolding(holding, holdingQuote(holding), costs);
-      return {
-        holding,
-        result,
-        hidden: hiddenReason(holding, entry.account, valueHolding(holding, closeQuote(holding), costs).value, visibilityPreferences),
-      };
-    }),
-  );
+  const liveSymbols = [...new Set(closingRows.filter(({ holding, hidden }) => !hidden && holding.market !== 'CRYPTO'
+    && (!selected || holding.accountId === selected.account.id)).map(row => row.holding.symbol))].sort().join(',');
+  const live = useHoldingLiveQuotes(liveSymbols, `${context}|${view}`, updateClose);
+  const evaluated = closingRows.map(row => {
+    const quote = !row.hidden && live[row.holding.symbol];
+    return quote ? { ...row, quote, result: valueHolding(row.holding, quote, costs) } : row;
+  });
   // Hidden holdings are a view preference: every total, subtotal and note below uses `all` (visible only).
   const all = evaluated.filter((row) => row.hidden === null);
   const hiddenRows = evaluated.filter(
@@ -361,16 +368,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                 />
               )}
             <div className="holdings-cards">
-              {accountRows.map(({ holding, result }) => (
+              {accountRows.map(({ holding, result, quote }) => (
                 <HoldingPosition
                   key={holding.id}
                   holding={holding}
                   result={result}
-                  quote={holdingQuote(holding)}
+                  quote={quote}
                   name={directory?.find((item) => item.symbol === holding.symbol)?.name}
                   pending={pendingAccounts.has(holding.accountId)}
                   net={net && validDiscount}
-                  retained={!holdingQuote(holding)?.liveState && (mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
+                  retained={!quote?.liveState && quote !== confirmedCloses[holding.symbol] && (mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
                     holding.symbol,
                   )}
                   onOpen={() => {

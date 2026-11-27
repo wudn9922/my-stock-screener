@@ -20,4 +20,11 @@ describe('holding live quote', () => {
     expect(holdingLiveQuote({ ...value, quote: { ...value.quote!, dataState: 'delayed' } }, now)?.liveState).toBe('delayed');
     expect(holdingLiveQuote(value, Date.parse('2026-11-27T06:00:00Z'))).toBeUndefined();
   });
+  it('does not advertise the closing auction or polling grace period as an intraday price', () => {
+    const close = Date.parse('2026-11-27T13:30:00+08:00');
+    const quote = { ...value.quote!, asOf: close / 1000 - 10 };
+    expect(holdingLiveQuote({ ...value, quote }, close - 1000)).toBeDefined();
+    expect(holdingLiveQuote({ ...value, quote }, close)).toBeUndefined();
+    expect(holdingLiveQuote({ ...value, quote: { ...quote, asOf: close / 1000 } }, close + 1000)).toBeUndefined();
+  });
 });

@@ -2,10 +2,61 @@ import { getDailyBarResult, getHoldingsSymbolDirectory } from '../app/dataSource
 import { loadUniverse } from '../report/universe';
 import { fetchResearch, researchUrl, worldAssetsSchema } from '../report/research';
 import { researchBars } from '../report/researchCandles';
-import { sessionDate, getMarketProfile } from '../market-data/MarketDataProvider';
+import type { BarResult } from '../market-data/MarketDataProvider';
+import { calendarDate, getMarketProfile, marketDateTime, sessionDate, type MarketProfile } from '../market-data/MarketProfile';
+import { marketCalendar } from '../market-data/MarketCalendar';
 import { barEndTime } from '../market-data/MarketTiming';
 import type { ImportSymbol } from './import';
 import type { FxRate, HoldingQuote } from './model';
+
+function closingTime(date: string, market: MarketProfile): number {
+  const open = marketDateTime(date, market.sessionOpenMinutes, market);
+  const session = marketCalendar.session(market, open * 1000);
+  return session === undefined ? barEndTime(open, '1D', market) : session?.close ?? Infinity;
+}
+
+type ClosingData = Pick<BarResult, 'asOf' | 'source' | 'market' | 'quote' | 'dataState'> & {
+  bars: Readonly<BarResult['bars']>;
+};
+
+/** The most recent two completed sessions, paired with the date convention of daily bars. */
+export function holdingCloseQuote(symbol: string, data: ClosingData, now = Date.now(), requireClosingPrint = false): HoldingQuote | undefined {
+  if (data.dataState === 'simulated') return undefined;
+  const market = data.market ?? getMarketProfile(symbol);
+  const observed = Math.min(now / 1000, data.asOf ?? now / 1000);
+  if (!Number.isFinite(observed)) return undefined;
+  const observedDate = sessionDate(observed, market);
+  const needsConfirmedPrice = requireClosingPrint || data.source.includes(' · 今日開高低／量：');
+  const source = data.source.split(/ · 今日(?:來源|開高低／量)：/, 1)[0]!;
+  const candidate = data.quote;
+  const quote = candidate?.symbol === symbol && Number.isFinite(candidate.asOf) && candidate.asOf <= observed
+    && candidate.cacheStatus !== 'stale' && candidate.dataState !== 'simulated'
+    && Number.isFinite(candidate.price) && candidate.price > 0 ? candidate : undefined;
+  // Yahoo can fall back to a daily bucket timestamp. Only an observation during or after
+  // the actual session can identify that day's partial or completed trading price.
+  const marketDay = quote && sessionDate(quote.asOf, market);
+  const close = marketDay ? closingTime(marketDay, market) : Infinity;
+  const quoteDate = quote && marketDay && Number.isFinite(close) && quote.asOf <= close + 15 * 60
+    && quote.asOf >= marketDateTime(marketDay, market.sessionOpenMinutes, market) ? marketDay : undefined;
+  const printed = quote && quoteDate && quote.asOf >= close ? quote : undefined;
+  const prices: { date: string; price: number; source: string; previous: number }[] = [];
+  if (printed && quoteDate) prices.push({ date: quoteDate, price: printed.price, source: printed.source ?? source,
+    previous: requireClosingPrint || printed.dataState === 'live' ? printed.price - printed.change : NaN });
+  for (const bar of [...data.bars].sort((a, b) => b.time - a.time)) {
+    if (!Number.isFinite(bar.time) || !Number.isFinite(bar.close) || bar.close <= 0) continue;
+    const date = calendarDate(bar.time, market);
+    if (date === quoteDate || date === observedDate && needsConfirmedPrice || closingTime(date, market) > observed) continue;
+    if (prices.some(price => price.date === date)) continue;
+    prices.push({ date, price: bar.close, source, previous: NaN });
+    if (prices.length >= 3 || !printed && prices.length >= 2) break;
+  }
+  const [latest, previous] = prices.sort((a, b) => b.date.localeCompare(a.date));
+  if (!latest) return undefined;
+  return {
+    price: String(latest.price), asOf: latest.date, source: latest.source.replace('證交所即時', '證交所 MIS'),
+    previous: Number.isFinite(latest.previous) && latest.previous > 0 ? String(latest.previous) : previous ? String(previous.price) : null,
+  };
+}
 
 export async function loadHoldingsDirectory(): Promise<ImportSymbol[]> {
   const [entries, result] = await Promise.all([getHoldingsSymbolDirectory(), loadUniverse().catch(() => null)]);
@@ -33,25 +84,8 @@ export async function loadHoldingQuotes(
         const symbol = stocks[cursor++]!;
         try {
           const result = await getDailyBarResult(symbol);
-          if (signal.aborted || result.dataState === 'simulated') continue;
-          const profile = result.market ?? getMarketProfile(symbol);
-          const observed = Math.min(Date.now() / 1000, result.asOf ?? Date.now() / 1000);
-          const historySource = result.source.split(/ · 今日(?:來源|開高低／量)：/, 1)[0]!;
-          const overlay = historySource !== result.source ? result.quote : undefined;
-          const bars = result.bars
-            .filter((bar) => Number.isFinite(bar.close) && bar.close > 0 && barEndTime(bar.time, '1D', profile) <= observed
-              && (!overlay || sessionDate(overlay.asOf, profile) !== sessionDate(bar.time, profile) || overlay.asOf >= barEndTime(bar.time, '1D', profile)))
-            .sort((a, b) => a.time - b.time);
-          const latest = bars.at(-1);
-          if (!latest) continue;
-          const latestDate = sessionDate(latest.time, profile);
-          const previous = [...bars].reverse().find((bar) => sessionDate(bar.time, profile) < latestDate);
-          quotes[symbol] = {
-            price: String(latest.close),
-            previous: previous ? String(previous.close) : null,
-            asOf: latestDate,
-            source: overlay && sessionDate(overlay.asOf, profile) === latestDate ? overlay.source ?? historySource : historySource,
-          };
+          const close = holdingCloseQuote(symbol, result);
+          if (!signal.aborted && close) quotes[symbol] = close;
         } catch {
           /* Quote failures never reveal private inputs or replace a missing quote with zero. */
         }
