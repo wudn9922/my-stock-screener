@@ -41,5 +41,20 @@ jobs:
         with:
           name: alpaca-us-comparison-${{ github.run_id }}
           path: .cache/alpaca-comparison/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
+  notify-system-failure:
+    needs: [compare]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: '${{ github.workflow }} · 執行失敗／取消'
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
