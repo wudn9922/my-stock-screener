@@ -95,7 +95,7 @@ Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal�
 
 ### 保守本益比 AI 情境
 
-每日排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`。選股只讀 `docs/report/financials/*.json` 的所有檔名，由 W6 selector 決定適用性；超過 600 檔拒絕整次執行。此工作不讀取私有持股或自選清單，也不持有任何 Supabase 金鑰（ADR-031）。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，股票不再適用時保留舊報告但前端不顯示。
+每日排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`。選股只讀 `docs/report/financials/*.json` 的所有檔名，由 W6 selector 決定適用性；超過 600 檔拒絕整次執行。美股名稱優先使用已發布的公開 NasdaqTrader 股票目錄（缺漏才用 SEC）；此工作不讀取私有持股或自選清單，也不持有任何 Supabase 金鑰（ADR-031）。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，股票不再適用時保留舊報告但前端不顯示。
 
 每日 UTC 最多 30 檔（`CONSERVATIVE_PE_AI_LIMIT` 只能調低），基期相同的報告重用 14 天，前端 21 天過期；沒有報告優先，再來基期改變、最舊報告，同類別依最近嘗試日輪替防止無新聞股票阻塞。每檔和每次 provider POST 前各自預留並發布 `conservativePeAiBudget`，取消或重跑不退還，舊週預算保守轉換；Gemini 同時追蹤 Pacific 配額日期。Google News 間隔 2 秒，SEC 使用 `SEC_USER_AGENT` 每秒至多一次。
 
