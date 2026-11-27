@@ -578,97 +578,243 @@ def validate_selection(selected, allowed, current):
     return result
 
 
-def iso_week(current):
-    return current.strftime("%G-W%V")
+def empty_budget(current):
+    return dict(day=current.date().isoformat(), used=0, providers={}, windows={}, attempted={})
 
 
 def budget_state(path, current):
-    week = iso_week(current)
+    fresh = empty_budget(current)
+    day = fresh["day"]
     try:
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return dict(week=week, used=0, cursor=0)
-    if (not isinstance(value, dict) or set(value) != {"week", "used", "cursor"}
-            or not isinstance(value["week"], str) or not re.fullmatch(r"[0-9]{4}-W(?:0[1-9]|[1-4][0-9]|5[0-3])", value["week"])
-            or value["week"] > week or type(value["used"]) is not int or not 0 <= value["used"] <= WEEKLY_LIMIT
-            or type(value["cursor"]) is not int or value["cursor"] < 0):
-        raise Invalid("Weekly analysis budget unavailable")
-    return dict(week=week, used=value["used"] if week == value["week"] else 0, cursor=value["cursor"])
+        return fresh
+    if not isinstance(value, dict):
+        raise Invalid("Invalid analysis budget")
+    if set(value) == {"week", "used", "cursor"}:
+        week = current.strftime("%G-W%V")
+        if (not isinstance(value["week"], str) or not re.fullmatch(r"[0-9]{4}-W(?:0[1-9]|[1-4][0-9]|5[0-3])", value["week"])
+                or value["week"] > week or type(value["used"]) is not int or not 0 <= value["used"] <= LEGACY_WEEKLY_LIMIT
+                or type(value["cursor"]) is not int or value["cursor"] < 0):
+            raise Invalid("Invalid legacy budget")
+        # Exact day/provider usage unknown. Conservatively charge today's legacy allowance.
+        if value["week"] == week:
+            fresh["used"] = value["used"]
+            for row in load_providers():
+                if row["id"] in ("gemini-flash", "groq-qwen"):
+                    fresh["providers"][row["id"]] = value["used"]
+                    fresh["windows"][quota_key(row)] = dict(day=quota_day(row, current),
+                        used=value["used"], tokens=value["used"] * 8000)
+        return fresh
+
+    def count(n):
+        return type(n) is int and n >= 0
+
+    if (set(value) != set(fresh) or not date(value["day"]) or value["day"] > day
+            or not count(value["used"]) or value["used"] > DAILY_LIMIT
+            or not isinstance(value["providers"], dict) or not all(isinstance(k, str) and count(v) for k, v in value["providers"].items())
+            or not isinstance(value["attempted"], dict)
+            or not all(normalize(k) == k and date(v) and v <= day for k, v in value["attempted"].items())
+            or not isinstance(value["windows"], dict)):
+        raise Invalid("Invalid daily analysis budget")
+    for key, window in value["windows"].items():
+        if (not isinstance(key, str) or not isinstance(window, dict) or set(window) != {"day", "used", "tokens"}
+                or not date(window["day"]) or window["day"] > day or not count(window["used"]) or not count(window["tokens"])):
+            raise Invalid("Invalid provider quota window")
+    if value["day"] == day:
+        return value
+    fresh["attempted"] = {k: v for k, v in value["attempted"].items()
+                          if (current.date() - dt.date.fromisoformat(v)).days <= REFRESH_DAYS}
+    # Pacific quota can remain active after UTC midnight.
+    fresh["windows"] = {k: v for k, v in value["windows"].items()
+                        if (current.date() - dt.date.fromisoformat(v["day"])).days <= 1}
+    return fresh
 
 
-def plan_reports(public, selected, state, limit, output, current):
-    remaining = min(limit, WEEKLY_LIMIT - state["used"])
-    chosen = []
-    if remaining <= 0:
-        return chosen
-    for _ in public:
-        index = state["cursor"] % len(public)
-        symbol = public[index]
-        state["cursor"] = (index + 1) % len(public)
-        company = selected.get(symbol)
-        if company is None or recent(output / (symbol + ".json"), current, company["baseline"]):
+def analysis_limit(env):
+    return min(DAILY_LIMIT, max(0, int(env.get("CONSERVATIVE_PE_AI_LIMIT") or DAILY_LIMIT)))
+
+
+def plan_reports(selected, state, limit, output, current):
+    remaining = max(0, min(limit, DAILY_LIMIT) - state["used"])
+    candidates = []
+    for symbol, company in selected.items():
+        last_attempt = state["attempted"].get(symbol, "")
+        if last_attempt == state["day"]:
             continue
-        chosen.append(company)
-        if len(chosen) >= remaining:
-            break
-    state["used"] += len(chosen)
-    return chosen
-
-
-def refresh_reports(chosen, output, week, session, sec, providers):
-    attempted = written = failed = 0
-    for public in chosen:
-        current = now()
-        if iso_week(current) != week:
-            break
-        attempted += 1
+        path = output / (symbol + ".json")
+        if recent(path, current, company["baseline"]):
+            continue
         try:
-            public = dict(public, companyName=sec.company_name(public))
-            news = news_items(session, public["symbol"], public["market"], public["companyName"], current.date())
-            if not news:
-                raise Invalid("No recent evidence")
-            segments = sec.segments(public, current.date())
+            old = json.loads(path.read_text(encoding="utf-8"))
+            stamp = dt.datetime.fromisoformat(old["generatedAt"])
+            if stamp.tzinfo is None or stamp > current or old["version"] != 1:
+                raise ValueError("invalid report")
+            priority = 1 if old["baseline"] != company["baseline"] else 2
+            age = stamp.timestamp()
+        except (OSError, ValueError, KeyError, TypeError):
+            priority, age = 0, 0
+        # Rotate unreported stocks with no news rather than permanently starving later symbols.
+        candidates.append((priority, last_attempt, age, symbol, company))
+    candidates.sort(key=lambda row: row[:4])
+    return [row[4] for row in candidates[:remaining]]
+
+
+def publish_budget(state):
+    write_json(BUDGET, state)
+    subprocess.run([sys.executable, ROOT / "scripts/generated_branch.py", "publish", "conservativePeAiBudget"],
+                   cwd=ROOT, check=True, timeout=90)
+
+
+class NewsPacer:
+    def __init__(self, session, sleep=time.sleep, clock=time.monotonic):
+        self.session, self.sleep, self.clock, self.next = session, sleep, clock, 0
+
+    def get(self, *args, **kwargs):
+        self.sleep(max(0, self.next - self.clock()))
+        self.next = self.clock() + NEWS_INTERVAL
+        return self.session.get(*args, **kwargs)
+
+
+def evidence_for(public, session, sec, current):
+    try:
+        name = sec.company_name(public)
+    except (Invalid, KeyError):
+        raise Skipped("Public company name unavailable") from None
+    public = dict(public, companyName=name)
+    try:
+        news = news_items(session, public["symbol"], public["market"], name, current.date())
+    except Invalid:
+        raise Skipped("Public news unavailable") from None
+    if not news:
+        raise Skipped("No recent public evidence")
+    return public, news, sec.segments(public, current.date())
+
+
+def refresh_reports(chosen, output, state, session, sec, providers, publish, current=now):
+    counts = dict(attempted=0, written=0, skipped=0, failed=0)
+    for company in chosen:
+        try:
+            if not providers.available():
+                break
+            stamp = current()
+            if stamp.date().isoformat() != state["day"]:
+                break
+            state["used"] += 1
+            state["attempted"][company["symbol"]] = state["day"]
+            publish(state)  # Reserve the stock slot before any external request.
+            counts["attempted"] += 1
+            public, news, segments = evidence_for(company, session, sec, stamp)
             answer = providers.analyze(public, news, segments)
-            write_report(output / (public["symbol"] + ".json"), public, answer, current)
-            written += 1
+            write_report(output / (public["symbol"] + ".json"), public, answer, current())
+            counts["written"] += 1
+        except Skipped:
+            counts["skipped"] += 1
+        except Exhausted:
+            counts["failed"] += 1
+            break
+        except StopRun:
+            if counts["attempted"] > counts["written"] + counts["skipped"] + counts["failed"]:
+                counts["skipped"] += 1
+            break
         except (Invalid, Transient, requests.RequestException, ET.ParseError, KeyError, TypeError, ValueError):
-            failed += 1
-    return attempted, written, failed
+            counts["failed"] += 1
+    return counts
+
+
+def exceeds_failure_threshold(counts):
+    return counts["failed"] > FAILURE_THRESHOLD * counts["attempted"]
+
+
+def probe(selected, session, sec, providers, current=now):
+    keys = list(providers.rows)
+    chosen = sorted(selected)[:PROBE_COUNT]
+    totals = {key: dict(attempts=0, success=0, valid=0, seconds=0.) for key in keys}
+    table = ["| Symbol | " + " | ".join(keys) + " |", "|---|" + "---|" * len(keys)]
+    for symbol in chosen:
+        values = []
+        try:
+            public, news, segments = evidence_for(selected[symbol], session, sec, current())
+            prompt, sources = build_prompt(public, news, segments)
+        except (Skipped, Invalid, requests.RequestException, ET.ParseError, KeyError, TypeError, ValueError):
+            table.append("| " + symbol + " | " + " | ".join(["no public evidence"] * len(keys)) + " |")
+            continue
+        for key in keys:
+            started = providers.clock()
+            before = providers.used.get(key, 0)
+            try:
+                raw, _ = providers.call(key, prompt)
+                totals[key]["success"] += 1
+                answer = validate_answer(raw, sources, segments)
+                totals[key]["valid"] += 1
+                values.append(f'{answer["affectedEarningsRatio"]} / {answer["confidence"]}')
+            except (Invalid, Transient, StopRun):
+                values.append("unavailable / invalid")
+            finally:
+                attempts = providers.used.get(key, 0) - before
+                if attempts:
+                    totals[key]["attempts"] += attempts
+                    totals[key]["seconds"] += providers.clock() - started
+        table.append("| " + symbol + " | " + " | ".join(values) + " |")
+    lines = ["## Provider probe (no report/budget writes)", *table, "",
+             "| Provider | Requests | Responses | Valid | Avg seconds | Today incl. probe |",
+             "|---|---:|---:|---:|---:|---:|"]
+    for key, stat in totals.items():
+        average = stat["seconds"] / stat["attempts"] if stat["attempts"] else 0
+        lines.append(f'| {key} | {stat["attempts"]} | {stat["success"]} | {stat["valid"]} | {average:.1f} | {providers.state["providers"].get(key, 0)} |')
+    lines.append("Probe calls consume actual provider quota but are not persisted. Run at most once per day; avoid a normal run in the same provider quota window.")
+    return "\n".join(lines)
+
+
+def summary(env, content):
+    if path := env.get("GITHUB_STEP_SUMMARY"):
+        with open(path, "a", encoding="utf-8") as stream:
+            stream.write(content + "\n")
+    else:
+        print(content)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--selector", required=True)
+    parser.add_argument("--mode", choices=("normal", "probe"), default="normal")
     args = parser.parse_args()
     env = os.environ
     if env.get("CONSERVATIVE_PE_AI_ENABLED") != "1" or env.get("CONSERVATIVE_PE_AI_FREE_TIER") != "1":
         raise Invalid("Explicit free-tier analysis opt-in required")
-    public = public_symbols(env.get("CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS", ""))
-    cap = min(WEEKLY_LIMIT, max(0, int(env.get("CONSERVATIVE_PE_AI_LIMIT") or str(WEEKLY_LIMIT))))
-    session = requests.Session()
-    providers = Providers(session, env)
-    sec = SecSegments(session, env.get("SEC_USER_AGENT"))
-    # The explicit public allowlist is the only selection input. This job never reads
-    # private holdings or watchlists, so it needs no Supabase credential (ADR-031).
-    eligible = sorted(set(public))
-    selected = json.loads(subprocess.run(["node", args.selector], cwd=ROOT, input=json.dumps(eligible),
-                                        text=True, check=True, capture_output=True, timeout=120).stdout)
+    deadline = time.monotonic() + RUN_SECONDS
+    cap = analysis_limit(env)
+    # Only repository public financial records are read; no user data or Supabase key (ADR-031).
+    eligible = public_symbols(FINANCIALS)
+    raw = json.loads(subprocess.run(["node", args.selector], cwd=ROOT, input=json.dumps(eligible),
+                                    text=True, check=True, capture_output=True, timeout=120).stdout)
     current = now()
-    selected = validate_selection(selected, eligible, current)
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    selected = validate_selection(raw, set(eligible), current)
     state = budget_state(BUDGET, current)
-    chosen = plan_reports(public, selected, state, cap, OUTPUT, current)
-    if chosen:
-        # Reserve before sending any request. A retry, partial failure or canceled
-        # workflow cannot reclaim already reserved slots in the same UTC week.
-        write_json(BUDGET, state)
-        subprocess.run([sys.executable, ROOT / "scripts/generated_branch.py", "publish", "conservativePeAiBudget"],
-                       cwd=ROOT, check=True)
-    attempted, written, failed = refresh_reports(chosen, OUTPUT, state["week"], session, sec, providers)
-    print(f"Scenario analysis: attempted={attempted}, written={written}, unavailable={failed}")
+    session = requests.Session()
+    providers = Providers(session, env, state=state, publish=publish_budget if args.mode == "normal" else None,
+                          deadline=deadline)
+    sec = SecSegments(session, env.get("SEC_USER_AGENT"))
+    news_session = NewsPacer(session)
+    if args.mode == "probe":
+        summary(env, probe(selected, news_session, sec, providers))
+        return
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    chosen = plan_reports(selected, state, cap, OUTPUT, current)
+    counts = refresh_reports(chosen, OUTPUT, state, news_session, sec, providers, publish_budget)
+    missing = sum(not (OUTPUT / (symbol + ".json")).is_file() for symbol in selected)
+    content = ("## Conservative PE daily analysis\n"
+               f'Eligible: {len(selected)} | attempted: {counts["attempted"]} | analyzed: {counts["written"]} | '
+               f'skipped: {counts["skipped"]} | failed: {counts["failed"]} | missing reports: {missing}\n\n'
+               f'UTC slots reserved: {state["used"]}/{cap}\n\n'
+               "| Provider | Requests this run | Reserved today |\n|---|---:|---:|\n")
+    for key in providers.rows:
+        content += f'| {key} | {providers.used.get(key, 0)} | {state["providers"].get(key, 0)} |\n'
+    summary(env, content)
     if output := env.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:
-            stream.write(f"failed={failed}\n")
+            stream.write(f'failed={counts["failed"]}\n')
+            stream.write(f'failure_threshold_exceeded={str(exceeds_failure_threshold(counts)).lower()}\n')
 
 
 if __name__ == "__main__":
