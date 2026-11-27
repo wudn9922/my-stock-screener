@@ -19,7 +19,7 @@
     "daily_limit": 18,
     "min_interval_seconds": 15,
     "max_output_tokens": 4096,
-    "thinking_level": "MINIMAL"
+    "thinking_level": "LOW"
   },
   {
     "id": "groq-qwen",
@@ -41,6 +41,6 @@
     "daily_limit": 13,
     "min_interval_seconds": 15,
     "max_output_tokens": 1400,
-    "reasoning_effort": "none"
+    "reasoning_effort": "low"
   }
 ]
