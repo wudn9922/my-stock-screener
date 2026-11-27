@@ -57,8 +57,19 @@ const reasons = (preferences = emptyVisibility()) =>
   Object.fromEntries(rows.map((r) => [r.holding.symbol, hiddenReason(r.holding, r.account, r.result.value, preferences)]));
 
 describe('holdings visibility rules', () => {
-  it('shows everything by default', () => {
-    expect(Object.values(reasons())).toEqual([null, null, null, null, null]);
+  it('enables dust hiding with currency-specific defaults', () => {
+    expect(defaultRules('TWD').dust).toEqual({ enabled: true, threshold: '100' });
+    expect(defaultRules('USD').dust).toEqual({ enabled: true, threshold: '1' });
+    expect(defaultRules('USDT').dust).toEqual({ enabled: true, threshold: '1' });
+    expect(Object.values(reasons())).toEqual([null, 'dust', null, null, 'dust']);
+  });
+  it('preserves saved disabled and custom rules rather than applying defaults', () => {
+    let preferences = setRules(emptyVisibility(), tw.id, { dust: { enabled: false, threshold: '10' }, hideUsdt: false });
+    preferences = setRules(preferences, mexc.id, { dust: { enabled: true, threshold: '0.001' }, hideUsdt: false });
+    const restored = validateVisibility(JSON.parse(JSON.stringify(preferences)));
+    expect(restored).toEqual(preferences);
+    expect(reasons(restored)['2330.TW']).toBeNull();
+    expect(reasons(restored)['PEPE/USDT']).toBeNull();
   });
   it('hides dust strictly below the threshold in the account currency, never a holding without a price', () => {
     const preferences = setRules(emptyVisibility(), mexc.id, { dust: { enabled: true, threshold: '10' }, hideUsdt: false });
@@ -67,8 +78,8 @@ describe('holdings visibility rules', () => {
       'PEPE/USDT': 'dust',
       'USDT/USDT': null,
       'RARE/USDT': null,
-      // The TW account has its own (default, off) rules: 5 TWD is not hidden.
-      '2330.TW': null,
+      // The TW account defaults to hiding values below 100 TWD.
+      '2330.TW': 'dust',
     });
     const exact = setRules(emptyVisibility(), mexc.id, { dust: { enabled: true, threshold: '0.003' }, hideUsdt: false });
     expect(reasons(exact)['PEPE/USDT']).toBeNull();
@@ -104,7 +115,7 @@ describe('holdings visibility rules', () => {
       holdingKey(mexc.id, 'BTC/USDT'),
     );
     const visible = rows.filter((r) => hiddenReason(r.holding, r.account, r.result.value, preferences) === null);
-    expect(visible.map((r) => r.holding.symbol)).toEqual(['RARE/USDT', '2330.TW']);
+    expect(visible.map((r) => r.holding.symbol)).toEqual(['RARE/USDT']);
     const totals = summarizeHoldings(visible, []);
     expect(totals.currencies.get('USDT')!.value.toString()).toBe('0');
     expect(totals.currencies.get('USDT')!.missing).toBe(1);

@@ -69,6 +69,7 @@ export function HoldingPosition({
           <span className="holding-number">
             <small>數量</small>
             <span>{quantity}</span>
+            <small title={holding.averageCost}>均價 {formatHoldingPrice(holding.averageCost)}</small>
           </span>
           <span className="holding-number">
             <small>市值</small>
