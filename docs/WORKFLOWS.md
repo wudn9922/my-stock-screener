@@ -30,7 +30,7 @@ Daily Stock Screener、Atlas Research Terminal、Financial Statement History、O
 | [`market-calendar.yml`](../.github/workflows/market-calendar.yml) | Market trading calendar | 定期資料更新 | cron `20 0 * * *`（每日 08:20）；手動 | 產生並發布未來台美股交易日曆。 | 是 |
 | [`market-extras.yml`](../.github/workflows/market-extras.yml) | IPO and extended quotes | 定期資料更新 | cron `41 12,13,21,22,1 * * 1-6`（週一～週六 09:41、20:41、21:41，週二～週日 05:41、06:41）；手動 | 在美股交易日更新 IPO 和盤前盤後報價快照。 | 是 |
 | [`warrant-data.yml`](../.github/workflows/warrant-data.yml) | Taiwan warrant data | 定期資料更新 | 每日 20:24（台北時間）、手動、PR 驗證 | 讀取 TWSE、TPEx 與 MOPS，按標的產出權證清單。使用 generated 分支的 `warrants` owner 發布。 | 是（發布工作） |
-| [`conservative-pe-ai.yml`](../.github/workflows/conservative-pe-ai.yml) | Conservative PE AI | 定期資料更新 | 週日 10:35（台北）、手動、PR 驗證 | 只在明確啟用時產生公開 owner 的市場擔憂情境。 | 是（發布工作） |
+| [`conservative-pe-ai.yml`](../.github/workflows/conservative-pe-ai.yml) | Conservative PE AI | 定期資料更新 | 週日 10:35（台北）、手動、PR 驗證 | 只在明確啟用時，為明確列出的公開代號產生市場擔憂情境。 | 是（發布工作） |
 | [`refresh-us-rates.yml`](../.github/workflows/refresh-us-rates.yml) | Refresh US Rates | 定期資料更新 | push `main` 的 `.github/workflows/refresh-us-rates.yml`、`scripts/build_rates.py`、`scripts/rates_analytics.py`、`scripts/rates_config.py`、`tests/test_rates.py`、`scripts/build_bond_research.py`、`tests/test_bond_research.py`、`atlas/data/yield-band-params.json`；手動 | 重建美國公債利率與債券研究報告。 | 是 |
 | [`research-data.yml`](../.github/workflows/research-data.yml) | Research public data | 定期資料更新 | cron `23 11 * * 1-5`（週一～週五 19:23）、`23 5 * * 2-6`（週二～週六 13:23）；push `main` 的 `scripts/*research*.py`、`scripts/build_sec_radar.py`、`scripts/build_world_assets.py`、`.github/workflows/research-data.yml`；手動 | 更新法人動向、成交量、警示、全球資產與 SEC 研究資料。 | 是 |
 | [`tw-chips.yml`](../.github/workflows/tw-chips.yml) | Taiwan Chips | 定期資料更新 | cron `41 11 * * 1-5`（週一～週五 19:41）；手動 | 更新台股籌碼資料，包含外資持股。 | 是 |
@@ -95,7 +95,7 @@ Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal�
 
 ### 保守本益比 AI 情境
 
-週排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`，並以 `CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS` 明確列出同意發布的代號（逗號或空白分隔）。`ADMIN_LINE_USER_ID`、`SUPABASE_USER_ID` 與 Supabase 的 `atlas_storage_owner_id()` 必須一致，且 owner 需有明示的 `cloud` 授權。私有持股與自選只用來選取已允許公開的股票。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，移除代號或停用排程後，既有報告和 Git 歷史仍可能可見。
+週排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`，並以 `CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS` 明確列出同意發布的代號（逗號或空白分隔）。這份清單就是唯一的選股來源：此工作不讀取私有持股或自選清單，也不持有任何 Supabase 金鑰（ADR-031）。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，移除代號或停用排程後，既有報告和 Git 歷史仍可能可見。
 
 僅使用已確認提供免費層的 `gemini-3.8-flash` 和 `qwen/qwen3.8-27b`。設定 `CONSERVATIVE_PE_AI_FREE_TIER=1` 前，請確認兩個提供者專案的金鑰均屬免費層且未啟用付費。API 金鑰無法查證帳務層級。使用既有 `SEC_USER_AGENT` 讀取官方財報。429、503、逾時或網路錯誤才會使用一次備援，提供者各自遵守 `Retry-After`。每 UTC ISO 週最多預留 20 檔，`CONSERVATIVE_PE_AI_LIMIT` 可調低。輪替游標從上次的位置繼續，基期相同的報告可重用七天。預留額度先寫入 generated owner `conservativePeAiBudget`，只保留週次、用量及游標，避免中斷或重跑超額。
 

@@ -67,59 +67,6 @@ def normalize(raw):
     return value if SYMBOL.fullmatch(value) else None
 
 
-class AccountSelection:
-    """Only the explicitly configured public report owner; no other account may be published."""
-    def __init__(self, env, session):
-        self.session = session
-        self.base = env.get("SUPABASE_URL", "").rstrip("/")
-        self.owner = env.get("SUPABASE_USER_ID", "")
-        key = env.get("SUPABASE_SERVICE_ROLE_KEY", "")
-        if not https(self.base) or not key or not re.fullmatch(r"U[0-9a-f]{32}", self.owner) or self.owner != env.get("ADMIN_LINE_USER_ID"):
-            raise Invalid("Public-owner configuration missing or mismatched")
-        self.headers = {"apikey": key, "Accept": "application/json"}
-        if key.startswith("eyJ"):
-            self.headers["Authorization"] = "Bearer " + key
-        if not self.base.endswith("/rest/v1"):
-            self.base += "/rest/v1"
-
-    def rows(self, table, fields, **filters):
-        rows = []
-        for page in range(50):
-            params = dict(select=fields, line_user_id="eq." + self.owner, limit=1000, offset=page * 1000, **filters)
-            response = self.session.get(self.base + "/" + table, headers=self.headers, params=params, timeout=25, allow_redirects=False)
-            if response.status_code != 200:
-                raise Invalid("Account selection unavailable")
-            batch = response.json()
-            if not isinstance(batch, list) or any(not isinstance(x, dict) or x.get("line_user_id") != self.owner for x in batch):
-                raise Invalid("Account selection owner mismatch")
-            rows.extend(batch)
-            if len(batch) < 1000:
-                return rows
-        raise Invalid("Account selection exceeds page limit")
-
-    def require_cloud(self):
-        rows = self.rows("atlas_storage_access", "line_user_id,storage_mode")
-        if len(rows) != 1 or rows[0].get("storage_mode") != "cloud":
-            raise Invalid("Explicit owner cloud permission required")
-
-    def symbols(self):
-        result = self.session.post(self.base + "/rpc/atlas_storage_owner_id", headers=self.headers,
-                                   json={}, timeout=25, allow_redirects=False)
-        if result.status_code != 200 or result.json() != self.owner:
-            raise Invalid("Configured account does not match the database owner")
-        self.require_cloud()
-        raw = [row.get("symbol") for row in self.rows("atlas_holdings", "line_user_id,symbol", market="in.(TW,US)", order="symbol.asc,account_id.asc,id.asc")]
-        for row in self.rows("atlas_watchlists", "line_user_id,kind:definition->>kind,symbols:definition->symbols,members:definition->history->-1->members", order="id.asc"):
-            if row.get("kind") == "manual" and isinstance(row.get("symbols"), list):
-                raw.extend(row["symbols"])
-            elif row.get("kind") == "rules" and isinstance(row.get("members"), list):
-                raw.extend(member.get("symbol") for member in row["members"] if isinstance(member, dict))
-            elif row.get("kind") != "rules" or row.get("members") is not None:
-                raise Invalid("Watchlist definition unavailable")
-        self.require_cloud()
-        return sorted({symbol for value in raw if (symbol := normalize(value))})
-
-
 def company_term(name):
     name = re.sub(r"\s+/[A-Z]{2}/$", "", name.strip())
     name = re.sub(r"(?i)[ ,.]+(?:inc(?:orporated)?|corporation|corp|plc|limited|ltd|co)\.?$", "", name.strip())
@@ -527,13 +474,12 @@ def plan_reports(public, selected, state, limit, output, current):
     return chosen
 
 
-def refresh_reports(chosen, output, week, session, selection, sec, providers):
+def refresh_reports(chosen, output, week, session, sec, providers):
     attempted = written = failed = 0
     for public in chosen:
         current = now()
         if iso_week(current) != week:
             break
-        selection.require_cloud()
         attempted += 1
         try:
             public = dict(public, companyName=sec.company_name(public))
@@ -546,7 +492,6 @@ def refresh_reports(chosen, output, week, session, selection, sec, providers):
             written += 1
         except (Invalid, Transient, requests.RequestException, ET.ParseError, KeyError, TypeError, ValueError):
             failed += 1
-    selection.require_cloud()
     return attempted, written, failed
 
 
@@ -560,10 +505,11 @@ def main():
     public = public_symbols(env.get("CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS", ""))
     cap = min(WEEKLY_LIMIT, max(0, int(env.get("CONSERVATIVE_PE_AI_LIMIT") or str(WEEKLY_LIMIT))))
     session = requests.Session()
-    selection = AccountSelection(env, session)
     providers = Providers(session, env)
     sec = SecSegments(session, env.get("SEC_USER_AGENT"))
-    eligible = sorted(set(public).intersection(selection.symbols()))
+    # The explicit public allowlist is the only selection input. This job never reads
+    # private holdings or watchlists, so it needs no Supabase credential (ADR-031).
+    eligible = sorted(set(public))
     selected = json.loads(subprocess.run(["node", args.selector], cwd=ROOT, input=json.dumps(eligible),
                                         text=True, check=True, capture_output=True, timeout=120).stdout)
     current = now()
@@ -577,7 +523,7 @@ def main():
         write_json(BUDGET, state)
         subprocess.run([sys.executable, ROOT / "scripts/generated_branch.py", "publish", "conservativePeAiBudget"],
                        cwd=ROOT, check=True)
-    attempted, written, failed = refresh_reports(chosen, OUTPUT, state["week"], session, selection, sec, providers)
+    attempted, written, failed = refresh_reports(chosen, OUTPUT, state["week"], session, sec, providers)
     print(f"Scenario analysis: attempted={attempted}, written={written}, unavailable={failed}")
     if output := env.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:

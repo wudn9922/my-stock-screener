@@ -156,7 +156,7 @@ class ScenarioTests(unittest.TestCase):
                 m.budget_state(state_file, next_week)
 
     def test_partial_failure_preserves_valid_output(self):
-        selection, sec, providers = Mock(), Mock(), Mock()
+        sec, providers = Mock(), Mock()
         sec.company_name.return_value = PUBLIC["companyName"]
         sec.segments.return_value = SEGMENTS
         good = dict(m.validate_answer(json.dumps(ANSWER), NEWS, SEGMENTS), provider="gemini", model=m.GEMINI_MODEL)
@@ -164,53 +164,11 @@ class ScenarioTests(unittest.TestCase):
         with TemporaryDirectory() as directory, patch.object(m, "now", return_value=NOW), patch.object(m, "news_items", return_value=NEWS):
             output = Path(directory)
             self.assertEqual(m.refresh_reports([PUBLIC, dict(PUBLIC, symbol="OTHER")], output, m.iso_week(NOW),
-                                               Mock(), selection, sec, providers), (2, 1, 1))
+                                               Mock(), sec, providers), (2, 1, 1))
             self.assertEqual([p.name for p in output.iterdir()], ["OTHER.json"])
-            self.assertEqual(selection.require_cloud.call_count, 3)
 
 
 class InputTests(unittest.TestCase):
-    def setUp(self):
-        self.owner = "U" + "a"*32
-        self.env = {"SUPABASE_URL": "https://example.com", "SUPABASE_USER_ID": self.owner,
-                    "ADMIN_LINE_USER_ID": self.owner, "SUPABASE_SERVICE_ROLE_KEY": "fake"}
-
-    def test_owner_scoped_minimal_projections_and_explicit_cloud_permission(self):
-        session = Mock()
-        session.post.return_value = response(payload=self.owner)
-        grant = response(payload=[dict(line_user_id=self.owner, storage_mode="cloud")])
-        session.get.side_effect = [grant, response(payload=[dict(line_user_id=self.owner, symbol="aapl")]),
-                                   response(payload=[dict(line_user_id=self.owner, kind="manual", symbols=["2330.TW"]),
-                                                     dict(line_user_id=self.owner, kind="rules", members=[dict(symbol="MSFT", name="x")])]),
-                                   grant]
-        selection = m.AccountSelection(self.env, session)
-        self.assertEqual(selection.symbols(), ["2330.TW", "AAPL", "MSFT"])
-        queries = [entry.kwargs["params"] for entry in session.get.call_args_list]
-        self.assertTrue(all(item["line_user_id"] == "eq." + self.owner for item in queries))
-        self.assertEqual(queries[1]["select"], "line_user_id,symbol")
-        self.assertIn("definition->history->-1->members", queries[2]["select"])
-        self.assertTrue(session.post.call_args.args[0].endswith("/rpc/atlas_storage_owner_id"))
-        session.get.side_effect = [response(payload=[dict(line_user_id=self.owner, storage_mode="device")])]
-        with self.assertRaises(m.Invalid):
-            selection.symbols()
-
-    def test_mismatched_config_and_foreign_row_fail_closed(self):
-        session = Mock()
-        other = "U" + "b"*32
-        with self.assertRaises(m.Invalid):
-            m.AccountSelection(dict(self.env, ADMIN_LINE_USER_ID=other), session)
-        session.get.assert_not_called()
-        selection = m.AccountSelection(self.env, session)
-        session.get.return_value = response(payload=[dict(line_user_id=other, storage_mode="cloud")])
-        session.post.return_value = response(payload=other)
-        with self.assertRaises(m.Invalid):
-            selection.symbols()
-        session.get.assert_not_called()
-        session.post.return_value = response(payload=self.owner)
-        with self.assertRaises(m.Invalid):
-            selection.symbols()
-        session.get.assert_called_once()
-
     def test_public_allowlist_and_w6_baseline_contract(self):
         self.assertEqual(m.public_symbols("aapl, 2330.tw BRK.B\n"), ["2330.TW", "AAPL", "BRK-B"])
         for value in ("", "INVALID/../FILE"):
