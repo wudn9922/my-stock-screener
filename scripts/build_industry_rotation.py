@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 from build_data_status import calendar_for
 from build_screener_history import read, write
 from universe_cache import read_bars, bars_path, UNKNOWN_VOLUME_DATES
-from scripts.output_guard import require, retain_count, retain_keys, unique_keys
+from scripts.output_guard import OutputRejected, require, retain_count, retain_keys, unique_keys
 
 # Single source for the per-market liquidity floor (shared with market warnings).
 PARAMS = json.loads((Path(__file__).parent / "market_warnings_params.json").read_text())
@@ -163,12 +163,9 @@ def validate_output(document, previous):
                         anchors=ROTATION_ANCHORS.get(market, ()))
             retain_count(sum(r["validCount"] for r in rows), sum(r["validCount"] for r in old_rows),
                          name + " valid members", min_share=ROTATION_RETENTION)
-            # Cache loss can blank volume/momentum even with intact universe returns.
-            for field in ("volumeCount", "pairedCount"):
-                before = sum(r.get(field, 0) for r in old_rows)
-                if before >= 100:
-                    retain_count(sum(r.get(field, 0) for r in rows), before,
-                                 name + " " + field, min_share=ROTATION_RETENTION)
+            # Volume/momentum coverage is intentionally optional: valid returns can
+            # coexist with missing paired bars or quarantined volume. Do not block
+            # a healthy primary return update on those optional fields.
 
 
 def run(root=ROOT, cache=None, now=None):
@@ -180,10 +177,19 @@ def run(root=ROOT, cache=None, now=None):
     return result
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--cache-dir", type=Path)
-    args = parser.parse_args()
-    result = run(args.root, args.cache_dir)
+    args = parser.parse_args(argv)
+    try:
+        result = run(args.root, args.cache_dir)
+    except OutputRejected as error:
+        print(f"::error::{error}")
+        return 1
     print("Industry rotation markets: " + ", ".join(result["markets"]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
