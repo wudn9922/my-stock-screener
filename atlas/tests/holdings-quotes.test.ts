@@ -45,6 +45,10 @@ describe('holdings quote boundary', () => {
     expect(h.calls).toEqual(['AAPL']);
     expect(result.quotes.AAPL).toEqual({ price: '105', previous: '100', asOf: '2026-10-28', source: 'real-provider' });
   });
+  it('does not label a forming daily bar as a closing price', async () => {
+    h.result.asOf = Date.parse('2026-10-28T15:00:00Z') / 1000;
+    expect((await loadHoldingQuotes(['AAPL'], new AbortController().signal)).quotes.AAPL).toMatchObject({ price: '100', asOf: '2026-10-27' });
+  });
   it('leaves missing and simulated quotes unavailable', async () => {
     h.result.dataState = 'simulated';
     expect((await loadHoldingQuotes(['AAPL'], new AbortController().signal)).quotes).toEqual({});
