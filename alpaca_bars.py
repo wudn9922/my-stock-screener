@@ -1,6 +1,7 @@
 """Optional SIP daily-bar fallback. No credentials means no HTTP."""
 from datetime import date, datetime, time as day_time, timedelta, timezone
 import os
+import math
 import re
 import threading
 import time
@@ -23,6 +24,8 @@ def enabled():
 
 def alpaca_symbol(symbol):
     if not isinstance(symbol, str) or not re.fullmatch(r"[A-Z][A-Z0-9]{0,5}(?:-[A-Z])?", symbol):
+        return None
+    if symbol.startswith(("CMD-", "FX-")):
         return None
     return symbol.replace("-", ".")
 
@@ -57,7 +60,7 @@ def _request(params):
                                  - datetime.now(timezone.utc)).total_seconds()
                     except (TypeError, ValueError, KeyError):
                         delay = 1
-                time.sleep(max(0.35, delay))
+                time.sleep(max(0.35, delay) if math.isfinite(delay) else 1)
                 continue
             response.raise_for_status()
             payload = response.json()
@@ -109,7 +112,7 @@ def prefetch(symbols, start, end):
                     bars = payload.get("bars") or {}
                     if not isinstance(bars, dict):
                         return None
-                    source = URL + "?" + urlencode(params)
+                    source = URL + "?" + urlencode({k: v for k, v in params.items() if k != "page_token"})
                     fetched = utcnow()
                     for name, entries in bars.items():
                         if name not in chunk:
