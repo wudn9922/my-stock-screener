@@ -19,6 +19,8 @@ on:
       - 'atlas/src/fundamentals/conservativePe*.ts'
       - '.github/workflows/conservative-pe-ai.yml'
       - '.github/generated-paths.json'
+      - 'scripts/generated_branch.py'
+      - 'tests/test_generated_branch.py'
 env:
   GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
 permissions:
@@ -54,6 +56,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - run: echo "CONSERVATIVE_PE_AI_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -83,7 +86,7 @@ jobs:
           CONSERVATIVE_PE_AI_ENABLED: ${{ vars.CONSERVATIVE_PE_AI_ENABLED }}
           CONSERVATIVE_PE_AI_FREE_TIER: ${{ vars.CONSERVATIVE_PE_AI_FREE_TIER }}
       - name: Publish completed reports even after a partial failure
-        if: always() && !cancelled() && inputs.mode != 'probe' && steps.analyze.outcome != 'skipped'
+        if: always() && !cancelled() && inputs.mode != 'probe' && steps.analyze.outputs.publish_reports == 'true'
         run: python scripts/generated_branch.py publish conservativePeAi
       - name: Report partial analysis failure after publishing successful results
         if: always() && !cancelled() && steps.analyze.outputs.failure_threshold_exceeded == 'true'
