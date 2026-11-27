@@ -101,6 +101,29 @@ class GeneratedStorageTests(unittest.TestCase):
             self.store.assemble(self.base, self.seed, b)
             self.assertEqual(gb.digest_tree(a), gb.digest_tree(b))
 
+    def test_conservative_pe_reserves_before_reports_and_assembles_partial_results(self):
+        budget = "docs/report/conservative-pe-budget.json"
+        report = "docs/report/conservative-pe/AAPL.json"
+        budget_bytes = b'{"week":"2026-W48","used":2,"cursor":2}'
+        self.write(budget, budget_bytes)
+        self.write("docs/internal-private.txt", b"unrelated local file")
+        self.store.publish("conservativePeAiBudget")
+        budget_tip = self.remote("generated")
+        self.assertEqual(self.body(budget_tip, budget), budget_bytes)
+        self.assertNotIn(report, self.store.entries(budget_tip))
+
+        self.write(report, b'{"version":1,"symbol":"AAPL"}')
+        self.store.publish("conservativePeAi")
+        tip = self.remote("generated")
+        self.assertEqual(self.body(tip, budget), budget_bytes)
+        self.assertEqual(self.remote("main"), self.base)
+        self.assertNotIn("docs/internal-private.txt", self.store.entries(tip))
+        assembled = Path(self.temp.name) / "site"
+        self.store.assemble(self.base, tip, assembled)
+        self.assertEqual((assembled / "report/conservative-pe/AAPL.json").read_bytes(), self.body(tip, report))
+        self.assertEqual((assembled / "report/conservative-pe-budget.json").read_bytes(), budget_bytes)
+        self.assertFalse((assembled / "internal-private.txt").exists())
+
     def test_world_candle_records_stay_on_main_and_report_is_overwritten_on_generated(self):
         self.write("data/world/CMD-WTI.csv", b"Date,Open,High,Low,Close,Volume\n2026-10-21,1,3,0,2,100\n")
         self.write("docs/report/research/world-assets.json", b'{"version":1}')

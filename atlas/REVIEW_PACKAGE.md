@@ -13,6 +13,9 @@ Primary self-review. Official reference releases and MIS order-book replay, with
 ## 2026-11-25 Screener EPS pill
 Primary self-review. 103 related Vitest cases, 123 Python tests, lint and build passed.
 
+## 2026-11-27 Conservative PE AI
+Primary self-review. Verified public evidence, owner-only REST, free-tier opt-in, partial publication and weekly rotation. [390px iPhone WebKit screenshot with test data](docs/screenshots/conservative-pe-ai-390.png)
+
 ## 2026-11-24 Chart loupe and opening quote
 Primary self-review. 85 related Vitest cases, 9 mobile Playwright regressions, lint and build passed.
 

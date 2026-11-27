@@ -22,6 +22,8 @@
       "docs/report/breakouts-archive/*.json"
     ],
     "marketExtras": ["docs/report/ipo-watch.json", "docs/report/extended-quotes/*.json"],
+    "conservativePeAi": ["docs/report/conservative-pe/*.json"],
+    "conservativePeAiBudget": ["docs/report/conservative-pe-budget.json"],
     "warrants": ["docs/report/warrants/*.json"],
     "research": ["docs/report/research/**"],
     "chips": ["docs/report/tw-chips.json"],
