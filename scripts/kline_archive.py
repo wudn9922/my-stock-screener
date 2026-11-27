@@ -1207,28 +1207,30 @@ SCALE_REPAIR_REASON = "scale-outlier-corrected"
 
 
 def _validate_scale_changes(symbol, baseline_rows, entries):
-    positions = {row[0]: i for i, row in enumerate(baseline_rows)}
+    groups = ki.validate_scale_run_groups([row[0] for row in baseline_rows], entries)
     replacements = {}
-    for item in entries:
-        day = item["date"]
-        i = positions.get(day, -1)
-        if i <= 0 or i >= len(baseline_rows) - 1 or day in replacements:
-            raise ValueError("Invalid scale correction date")
-        previous, current, following = baseline_rows[i-1:i+2]
-        if tuple(item["old"]) != current:
-            raise ValueError("Scale correction old row mismatch")
-        new = normalize(item["new"])
-        if new[0] != day or new == current:
-            raise ValueError("Invalid scale correction replacement")
-        failure = ki.scale_replacement_reason(values(previous), values(current), values(following), values(new))
+    from urllib.parse import urlparse
+    for start, end, group in groups:
+        previous, *currents, following = baseline_rows[start-1:end+2]
+        a, b = values(previous), values(following)
+        failure = ki.scale_run_original_reason(a, [values(row) for row in currents], b)
         if failure:
             raise ValueError("Scale correction rejected: " + failure)
-        from urllib.parse import urlparse
-        host = urlparse(item["sourceUrl"]).hostname
-        allowed = ("data.alpaca.markets",) if market_of(symbol) == "us" else ("www.twse.com.tw", "www.tpex.org.tw")
-        if market_of(symbol) not in ("us", "tw") or host not in allowed or not item.get("fetchedAt"):
-            raise ValueError("Invalid independent scale correction source")
-        replacements[day] = new
+        for current, item in zip(currents, group):
+            day = item["date"]
+            if tuple(item["old"]) != current:
+                raise ValueError("Scale correction old row mismatch")
+            new = normalize(item["new"])
+            if new[0] != day or new == current:
+                raise ValueError("Invalid scale correction replacement")
+            failure = ki.scale_source_reason(a, b, values(new))
+            if failure:
+                raise ValueError("Scale correction rejected: " + failure)
+            host = urlparse(item["sourceUrl"]).hostname
+            allowed = ("data.alpaca.markets",) if market_of(symbol) == "us" else ("www.twse.com.tw", "www.tpex.org.tw")
+            if market_of(symbol) not in ("us", "tw") or host not in allowed or not item.get("fetchedAt"):
+                raise ValueError("Invalid independent scale correction source")
+            replacements[day] = new
     return replacements
 
 
@@ -1375,6 +1377,7 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
     needed = {name: old_tree[name] for names in changed.values() for name in names if name in old_tree}
     needed.update({old_last[symbol]: old_tree[old_last[symbol]] for symbol in changed if symbol in old_last})
     scale_symbols = {name.split("/")[1] for name in scale_audit}
+    scale_replacements = {}
     needed.update({name: blob for name, blob in old_tree.items() if name.split("/")[1] in scale_symbols})
     stats = {}
     active_symbol, last_name, last_rows, last_hash, last = None, None, [], None, ""
@@ -1410,9 +1413,16 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                         or not entries or edge["new"]["rowsChanged"] != len(entries)
                         or any(item["date"][:4] != path.stem for item in entries)):
                     raise ValueError("Scale correction audit does not match exact file transition")
-                full = [row for other in sorted(old_tree) if other.split("/")[1] == symbol
-                        for row in baseline(other)[0]]
-                replacements = _validate_scale_changes(symbol, full, entries)
+                # Validate a cross-year run once against the original symbol,
+                # including every annual audit entry, not one year's fragment.
+                if symbol not in scale_replacements:
+                    full = [row for other in sorted(old_tree) if other.split("/")[1] == symbol
+                            for row in baseline(other)[0]]
+                    all_entries = [item for other, audits in scale_audit.items()
+                                   if other.split("/")[1] == symbol
+                                   for audit in audits for item in audit["entries"]]
+                    scale_replacements[symbol] = _validate_scale_changes(symbol, full, all_entries)
+                replacements = scale_replacements[symbol]
                 if rows != [replacements.get(row[0], row) for row in old_rows]:
                     raise ValueError("Scale correction touched unlisted dates or values")
                 continue
