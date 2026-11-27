@@ -59,6 +59,10 @@ def snapshot_cohorts(snapshot, market, stamp):
     require(required <= set(fields), LABEL, "snapshot missing preset columns")
     rows = [dict(zip(fields, row)) for row in source["rows"]]
     require(bool(rows), LABEL, "empty full universe")
+    counts = source.get("counts")
+    if counts is not None:
+        require(counts["rows"] == len(rows) and counts["listed"] >= len(rows)
+                and len(rows) >= .5 * counts["listed"], LABEL, "full universe count mismatch or insufficient coverage")
     unique_keys((row.get("symbol") for row in rows), LABEL)
     current = {row["symbol"]: row for row in rows if row.get("asOf") == stamp
                and positive(row.get("close")) and valid_symbol(row["symbol"], market)}
@@ -111,6 +115,7 @@ def capture(root):
                     staged.append((paths[kind], {"version": 1, "market": market, "signalType": kind,
                                                 "triggerDate": stamp, "rows": rows}))
     for path, value in staged:
+        require(not path.exists(), LABEL, f"signal shard already exists: {path.name}")
         write(path, value)
     return len(staged)
 
