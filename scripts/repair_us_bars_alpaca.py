@@ -193,11 +193,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-dir", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--report", type=Path, help="Optional JSON artifact outside permanent data")
     args = parser.parse_args()
     report = run(ROOT, args.archive_dir, args.apply)
     print(markdown(report))
-    print("<!-- Full report follows in JSON -->")
-    print(json.dumps(report, allow_nan=False))
+    if args.report:
+        args.report.write_text(json.dumps(report, allow_nan=False, indent=2) + "\n")
 
 
 if __name__ == "__main__":
