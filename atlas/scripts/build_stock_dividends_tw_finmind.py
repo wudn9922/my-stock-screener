@@ -47,6 +47,8 @@ def due(document, today, name="stockDividends"):
 def apply_block(path, document, name, new, source):
     """Writes block `name` (only when its events, source or check day changed) → ('written' | 'unchanged', document)."""
     old = document.get(name)
+    if name == "stockDividends" and isinstance(old, dict) and "cashEvents" in old and "cashEvents" not in new:
+        new = {**new, "cashEvents": old["cashEvents"]}
     if isinstance(old, dict) and old.get("events") == new["events"] and old.get("source") == source and old.get("checked") == new["checked"] and old.get("cashEvents") == new.get("cashEvents"):
         return "unchanged", document
     document = dict(document)
@@ -198,7 +200,9 @@ def run(args, http=None, sleep=time.sleep, clock=time.monotonic, log=print, toda
                 continue
             if name == "stockDividends":
                 block = div.block(div.parse_events(answers[0]), today.isoformat())
-                block["cashEvents"] = div.parse_cash_events(answers[0])
+                cash_fields = {"CashExDividendTradingDate", "CashEarningsDistribution", "CashStatutorySurplus"}
+                if answers[0] and all(cash_fields <= set(row) for row in answers[0]):
+                    block["cashEvents"] = div.parse_cash_events(answers[0])
                 store(path, name, block, div.SOURCE)
             else:
                 events = splits.parse_events(answers[0], par_rows.get(code.upper(), []), code, log)
