@@ -34,6 +34,7 @@ LEGACY_WEEKLY_LIMIT = 20
 MAX_PROMPT_BYTES = 6200
 CHAT_OVERHEAD_TOKENS = 128
 GROQ_DAILY_TOKENS = 200_000
+GROQ_MINUTE_TOKENS = 8_000
 NEWS_INTERVAL = 2
 RUN_SECONDS = 45 * 60
 MIN_REMAINING = 180
@@ -368,7 +369,7 @@ def provider_available(state, row, current, prompt=None):
         return False
     if row["secret"] == "GROQ_API_KEY":
         needed = request_tokens(row, prompt) if prompt is not None else CHAT_OVERHEAD_TOKENS + row.get("max_output_tokens", 1400)
-        if needed > 8000 or usage["tokens"] + needed > GROQ_DAILY_TOKENS:
+        if needed > GROQ_MINUTE_TOKENS or usage["tokens"] + needed > GROQ_DAILY_TOKENS:
             return False
     return True
 
@@ -421,6 +422,7 @@ class Providers:
         self.publish = publish or (lambda state: None)
         self.deadline = deadline if deadline is not None else clock() + RUN_SECONDS
         self.next = {}
+        self.latency = {}
         self.disabled = set()
         self.rows = {}
         self.used = {}
@@ -475,11 +477,14 @@ class Providers:
         reserve_provider(self.state, row, self.current(), prompt, self.publish)
         self.used[provider] = self.used.get(provider, 0) + 1
         self.next[provider] = self.clock() + row["min_interval_seconds"]
+        started = self.clock()
         try:
             response = self.session.post(url, json=body, headers=headers, timeout=90, allow_redirects=False)
         except requests.RequestException:
             self.disabled.add(provider)
             raise Transient("Provider connection unavailable") from None
+        finally:
+            self.latency[provider] = self.clock() - started
         # 429 can mean a daily quota or zero availability. Do not retry each stock.
         if response.status_code != 200:
             self.disabled.add(provider)
@@ -550,8 +555,10 @@ def public_symbols(directory=FINANCIALS):
 
 
 def validate_selection(selected, allowed, current):
-    if not isinstance(selected, list) or len(selected) > MAX_ELIGIBLE:
+    if not isinstance(selected, list):
         raise Invalid("Invalid selector result")
+    if len(selected) > MAX_ELIGIBLE:
+        raise Invalid("Selector exceeds 600 eligible public symbols")
     result = {}
     day = current.date().isoformat()
     for row in selected:
@@ -604,7 +611,7 @@ def budget_state(path, current):
                 if row["id"] in ("gemini-flash", "groq-qwen"):
                     fresh["providers"][row["id"]] = value["used"]
                     fresh["windows"][quota_key(row)] = dict(day=quota_day(row, current),
-                        used=value["used"], tokens=value["used"] * 8000)
+                        used=value["used"], tokens=value["used"] * GROQ_MINUTE_TOKENS)
         return fresh
 
     def count(n):
@@ -743,7 +750,6 @@ def probe(selected, session, sec, providers, current=now):
             table.append("| " + symbol + " | " + " | ".join(["no public evidence"] * len(keys)) + " |")
             continue
         for key in keys:
-            started = providers.clock()
             before = providers.used.get(key, 0)
             try:
                 raw, _ = providers.call(key, prompt)
@@ -757,7 +763,7 @@ def probe(selected, session, sec, providers, current=now):
                 attempts = providers.used.get(key, 0) - before
                 if attempts:
                     totals[key]["attempts"] += attempts
-                    totals[key]["seconds"] += providers.clock() - started
+                    totals[key]["seconds"] += providers.latency.get(key, 0.)
         table.append("| " + symbol + " | " + " | ".join(values) + " |")
     lines = ["## Provider probe (no report/budget writes)", *table, "",
              "| Provider | Requests | Responses | Valid | Avg seconds | Today incl. probe |",
