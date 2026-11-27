@@ -97,6 +97,7 @@ def build(root, archive, now=None):
     closed = set(verified_closures("us")) | set(policy.get("us", {}))
     moves = {}
     for symbol, past in sorted(history.items()):
+        require(isinstance(symbol, str) and not symbol.endswith((".TW", ".TWO")), LABEL, "invalid US history symbol")
         require(isinstance(past, dict), LABEL, "invalid earnings history")
         if not past:
             continue
@@ -144,6 +145,7 @@ def build(root, archive, now=None):
     retain_count(coverage["alerts"], previous.get("coverage", {}).get("alerts", 0),
                  LABEL + " alerts", min_share=.5, minimum=0)
     for item in alerts["events"]:
+        require(item["kind"] in ("notice", "disposal") and item["market"] in ("TW", "TWO"), LABEL, "invalid alert record")
         if item["kind"] == "disposal":
             for field, kind, detail in (("start", "disposal-start", "公告處置開始"),
                                         ("end", "disposal-end", "公告處置結束日（可能展延）")):
