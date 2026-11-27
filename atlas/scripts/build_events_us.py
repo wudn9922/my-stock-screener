@@ -253,6 +253,12 @@ def main(report_dir=REPORT_DIR, data_dir=DATA_DIR, out_dir=None, now=None):
     if not items:
         raise RuntimeError("no US earnings dates in the quotes")
 
+    previous = {}
+    if os.path.exists(out_path):
+        with open(out_path, encoding="utf-8") as stream:
+            previous = json.load(stream)
+        if not isinstance(previous, dict):
+            raise ValueError("invalid previous earnings file")
     document = {
         "version": 1,
         "market": "US",
@@ -263,7 +269,7 @@ def main(report_dir=REPORT_DIR, data_dir=DATA_DIR, out_dir=None, now=None):
             "confirmed time of day (null for estimates); window = Yahoo's estimated date range."
         ),
         "items": items,
-        "history": observed_history(read_json(out_path) or {}, quotes, now),
+        "history": observed_history(previous, quotes, now),
     }
     size = write_atomic(out_path, document)
     print(json.dumps({
