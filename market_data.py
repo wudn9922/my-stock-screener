@@ -98,6 +98,7 @@ def extract_yfinance_data(downloaded_data, ticker=None):
         return frame
     return kline.accept_frame(
         frame, ticker, refetch=lambda: refetch_kline_once(ticker),
+        retained_path=kline.ROOT / 'data' / (str(ticker) + '.csv'),
         source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + str(ticker),
         fetched_at=kline.utcnow(),
     )
