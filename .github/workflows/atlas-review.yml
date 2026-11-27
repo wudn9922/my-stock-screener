@@ -259,6 +259,7 @@ jobs:
             atlas/test-results/site/**/volume-ratios-first.png
             atlas/test-results/site/**/volatility-large-values.png
             atlas/test-results/site/**/btc-usdt-*.png
+            atlas/test-results/site/**/signal-outcomes-390.png
             atlas/test-results/site/**/compact-explanations.png
             atlas/test-results/site/**/monitor-signal-scroll.png
             atlas/test-results/site/**/screener-health-*.png

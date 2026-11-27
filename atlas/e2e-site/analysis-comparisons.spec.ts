@@ -273,3 +273,34 @@ test("industry comparison switches shared windows and metrics; missing volume st
     ),
   ).toBeLessThanOrEqual(0);
 });
+
+test("public signal outcomes show mature horizons and suppress small-sample wins", async ({ page }, testInfo) => {
+  await mockSite(page, { report: buildReport(20) });
+  const h = (mature: number, winRate: number | null) => ({
+    mature, pending: 30 - mature, mean: mature ? 2 : null, median: mature ? 1 : null,
+    winRate, benchmarkMean: mature ? 0.5 : null, insufficient: mature < 20,
+  });
+  const window = { samples: 30, horizons: { '1': h(25, 60), '5': h(10, 99), '20': h(0, null) }, mfe: null, mae: null };
+  await page.route("**/report/signal-outcomes.json", route => route.fulfill({ json: {
+    version: 1, generatedAt: "2026-11-27T12:00:00Z", minSample: 20,
+    markets: { TW: { observedThrough: "2026-11-27", asOf: "2026-11-27", benchmark: "^TWII",
+      signals: { "ambush-v1": { startDate: "2026-11-16", lastSignalDate: "2026-11-27", capturedSessions: 10,
+        windows: { '1': window, '3': window, '6': window } } } } }
+  } }));
+  await page.goto("./?page=screener&group=tw_all");
+  await page.getByText("訊號事後表現", { exact: true }).click();
+  const card = page.locator(".signal-outcomes");
+  await expect(card).toContainText("自 2026-11-16 開始累積");
+  await expect(card.getByLabel("T+1", { exact: true })).toContainText("60.00%");
+  await expect(card.getByLabel("T+5", { exact: true })).toContainText("樣本不足");
+  await expect(card).not.toContainText("99.00%");
+  await expect(card.getByLabel("T+20", { exact: true })).toContainText("尚未成熟 30");
+  await card.getByRole("button", { name: "近 3 月" }).click();
+  await expect(card.getByRole("button", { name: "近 3 月" })).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  if (testInfo.project.name === "iphone-webkit") {
+    expect(page.viewportSize()?.width).toBe(390);
+    await card.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath("signal-outcomes-390.png") });
+  }
+});
