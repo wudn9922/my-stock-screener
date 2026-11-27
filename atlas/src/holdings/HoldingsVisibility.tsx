@@ -103,7 +103,7 @@ export function VisibilitySettings({
         </label>
       )}
       <p className="holdings-muted">
-        市值以本頁顯示的報價計算；沒有報價的持股不會自動隱藏。隱藏只影響顯示與加總，不會刪除或修改持股，同步與匯入仍包含全部持股。
+        小額門檻以收盤價估算（加密貨幣沿用既有報價），避免盤中持股反覆顯示與隱藏；沒有報價的持股不會自動隱藏。隱藏只影響顯示與加總，不會刪除或修改持股，同步與匯入仍包含全部持股。
         {storageNote[storageMode]}
       </p>
     </details>
