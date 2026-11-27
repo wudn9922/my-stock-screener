@@ -62,7 +62,7 @@ jobs:
         run: python scripts/build_signal_outcomes.py --capture-only
       - name: Checkout validated permanent K-line archive (read only)
         id: signal_archive
-        if: always() && !cancelled() && steps.signal_capture.outcome == 'success'
+        if: always() && !cancelled() && steps.inputs.outcome == 'success'
         uses: actions/checkout@v4
         with:
           ref: kline-archive
