@@ -30,7 +30,7 @@ Daily Stock Screener、Atlas Research Terminal、Financial Statement History、O
 | [`market-calendar.yml`](../.github/workflows/market-calendar.yml) | Market trading calendar | 定期資料更新 | cron `20 0 * * *`（每日 08:20）；手動 | 產生並發布未來台美股交易日曆。 | 是 |
 | [`market-extras.yml`](../.github/workflows/market-extras.yml) | IPO and extended quotes | 定期資料更新 | cron `41 12,13,21,22,1 * * 1-6`（週一～週六 09:41、20:41、21:41，週二～週日 05:41、06:41）；手動 | 在美股交易日更新 IPO 和盤前盤後報價快照。 | 是 |
 | [`warrant-data.yml`](../.github/workflows/warrant-data.yml) | Taiwan warrant data | 定期資料更新 | 每日 20:24（台北時間）、手動、PR 驗證 | 讀取 TWSE、TPEx 與 MOPS，按標的產出權證清單。使用 generated 分支的 `warrants` owner 發布。 | 是（發布工作） |
-| [`conservative-pe-ai.yml`](../.github/workflows/conservative-pe-ai.yml) | Conservative PE AI | 定期資料更新 | 週日 10:35（台北）、手動、PR 驗證 | 只在明確啟用時，為明確列出的公開代號產生市場擔憂情境。 | 是（發布工作） |
+| [`conservative-pe-ai.yml`](../.github/workflows/conservative-pe-ai.yml) | Conservative PE AI | 定期資料更新 | 每日 11:17（台北）、手動（含 probe）、PR 驗證 | 只在明確啟用時，為符合 W6 的全市場公開財報代號產生市場擔憂情境。 | 是（發布工作） |
 | [`refresh-us-rates.yml`](../.github/workflows/refresh-us-rates.yml) | Refresh US Rates | 定期資料更新 | push `main` 的 `.github/workflows/refresh-us-rates.yml`、`scripts/build_rates.py`、`scripts/rates_analytics.py`、`scripts/rates_config.py`、`tests/test_rates.py`、`scripts/build_bond_research.py`、`tests/test_bond_research.py`、`atlas/data/yield-band-params.json`；手動 | 重建美國公債利率與債券研究報告。 | 是 |
 | [`research-data.yml`](../.github/workflows/research-data.yml) | Research public data | 定期資料更新 | cron `23 11 * * 1-5`（週一～週五 19:23）、`23 5 * * 2-6`（週二～週六 13:23）；push `main` 的 `scripts/*research*.py`、`scripts/build_sec_radar.py`、`scripts/build_world_assets.py`、`.github/workflows/research-data.yml`；手動 | 更新法人動向、成交量、警示、全球資產與 SEC 研究資料。 | 是 |
 | [`tw-chips.yml`](../.github/workflows/tw-chips.yml) | Taiwan Chips | 定期資料更新 | cron `41 11 * * 1-5`（週一～週五 19:41）；手動 | 更新台股籌碼資料，包含外資持股。 | 是 |
@@ -95,8 +95,12 @@ Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal�
 
 ### 保守本益比 AI 情境
 
-週排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`，並以 `CONSERVATIVE_PE_AI_PUBLIC_SYMBOLS` 明確列出同意發布的代號（逗號或空白分隔）。這份清單就是唯一的選股來源：此工作不讀取私有持股或自選清單，也不持有任何 Supabase 金鑰（ADR-031）。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，移除代號或停用排程後，既有報告和 Git 歷史仍可能可見。
+每日排程預設停用。啟用時須同時設 `CONSERVATIVE_PE_AI_ENABLED=1`、`CONSERVATIVE_PE_AI_FREE_TIER=1`。選股只讀 `docs/report/financials/*.json` 的所有檔名，由 W6 selector 決定適用性；超過 600 檔拒絕整次執行。此工作不讀取私有持股或自選清單，也不持有任何 Supabase 金鑰（ADR-031）。每次 AI 請求只含一檔股票的公開名稱、代號、財報及來源。報告與生成分支均公開，股票不再適用時保留舊報告但前端不顯示。
 
-僅使用已確認提供免費層的 `gemini-3.8-flash` 和 `qwen/qwen3.8-27b`。設定 `CONSERVATIVE_PE_AI_FREE_TIER=1` 前，請確認兩個提供者專案的金鑰均屬免費層且未啟用付費。API 金鑰無法查證帳務層級。使用既有 `SEC_USER_AGENT` 讀取官方財報。429、503、逾時或網路錯誤才會使用一次備援，提供者各自遵守 `Retry-After`。每 UTC ISO 週最多預留 20 檔，`CONSERVATIVE_PE_AI_LIMIT` 可調低。輪替游標從上次的位置繼續，基期相同的報告可重用七天。預留額度先寫入 generated owner `conservativePeAiBudget`，只保留週次、用量及游標，避免中斷或重跑超額。
+每日 UTC 最多 30 檔（`CONSERVATIVE_PE_AI_LIMIT` 只能調低），基期相同的報告重用 14 天，前端 21 天過期；沒有報告優先，再來基期改變、最舊報告，同類別依最近嘗試日輪替防止無新聞股票阻塞。每檔和每次 provider POST 前各自預留並發布 `conservativePeAiBudget`，取消或重跑不退還，舊週預算保守轉換；Gemini 同時追蹤 Pacific 配額日期。Google News 間隔 2 秒，SEC 使用 `SEC_USER_AGENT` 每秒至多一次。
 
-AI 情境採用 W6 同一組適用條件及 EPS 口徑。Google News RSS 僅採用可由標題確認與公司相關的近期財經消息。SEC 10-K 分部營業利益須與基期對應的財報期間及幣別相符，且只用於約束盈餘損失假設。缺少可核對的分部盈餘證據（包括目前的台灣 MOPS 樣本）時保留低信心說明，估值欄留空。程式從基期 EPS 計算情境 EPS，財務頁採用 W6 有日期的可比較日 K 收盤價。報告存放於 `docs/report/conservative-pe/<KEY>.json`，generated owner 為 `conservativePeAi`。個別失敗後仍發布成功報告，再發送失敗通知。PR 驗證使用假資料。
+提供者依 `config/conservative-pe-providers.json` 順序，缺金鑰跳過，429/HTTP/連線不可用則在該次執行停用該提供者；回答驗證失敗不重問。換模型時，查官方 API ID、免費層與速率限制，修改設定檔 model、daily_limit、min_interval_seconds、輸出與推理設定、順序，開 PR 並跑 mock CI；原模型環境變數不再使用。設定 `GEMINI_API_KEY`、`GROQ_API_KEY`、`CLOUDFLARE_API_TOKEN`（僅 Workers AI）、`CLOUDFLARE_ACCOUNT_ID`；Cloudflare 缺任一即略過。請確認這些帳戶未啟用付費；金鑰不能證明帳務層級，且 Cloudflare 免費額度與其他模型共用。模型每日上限不代表官方保證；Gemini 實際限額查 AI Studio。Groq 另保守預留 200K tokens/日。Cloudflare 13 次上限以 6,200 UTF-8 bytes、128 wrapper tokens、1,400 output tokens × 官方 40,909/290,909 neurons 每百萬 tokens 估算約 667 neurons/次，13 次約 8,671，留餘額給誤差。
+
+手動 `mode=probe` 比較排序前五檔的同一份 prompt（缺公開證據則略過），各模型次數、成功、驗證、耗時、比例與信心只寫 Step Summary，不發布或修改報告/預算。probe 仍耗真正配額，不要在同一 provider 配額窗口重複 probe 或接著正常跑；請在下一配額窗口執行一般模式。常態每次完成的報告先發布，只有失敗比例 >30% 或 job 本身硬錯誤才通知，無近期證據計為略過。
+
+AI 情境採用 W6 同一組適用條件及 EPS 口徑。Google News RSS 僅採用可由標題確認與公司相關的近期財經消息。SEC 10-K 分部營業利益須與基期對應的財報期間及幣別相符，且只用於約束盈餘損失假設。缺少可核對的分部盈餘證據（包括目前的台灣 MOPS 樣本）時保留低信心說明，估值欄留空。程式從基期 EPS 計算情境 EPS，財務頁採用 W6 有日期的可比較日 K 收盤價。報告存放於 `docs/report/conservative-pe/<KEY>.json`，generated owner 為 `conservativePeAi`。個別失敗後仍發布成功報告，超過門檻才發送失敗通知。PR 驗證使用假資料。
