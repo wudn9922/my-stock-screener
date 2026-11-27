@@ -66,114 +66,227 @@ class ScenarioTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(m.Invalid):
                 m.validate_answer(json.dumps(dict(ANSWER, **changes)), NEWS, SEGMENTS)
 
-    def test_fallback_only_for_statuses_or_connection_failures_and_only_once(self):
-        valid = model_answer("groq", json.dumps(ANSWER))
-        for first in (response(429), response(503), requests.Timeout(), requests.ConnectionError()):
-            with self.subTest(first=first):
-                session = Mock()
-                providers = m.Providers(session, {"GEMINI_API_KEY": "fake", "GROQ_API_KEY": "fake"}, sleep=Mock())
-                session.post.side_effect = [first, valid]
-                self.assertEqual(providers.analyze(PUBLIC, NEWS, SEGMENTS)["model"], "qwen/qwen3.8-27b")
-                primary, fallback = session.post.call_args_list
-                self.assertIn("/gemini-3.8-flash:", primary.args[0])
-                self.assertEqual(primary.kwargs["json"]["generationConfig"]["responseMimeType"], "application/json")
-                self.assertEqual(fallback.kwargs["json"]["response_format"], {"type": "json_object"})
-                session.post.reset_mock()
-                session.post.side_effect = [first, response(503), valid]
-                with self.assertRaises(m.Transient):
-                    providers.analyze(PUBLIC, NEWS, SEGMENTS)
-                self.assertEqual(session.post.call_count, 2)
+    def provider(self, session, env=None, state=None, publish=None, config=None):
+        return m.Providers(session, env if env is not None else {
+            "GEMINI_API_KEY": "fake", "GROQ_API_KEY": "fake",
+            "CLOUDFLARE_API_TOKEN": "fake", "CLOUDFLARE_ACCOUNT_ID": "a" * 32,
+        }, state=state, publish=publish, config=config, sleep=Mock(),
+            clock=lambda: 0, current=lambda: NOW)
 
-    def test_invalid_json_sources_and_other_http_errors_never_fallback(self):
-        invented = json.dumps(dict(ANSWER, segmentEvidence="fabricated"))
-        for first in (response(400), response(401), response(404), response(500), response(502),
-                      model_answer("gemini", "not JSON"), model_answer("gemini", invented)):
-            with self.subTest(first=first):
-                session = Mock()
-                session.post.side_effect = [first]
-                providers = m.Providers(session, {"GEMINI_API_KEY": "fake", "GROQ_API_KEY": "fake"}, sleep=Mock())
-                with self.assertRaises(m.Invalid):
-                    providers.analyze(PUBLIC, NEWS, SEGMENTS)
-                session.post.assert_called_once()
+    def test_order_long_retry_after_and_separate_gemini_quotas(self):
+        session = Mock()
+        session.post.side_effect = [
+            response(429, headers={"Retry-After": "3600"}),
+            model_answer("gemini", json.dumps(ANSWER)),
+            response(429), model_answer("groq", json.dumps(ANSWER)),
+            model_answer("groq", json.dumps(ANSWER)),
+        ]
+        provider = self.provider(session)
+        self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "gemini-flash")
+        self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "groq-qwen")
+        self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "groq-qwen")
+        self.assertEqual(provider.used, {"gemini-hydrogen": 1, "gemini-flash": 2, "groq-qwen": 2})
+        self.assertEqual(provider.disabled, {"gemini-hydrogen", "gemini-flash"})
+        self.assertIn("/gemini-4-hydrogen:", session.post.call_args_list[0].args[0])
+        self.assertIn("/gemini-3.8-flash:", session.post.call_args_list[1].args[0])
+        self.assertEqual(session.post.call_args_list[3].kwargs["json"]["model"], "qwen/qwen3.8-27b")
 
-    def test_retry_after_supports_seconds_and_http_date_per_provider(self):
-        session, sleep = Mock(), Mock()
-        providers = m.Providers(session, {"GEMINI_API_KEY": "fake"}, sleep=sleep, clock=lambda: 0)
-        session.post.side_effect = [response(429, headers={"Retry-After": "45"}), model_answer("gemini", "{}")]
-        with self.assertRaises(m.Transient):
-            providers.call("gemini", "public")
-        self.assertEqual(providers.next["gemini"], 45)
-        providers.call("gemini", "public")
-        sleep.assert_called_with(45)
-        retry_at = email.utils.format_datetime(NOW + dt.timedelta(seconds=75))
-        self.assertEqual(m.retry_seconds(retry_at, NOW), 75)
-        session.post.side_effect = [response(429, headers={"Retry-After": "3600"})]
-        with self.assertRaises(m.Transient):
-            providers.call("gemini", "public")
+    def test_missing_secrets_quota_and_unknown_model(self):
+        session = Mock()
         with self.assertRaises(m.Invalid):
-            providers.call("gemini", "public")
-        self.assertEqual(session.post.call_count, 3)
+            self.provider(session, {})
+        with self.assertRaises(m.Invalid):
+            self.provider(session, {"CLOUDFLARE_API_TOKEN": "fake"})
+        provider = self.provider(session, {"GROQ_API_KEY": "fake", "GROQ_MODEL": "unreviewed"})
+        self.assertEqual(list(provider.rows), ["groq-qwen"])
+        with self.assertRaises(m.Invalid):
+            provider.call("unreviewed", "public")
+        session.post.assert_not_called()
+        row = provider.rows["groq-qwen"]
+        provider.state["providers"]["groq-qwen"] = row["daily_limit"]
+        with self.assertRaises(m.Exhausted):
+            provider.analyze(PUBLIC, NEWS, SEGMENTS)
+        session.post.assert_not_called()
+
+    def test_quota_switch_and_persist_before_post_including_failures(self):
+        session, publish = Mock(), Mock()
+        state = m.empty_budget(NOW)
+        provider = self.provider(session, state=state, publish=publish)
+        state["providers"]["gemini-hydrogen"] = provider.rows["gemini-hydrogen"]["daily_limit"]
+        state["providers"]["gemini-flash"] = provider.rows["gemini-flash"]["daily_limit"]
+
+        def post(*args, **kwargs):
+            self.assertGreater(state["providers"]["groq-qwen"], 0)
+            publish.assert_called_once_with(state)
+            return response(429, headers={"Retry-After": "3600"})
+        session.post.side_effect = [response(429), model_answer("groq", json.dumps(ANSWER))]
+        def dispatch(*args, **kwargs):
+            if "groq.com" in args[0]:
+                return post(*args, **kwargs)
+            self.assertEqual(state["providers"]["cloudflare-qwen"], 1)
+            self.assertEqual(publish.call_count, 2)
+            self.assertIn("/accounts/" + "a" * 32 + "/ai/v1/chat/completions", args[0])
+            return model_answer("groq", json.dumps(ANSWER))
+        session.post.side_effect = dispatch
+        self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "cloudflare-qwen")
+        self.assertEqual(state["providers"]["groq-qwen"], 1)
+
+    def test_invalid_answer_never_reasks_and_thought_is_excluded(self):
+        for raw in ("not JSON", json.dumps(dict(ANSWER, segmentEvidence="fabricated"))):
+            session = Mock()
+            session.post.return_value = model_answer("gemini", raw)
+            with self.assertRaises(m.Invalid):
+                self.provider(session).analyze(PUBLIC, NEWS, SEGMENTS)
+            session.post.assert_called_once()
+        session = Mock()
+        session.post.return_value = response(payload={"candidates": [{"finishReason": "STOP",
+            "content": {"parts": [{"text": "private reasoning", "thought": True}, {"text": json.dumps(ANSWER)}]}}]})
+        result = self.provider(session).analyze(PUBLIC, NEWS, SEGMENTS)
+        self.assertEqual(result["affectedEarningsRatio"], 0.3)
+        self.assertNotIn("private reasoning", json.dumps(result))
+        self.assertEqual(session.post.call_args.kwargs["json"]["generationConfig"]["thinkingConfig"]["includeThoughts"], False)
 
     def test_only_public_fields_enter_the_prompt(self):
         session = Mock()
         session.post.return_value = model_answer("gemini", json.dumps(ANSWER))
-        providers = m.Providers(session, {"GEMINI_API_KEY": "test-secret"}, sleep=Mock())
+        provider = self.provider(session, {"GEMINI_API_KEY": "test-secret"})
         public = dict(PUBLIC, account="PRIVATE", quantity="PRIVATE", list="PRIVATE", baseline=dict(BASELINE, averageCost="PRIVATE"))
-        providers.analyze(public, NEWS, SEGMENTS)
+        provider.analyze(public, NEWS, SEGMENTS)
         message = session.post.call_args.kwargs["json"]["contents"][0]["parts"][0]["text"]
         self.assertNotIn("PRIVATE", message)
         self.assertNotIn("test-secret", message)
         self.assertIn('"eps": 10', message)
+        self.assertLessEqual(len(message.encode()), m.MAX_PROMPT_BYTES)
 
-    def test_seven_day_cache_and_calculated_eps(self):
+    def test_fourteen_day_cache_and_calculated_eps(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "TEST.json"
             answer = m.validate_answer(json.dumps(ANSWER), NEWS, SEGMENTS)
-            m.write_report(path, PUBLIC, dict(answer, provider="gemini", model=m.GEMINI_MODEL), NOW)
+            m.write_report(path, PUBLIC, dict(answer, provider="gemini-hydrogen", model="gemini-4-hydrogen"), NOW)
             self.assertEqual(json.loads(path.read_text())["scenarioEps"], 7)
-            self.assertTrue(m.recent(path, NOW + dt.timedelta(days=6), BASELINE))
-            self.assertFalse(m.recent(path, NOW + dt.timedelta(days=6), dict(BASELINE, eps=11)))
-            self.assertFalse(m.recent(path, NOW + dt.timedelta(days=7), BASELINE))
+            self.assertTrue(m.recent(path, NOW + dt.timedelta(days=13), BASELINE))
+            self.assertFalse(m.recent(path, NOW + dt.timedelta(days=13), dict(BASELINE, eps=11)))
+            self.assertFalse(m.recent(path, NOW + dt.timedelta(days=14), BASELINE))
             self.assertFalse(m.recent(path, NOW - dt.timedelta(days=1), BASELINE))
 
-    def test_weekly_budget_survives_reruns_and_rotates_failed_or_uncached_symbols(self):
+    def test_budget_reset_migration_and_pacific_window(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "budget.json"
+            m.write_json(path, {"week": NOW.strftime("%G-W%V"), "used": 12, "cursor": 42})
+            state = m.budget_state(path, NOW)
+            self.assertEqual(state["used"], 12)
+            self.assertEqual(state["providers"]["gemini-flash"], 12)
+            m.write_json(path, state)
+            self.assertEqual(m.budget_state(path, NOW), state)
+            next_day = NOW + dt.timedelta(days=1)
+            self.assertEqual(m.budget_state(path, next_day)["used"], 0)
+            state = m.empty_budget(NOW + dt.timedelta(hours=23))
+            row = m.load_providers()[0]
+            m.reserve_provider(state, row, NOW + dt.timedelta(hours=23), "public", Mock())
+            m.write_json(path, state)
+            next_state = m.budget_state(path, next_day)
+            self.assertEqual(next_state["providers"], {})
+            self.assertEqual(m.provider_usage(next_state, row, next_day)["used"], 1)
+            m.write_json(path, dict(next_state, used=-1))
+            with self.assertRaises(m.Invalid):
+                m.budget_state(path, next_day)
+        self.assertEqual(m.analysis_limit({"CONSERVATIVE_PE_AI_LIMIT": "99"}), m.DAILY_LIMIT)
+        self.assertEqual(m.analysis_limit({"CONSERVATIVE_PE_AI_LIMIT": "12"}), 12)
+
+    def test_priorities_and_no_report_rotation(self):
         with TemporaryDirectory() as directory:
             output = Path(directory)
-            state_file = output / "budget.json"
-            symbols = [f"S{i:02}" for i in range(27)]
-            selected = {symbol: dict(PUBLIC, symbol=symbol) for symbol in symbols}
-            state = m.budget_state(state_file, NOW)
-            self.assertEqual([r["symbol"] for r in m.plan_reports(symbols, selected, state, 20, output, NOW)], symbols[:20])
-            m.write_json(state_file, state)
-            self.assertEqual(m.plan_reports(symbols, selected, m.budget_state(state_file, NOW), 20, output, NOW), [])
-            next_week = NOW + dt.timedelta(days=7)
-            following = m.budget_state(state_file, next_week)
-            self.assertEqual([r["symbol"] for r in m.plan_reports(symbols, selected, following, 10, output, next_week)],
-                             symbols[20:] + symbols[:3])
-            self.assertEqual(following["used"], 10)
-            m.write_json(state_file, dict(following, used=-1))
-            with self.assertRaises(m.Invalid):
-                m.budget_state(state_file, next_week)
+            selected = {symbol: dict(PUBLIC, symbol=symbol) for symbol in ("NEW", "CHANGE", "OLD", "LESSOLD", "FRESH")}
+            answer = dict(m.validate_answer(json.dumps(ANSWER), NEWS, SEGMENTS), provider="gemini", model="gemini-3.8-flash")
+            for symbol, age in (("CHANGE", 1), ("OLD", 25), ("LESSOLD", 18), ("FRESH", 13)):
+                public = selected[symbol]
+                if symbol == "CHANGE":
+                    public = dict(public, baseline=dict(BASELINE, eps=12))
+                m.write_report(output / (symbol + ".json"), public, answer, NOW - dt.timedelta(days=age))
+            state = m.empty_budget(NOW)
+            self.assertEqual([p["symbol"] for p in m.plan_reports(selected, state, 30, output, NOW)],
+                             ["NEW", "CHANGE", "OLD", "LESSOLD"])
+            state["attempted"]["NEW"] = state["day"]
+            state["used"] = 29
+            self.assertEqual([p["symbol"] for p in m.plan_reports(selected, state, 30, output, NOW)], ["CHANGE"])
+            state["used"] = 30
+            self.assertEqual(m.plan_reports(selected, state, 100, output, NOW), [])
 
-    def test_partial_failure_preserves_valid_output(self):
-        sec, providers = Mock(), Mock()
+    def test_partial_failure_no_news_and_exhaustion(self):
+        sec, providers, publish = Mock(), Mock(), Mock()
         sec.company_name.return_value = PUBLIC["companyName"]
         sec.segments.return_value = SEGMENTS
-        good = dict(m.validate_answer(json.dumps(ANSWER), NEWS, SEGMENTS), provider="gemini", model=m.GEMINI_MODEL)
-        providers.analyze.side_effect = [m.Invalid(), good]
-        with TemporaryDirectory() as directory, patch.object(m, "now", return_value=NOW), patch.object(m, "news_items", return_value=NEWS):
+        providers.available.return_value = ["gemini-hydrogen"]
+        good = dict(m.validate_answer(json.dumps(ANSWER), NEWS, SEGMENTS), provider="gemini-hydrogen", model="gemini-4-hydrogen")
+        providers.analyze.side_effect = [m.Invalid(), good, m.Exhausted()]
+        chosen = [dict(PUBLIC, symbol=s) for s in ("FIRST", "SECOND", "THIRD", "FOURTH", "FIFTH")]
+        state = m.empty_budget(NOW)
+        with TemporaryDirectory() as directory, patch.object(m, "news_items", side_effect=[[], NEWS, NEWS, NEWS, NEWS]):
             output = Path(directory)
-            self.assertEqual(m.refresh_reports([PUBLIC, dict(PUBLIC, symbol="OTHER")], output, m.iso_week(NOW),
-                                               Mock(), sec, providers), (2, 1, 1))
-            self.assertEqual([p.name for p in output.iterdir()], ["OTHER.json"])
+            counts = m.refresh_reports(chosen, output, state, Mock(), sec, providers, publish, current=lambda: NOW)
+            self.assertEqual(counts, dict(attempted=4, written=1, skipped=1, failed=2))
+            self.assertEqual([p.name for p in output.iterdir()], ["THIRD.json"])
+            self.assertEqual(publish.call_count, 4)
+            self.assertEqual(state["used"], 4)
+        self.assertTrue(m.exceeds_failure_threshold(counts))
+        self.assertFalse(m.exceeds_failure_threshold({"attempted": 10, "failed": 3}))
+        self.assertTrue(m.exceeds_failure_threshold({"attempted": 10, "failed": 4}))
+
+    def test_probe_uses_identical_prompt_and_no_publisher(self):
+        session = Mock()
+        session.post.side_effect = [model_answer("gemini", json.dumps(ANSWER)),
+                                    model_answer("gemini", json.dumps(ANSWER)),
+                                    model_answer("groq", json.dumps(ANSWER)),
+                                    model_answer("groq", json.dumps(ANSWER))]
+        provider = self.provider(session)
+        sec = Mock()
+        sec.company_name.return_value = PUBLIC["companyName"]
+        sec.segments.return_value = SEGMENTS
+        with patch.object(m, "news_items", return_value=NEWS), patch.object(m, "write_json") as write, patch.object(m, "publish_budget") as publish:
+            result = m.probe({"TEST": PUBLIC}, Mock(), sec, provider, current=lambda: NOW)
+        write.assert_not_called()
+        publish.assert_not_called()
+        self.assertIn("0.3 / medium", result)
+        self.assertEqual(session.post.call_count, 4)
+        bodies = [c.kwargs["json"] for c in session.post.call_args_list]
+        prompts = [b["contents"][0]["parts"][0]["text"] if "contents" in b else b["messages"][0]["content"] for b in bodies]
+        self.assertEqual(len(set(prompts)), 1)
+        self.assertEqual(sum(provider.used.values()), 4)
+
+    def test_config_validation_and_news_pacing(self):
+        config = m.load_providers()
+        self.assertEqual([r["id"] for r in config], ["gemini-hydrogen", "gemini-flash", "groq-qwen", "cloudflare-qwen"])
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "providers.json"
+            m.write_json(path, [dict(config[0], base_url="https://unreviewed.example")])
+            with self.assertRaises(m.Invalid):
+                m.load_providers(path)
+        session, sleep = Mock(), Mock()
+        pacer = m.NewsPacer(session, sleep=sleep, clock=lambda: 0)
+        pacer.get("a")
+        pacer.get("b")
+        self.assertEqual(sleep.call_args_list[-1].args, (2,))
+
+    def test_selector_cap_fails_before_any_write_or_http(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for symbol in ("TEST", "AAPL", "2330.TW"):
+                (root / (symbol + ".json")).write_text("{}")
+            (root / "not-json.csv").write_text("")
+            with patch.object(m, "FINANCIALS", root), patch.object(m.subprocess, "run") as run, \
+                    patch.object(m, "write_json") as write, patch.object(m.requests, "Session") as session, \
+                    patch.dict(os.environ, {"CONSERVATIVE_PE_AI_ENABLED": "1", "CONSERVATIVE_PE_AI_FREE_TIER": "1"}, clear=True), \
+                    patch.object(sys, "argv", ["builder", "--selector", "unused"]):
+                run.return_value.stdout = json.dumps([PUBLIC] * 601)
+                with self.assertRaises(m.Invalid):
+                    m.main()
+                self.assertEqual(json.loads(run.call_args.kwargs["input"]), ["2330.TW", "AAPL", "TEST"])
+                write.assert_not_called()
+                session.assert_not_called()
 
 
 class InputTests(unittest.TestCase):
-    def test_public_allowlist_and_w6_baseline_contract(self):
-        self.assertEqual(m.public_symbols("aapl, 2330.tw BRK.B\n"), ["2330.TW", "AAPL", "BRK-B"])
-        for value in ("", "INVALID/../FILE"):
-            with self.assertRaises(m.Invalid):
-                m.public_symbols(value)
+    def test_public_selection_and_w6_baseline_contract(self):
         self.assertEqual(m.validate_selection([PUBLIC], ["TEST"], NOW), {"TEST": PUBLIC})
         for row in (dict(PUBLIC, symbol="PRIVATE"), dict(PUBLIC, baseline=dict(BASELINE, shareBasis="adr")),
                     dict(PUBLIC, baseline=dict(BASELINE, currency="TWD")),

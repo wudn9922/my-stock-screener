@@ -54,7 +54,8 @@ export const scenarioSchema = z.object({
   concern: z.string().min(1).max(2000),
   evidence: z.string().min(1).max(2000),
   confidence: z.enum(['low', 'medium', 'high']),
-  provider: z.enum(['gemini', 'groq']),
+  // Legacy provider ids remain readable; new ids are reviewed in the backend config.
+  provider: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
   model: z.string().min(1),
   news: z.array(z.object({ url: https, date, title: z.string().min(1).max(300) })).min(1).max(20),
   segment: z.object({ url: https, date, periodEnd: date, metric: z.literal('operating-income'),
@@ -75,7 +76,8 @@ export const scenarioSchema = z.object({
 export type Scenario = z.infer<typeof scenarioSchema>;
 export function scenarioIsCurrent(scenario: Scenario, now = Date.now()): boolean {
   const age = now - Date.parse(scenario.generatedAt);
-  return age >= 0 && age < 7 * 86400000;
+  // Backend REFRESH_DAYS = 14, plus 7 days of scheduling grace.
+  return age >= 0 && age < 21 * 86400000;
 }
 export function sameScenarioBaseline(a: ScenarioBaseline, b: ScenarioBaseline): boolean {
   return a.eps === b.eps && a.basis === b.basis && a.end === b.end && a.annualEnd === b.annualEnd && a.currency === b.currency

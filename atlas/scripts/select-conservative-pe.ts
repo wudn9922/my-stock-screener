@@ -8,6 +8,22 @@ const taiwan = JSON.parse(readFileSync('atlas/public/symbols/taiwan.json', 'utf8
 };
 const names = new Map(taiwan.entries.map(entry => [entry.symbol, entry.name]));
 
+// The deployed directory contains cleaned public NasdaqTrader issuer names.
+// Reuse it instead of making US news coverage depend on SEC being reachable.
+try {
+  const directory = JSON.parse(readFileSync('docs/atlas/symbols/directory.json', 'utf8')) as { version?: number; items?: unknown[] };
+  if (directory.version === 1 && Array.isArray(directory.items)) {
+    for (const row of directory.items) {
+      if (!Array.isArray(row) || row.length !== 3 || typeof row[0] !== 'string' || typeof row[1] !== 'string') continue;
+      const key = financialsKey(row[0]);
+      const name = row[1].trim();
+      if (key && name.length > 0 && name.length <= 200 && !names.has(key)) names.set(key, name);
+    }
+  }
+} catch {
+  // Optional public directory; the existing SEC issuer lookup remains a fallback.
+}
+
 const input: unknown = JSON.parse(readFileSync(0, 'utf8'));
 if (!Array.isArray(input) || input.some(symbol => typeof symbol !== 'string')) throw new Error('Invalid symbol input');
 const result = [];

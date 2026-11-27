@@ -293,11 +293,11 @@ class Storage:
                 self.update_index(delta, env)
                 tree = git("write-tree", env=env).decode().strip()
             if tree == git("rev-parse", head + "^{tree}").decode().strip():
-                return False
+                return head
             commit = self.commit(tree, message, head)
             result = subprocess.run(["git", "push", "origin", f"{commit}:refs/heads/{branch}"], check=False)
             if result.returncode == 0:
-                return True
+                return commit
             # Fetch and replay this exact owner's patch on the new parent, including
             # after a concurrent daily squash. Never force a producer push.
             time.sleep(attempt + 1)
@@ -309,8 +309,16 @@ class Storage:
         records = self.config["records"].get(owner, [])
         if records:
             self.publish_one("main", state["main"], records, f"Update {owner} records")
-        self.publish_one("generated", state["generated"], self.config["owners"][owner],
-                         f"Regenerate {owner} outputs")
+        # Budget reservations publish repeatedly in one restored checkout. Only
+        # advance this owner's base, never the base of uncommitted report outputs.
+        base = state.get("conservativePeAiBudget", state["generated"]) if owner == "conservativePeAiBudget" else state["generated"]
+        tip = self.publish_one("generated", base, self.config["owners"][owner],
+                               f"Regenerate {owner} outputs")
+        if owner == "conservativePeAiBudget" and tip:
+            state[owner] = tip
+            temporary = self.state.with_suffix(".tmp")
+            temporary.write_text(json.dumps(state))
+            temporary.replace(self.state)
 
     def squash(self):
         for attempt in range(5):

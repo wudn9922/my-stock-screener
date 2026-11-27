@@ -781,7 +781,7 @@ test('AI conservative PE uses the financial period and suppresses a stale scenar
     baseline: { eps: 10, basis: 'annual', end: '2025-12-31', annualEnd: '2025-12-31', currency: 'USD', shareBasis: 'us-reported', adrRatio: null },
     scenarioEps: 7, affectedEarningsRatio: 0.3, concern: '新機換機需求疲弱，可能壓縮相關市場的獲利。',
     evidence: '依測試財報的分部營業利益與公開新聞標題，假設合併盈餘減少三成。',
-    confidence: 'medium', provider: 'gemini', model: 'gemini-3.8-flash',
+    confidence: 'medium', provider: 'gemini-hydrogen', model: 'gemini-4-hydrogen',
     news: [{ url: 'https://news.google.com/rss/articles/example', date: '2026-11-25', title: 'Apple earnings — scenario fixture' }],
     segment: { url: 'https://www.sec.gov/Archives/edgar/test.htm', date: '2026-02-05', periodEnd: '2025-12-31',
       metric: 'operating-income', excerpt: 'Segment operating income 40 USD out of consolidated 100 USD', maxRatio: 0.4 },
@@ -796,6 +796,7 @@ test('AI conservative PE uses the financial period and suppresses a stale scenar
   await expect(panel).toContainText(`情境本益比 ${(close / 7).toFixed(2)} 倍`);
   await expect(panel).toContainText('基期 EPS USD 10.0000（年度，2025-12-31）');
   await expect(panel).toContainText('假設盈餘損失 30.0%');
+  await expect(panel).toContainText('AI 分析 2026-11-27 · gemini-4-hydrogen');
   await panel.getByText('財報分部營業利益', { exact: true }).click();
   await expect(panel.getByRole('link', { name: '2025-12-31 財報' })).toBeVisible();
   expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
@@ -806,6 +807,13 @@ test('AI conservative PE uses the financial period and suppresses a stale scenar
   data = { ...report, generatedAt: '2026-11-18T00:00:00Z', news: [{ ...report.news[0]!, date: '2026-11-17' }] };
   await page.reload();
   await openFold(card);
-  await expect(panel).toContainText('情境本益比 暫無');
-  await expect(panel).toContainText('時效已過');
+  // 9 days is within the 21-day frontend grace period.
+  await expect(panel).toContainText(`情境本益比 ${(close / 7).toFixed(2)} 倍`);
+  await expect(panel).toContainText('AI 分析 2026-11-18');
+  data = { ...report, generatedAt: '2026-11-06T00:00:00Z', news: [{ ...report.news[0]!, date: '2026-11-05' }] };
+  await page.reload();
+  await openFold(card);
+  await expect(card).toContainText('AI 分析已逾期，等待重新分析');
+  await expect(panel).toHaveCount(0);
+  await expect(card).not.toContainText(report.concern);
 });

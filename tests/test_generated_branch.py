@@ -104,7 +104,7 @@ class GeneratedStorageTests(unittest.TestCase):
     def test_conservative_pe_reserves_before_reports_and_assembles_partial_results(self):
         budget = "docs/report/conservative-pe-budget.json"
         report = "docs/report/conservative-pe/AAPL.json"
-        budget_bytes = b'{"week":"2026-W48","used":2,"cursor":2}'
+        budget_bytes = b'{"day":"2026-11-28","used":2,"providers":{},"windows":{},"attempted":{}}'
         self.write(budget, budget_bytes)
         self.write("docs/internal-private.txt", b"unrelated local file")
         self.store.publish("conservativePeAiBudget")
@@ -113,6 +113,13 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertNotIn(report, self.store.entries(budget_tip))
 
         self.write(report, b'{"version":1,"symbol":"AAPL"}')
+        # Multiple budget commits in the same restore must not conflict with our own prior commit
+        # or accidentally publish/discard the pending report.
+        budget_bytes = b'{"day":"2026-11-28","used":2,"providers":{"gemini-flash":1},"windows":{},"attempted":{}}'
+        self.write(budget, budget_bytes)
+        self.store.publish("conservativePeAiBudget")
+        self.assertNotIn(report, self.store.entries(self.remote("generated")))
+        self.assertEqual(self.body(self.remote("generated"), budget), budget_bytes)
         self.store.publish("conservativePeAi")
         tip = self.remote("generated")
         self.assertEqual(self.body(tip, budget), budget_bytes)
