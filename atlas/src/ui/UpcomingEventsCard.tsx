@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { accessState } from '../auth/access';
+import { usePageActive } from '../app/pageActivity';
 import { holdingsStore } from '../holdings/store';
 import type { SavedWatchlist } from '../watchlists/model';
 import { EVENTS_UNAVAILABLE, fetchUpcomingEvents, groupUpcomingEvents, type UpcomingEvents, type UpcomingEvent } from '../events/UpcomingEvents';
@@ -12,6 +13,7 @@ const labels: Record<UpcomingEvent['kind'], string> = {
 };
 
 export function UpcomingEventsCard({ lists }: { lists: readonly SavedWatchlist[] }) {
+  const active = usePageActive();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<UpcomingEvents | null>(null);
   const [error, setError] = useState(false);
@@ -19,12 +21,12 @@ export function UpcomingEventsCard({ lists }: { lists: readonly SavedWatchlist[]
   const holdings = holdingsStore();
   const snapshot = useSyncExternalStore(holdings.subscribe, holdings.getSnapshot);
   useEffect(() => {
-    if (!open || access.storageMode !== 'cloud') return;
+    if (!open || !active || access.storageMode !== 'cloud') return;
     // Reuse the existing authorized holdings read; no symbol list is sent.
     void holdings.reload().catch(() => undefined);
-  }, [open, holdings, access.storageMode]);
+  }, [open, active, holdings, access.storageMode]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || !active) return;
     const abort = new AbortController();
     void fetchUpcomingEvents(abort.signal).then(value => {
       if (!abort.signal.aborted) { setData(value); setError(false); }
@@ -32,7 +34,7 @@ export function UpcomingEventsCard({ lists }: { lists: readonly SavedWatchlist[]
       if (!abort.signal.aborted) { setData(null); setError(true); }
     });
     return () => abort.abort();
-  }, [open]);
+  }, [open, active]);
   // This is a projection only: never visit, evaluate, persist or sync a list.
   const symbols = [...lists.flatMap(list => list.kind === 'manual' ? list.symbols
     : (list.history.at(-1) ?? list.lastViewed)?.members.map(member => member.symbol) ?? []),
@@ -44,7 +46,8 @@ export function UpcomingEventsCard({ lists }: { lists: readonly SavedWatchlist[]
       <p className="muted">自選清單及可用持股 · 市場事件另列 · 日期及倒數依交易所當地時間。</p>
       {snapshot.error && <p className="muted">持股資料暫時無法取得；仍顯示可用清單。</p>}
       {error ? <p role="status">{EVENTS_UNAVAILABLE}</p> : !data ? <p role="status">載入中…</p> : <>
-        <p className="muted">更新 {data.generatedAt.slice(0, 10)} · 台股財報／法說會尚無預告來源；除息資料依既有股利更新逐步補齊。</p>
+        <p className="muted">更新 {data.generatedAt.slice(0, 10)} · 台股財報／法說會尚無預告來源；現金股利依既有約 30 天逐檔更新，可能尚未涵蓋新公告。</p>
+        <p className="muted">財報日期涵蓋 {data.coverage.earnings.toLocaleString()} 檔 · 現金股利已讀取 {data.coverage.cashDividends.toLocaleString()} 檔。</p>
         {!groups.length && <p role="status">已收錄的事件中，未來 14 天沒有符合的項目。</p>}
         {groups.map(group => <section key={group.date} className="upcoming-event-day" aria-label={group.date}>
           <h3><time dateTime={group.date}>{group.date}</time></h3>
