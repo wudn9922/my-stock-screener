@@ -129,7 +129,6 @@ test('guest upcoming events use only in-memory list symbols and group dates on b
     } });
   });
   await page.goto('./?page=watchlist');
-  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   await openListActions(page);
   await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
   await page.getByRole('textbox', { name: '手動清單名稱' }).fill('事件測試');
@@ -150,8 +149,9 @@ test('guest upcoming events use only in-memory list symbols and group dates on b
   }
   expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
   // Navigation via the app, not a reload (RAM-only list remains in this session).
-  await page.locator('a[href*="page=console"]').first().click();
+  await page.locator('nav:visible').getByRole('button', { name: '我的', exact: true }).click();
   await expect(page.locator('.site')).toHaveAttribute('data-page', 'console');
+  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
   const myCard = page.locator('.upcoming-events');
   await myCard.getByText('未來 14 天事件', { exact: true }).click();
   await expect(myCard).toContainText('NVDA · 財報公布');
