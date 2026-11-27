@@ -488,6 +488,37 @@ def scale_run_bounds(closes):
             if start != end or start not in inverse_edges]
 
 
+def validate_scale_run_groups(dates, entries):
+    """Require complete contiguous runs and unchanged independent boundaries.
+
+    Legacy archive entries without run metadata are singletons. New runs
+    must name both endpoints, including when their rows span two years.
+    """
+    positions = {day: i for i, day in enumerate(dates)}
+    grouped = {}
+    seen = set()
+    for item in entries:
+        day = item["date"]
+        if day in seen or ("runStart" in item) != ("runEnd" in item):
+            raise ValueError("Duplicate scale date or incomplete run metadata")
+        seen.add(day)
+        key = (item.get("runStart", day), item.get("runEnd", day))
+        grouped.setdefault(key, []).append(item)
+    runs = []
+    for (first, last), group in grouped.items():
+        start, end = positions.get(first, -1), positions.get(last, -1)
+        if not (0 < start <= end < len(dates)-1 and end-start < 3):
+            raise ValueError("Invalid scale correction run bounds")
+        group = sorted(group, key=lambda item: item["date"])
+        if [item["date"] for item in group] != list(dates[start:end+1]):
+            raise ValueError("Incomplete or noncontiguous scale correction run")
+        runs.append((start, end, group))
+    runs.sort(key=lambda run: (run[0], run[1]))
+    if any(right[0] <= left[1] + 1 for left, right in zip(runs, runs[1:])):
+        raise ValueError("Adjacent or overlapping scale correction runs")
+    return runs
+
+
 def scale_run_original_reason(previous, currents, following):
     if any(violation(row) for row in (previous, *currents, following)):
         return "invalid-original-or-neighbor"
