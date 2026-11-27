@@ -46,7 +46,7 @@ class ClientTest(unittest.TestCase):
         self.addCleanup(p.stop)
 
     def test_disabled_or_unsupported_no_http(self):
-        for symbol in ("^GSPC", "FX-USDJPY", "CMD-GOLD", "2330.TW", "1234.TWO", "BTC-USD", "GC=F"):
+        for symbol in ("^GSPC", "FX-USDJPY", "FX-X", "CMD-GOLD", "CMD-X", "2330.TW", "1234.TWO", "BTC-USD", "GC=F"):
             self.assertIsNone(a.alpaca_symbol(symbol))
             self.assertIsNone(a.alpaca_bar(symbol, DAY))
         self.assertEqual(a.alpaca_symbol("BRK-B"), "BRK.B")
@@ -144,6 +144,71 @@ class AcceptanceTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 k.fill_missing_bar(path, "AAPL", day, values, URL, NOW.isoformat(), self.log)
         self.assertEqual(path.read_bytes(), before)
+
+
+class HistoricalToolsTest(unittest.TestCase):
+    def setUp(self):
+        from scripts import kline_archive as archive
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "main"
+        self.archive = Path(tmp.name) / "archive"
+        self.path = self.root / "data/AAPL.csv"
+        self.path.parent.mkdir(parents=True)
+        self.log = self.root / archive.LOG
+        self.path.write_text("Date,Open,High,Low,Close,Volume\n2024-07-01,10,12,9,11,100\n2024-07-03,10,12,9,11,100\n")
+        archive.initialize(self.archive)
+        archive.put_symbol(self.archive, "AAPL",
+                           [("2024-07-01", 10, 12, 9, 11, 100),
+                            ("2024-07-03", 10, 12, 9, 11, 100)])
+        archive.update_manifest(self.archive)
+        k.log_event("AAPL", "2024-07-02", "rejected", old=BAR | {"Low": 13},
+                    reason="invalid-OHLC-bounds", log_path=self.log)
+        for target, value in [("enabled", True), ("prefetch", True)]:
+            p = patch.object(a, target, return_value=value)
+            p.start()
+            self.addCleanup(p.stop)
+        p = patch("requests.get")
+        self.http = p.start()
+        self.addCleanup(p.stop)
+
+    def snapshot(self):
+        return {str(p): p.read_bytes() for p in self.root.parent.rglob("*") if p.is_file()}
+
+    def test_repair_dry_run_and_apply_both_permanent_copies(self):
+        from scripts import repair_us_bars_alpaca as repair
+        from scripts import kline_archive as archive
+        before = self.snapshot()
+        with patch.object(a, "alpaca_bar", return_value=(BAR, URL, NOW.isoformat())):
+            report = repair.run(self.root, self.archive)
+            self.assertEqual(self.snapshot(), before)
+            self.assertEqual(report["operations"][0]["destinations"], ["data/AAPL.csv", "archive"])
+            repair.run(self.root, self.archive, apply=True)
+            self.assertFalse(repair.run(self.root, self.archive)["operations"])
+        self.assertEqual(list(pd.read_csv(self.path).Date), ["2024-07-01", "2024-07-02", "2024-07-03"])
+        self.assertEqual([r[0] for r in archive.symbol_rows(self.archive, "AAPL")],
+                         ["2024-07-01", "2024-07-02", "2024-07-03"])
+        for log in (self.log, self.archive / archive.LOG):
+            self.assertTrue(any(e["status"] == "corrected" and e["sourceUrl"] == URL
+                                for e in k.read_log(log)["events"]))
+        archive.verify(self.archive)
+        self.http.assert_not_called()
+
+    def test_comparison_reports_price_volume_and_missing_dates_without_writes(self):
+        from scripts import compare_us_bars_alpaca as compare
+        before = self.snapshot()
+        def bar(symbol, day):
+            if day == "2024-07-03":
+                return None
+            return BAR | {"Volume": 50}, URL, NOW.isoformat()
+        with patch.object(a, "alpaca_bar", side_effect=bar):
+            report = compare.compare(self.root, 1, 2)
+        self.assertEqual(report["pricesPct"]["Close"]["median"], 0)
+        self.assertEqual(report["volumeRatio"]["median"], 2)
+        self.assertEqual(report["yahooOnly"], [["AAPL", "2024-07-03"]])
+        self.assertEqual(report["alpacaOnly"], [["AAPL", "2024-07-02"]])
+        self.assertEqual(self.snapshot(), before)
+        self.http.assert_not_called()
 
 
 if __name__ == "__main__":
