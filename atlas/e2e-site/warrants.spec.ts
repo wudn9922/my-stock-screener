@@ -30,6 +30,12 @@ const list = (page: Page) => page.getByLabel('權證清單').getByRole('article'
 const row = (page: Page, symbol: string) => list(page).and(page.getByRole('article', { name: symbol, exact: true }));
 const section = (page: Page, name: string) => page.getByRole('navigation', { name: '市場分頁' }).getByRole('link', { name, exact: true });
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(complete => { resolve = complete; });
+  return { promise, resolve };
+}
+
 test('ranks every matching warrant across sequential quote batches before paging', async ({ page }, info) => {
   await site(page, CLOSE * 1_000 + 30 * 60_000);
   const rows = Array.from({ length: 24 }, (_, i) => warrant(
@@ -97,8 +103,8 @@ test('expires intraday prices, stops off-page and hidden requests, and starts af
   await page.route('**/report/warrants/2330.TW.json', route => route.fulfill({ json: file('2330.TW', [warrant('066186')]) }));
   await page.route('**/report/warrants/6488.TWO.json', route => route.fulfill({ json: file('6488.TWO', [warrant('714060', 'put', '2027-01-08', 'TPEx')]) }));
   const requests: string[] = [];
-  const returning = Promise.withResolvers<void>();
-  const previousSymbol = Promise.withResolvers<void>();
+  const returning = deferred();
+  const previousSymbol = deferred();
   const cancellations: string[] = [];
   page.on('requestfailed', request => {
     const query = new URL(request.url()).searchParams.get('warrantQuotes');
