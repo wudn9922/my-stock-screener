@@ -436,7 +436,8 @@ def _write_preserving_lines(path, updates):
     _atomic(path, lines[0] + "".join(records[d] for d in sorted(records)))
 
 
-def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None):
+def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None,
+                reason="verified-official-correction"):
     if violation(values):
         raise ValueError("Refusing an invalid replacement")
     frame = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP)
@@ -447,7 +448,7 @@ def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None
     new = bar_values(values)
     if old != new:
         log_event(symbol, day, "corrected", old=old, new=new, source_url=source_url,
-                  fetched_at=fetched_at, reason="verified-official-correction", log_path=log_path)
+                  fetched_at=fetched_at, reason=reason, log_path=log_path)
         for field in FIELDS:
             frame.loc[target, field] = values[field]
         _write_preserving_lines(path, frame.loc[[target]])
