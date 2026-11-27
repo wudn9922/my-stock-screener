@@ -12,6 +12,7 @@ import { LEVEL_TEXT } from '../ui/financials/qualityLabels';
 import { usePageActive } from '../app/pageActivity';
 import { chartList } from '../app/listContext';
 import { ScreenerChanges } from '../ui/ScreenerChanges';
+import { SignalOutcomesCard } from '../ui/SignalOutcomesCard';
 import {
   fetchTrendingStocks, LINE_TRENDING_GROUP_KEY, trendingStocksGroup, trendingStocksStale, type TrendingStocksResult,
 } from '../report/trendingStocks';
@@ -698,6 +699,7 @@ function ScreenerView({
       <GroupChips groups={groups} active={group.key} universeCounts={universeCounts} trendingGroup={trendingGroup} onChange={changeGroup}
         compactMarket={compact ? market : undefined} />
       {!compact && changes}
+      {!compact && !isTrending && <SignalOutcomesCard market={market} />}
       <div className="screener-tools">
         <label className="filter-field">
           <Search size={compact ? 18 : 15} aria-hidden="true" />
@@ -962,6 +964,7 @@ function ScreenerView({
     </div>
     {/* Phone and tablet: below the list (which fills the screen above the dock), before the page footer. */}
     {compact && changes}
+    {compact && !isTrending && <SignalOutcomesCard market={market} />}
     </>
   );
 }
