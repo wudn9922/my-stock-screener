@@ -1,0 +1,9 @@
+.signal-outcomes { min-width: 0; width: 100%; }
+.signal-outcomes > summary { cursor: pointer; padding: 12px 14px; font-weight: 650; }
+.signal-window { display: flex; gap: 8px; flex-wrap: wrap; }
+.signal-window button { border: 1px solid currentColor; border-radius: 8px; padding: 8px 12px; background: transparent; color: inherit; font: inherit; }
+.signal-window button[aria-pressed="true"] { font-weight: 700; background: color-mix(in srgb, currentColor 12%, transparent); }
+.signal-cohort { min-width: 0; margin-top: 14px; }
+.signal-cohort h3 { font-size: 15px; margin: 8px 0; }
+.signal-horizon { margin: 8px 0; min-width: 0; }
+.signal-outcomes .bo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
