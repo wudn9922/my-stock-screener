@@ -332,6 +332,132 @@ class ScaleTests(unittest.TestCase):
         self.assertEqual({i["reason"] for i in report["skipped"]}, {"invalid-source-bar", "neighbor-close-mismatch-25pct"})
         self.assertEqual(self.snapshot(), before)
 
+    def set_run_fixture(self, dates, closes, symbol="AAPL", *, archived=False):
+        from scripts import kline_archive as archive
+        self.main.unlink()
+        self.tw.unlink()
+        self.main = self.root / "data" / (symbol + ".csv")
+        rows = [(day, close, close, close, close, 100) for day, close in zip(dates, closes)]
+        self.main.write_text(archive.csv_text(rows))
+        if archived:
+            # A different symbol keeps the original single-bar fixture independent.
+            archive.put_symbol(self.archive, symbol, rows)
+            archive.update_manifest(self.archive)
+            self.git("add", ".")
+            self.git("commit", "-m", "run baseline")
+            self.base = self.git("rev-parse", "HEAD")
+        return rows
+
+    def test_run_detector(self):
+        self.assertEqual(k.scale_run_bounds([615, 611, 63.3, 63.1, 635, 65.1, 66.8]), [(2, 3)])
+        self.assertEqual(k.scale_run_bounds([169.96, 82.875, 167.11, 85.435]), [(1, 1), (2, 2)])
+        self.assertEqual(k.scale_run_bounds([100, 50, 51, 49, 102]), [(1, 3)])
+        self.assertEqual(k.scale_run_bounds([100, 50, 51, 49, 50, 102]), [])
+        self.assertEqual(k.scale_run_bounds([100, 50, 51, 49, 50, 50]), [])
+        self.assertEqual(k.scale_run_bounds([100, 50, 25, 100]), [])
+        self.assertEqual(k.scale_run_bounds([100, 50, 50, 100, 100, 50]), [(1, 2), (3, 4)])
+
+    def test_poya_two_bar_official_repair(self):
+        from scripts import repair_scale_outliers as scale
+        dates = ["2026-07-17", "2026-07-20", "2026-07-21", "2026-07-22",
+                 "2026-07-23", "2026-07-24", "2026-07-27"]
+        self.set_run_fixture(dates, [615, 611, 63.3, 63.1, 635, 65.1, 66.8], "5904.TWO")
+        before = self.snapshot()
+        def official(symbol, day):
+            close = {"2026-07-21": 633, "2026-07-22": 631}[day]
+            return dict(Open=close, High=close, Low=close, Close=close, Volume=100), "https://www.tpex.org.tw/test", NOW.isoformat()
+        with patch.object(a, "alpaca_bar", return_value=None), patch.object(k, "official_bar", side_effect=official) as tw:
+            report = scale.plan_scale(self.root, self.archive)
+        self.assertEqual([i["date"] for i in report["operations"]], dates[2:4])
+        self.assertEqual([call.args for call in tw.call_args_list], [("5904.TWO", day) for day in dates[2:4]])
+        self.assertNotIn(dates[4], [i["date"] for i in report["operations"] + report["skipped"]])
+        self.assertEqual(self.snapshot(), before)
+        summary = scale.markdown(report)
+        self.assertEqual(summary.count("run 2026-07-21..2026-07-22"), 2)
+        scale.apply_scale(self.root, self.archive, report)
+        self.assertEqual(pd.read_csv(self.main).Close.tolist(), [615, 611, 633, 631, 635, 65.1, 66.8])
+        events = k.read_log(self.log)["events"]
+        self.assertEqual({(e["date"], e["reason"]) for e in events},
+                         {(day, "scale-outlier-corrected") for day in dates[2:4]})
+
+    def test_aph_singleton_source_disambiguation_preserved(self):
+        from scripts import repair_scale_outliers as scale
+        dates = ["2026-08-12", "2026-08-13", "2026-08-14", "2026-08-17"]
+        self.set_run_fixture(dates, [169.96, 82.875, 167.11, 85.435], "APH")
+        def us(symbol, day, adjustment):
+            if symbol != "APH":
+                return None
+            close = {"2026-08-13": 165.75, "2026-08-14": 167.11}[day]
+            return dict(Open=close, High=close, Low=close, Close=close, Volume=100), URL, NOW.isoformat()
+        with patch.object(a, "alpaca_bar", side_effect=us), patch.object(k, "official_bar") as tw:
+            report = scale.plan_scale(self.root, self.archive)
+        tw.assert_not_called()
+        self.assertEqual([i["date"] for i in report["operations"]], [dates[1]])
+        self.assertEqual([i["reason"] for i in report["skipped"] if i["symbol"] == "APH"],
+                         ["neighbor-close-mismatch-25pct"])
+
+    def test_run_any_failed_source_rejects_every_bar(self):
+        from scripts import repair_scale_outliers as scale
+        dates = ["2024-12-27", "2024-12-30", "2024-12-31", "2025-01-02"]
+        self.set_run_fixture(dates, [100, 50, 51, 100], "GORO", archived=True)
+        before = self.snapshot()
+        far = dict(Open=50, High=51, Low=49, Close=50, Volume=100)
+        for failed, reason in [(None, "no-source-bar"), ((far, URL, NOW.isoformat()), "neighbor-close-mismatch-25pct"),
+                               ((self.new | {"Low": 150}, URL, NOW.isoformat()), "invalid-source-bar")]:
+            with self.subTest(reason=reason):
+                def us(symbol, day, adjustment):
+                    if symbol != "GORO":
+                        return None
+                    return failed if day == dates[2] else (self.new, URL, NOW.isoformat())
+                with patch.object(a, "alpaca_bar", side_effect=us):
+                    report = scale.plan_scale(self.root, self.archive)
+                self.assertFalse(report["operations"])
+                skipped = [i for i in report["skipped"] if i["symbol"] == "GORO"]
+                self.assertEqual(len(skipped), 4)
+                self.assertEqual({i["reason"] for i in skipped},
+                                 {reason, "run-rejected:" + dates[2] + ":" + reason})
+                self.assertEqual(self.snapshot(), before)
+
+    def test_conflicting_runs_never_repair(self):
+        from scripts import repair_scale_outliers as scale
+        dates = ["2024-12-24", "2024-12-26", "2024-12-27", "2024-12-30", "2024-12-31", "2025-01-02"]
+        self.set_run_fixture(dates, [100, 50, 50, 100, 100, 50], "GORO")
+        with patch.object(a, "alpaca_bar", return_value=None) as us:
+            report = scale.plan_scale(self.root, self.archive)
+        self.assertFalse(report["operations"])
+        self.assertEqual({i["reason"] for i in report["skipped"] if i["symbol"] == "GORO"},
+                         {"adjacent-corrections-ambiguous"})
+        self.assertFalse(any(call.args[0] == "GORO" for call in us.call_args_list))
+
+    def test_cross_year_run_archive_validation_and_partial_rejection(self):
+        from scripts import repair_scale_outliers as scale
+        from scripts import kline_archive as archive
+        dates = ["2024-12-30", "2024-12-31", "2025-01-02", "2025-01-03"]
+        self.set_run_fixture(dates, [100, 50, 51, 100], "GORO", archived=True)
+        before = self.snapshot()
+        def us(symbol, day, adjustment):
+            return (self.new, URL, NOW.isoformat()) if symbol == "GORO" else None
+        with patch.object(a, "alpaca_bar", side_effect=us):
+            report = scale.plan_scale(self.root, self.archive)
+        self.assertEqual(len(report["operations"]), 4)
+        self.assertEqual(self.snapshot(), before)
+        partial = report | {"operations": [i for i in report["operations"] if i["date"] != dates[2]]}
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            scale.apply_scale(self.root, self.archive, partial)
+        self.assertEqual(self.snapshot(), before)
+        scale.apply_scale(self.root, self.archive, report)
+        self.assertEqual(pd.read_csv(self.main).Close.tolist(), [100, 100, 100, 100])
+        self.assertEqual([float(row[4]) for row in archive.symbol_rows(self.archive, "GORO")], [100]*4)
+        self.assertEqual({e["date"] for e in k.read_log(self.log)["events"]}, set(dates[1:3]))
+        archive.verify(self.archive, base=self.base)
+        # Cross-year verification must not trust an audit for one year's fragment.
+        path = self.archive / "us/GORO/2025.csv"
+        path.write_text(path.read_text().replace("2025-01-03,100.0000,100.0000,100.0000,100.0000,100",
+                                                "2025-01-03,101.0000,101.0000,101.0000,101.0000,100"))
+        archive.update_manifest(self.archive)
+        with self.assertRaises(ValueError):
+            archive.verify(self.archive, base=self.base)
+
     def test_correct_bar_default_reason(self):
         k.correct_bar(self.main, "AAPL", "2024-12-31", self.new, URL, NOW.isoformat(), self.log)
         self.assertEqual(k.read_log(self.log)["events"][-1]["reason"], "verified-official-correction")

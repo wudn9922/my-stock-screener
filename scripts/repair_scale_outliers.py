@@ -32,11 +32,8 @@ def adjustment(destination):
 
 
 def candidates(frame):
-    """Scan closes cheaply; validate all OHLCV only for candidate triples."""
-    closes = frame["Close"].tolist()
-    for i in range(1, len(closes) - 1):
-        if k.isolated_scale(closes[i-1], closes[i], closes[i+1]):
-            yield i
+    """Yield inclusive run bounds, leaving row validation to the planner."""
+    yield from k.scale_run_bounds(frame["Close"].tolist())
 
 
 def _blocked(journal):
@@ -58,76 +55,111 @@ def _prefetch(targets):
             raise RuntimeError("Alpaca batch fetch failed; refusing incomplete audit")
 
 
+def _check_source(item):
+    symbol, day, destination = item["symbol"], item["date"], item["destination"]
+    basis = adjustment(destination)
+    try:
+        if alpaca.alpaca_symbol(symbol):
+            result = alpaca.alpaca_bar(symbol, day, adjustment=basis)
+        else:
+            result = k.official_bar(symbol, day)
+    except Exception as exc:
+        return "source-error:" + type(exc).__name__
+    if result is None:
+        return "no-source-bar"
+    values, url, fetched = result
+    item.update(new=k.bar_values(values), sourceUrl=url, fetchedAt=fetched)
+    failure = k.scale_source_reason(item["previous"], item["following"], values)
+    if not failure and alpaca.alpaca_symbol(symbol):
+        other_basis = alpaca.ARCHIVE_ADJUSTMENT if basis == alpaca.MAIN_ADJUSTMENT else alpaca.MAIN_ADJUSTMENT
+        other = alpaca.alpaca_bar(symbol, day, adjustment=other_basis)
+        if other is None or k.violation(other[0]):
+            failure = "no-valid-alternate-basis"
+        elif abs(float(values["Close"]) / float(other[0]["Close"]) - 1) > .01:
+            refs = pd.DataFrame([item["previous"], item["following"]],
+                                index=pd.to_datetime(item["neighborDates"]))
+            failure = basis_witness_reason(symbol, day, refs, set(), basis)
+    if not failure and destination == "archive":
+        try:
+            archive.normalize([day] + [values.get(f) for f in k.FIELDS])
+        except (ValueError, ArithmeticError):
+            failure = "archive-price-or-volume-not-representable"
+    return failure
+
+
+def _reject_run(items, reason):
+    for item in items:
+        if not item["reason"]:
+            item["reason"] = reason
+
+
+def _reject_conflicts(runs, *, multi_only=False):
+    """Compare ranges in the original frame, not just calendar adjacency."""
+    conflicts = set()
+    for i, (start, end, items) in enumerate(runs):
+        for j in range(i+1, len(runs)):
+            next_start, next_end, other = runs[j]
+            if next_start > end + 1:
+                break
+            if multi_only and start == end and next_start == next_end:
+                continue
+            if not multi_only and (any(item["reason"] for item in items)
+                                   or any(item["reason"] for item in other)):
+                continue
+            conflicts.update((i, j))
+    for i in conflicts:
+        _reject_run(runs[i][2], "adjacent-corrections-ambiguous")
+
+
 def plan_scale(root, archive_dir):
-    pending = []
+    all_runs = []
     targets = set()
     blocked = {}
     for symbol, destination, frame, journal in stores(root, archive_dir):
         if journal not in blocked:
             blocked[journal] = _blocked(journal)
         excluded = blocked[journal][symbol]
-        for i in candidates(frame):
-            dates = [str(d.date()) for d in frame.index[i-1:i+2]]
-            previous, current, following = [k.bar_values(row) for _, row in frame.iloc[i-1:i+2].iterrows()]
-            day = dates[1]
-            item = dict(symbol=symbol, destination=destination, date=day, old=current, new=None,
-                        sourceUrl=None, fetchedAt=None, reason=None,
-                        previous=previous, following=following, neighborDates=[dates[0], dates[2]])
+        runs = []
+        for start, end in candidates(frame):
+            dates = [str(d.date()) for d in frame.index[start-1:end+2]]
+            previous, *currents, following = [k.bar_values(row) for _, row in frame.iloc[start-1:end+2].iterrows()]
+            reason = None
             if any(d in excluded for d in dates):
-                item["reason"] = "quarantined-original-or-neighbor"
-            elif any(k.violation(row) for row in (previous, current, following)):
-                item["reason"] = "invalid-original-or-neighbor"
-            elif not k.session_complete(dates[2], symbol):
-                item["reason"] = "unfinished-neighbor-session"
-            elif alpaca.alpaca_symbol(symbol):
+                reason = "quarantined-original-or-neighbor"
+            else:
+                reason = k.scale_run_original_reason(previous, currents, following)
+            if not reason and not k.session_complete(dates[-1], symbol):
+                reason = "unfinished-neighbor-session"
+            if not reason and alpaca.alpaca_symbol(symbol):
                 if not alpaca.enabled():
-                    item["reason"] = "alpaca-disabled"
+                    reason = "alpaca-disabled"
                 else:
-                    # Both bases are fetched to detect small corporate-action scale differences.
                     for basis in (alpaca.MAIN_ADJUSTMENT, alpaca.ARCHIVE_ADJUSTMENT):
                         for d in dates:
                             targets.add((symbol, d, basis))
-            pending.append(item)
+            items = [dict(symbol=symbol, destination=destination, date=day, old=current, new=None,
+                          sourceUrl=None, fetchedAt=None, reason=reason,
+                          previous=previous, following=following, neighborDates=[dates[0], dates[-1]],
+                          runStart=dates[1], runEnd=dates[-2])
+                     for day, current in zip(dates[1:-1], currents)]
+            runs.append((start, end, items))
+        # Multi-bar structural conflicts are ambiguous even before source checks.
+        # For singletons retain the previous behavior: only independently
+        # eligible adjacent hypotheses conflict (e.g. the APH split boundary).
+        _reject_conflicts(runs, multi_only=True)
+        all_runs.append(runs)
     _prefetch(targets)
-    for item in pending:
-        if item["reason"]:
-            continue
-        symbol, day, destination = item["symbol"], item["date"], item["destination"]
-        basis = adjustment(destination)
-        try:
-            if alpaca.alpaca_symbol(symbol):
-                result = alpaca.alpaca_bar(symbol, day, adjustment=basis)
-            else:
-                result = k.official_bar(symbol, day)
-        except Exception as exc:
-            item["reason"] = "source-error:" + type(exc).__name__
-            continue
-        if result is None:
-            item["reason"] = "no-source-bar"
-            continue
-        values, url, fetched = result
-        item.update(new=k.bar_values(values), sourceUrl=url, fetchedAt=fetched)
-        failure = k.scale_replacement_reason(item["previous"], item["old"], item["following"], values)
-        if not failure and alpaca.alpaca_symbol(symbol):
-            other_basis = alpaca.ARCHIVE_ADJUSTMENT if basis == alpaca.MAIN_ADJUSTMENT else alpaca.MAIN_ADJUSTMENT
-            other = alpaca.alpaca_bar(symbol, day, adjustment=other_basis)
-            if other is None or k.violation(other[0]):
-                failure = "no-valid-alternate-basis"
-            elif abs(float(values["Close"]) / float(other[0]["Close"]) - 1) > .01:
-                refs = pd.DataFrame([item["previous"], item["following"]],
-                                    index=pd.to_datetime(item["neighborDates"]))
-                failure = basis_witness_reason(symbol, day, refs, set(), basis)
-        if not failure and destination == "archive":
-            try:
-                archive.normalize([day] + [values.get(f) for f in k.FIELDS])
-            except (ValueError, ArithmeticError):
-                failure = "archive-price-or-volume-not-representable"
-        item["reason"] = failure
-    # Do not apply adjacent accepted candidates: their witnesses would change.
-    accepted = {(i["symbol"], i["destination"], i["date"]) for i in pending if not i["reason"]}
-    for item in pending:
-        if not item["reason"] and any((item["symbol"], item["destination"], d) in accepted for d in item["neighborDates"]):
-            item["reason"] = "adjacent-corrections-ambiguous"
+    for runs in all_runs:
+        for _, _, items in runs:
+            if any(item["reason"] for item in items):
+                continue
+            for item in items:
+                item["reason"] = _check_source(item)
+            failed = next((item for item in items if item["reason"]), None)
+            if failed:
+                _reject_run(items, "run-rejected:" + failed["date"] + ":" + failed["reason"])
+        _reject_conflicts(runs)
+    pending = [item for runs in all_runs for _, _, items in runs for item in items]
     return dict(mode="scale-outliers", candidates=len(pending),
                 operations=[i for i in pending if not i["reason"]],
                 skipped=[i for i in pending if i["reason"]])
@@ -136,24 +168,34 @@ def plan_scale(root, archive_dir):
 def apply_scale(root, archive_dir, report):
     root, archive_dir = Path(root), Path(archive_dir)
     archive_ops = defaultdict(list)
-    main_ops = []
+    main_runs = defaultdict(list)
     for item in report["operations"]:
         symbol, day, destination = item["symbol"], item["date"], item["destination"]
+        run = (item["runStart"], item["runEnd"])
         if destination == "archive":
-            archive_ops[symbol].append(dict(date=day,
+            archive_ops[symbol].append(dict(date=day, runStart=run[0], runEnd=run[1],
                 old=list(archive.normalize([day] + [item["old"][f] for f in k.FIELDS])),
                 new=list(archive.normalize([day] + [item["new"][f] for f in k.FIELDS])),
                 sourceUrl=item["sourceUrl"], fetchedAt=item["fetchedAt"]))
         else:
-            path = root / destination
-            frame = read_main(path).sort_index()
-            pos = frame.index.get_loc(pd.Timestamp(day))
-            if pos <= 0 or pos >= len(frame) - 1 or k.bar_values(frame.iloc[pos]) != item["old"]:
-                raise ValueError("Main scale repair changed after planning")
-            prev, current, next_ = [frame.iloc[j] for j in (pos-1, pos, pos+1)]
-            if k.scale_replacement_reason(prev, current, next_, item["new"]):
+            main_runs[(root / destination, symbol)].append(item)
+    main_ops = []
+    for (path, symbol), items in main_runs.items():
+        frame = read_main(path).sort_index()
+        dates = [str(d.date()) for d in frame.index]
+        groups = k.validate_scale_run_groups(dates, items)
+        blocked = k.quarantined_dates(symbol, root / archive.LOG)
+        for start, end, group in groups:
+            previous, *currents, following = [k.bar_values(row) for _, row in frame.iloc[start-1:end+2].iterrows()]
+            if (any(d in blocked for d in dates[start-1:end+2])
+                    or k.scale_run_original_reason(previous, currents, following)):
                 raise ValueError("Main scale repair no longer passes guards")
-            main_ops.append((path, item))
+            for current, item in zip(currents, group):
+                if current != item["old"]:
+                    raise ValueError("Main scale repair changed after planning")
+                if k.scale_source_reason(previous, following, item["new"]):
+                    raise ValueError("Main scale repair no longer passes guards")
+                main_ops.append((path, item))
     for symbol, entries in archive_ops.items():
         archive._validate_scale_changes(symbol, archive.symbol_rows(archive_dir, symbol), entries)
     for symbol, entries in archive_ops.items():
@@ -228,10 +270,15 @@ def markdown(report):
              f"reported/skipped: {len(report['skipped'])}"]
     if "checked" in report:
         lines.append(f"Compared permanent copies: {report['checked']}; raw main / split archive.")
+    scale_mode = report["mode"] == "scale-outliers"
     lines += ["", "Old/new fields: Open/High/Low/Close/Volume.", "",
-              "| Symbol | Date | Destination | Old | New | Source | Result |",
-              "|---|---|---|---|---|---|---|"]
-    for item in sorted(report["operations"] + report["skipped"], key=lambda i: (i["symbol"], i["date"], i["destination"])):
+              "| Symbol | Date | Destination | Old | New | Source | Result |" + (" Run |" if scale_mode else ""),
+              "|---|---|---|---|---|---|---|" + ("---|" if scale_mode else "")]
+    def order(item):
+        if scale_mode:
+            return (item["symbol"], item["destination"], item["runStart"], item["runEnd"], item["date"])
+        return (item["symbol"], item["date"], item["destination"])
+    for item in sorted(report["operations"] + report["skipped"], key=order):
         source = item.get("sourceUrl") or "-"
         if source != "-":
             from urllib.parse import urlparse, parse_qs
@@ -241,6 +288,7 @@ def markdown(report):
         reason = item.get("reason") or "eligible"
         if "differencePct" in item:
             reason += f" ({max(item['differencePct'].values()):.4g}%)"
+        run = f" run {item['runStart']}..{item['runEnd']} |" if scale_mode else ""
         lines.append(f"| {item['symbol']} | {item['date']} | {item['destination']} | {bar(item.get('old'))} | "
-                     f"{bar(item.get('new'))} | {source} | {reason} |")
+                     f"{bar(item.get('new'))} | {source} | {reason} |" + run)
     return "\n".join(lines) + "\n"
