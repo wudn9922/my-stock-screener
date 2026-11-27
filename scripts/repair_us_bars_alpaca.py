@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -48,6 +49,20 @@ def neighbor_reason(frame, day, values, blocked):
     return None
 
 
+def basis_witness_reason(symbol, day, frame, blocked, basis):
+    stamp = pd.Timestamp(day)
+    rows = [(d, row) for d, row in frame.sort_index().iterrows()
+            if d != stamp and str(d.date()) not in blocked and not k.violation(row)]
+    refs = [(d, row) for d, row in rows if d < stamp][-1:] + [(d, row) for d, row in rows if d > stamp][:1]
+    if not refs:
+        return "no-basis-witness"
+    for d, row in refs:
+        result = alpaca.alpaca_bar(symbol, str(d.date()), adjustment=basis)
+        if result is None or k.violation(result[0]) or abs(float(row["Close"]) / float(result[0]["Close"]) - 1) > .03 + 1e-12:
+            return "destination-basis-unconfirmed"
+    return None
+
+
 def plan(root, archive_dir):
     root, archive_dir = Path(root), Path(archive_dir)
     journal = root / archive.LOG
@@ -65,8 +80,9 @@ def plan(root, archive_dir):
         groups[day[:4]].append((symbol, day))
     for entries in groups.values():
         days = [d for _, d in entries]
-        if alpaca.prefetch({s for s, _ in entries}, min(days), max(days)) is None:
-            raise RuntimeError("Alpaca batch fetch failed; refusing an incomplete repair")
+        for adjustment in (alpaca.MAIN_ADJUSTMENT, alpaca.ARCHIVE_ADJUSTMENT):
+            if alpaca.prefetch({s for s, _ in entries}, min(days), max(days), adjustment=adjustment) is None:
+                raise RuntimeError("Alpaca batch fetch failed; refusing an incomplete repair")
     main_paths = defaultdict(list)
     for path in (root / "data").rglob("*.csv"):
         if alpaca.alpaca_symbol(path.stem):
@@ -91,38 +107,55 @@ def plan(root, archive_dir):
             reason = "no-existing-permanent-symbol"
         elif not missing:
             reason = "already-present-in-all-copies"
-        result = None if reason else alpaca.alpaca_bar(symbol, day)
-        if not reason and result is None:
-            reason = "no-alpaca-bar"
+        pending = []
         if not reason:
-            values, url, fetched = result
-            reason = k.violation(values)
-            if not reason:
-                # A valid rejected Yahoo close is a second, tighter guard.
-                old = event.get("old") or {}
-                try:
-                    old_close = float(old.get("Close"))
-                except (TypeError, ValueError):
-                    old_close = float("nan")
-                import math
-                if math.isfinite(old_close) and old_close > 0 and abs(float(values["Close"]) / old_close - 1) > .03 + 1e-12:
+            sources = {basis: alpaca.alpaca_bar(symbol, day, adjustment=basis)
+                       for basis in (alpaca.MAIN_ADJUSTMENT, alpaca.ARCHIVE_ADJUSTMENT)}
+            # The rejected Yahoo download was split-adjusted; compare that
+            # observation with the same basis, not the main raw destination.
+            old = event.get("old") or {}
+            try:
+                old_close = float(old.get("Close"))
+            except (TypeError, ValueError):
+                old_close = math.nan
+            split = sources[alpaca.ARCHIVE_ADJUSTMENT]
+            if math.isfinite(old_close) and old_close > 0:
+                if split is None or k.violation(split[0]):
+                    reason = "no-valid-split-reference"
+                elif abs(float(split[0]["Close"]) / old_close - 1) > .03 + 1e-12:
                     reason = "rejected-close-mismatch-3pct"
-            if not reason:
-                for name, frame, blocked in copies:
-                    reason = neighbor_reason(frame, day, values, blocked)
-                    if reason:
-                        reason = name + ":" + reason
-                        break
-            if not reason and "archive" in missing:
-                try:
-                    archive.normalize([day] + [values.get(f) for f in k.FIELDS])
-                except (ValueError, ArithmeticError):
-                    reason = "archive-price-or-volume-not-representable"
+            for name, frame, blocked in copies:
+                if reason:
+                    break
+                basis = alpaca.ARCHIVE_ADJUSTMENT if name == "archive" else alpaca.MAIN_ADJUSTMENT
+                result = sources[basis]
+                if result is None:
+                    reason = name + ":no-alpaca-bar"
+                    break
+                values, url, fetched = result
+                failure = k.violation(values) or neighbor_reason(frame, day, values, blocked)
+                # When raw/split disagree materially, require same-date
+                # independent witnesses for the destination basis. A 25% price
+                # continuity check alone cannot distinguish a 5:4 split.
+                other = sources[alpaca.ARCHIVE_ADJUSTMENT if basis == alpaca.MAIN_ADJUSTMENT else alpaca.MAIN_ADJUSTMENT]
+                if not failure and name in missing and other and not k.violation(other[0]) and abs(float(values["Close"]) / float(other[0]["Close"]) - 1) > .01:
+                    failure = basis_witness_reason(symbol, day, frame, blocked, basis)
+                if not failure and name == "archive" and name in missing:
+                    try:
+                        archive.normalize([day] + [values.get(f) for f in k.FIELDS])
+                    except (ValueError, ArithmeticError):
+                        failure = "archive-price-or-volume-not-representable"
+                if failure:
+                    reason = name + ":" + failure
+                    break
+                if name in missing:
+                    pending.append(dict(symbol=symbol, date=day, destinations=[name],
+                                        adjustment=basis, values=k.bar_values(values),
+                                        sourceUrl=url, fetchedAt=fetched))
         if reason:
             skipped.append(dict(symbol=symbol, date=day, reason=reason))
         else:
-            operations.append(dict(symbol=symbol, date=day, destinations=missing,
-                                   values=k.bar_values(values), sourceUrl=url, fetchedAt=fetched))
+            operations.extend(pending)
     return dict(candidates=len(events), operations=operations, skipped=skipped)
 
 
@@ -163,10 +196,8 @@ def apply_plan(root, archive_dir, report):
                 if target != "archive":
                     k.fill_missing_bar(root / target, symbol, day, values,
                                        op["sourceUrl"], op["fetchedAt"], journal)
-            # Also record archive-only repairs in the main rejection journal.
-            k.log_event(symbol, day, "corrected", new=k.bar_values(values),
-                        source_url=op["sourceUrl"], fetched_at=op["fetchedAt"],
-                        reason="missing-bar-filled-alpaca", log_path=journal)
+            # Archive-only repairs belong to the archive journal. Do not
+            # mislabel split prices as main raw prices in the main journal.
 
 
 def run(root, archive_dir, apply=False):
