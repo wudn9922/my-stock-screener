@@ -185,7 +185,7 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     const view = resolved?.page === 'world' && resolved.view ? resolved.view : params.get('view')?.trim().toLowerCase();
     route = view === 'indices' || view === 'commodities' || view === 'fx' || view === 'jp-bonds' ? { page, view } : { page };
   } else if (page === 'warrants') {
-    route = { page, ...(symbol && /^(?:[0-9A-Z]{1,10}\.TWO?|\^[A-Z0-9]{1,10})$/.test(symbol) ? { symbol } : {}) };
+    route = { page, ...(symbol && /^(?:[0-9]{4,6}[A-Z]?\.TWO?|\^[A-Z0-9]{1,12}|IX[0-9]{4})$/.test(symbol) ? { symbol } : {}) };
   } else if (page === 'financials') {
     const p = params.get('p')?.trim().toLowerCase();
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));

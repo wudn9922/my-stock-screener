@@ -3,6 +3,9 @@
 .warrant-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,120px),1fr)); gap: 8px; margin-top: 12px; }
 .warrant-filters label { display: grid; gap: 4px; min-width: 0; }
 .warrant-filters input,.warrant-filters select { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; }
+.warrant-coverage { margin: 8px 0 12px; }
+.warrant-coverage p { margin: 4px 0; }
+.warrant-coverage button { min-height: 44px; margin-top: 4px; }
 .warrant-paging { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .warrant-paging button { min-height: 44px; }
 .warrant-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); margin: 12px 0; }

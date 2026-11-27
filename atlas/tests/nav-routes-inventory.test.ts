@@ -17,6 +17,7 @@ const cases: Case[] = [
     { input: `?page=market&market=${market}`, route: { page: 'markets' as const, market }, canonical: `?page=markets&market=${market}`, rewrite: true },
   ]),
   { input: '?page=warrants&symbol=2330.TW', route: { page: 'warrants', symbol: '2330.TW' }, canonical: '?page=warrants&symbol=2330.TW', rewrite: false },
+  { input: '?page=warrants&symbol=IX0007', route: { page: 'warrants', symbol: 'IX0007' }, canonical: '?page=warrants&symbol=IX0007', rewrite: false },
   { input: '?page=world', route: { page: 'world' }, canonical: '?page=world', rewrite: false },
   { input: '?page=world&view=rates', route: { page: 'world' }, canonical: '?page=world', rewrite: true },
   { input: '?page=rates', route: { page: 'world' }, canonical: '?page=world', rewrite: true },
