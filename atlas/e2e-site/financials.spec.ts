@@ -733,3 +733,36 @@ test('annual provenance identifies Yahoo fields inside official rows', async ({ 
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
   await expect(page.locator('.fin-table').getByText('SEC ＋ Yahoo 欄位回補', { exact: true })).toBeVisible();
 });
+
+test('conservative PE explains eligibility and both inertia calculations at 390px', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockMarketLogin(page);
+  const fixture = JSON.parse(fixtures.AAPL!);
+  fixture.annual = {
+    end: Array.from({ length: 10 }, (_, i) => `${2016 + i}-12-31`),
+    fy: Array.from({ length: 10 }, (_, i) => 2016 + i),
+    fq: Array(10).fill(null), src: Array(10).fill('sec'),
+    values: { epsDiluted: Array(10).fill(10) },
+  };
+  fixture.quarterly = {
+    end: Array.from({ length: 7 }, (_, i) => `${2024 + Math.floor(i / 4)}-${['03-31', '06-30', '09-30', '12-31'][i % 4]}`),
+    fy: Array.from({ length: 7 }, (_, i) => 2024 + Math.floor(i / 4)),
+    fq: Array.from({ length: 7 }, (_, i) => i % 4 + 1),
+    src: Array(7).fill('sec'), values: { epsDiluted: [10, 10, 10, 20, 11, 12, 13] },
+  };
+  fixture.quality.issues = [];
+  await mockFinancials(page, {}, { AAPL: JSON.stringify(fixture) });
+  await page.goto('./?page=financials&symbol=AAPL&p=a');
+  const section = page.locator('[data-group="conservative-pe"]');
+  await expect(section).toContainText('符合適用條件');
+  await openFold(section);
+  await expect(section).toContainText(/估值參考（日 K 收盤）：USD .* · 2026-10-08 · Yahoo/);
+  await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('下一期年增率 40%');
+  await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('本益比分母 EPS 64');
+  await expect(section.getByRole('region', { name: '年度慣性本益比' })).toContainText('本益比分母 EPS 10');
+  await expect(section).toContainText('尚未產生');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await section.scrollIntoViewIfNeeded();
+  if (info.project.name.includes('webkit') && process.env.ATLAS_CONSERVATIVE_PE_SCREENSHOT === '1')
+    await page.screenshot({ path: info.outputPath('conservative-pe-390.png'), scale: 'css' });
+});
