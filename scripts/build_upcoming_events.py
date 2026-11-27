@@ -108,10 +108,12 @@ def build(root, archive, now=None):
         bars = {r[0]: tuple(float(v) for v in r[1:5]) for r in symbol_rows(archive, symbol, years=years)
                 if r[0] not in blocked[symbol] and r[5] != "0"}
         moves[symbol] = earnings_moves(past, bars, sessions, today["US"])
-    for symbol, old in previous.get("moves", {}).items():
-        if old["samples"]:
-            require(symbol in moves and moves[symbol]["samples"] >= old["samples"],
-                    LABEL, f"earnings samples regressed for {symbol}")
+    # Aggregate floor, not per-symbol monotonicity: a later quarantine can legitimately
+    # remove one symbol's sample, and a strict per-symbol check would then reject every
+    # future run against the same retained snapshot. A broken archive still trips this.
+    retain_count(sum(m["samples"] for m in moves.values()),
+                 sum(m["samples"] for m in previous.get("moves", {}).values()),
+                 LABEL + " earnings samples", min_share=.8, minimum=0)
     for symbol, item in items.items():
         stamp = iso(item["earningsDate"])
         require(item.get("session") in (None, "bmo", "amc") and isinstance(item.get("estimate"), bool),
