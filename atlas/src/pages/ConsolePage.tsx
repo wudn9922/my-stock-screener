@@ -455,7 +455,8 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <WatchlistBoard viewSwitch={viewSwitch} holdingsActive={listsView === 'holdings'} onShowLists={() => setListsView('lists')} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
-      {section === 'lists' && <UpcomingEventsCard lists={document.lists} />}
+      {/* Below the list only; in 持股 the panel renders later and must stay first on phones. */}
+      {section === 'lists' && listsView === 'lists' && <UpcomingEventsCard lists={document.lists} />}
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); navigate({ page: 'watchlist' });
