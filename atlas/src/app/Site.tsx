@@ -35,6 +35,7 @@ import { requestWatchlistActions, watchlistActionsRequest } from './watchlistAct
 const MarketsPage = lazy(() => import('../pages/MarketsPage'));
 const WorldPage = lazy(() => import('../pages/WorldPage'));
 const ThemesPage = lazy(() => import('../pages/ThemesPage'));
+const WarrantsPage = lazy(() => import('../pages/WarrantsPage'));
 const ScreenerPage = lazy(() => import('../pages/ScreenerPage'));
 // Not in the bottom bar; opened from the chart header (financials of the chart's symbol).
 const FinancialsPage = lazy(() => import('../pages/FinancialsPage'));
@@ -59,6 +60,7 @@ const PAGE_TITLES: Record<Page, string> = {
   markets: '市場',
   world: '世界指數',
   themes: '題材輪動',
+  warrants: '權證查詢',
   screener: '選股',
   chart: '圖表',
   financials: '財報分析',
@@ -328,6 +330,7 @@ export function Site() {
   const keptContent = (shown: Route): ReactNode => {
     switch (shown.page) {
       case 'markets': return <MarketsPage {...pageProps} market={shown.market} />;
+      case 'warrants': return <WarrantsPage {...pageProps} symbol={shown.symbol} />;
       case 'world': return <WorldPage {...pageProps} view={shown.view} />;
       case 'themes': return <ThemesPage {...pageProps} theme={shown.theme} market={shown.market} view={shown.v} />;
       case 'screener': return <ScreenerPage {...pageProps} group={shown.group} f={shown.f} />;
@@ -399,7 +402,7 @@ export function Site() {
       <main className="site-main" id="main">
         {/* Full account controls on 我的; elsewhere only an in-progress login or handoff shows. */}
         <div className="site-account-flow">{SCREENER_HOSTING && <StorageNotice variant={route.page === 'console' && !(mobile && route.view) ? 'full' : 'alerts'} />}<MarketQuotaNotice /></div>
-        {(route.page === 'markets' || route.page === 'world' || route.page === 'themes') &&
+        {(route.page === 'markets' || route.page === 'world' || route.page === 'themes' || route.page === 'warrants') &&
           <div className="market-head">
             {reportDate && <span className="market-head-date">資料日 {formatDateTime(reportDate, false)}</span>}
             <MarketSectionNav active={marketSection!} routes={routeMemory.current.sections} navigate={navigate} />

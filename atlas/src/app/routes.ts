@@ -10,7 +10,7 @@ import type { Timeframe } from '../market-data/MarketDataProvider';
  * `?page=financials&symbol=AAPL&p=q` (not in the bottom bar; opened from the chart header). Legacy report links (`?symbol=…&tf=…`) open the chart.
  * LINE LIFF wraps the original path and query in `liff.state`, which is unwrapped first.
  */
-export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financials', 'watchlist', 'console'] as const;
+export const PAGES = ['markets', 'world', 'themes', 'screener', 'chart', 'financials', 'watchlist', 'console', 'warrants'] as const;
 export type Page = (typeof PAGES)[number];
 
 /** Phone/tablet 我的 sub-views (`?page=console&view=status`); the desktop page keeps its tabs and ignores this. */
@@ -28,6 +28,7 @@ export type Route =
   | { page: 'screener'; group?: string; f?: string }
   | { page: 'console'; view?: ConsoleView }
   | { page: 'watchlist'; list?: string }
+  | { page: 'warrants'; symbol?: string }
   | { page: 'chart'; symbol?: string; tf?: Timeframe }
   /** q/a stores the period choice; US defaults to quarters, Taiwan to annual. tf returns to the chart. */
   | { page: 'financials'; symbol?: string; p?: 'q' | 'a'; tf?: Timeframe };
@@ -54,6 +55,7 @@ const pageAliases: Record<string, Page> = {
   chart: 'chart',
   financials: 'financials',
   financial: 'financials',
+  warrants: 'warrants',
 };
 /** Page aliases that also select a sub-view of their page (rates is the world page's default view, so no `view`). */
 const viewAliases: Record<string, { page: Page; view?: 'indices' | 'commodities' | 'fx' | 'jp-bonds' }> = {
@@ -86,6 +88,7 @@ export function defaultRoute(page: Page): Route {
     case 'watchlist':
       return { page };
     case 'financials':
+    case 'warrants':
       return { page };
   }
 }
@@ -181,6 +184,8 @@ export function parseRoute(search: string, fallback: Page = 'markets'): ParsedRo
     // US rates (including the old `view=rates`) remains the default `{ page: 'world' }`.
     const view = resolved?.page === 'world' && resolved.view ? resolved.view : params.get('view')?.trim().toLowerCase();
     route = view === 'indices' || view === 'commodities' || view === 'fx' || view === 'jp-bonds' ? { page, view } : { page };
+  } else if (page === 'warrants') {
+    route = { page, ...(symbol && /^(?:[0-9A-Z]{1,10}\.TWO?|\^[A-Z0-9]{1,10})$/.test(symbol) ? { symbol } : {}) };
   } else if (page === 'financials') {
     const p = params.get('p')?.trim().toLowerCase();
     const tf = parseLaunchTimeframe(params.get('tf') ?? params.get('timeframe'));
@@ -211,6 +216,7 @@ export function serializeRoute(route: Route): string {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);
   }
+  if (route.page === 'warrants' && route.symbol) params.set('symbol', route.symbol);
   if (route.page === 'financials') {
     if (route.symbol) params.set('symbol', route.symbol);
     if (route.tf) params.set('tf', route.tf);

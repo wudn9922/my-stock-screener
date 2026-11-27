@@ -1,0 +1,15 @@
+.warrants-page { min-width: 0; overflow-wrap: anywhere; }
+.warrants-controls { padding: 12px; }
+.warrant-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,120px),1fr)); gap: 8px; margin-top: 12px; }
+.warrant-filters label { display: grid; gap: 4px; min-width: 0; }
+.warrant-filters input,.warrant-filters select { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; }
+.warrant-paging { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.warrant-paging button { min-height: 44px; }
+.warrant-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); margin: 12px 0; }
+.warrant-row { min-width: 0; padding: 12px; }
+.warrant-row header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px; }
+.warrant-row dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+.warrant-row .warrant-details { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.warrant-row dt,.warrant-row .muted { color: var(--text-3); font-size: 12px; }
+.warrant-row dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.warrant-book dd { font-size: 18px; font-weight: 600; }

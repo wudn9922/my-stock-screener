@@ -2,7 +2,7 @@ import { defaultRoute, sameRoute, type Page, type Route } from './routes';
 import { INITIAL_MARKET_SECTIONS, marketSectionOf, rememberMarketSection, type MarketSectionRoutes } from '../ui/MarketSectionNav';
 
 /** Main pages that stay mounted (hidden) after their first visit, like the chart page. */
-export const KEPT_PAGES = ['watchlist', 'markets', 'world', 'themes', 'screener', 'console'] as const;
+export const KEPT_PAGES = ['watchlist', 'markets', 'world', 'themes', 'screener', 'console', 'warrants'] as const;
 export type KeptPage = (typeof KEPT_PAGES)[number];
 export const isKeptPage = (page: Page): page is KeptPage => (KEPT_PAGES as readonly Page[]).includes(page);
 
@@ -10,7 +10,7 @@ export const isKeptPage = (page: Page): page is KeptPage => (KEPT_PAGES as reado
 export type NavPage = 'watchlist' | 'markets' | 'screener' | 'chart' | 'console';
 /** Existing detail pages light their parent primary section. */
 export const navPageOf = (page: Page): NavPage =>
-  page === 'financials' ? 'chart' : page === 'world' || page === 'themes' ? 'markets' : page;
+  page === 'financials' ? 'chart' : page === 'world' || page === 'themes' || page === 'warrants' ? 'markets' : page;
 
 export interface RouteMemory {
   /** The route each kept page showed last (what a nav tap reopens). */
@@ -41,7 +41,7 @@ export function rememberRoute(memory: RouteMemory, route: Route): RouteMemory {
 }
 
 function sameSections(a: MarketSectionRoutes, b: MarketSectionRoutes) {
-  return sameRoute(a.markets, b.markets) && sameRoute(a.world, b.world) && sameRoute(a.themes, b.themes);
+  return sameRoute(a.markets, b.markets) && sameRoute(a.world, b.world) && sameRoute(a.themes, b.themes) && sameRoute(a.warrants, b.warrants);
 }
 
 /** The default route of a bottom-bar destination. */
@@ -84,7 +84,8 @@ export function scrollSection(route: Route): string {
     case 'world': return route.view ?? '';
     case 'themes': return route.market ?? '';
     case 'console': return route.view ?? '';
-    case 'chart': return route.symbol ?? '';
+    case 'chart':
+    case 'warrants': return route.symbol ?? '';
     default: return '';
   }
 }
@@ -95,4 +96,4 @@ export const scrollIdentity = (route: Route): string =>
 
 /** The kept pages one destination covers. */
 export const keptPagesOf = (nav: Exclude<NavPage, 'chart'>): readonly KeptPage[] =>
-  nav === 'markets' ? ['markets', 'world', 'themes'] : [nav];
+  nav === 'markets' ? ['markets', 'world', 'themes', 'warrants'] : [nav];

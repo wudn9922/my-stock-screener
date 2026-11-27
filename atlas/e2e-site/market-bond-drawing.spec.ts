@@ -29,7 +29,7 @@ test('global includes Japanese spreads and both countries use the attached reaso
   const sourceRequests: string[] = [];
   page.on('request', request => { if (/fred\.stlouisfed|mof\.go\.jp|boj\.or\.jp/.test(request.url())) sourceRequests.push(request.url()); });
   await page.goto('./?page=world&view=jp-bonds');
-  await expect(page.getByRole('navigation', { name: '市場分頁' }).getByRole('link')).toHaveText(['大盤', '全球', '題材']);
+  await expect(page.getByRole('navigation', { name: '市場分頁' }).getByRole('link')).toHaveText(['大盤', '全球', '題材', '權證']);
   const tabs = page.getByRole('group', { name: '世界頁面' });
   await expect(tabs.getByRole('button')).toHaveText(['美債', '指數', '日債', '原物料', '匯率']);
   await expect(tabs.getByRole('button', { name: '日債', exact: true })).toHaveAttribute('aria-pressed', 'true');
