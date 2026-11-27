@@ -1,3 +1,6 @@
+## 2026-11-27 Holdings live quotes
+Primary self-review; shared feed and close-based visibility. Related unit/browser tests, lint/build pending.
+
 ## 2026-11-26 Holdings display
 Primary self-review. Currency defaults and compact average cost verified with 99 related Vitest cases, iPhone WebKit holdings and visibility tests, lint, build, and one 390px screenshot.
 

@@ -9,6 +9,7 @@ import { accessState } from '../auth/access';
 import { ImportHoldings } from './ImportHoldings';
 import { holdingsStore } from './store';
 import { loadHoldingQuotes, loadHoldingsDirectory } from './quotes';
+import { useHoldingLiveQuotes } from './useHoldingLiveQuotes';
 import {
   Money,
   decimalText,
@@ -186,9 +187,20 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       })
       .map((connection) => connection.accountId),
   );
-  const holdingQuote = (holding: Holding) => {
+  const closeQuote = (holding: Holding) => {
     const connection = mexcSnapshot.state.connections.find((entry) => entry.accountId === holding.accountId);
     return connection ? connection.quotes[holding.symbol] : quotes[holding.symbol];
+  };
+  // Determine subscriptions from the existing close-based visibility rules. Keeping this membership
+  // stable during a live tick prevents a dust holding from oscillating between subscribe/unsubscribe.
+  const liveSymbols = [...new Set((selected ? [selected] : document.accounts).flatMap(entry =>
+    entry.holdings.filter(holding => holding.market !== 'CRYPTO'
+      && hiddenReason(holding, entry.account, valueHolding(holding, closeQuote(holding), costs).value, visibilityPreferences) === null)
+      .map(holding => holding.symbol)))].sort().join(',');
+  const live = useHoldingLiveQuotes(liveSymbols);
+  const holdingQuote = (holding: Holding) => {
+    if (holding.market === 'CRYPTO') return closeQuote(holding);
+    return live[holding.symbol] ?? closeQuote(holding);
   };
   const evaluated = document.accounts.flatMap((entry) =>
     entry.holdings.map((holding) => {
@@ -196,7 +208,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       return {
         holding,
         result,
-        hidden: hiddenReason(holding, entry.account, result.value, visibilityPreferences),
+        hidden: hiddenReason(holding, entry.account, valueHolding(holding, closeQuote(holding), costs).value, visibilityPreferences),
       };
     }),
   );
@@ -358,7 +370,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
                   name={directory?.find((item) => item.symbol === holding.symbol)?.name}
                   pending={pendingAccounts.has(holding.accountId)}
                   net={net && validDiscount}
-                  retained={(mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
+                  retained={!holdingQuote(holding)?.liveState && (mexcSnapshot.accountRetainedQuotes[holding.accountId] ?? retainedQuotes).includes(
                     holding.symbol,
                   )}
                   onOpen={() => {
