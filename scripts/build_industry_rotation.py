@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from build_data_status import calendar_for
 from build_screener_history import read, write
 from universe_cache import read_bars, bars_path, UNKNOWN_VOLUME_DATES
+from scripts.output_guard import require, retain_count, retain_keys, unique_keys
 
 # Single source for the per-market liquidity floor (shared with market warnings).
 PARAMS = json.loads((Path(__file__).parent / "market_warnings_params.json").read_text())
@@ -138,11 +139,51 @@ def build(root=ROOT, cache=None, now=None):
     return {"version": 1, "generatedAt": now or datetime.now(timezone.utc).isoformat(), "markets": markets}
 
 
+ROTATION_RETENTION = .75
+ROTATION_ANCHORS = {"TW": ("半導體業", "金融保險業"), "US": ("Technology", "Finance")}
+
+
+def validate_output(document, previous):
+    markets = document["markets"]
+    old = (previous or {}).get("markets", {})
+    require(bool(markets), "industry-rotation.json", "no market data")
+    require(set(old) <= set(markets), "industry-rotation.json", "previous market missing")
+    for market, entry in markets.items():
+        prior = old.get(market, {})
+        label = f"industry-rotation.json {market}"
+        require(not prior.get("asOf") or entry["asOf"] >= prior["asOf"], label, "market date regressed")
+        for period in WINDOWS:
+            rows = entry["periods"][period]["rows"]
+            old_rows = prior.get("periods", {}).get(period, {}).get("rows", [])
+            name = f"{label} {period}"
+            unique_keys((r.get("name") for r in rows), name)
+            ranked = {r["name"] for r in rows if finite(r.get("medianReturnPct"))}
+            old_ranked = {r["name"] for r in old_rows if finite(r.get("medianReturnPct"))}
+            retain_keys(ranked, old_ranked, name, min_share=ROTATION_RETENTION,
+                        anchors=ROTATION_ANCHORS.get(market, ()))
+            retain_count(sum(r["validCount"] for r in rows), sum(r["validCount"] for r in old_rows),
+                         name + " valid members", min_share=ROTATION_RETENTION)
+            # Cache loss can blank volume/momentum even with intact universe returns.
+            for field in ("volumeCount", "pairedCount"):
+                before = sum(r.get(field, 0) for r in old_rows)
+                if before >= 100:
+                    retain_count(sum(r.get(field, 0) for r in rows), before,
+                                 name + " " + field, min_share=ROTATION_RETENTION)
+
+
+def run(root=ROOT, cache=None, now=None):
+    root = Path(root)
+    path = root / "docs/report/industry-rotation.json"
+    result = build(root, cache, now)
+    validate_output(result, read(path, {}))
+    write(path, result)
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--cache-dir", type=Path)
     args = parser.parse_args()
-    result = build(args.root, args.cache_dir)
-    write(args.root / "docs/report/industry-rotation.json", result)
+    result = run(args.root, args.cache_dir)
     print("Industry rotation markets: " + ", ".join(result["markets"]))
