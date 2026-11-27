@@ -123,7 +123,7 @@ jobs:
               git -C "$repo" commit -m "Fill verified rejected US daily bars from Alpaca"
             fi
           done
-          git fetch "$GITHUB_WORKSPACE/$archive" HEAD
+          git fetch --update-shallow "$GITHUB_WORKSPACE/$archive" HEAD
           archive_head=$(git -C "$archive" rev-parse HEAD)
           # Either both permanent copies publish or neither does. No force/rebase.
           git push --atomic origin HEAD:refs/heads/main "$archive_head:refs/heads/kline-archive"
