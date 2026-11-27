@@ -184,6 +184,33 @@ def build_item(raw, now=None):
     }
 
 
+def observed_history(previous, quotes, now):
+    """Retain only past, non-estimated Yahoo timestamps with an identifiable session.
+    Do not promote an elapsed estimated/announced future date to an actual release.
+    """
+    history = previous.get("history", {})
+    if not isinstance(history, dict):
+        raise ValueError("invalid retained earnings history")
+    result = {}
+    for symbol, rows in history.items():
+        if not is_us_symbol(symbol) or not isinstance(rows, dict):
+            raise ValueError("invalid retained earnings history")
+        for day, session in rows.items():
+            if datetime.strptime(day, "%Y-%m-%d").date().isoformat() != day or session not in ("bmo", "amc"):
+                raise ValueError("invalid retained earnings observation")
+        result[symbol] = dict(rows)
+    for symbol, raw in quotes.items():
+        at = raw.get("at")
+        if not is_us_symbol(symbol) or raw.get("quoteType") not in (None, "EQUITY") or raw["estimate"] or at is None or is_date_only(at):
+            continue
+        if market_date(at) >= now.astimezone(EASTERN).date().isoformat():
+            continue
+        session = session_of(eastern_moment(at), False)
+        if session:
+            result.setdefault(symbol, {})[market_date(at)] = session
+    return result
+
+
 def fetch_quotes(yahoo, symbols):
     quotes = {}
     failures = 0
@@ -236,6 +263,7 @@ def main(report_dir=REPORT_DIR, data_dir=DATA_DIR, out_dir=None, now=None):
             "confirmed time of day (null for estimates); window = Yahoo's estimated date range."
         ),
         "items": items,
+        "history": observed_history(read_json(out_path) or {}, quotes, now),
     }
     size = write_atomic(out_path, document)
     print(json.dumps({
