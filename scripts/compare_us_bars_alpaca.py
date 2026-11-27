@@ -107,11 +107,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", type=int, default=200)
     parser.add_argument("--days", type=int, default=250)
+    parser.add_argument("--report", type=Path, help="Optional JSON artifact outside permanent data")
     args = parser.parse_args()
     report = compare(ROOT, args.samples, args.days)
     print(markdown(report))
-    print("<!-- Full report follows in JSON -->")
-    print(json.dumps(report, allow_nan=False))
+    if args.report:
+        args.report.write_text(json.dumps(report, allow_nan=False, indent=2) + "\n")
 
 
 if __name__ == "__main__":
