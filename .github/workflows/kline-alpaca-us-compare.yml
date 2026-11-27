@@ -1,0 +1,60 @@
+name: Compare Yahoo and Alpaca US daily bars
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: 'Number of US CSV symbols to sample'
+        type: number
+        default: 200
+      days:
+        description: 'Number of recent trading dates'
+        type: number
+        default: 250
+permissions:
+  contents: read
+jobs:
+  compare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Compare without modifying any permanent records
+        env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+          SAMPLE_COUNT: ${{ inputs.samples }}
+          TRADING_DAYS: ${{ inputs.days }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/alpaca-comparison
+          python -u scripts/compare_us_bars_alpaca.py --samples "$SAMPLE_COUNT" --days "$TRADING_DAYS" --report .cache/alpaca-comparison/report.json | tee .cache/alpaca-comparison/report.md "$GITHUB_STEP_SUMMARY"
+          test -z "$(git status --porcelain --untracked-files=no)"
+      - uses: actions/upload-artifact@v4
+        if: always() && !cancelled()
+        with:
+          name: alpaca-us-comparison-${{ github.run_id }}
+          path: .cache/alpaca-comparison/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+  notify-system-failure:
+    needs: [compare]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: '${{ github.workflow }} · 執行失敗／取消'
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

@@ -45,6 +45,8 @@ jobs:
       - run: pip install --quiet pandas requests 'curl_cffi>=0.7,<1'
       - name: Resume five complete years plus this year, without editing archive files
         env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
           SEGMENT: ${{ inputs.segment }}
           MARKETS: ${{ inputs.markets }}
           BATCH_SIZE: ${{ inputs.batch_size }}

@@ -20,6 +20,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+import alpaca_bars
+
 from scripts.kline_journal import dump_journal, fact, merge_logs, prune_main_journal
 
 ROOT = Path(__file__).resolve().parent
@@ -266,8 +268,43 @@ def official_bar(symbol, day):
     return None
 
 
-def accept_frame(frame, symbol, *, refetch=None, official=official_bar, source_url=None,
-                 fetched_at=None, now=None, zone=None, log_path=None):
+def alpaca_replacement_reason(values, old, frame, day):
+    """Check a fallback bar against its original or closest usable close."""
+    invalid = violation(values)
+    if invalid:
+        return invalid
+    try:
+        close = float(old.get("Close")) if old is not None else math.nan
+    except (TypeError, ValueError):
+        close = math.nan
+    if math.isfinite(close) and close > 0:
+        return "close-mismatch-3pct" if abs(float(values["Close"]) / close - 1) > 0.03 + 1e-12 else None
+    target = pd.Timestamp(day)
+    neighbors = sorted(((abs(pd.Timestamp(stamp) - target), pd.Timestamp(stamp), row)
+                        for stamp, row in frame.iterrows() if pd.Timestamp(stamp) != target and not violation(row)),
+                       key=lambda item: (item[0], item[1]))
+    if not neighbors:
+        return "no-valid-reference-close"
+    close = float(neighbors[0][2]["Close"])
+    return "close-mismatch-25pct" if abs(float(values["Close"]) / close - 1) > 0.25 + 1e-12 else None
+
+
+def retained_bar(path, stamp):
+    """Only consulted on an enabled fallback; a good existing date takes precedence."""
+    if path is None or not Path(path).exists():
+        return None
+    retained = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP)
+    if stamp in retained.index:
+        row = retained.loc[stamp]
+        if not isinstance(row, pd.Series):
+            raise ValueError("Duplicate permanent date")
+        if not violation(row):
+            return bar_values(row)
+    return None
+
+
+def accept_frame(frame, symbol, *, refetch=None, official=official_bar, us_source=alpaca_bars.alpaca_bar, source_url=None,
+                 fetched_at=None, now=None, zone=None, log_path=None, retained_path=None):
     """Validate raw new inputs; refetch the latest invalid session at most once.
 
     A known quarantine is never silently released by an unrelated new download.
@@ -310,6 +347,30 @@ def accept_frame(frame, symbol, *, refetch=None, official=official_bar, source_u
                         candidate = official(symbol, day)
                     except Exception as exc:
                         reason += "; official:" + type(exc).__name__
+                if (candidate is None and us_source and alpaca_bars.alpaca_symbol(symbol)
+                        and (us_source is not alpaca_bars.alpaca_bar or alpaca_bars.enabled())):
+                    try:
+                        preserved = retained_bar(retained_path, stamp)
+                        if preserved is not None:
+                            # The raw observation was rejected, but there is no
+                            # reason to replace previously accepted evidence.
+                            log_event(symbol, day, "rejected", old=old, source_url=source_url,
+                                      fetched_at=fetched_at, reason=reason + "; alpaca:retained-valid-bar",
+                                      log_path=log_path)
+                            rows.append((stamp, pd.Series(preserved)))
+                            continue
+                        alternative = us_source(symbol, day)
+                        if alternative is None:
+                            reason += "; alpaca:no-bar"
+                        else:
+                            reference = frame.loc[[d for d in completed if str(d.date()) not in blocked]]
+                            failure = alpaca_replacement_reason(alternative[0], old, reference, stamp)
+                            if failure:
+                                reason += "; alpaca:" + failure
+                            else:
+                                candidate = alternative
+                    except Exception as exc:
+                        reason += "; alpaca:" + type(exc).__name__
             if candidate is None:
                 log_event(symbol, day, "rejected", old=old, source_url=source_url,
                           fetched_at=fetched_at, reason=reason, log_path=log_path)
@@ -329,6 +390,7 @@ def write_csv(path, frame, *, symbol=None, source_url=None, fetched_at=None, log
     """Permanent union merge, validated writes, atomic file and correction audit."""
     path = Path(path)
     symbol = symbol or path.stem
+    kwargs.setdefault('retained_path', path)
     accepted = accept_frame(frame[FIELDS], symbol, source_url=source_url,
                             fetched_at=fetched_at, log_path=log_path, **kwargs)
     retained = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP) if path.exists() else pd.DataFrame(columns=FIELDS)
@@ -389,3 +451,21 @@ def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None
         for field in FIELDS:
             frame.loc[target, field] = values[field]
         _write_preserving_lines(path, frame.loc[[target]])
+
+
+def fill_missing_bar(path, symbol, day, values, source_url, fetched_at, log_path=None):
+    """Insert a verified missing date without changing any existing CSV record."""
+    if violation(values):
+        raise ValueError("Refusing an invalid insertion")
+    path = Path(path)
+    target = pd.Timestamp(day).normalize()
+    if path.exists():
+        frame = pd.read_csv(path, index_col=0, parse_dates=True, **ROUND_TRIP)
+        if target in frame.index:
+            raise ValueError("Insertion must target a missing date")
+    update = pd.DataFrame([bar_values(values)], index=[target], columns=FIELDS)
+    update.index.name = "Date"
+    _write_preserving_lines(path, update)
+    log_event(symbol, target.date().isoformat(), "corrected", old=None,
+              new=bar_values(values), source_url=source_url, fetched_at=fetched_at,
+              reason="missing-bar-filled-alpaca", log_path=log_path)
