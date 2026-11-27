@@ -43,11 +43,13 @@ describe('scenario PE', () => {
 
   it('withholds valuation for stale reports and changed periods, EPS or shares', () => {
     const data = scenarioSchema.parse(sample);
+    expect(scenarioSchema.safeParse({ ...sample, provider: 'cloudflare-qwen', model: '@cf/qwen/qwen3.8-27b' }).success).toBe(true);
+    expect(scenarioSchema.safeParse({ ...sample, provider: 'gemini-hydrogen', model: 'gemini-4-hydrogen' }).success).toBe(true);
     const generated = Date.parse(sample.generatedAt);
     expect(scenarioIsCurrent(data, generated - 1)).toBe(false);
-    expect(scenarioIsCurrent(data, generated + 7 * 86400000)).toBe(false);
-    expect(scenarioIsCurrent(data, generated + 7 * 86400000 - 1)).toBe(true);
-    expect(scenarioPe(price, data, data.baseline, generated + 7 * 86400000)).toBeNull();
+    expect(scenarioIsCurrent(data, generated + 21 * 86400000)).toBe(false);
+    expect(scenarioIsCurrent(data, generated + 21 * 86400000 - 1)).toBe(true);
+    expect(scenarioPe(price, data, data.baseline, generated + 21 * 86400000)).toBeNull();
     for (const patch of [{ eps: 11 }, { end: '2026-01-01' }, { shareBasis: 'adr' as const, adrRatio: 3 }]) {
       expect(scenarioPe(price, data, { ...data.baseline, ...patch }, current)).toBeNull();
     }
