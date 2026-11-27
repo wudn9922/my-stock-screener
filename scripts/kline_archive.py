@@ -1203,6 +1203,58 @@ def _baseline_blobs(root, entries):
         yield read
 
 
+SCALE_REPAIR_REASON = "scale-outlier-corrected"
+
+
+def _validate_scale_changes(symbol, baseline_rows, entries):
+    positions = {row[0]: i for i, row in enumerate(baseline_rows)}
+    replacements = {}
+    for item in entries:
+        day = item["date"]
+        i = positions.get(day, -1)
+        if i <= 0 or i >= len(baseline_rows) - 1 or day in replacements:
+            raise ValueError("Invalid scale correction date")
+        previous, current, following = baseline_rows[i-1:i+2]
+        if tuple(item["old"]) != current:
+            raise ValueError("Scale correction old row mismatch")
+        new = normalize(item["new"])
+        if new[0] != day or new == current:
+            raise ValueError("Invalid scale correction replacement")
+        failure = ki.scale_replacement_reason(values(previous), values(current), values(following), values(new))
+        if failure:
+            raise ValueError("Scale correction rejected: " + failure)
+        from urllib.parse import urlparse
+        host = urlparse(item["sourceUrl"]).hostname
+        allowed = ("data.alpaca.markets",) if market_of(symbol) == "us" else ("www.twse.com.tw", "www.tpex.org.tw")
+        if market_of(symbol) not in ("us", "tw") or host not in allowed or not item.get("fetchedAt"):
+            raise ValueError("Invalid independent scale correction source")
+        replacements[day] = new
+    return replacements
+
+
+def correct_scale_rows(root, symbol, entries):
+    """Explicit isolated corrections only; do not use broad split adjustment authorization."""
+    root = Path(root)
+    baseline_rows = symbol_rows(root, symbol)
+    replacements = _validate_scale_changes(symbol, baseline_rows, entries)
+    events = []
+    for year in sorted({day[:4] for day in replacements}):
+        path = root / market_of(symbol) / symbol / (year + ".csv")
+        before = read_rows(path, strict=True)
+        after = [replacements.get(row[0], row) for row in before]
+        content = csv_text(after)
+        scoped = sorted((item for item in entries if item["date"][:4] == year), key=lambda x: x["date"])
+        record = dict(symbol=symbol, date=scoped[0]["date"], status="corrected",
+                      reason=SCALE_REPAIR_REASON, old={"sha256": digest(path.read_bytes())},
+                      new={"path": path.relative_to(root).as_posix(), "sha256": digest(content.encode()),
+                           "rowsChanged": len(scoped)}, entries=scoped)
+        record.update(id=digest(json.dumps(record, sort_keys=True).encode()), loggedAt=ki.utcnow())
+        events.append(record)
+        atomic(path, content)
+    add_events(root, events)
+    return len(replacements)
+
+
 def verify(root, base=None, summary=None, refresh_manifest=False):
     """Validate all CSVs once; baseline diffs use one batch, never per-file Git.
 
@@ -1281,7 +1333,7 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                         raise ValueError("Invalid Yahoo v8 TWII close")
                 except (ValueError, InvalidOperation, TypeError) as exc:
                     raise ValueError("Invalid Yahoo v8 TWII close") from exc
-    old_tree, old_last, changed, file_audit, removals = {}, {}, {}, {}, {}
+    old_tree, old_last, changed, file_audit, removals, scale_audit = {}, {}, {}, {}, {}, {}
     if base:
         for item in _git(root, "ls-tree", "-rz", base, "--", "tw", "us", "global").split("\0"):
             if not item:
@@ -1307,7 +1359,12 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
             if old_tree.get(name) != metadata["blob"]:
                 changed.setdefault(name.split("/")[1], []).append(name)
         for e in audit:
-            if ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
+            if e.get("reason") == SCALE_REPAIR_REASON:
+                name = e["new"]["path"]
+                if e["status"] != "corrected" or name not in changed.get(e["symbol"], []) or name not in old_tree:
+                    raise ValueError("Scale correction must target a changed existing file")
+                scale_audit.setdefault(name, []).append(e)
+            elif ((e["status"] == "backfilled" and e.get("reason") == "kline-archive/backfill-year")
                     or (e["status"] == "corrected" and (str(e.get("reason", "")).startswith("kline-archive/adjustment-year:")
                          or e.get("reason") == OFFICIAL_TWII_VOLUME_REASON))):
                 file_audit.setdefault(e["new"]["path"], []).append(e)
@@ -1317,6 +1374,8 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                 removals.setdefault(e["new"]["path"], []).append(e)
     needed = {name: old_tree[name] for names in changed.values() for name in names if name in old_tree}
     needed.update({old_last[symbol]: old_tree[old_last[symbol]] for symbol in changed if symbol in old_last})
+    scale_symbols = {name.split("/")[1] for name in scale_audit}
+    needed.update({name: blob for name, blob in old_tree.items() if name.split("/")[1] in scale_symbols})
     stats = {}
     active_symbol, last_name, last_rows, last_hash, last = None, None, [], None, ""
     with timed("verify.csv_rows_and_history"), _baseline_blobs(root, needed) as baseline:
@@ -1341,6 +1400,22 @@ def verify(root, base=None, summary=None, refresh_manifest=False):
                 continue
             old_rows, old_hash = (last_rows, last_hash) if name == last_name else baseline(name) if name in old_tree else ([], None)
             old = {r[0]: r for r in old_rows}
+            if name in scale_audit:
+                edges = scale_audit[name]
+                if len(edges) != 1:
+                    raise ValueError("Multiple scale correction audits for one file")
+                edge = edges[0]
+                entries = edge["entries"]
+                if (edge["old"]["sha256"] != old_hash or edge["new"]["sha256"] != current[name]["sha256"]
+                        or not entries or edge["new"]["rowsChanged"] != len(entries)
+                        or any(item["date"][:4] != path.stem for item in entries)):
+                    raise ValueError("Scale correction audit does not match exact file transition")
+                full = [row for other in sorted(old_tree) if other.split("/")[1] == symbol
+                        for row in baseline(other)[0]]
+                replacements = _validate_scale_changes(symbol, full, entries)
+                if rows != [replacements.get(row[0], row) for row in old_rows]:
+                    raise ValueError("Scale correction touched unlisted dates or values")
+                continue
             # The official repair exception never licenses arbitrary history changes:
             # dates/OHLC are byte-identical and ONLY 0/empty TWII volumes become positive.
             official_edges = [e for e in file_audit.get(name, [])

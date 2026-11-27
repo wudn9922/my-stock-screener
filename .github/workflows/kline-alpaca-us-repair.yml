@@ -2,6 +2,11 @@ name: Alpaca US missing daily bars repair
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        type: choice
+        options: [missing, audit-filled, scale-outliers]
+        default: missing
+        description: 'Missing bars, read-only audit of previous fills, or isolated scale errors'
       apply:
         description: 'Write only after reviewing a dry-run and the comparison report'
         type: boolean
@@ -37,6 +42,7 @@ jobs:
           ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
           ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
           REPAIR_APPLY: ${{ inputs.apply }}
+          REPAIR_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           mkdir -p .cache/alpaca-repair
@@ -45,7 +51,7 @@ jobs:
           git rev-parse HEAD > "$output/main-base"
           git -C "$archive" rev-parse HEAD > "$output/archive-base"
           python scripts/kline_archive.py verify --archive-dir "$archive"
-          args=(--archive-dir "$archive" --report "$output/report.json")
+          args=(--archive-dir "$archive" --report "$output/report.json" --mode "$REPAIR_MODE")
           if [ "$REPAIR_APPLY" = true ]; then args+=(--apply); fi
           python -u scripts/repair_us_bars_alpaca.py "${args[@]}" | tee "$output/report.md" "$GITHUB_STEP_SUMMARY"
           if [ "$REPAIR_APPLY" = true ]; then
@@ -121,7 +127,7 @@ jobs:
             git -C "$repo" config user.name 'github-actions[bot]'
             git -C "$repo" config user.email 'github-actions[bot]@users.noreply.github.com'
             if ! git -C "$repo" diff --cached --quiet; then
-              git -C "$repo" commit -m "Fill verified rejected US daily bars from Alpaca"
+              git -C "$repo" commit -m "Repair independently verified daily bars"
             fi
           done
           git fetch --update-shallow "$GITHUB_WORKSPACE/$archive" HEAD

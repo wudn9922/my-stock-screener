@@ -21,6 +21,7 @@ on:
       - 'kline_integrity.py'
       - 'alpaca_bars.py'
       - 'scripts/repair_us_bars_alpaca.py'
+      - 'scripts/repair_scale_outliers.py'
       - 'scripts/compare_us_bars_alpaca.py'
       - 'tests/test_alpaca_bars.py'
       - '.github/workflows/kline-alpaca-us-*.yml'

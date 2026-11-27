@@ -75,6 +75,16 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(self.get.call_args.kwargs["params"]["adjustment"], "split")
         self.assertNotIn("fake-secret", a.alpaca_bar("AAPL", "2024-07-02")[1])
 
+    def test_raw_split_caches_are_independent(self):
+        self.get.side_effect = [
+            response({"bars": {"AAPL": [item("2024-07-01", o=20, h=24, l=18, c=22)]}}),
+            response({"bars": {"AAPL": [item("2024-07-01")]}}),
+        ]
+        self.assertEqual(a.alpaca_bar("AAPL", "2024-07-01", adjustment="raw")[0]["Close"], 22)
+        self.assertEqual(a.alpaca_bar("AAPL", "2024-07-01", adjustment="split")[0]["Close"], 11)
+        self.assertEqual(a.alpaca_bar("AAPL", "2024-07-01", adjustment="raw")[0]["Close"], 22)
+        self.assertEqual(self.get.call_count, 2)
+
     def test_rate_limit_retries_and_failure(self):
         self.get.side_effect = [response(status=429, headers={"Retry-After": "2"}),
                                 response({"bars": {"AAPL": [item("2024-07-01")]}})]
@@ -194,7 +204,8 @@ class HistoricalToolsTest(unittest.TestCase):
         with patch.object(a, "alpaca_bar", return_value=(BAR, URL, NOW.isoformat())):
             report = repair.run(self.root, self.archive)
             self.assertEqual(self.snapshot(), before)
-            self.assertEqual(report["operations"][0]["destinations"], ["data/AAPL.csv", "archive"])
+            self.assertEqual({(op["destinations"][0], op["adjustment"]) for op in report["operations"]},
+                             {("data/AAPL.csv", "raw"), ("archive", "split")})
             repair.run(self.root, self.archive, apply=True)
             self.assertFalse(repair.run(self.root, self.archive)["operations"])
         self.assertEqual(list(pd.read_csv(self.path).Date), ["2024-07-01", "2024-07-02", "2024-07-03"])
@@ -209,7 +220,7 @@ class HistoricalToolsTest(unittest.TestCase):
     def test_comparison_reports_price_volume_and_missing_dates_without_writes(self):
         from scripts import compare_us_bars_alpaca as compare
         before = self.snapshot()
-        def bar(symbol, day):
+        def bar(symbol, day, adjustment="raw"):
             if day == "2024-07-03":
                 return None
             return BAR | {"Volume": 50}, URL, NOW.isoformat()
@@ -221,6 +232,132 @@ class HistoricalToolsTest(unittest.TestCase):
         self.assertEqual(report["alpacaOnly"], [["AAPL", "2024-07-02"]])
         self.assertEqual(self.snapshot(), before)
         self.http.assert_not_called()
+
+
+    def test_mixed_destination_basis_and_small_split_guard(self):
+        from scripts import repair_us_bars_alpaca as repair
+        raw = {f: (v * 1.25 if f != "Volume" else v) for f, v in BAR.items()}
+        def source(symbol, day, adjustment):
+            return (raw if adjustment == "raw" else BAR, URL, NOW.isoformat())
+        with patch.object(a, "alpaca_bar", side_effect=source):
+            # Both retained copies currently use split prices. Raw should not
+            # pass simply because a 25% ratio is within the continuity guard.
+            report = repair.plan(self.root, self.archive)
+            self.assertFalse(report["operations"])
+            self.assertIn("destination-basis-unconfirmed", report["skipped"][0]["reason"])
+            self.path.write_text("Date,Open,High,Low,Close,Volume\n2024-07-01,12.5,15,11.25,13.75,100\n2024-07-03,12.5,15,11.25,13.75,100\n")
+            report = repair.plan(self.root, self.archive)
+        self.assertEqual({op["adjustment"]: op["values"]["Close"] for op in report["operations"]},
+                         {"raw": 13.75, "split": 11})
+
+
+class ScaleTests(unittest.TestCase):
+    def setUp(self):
+        import subprocess
+        from scripts import kline_archive as archive
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "main"
+        self.archive = Path(tmp.name) / "archive"
+        (self.root / "data").mkdir(parents=True)
+        self.main = self.root / "data/AAPL.csv"
+        self.tw = self.root / "data/2330.TW.csv"
+        self.log = self.root / archive.LOG
+        self.rows = [("2024-12-30", 100, 102, 99, 100, 100),
+                     ("2024-12-31", 50, 51, 49, 50, 100),
+                     ("2025-01-02", 100, 102, 99, 100, 100)]
+        for path in (self.main, self.tw):
+            path.write_text(archive.csv_text(self.rows))
+        archive.initialize(self.archive)
+        archive.put_symbol(self.archive, "AAPL", self.rows)
+        archive.update_manifest(self.archive)
+        def git(*args):
+            return subprocess.check_output(["git", "-C", str(self.archive), *args], text=True).strip()
+        self.git = git
+        git("init")
+        git("config", "user.email", "test@example.com")
+        git("config", "user.name", "test")
+        git("add", ".")
+        git("commit", "-m", "baseline")
+        self.base = git("rev-parse", "HEAD")
+        self.new = dict(Open=100, High=102, Low=99, Close=100, Volume=100)
+        for obj, name, value in [(a, "enabled", True), (a, "prefetch", True)]:
+            p = patch.object(obj, name, return_value=value)
+            p.start()
+            self.addCleanup(p.stop)
+        p = patch("requests.get", side_effect=AssertionError("No live HTTP"))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def snapshot(self):
+        return {str(p): p.read_bytes() for p in self.root.parent.rglob("*") if p.is_file() and ".git" not in p.parts}
+
+    def test_detector(self):
+        for triple in [(169.96, 82.875, 167.11), (100, 200, 101), (100, 25, 100)]:
+            self.assertTrue(k.isolated_scale(*triple))
+        for triple in [(100, 50, 51), (100, 140, 100), (100, 50, 120)]:
+            self.assertFalse(k.isolated_scale(*triple))
+
+    def test_dry_run_apply_and_exact_archive_audit(self):
+        from scripts import repair_scale_outliers as scale
+        from scripts import kline_archive as archive
+        before = self.snapshot()
+        with patch.object(a, "alpaca_bar", return_value=(self.new, URL, NOW.isoformat())) as us, \
+             patch.object(k, "official_bar", return_value=(self.new, "https://www.twse.com.tw/test", NOW.isoformat())) as tw:
+            report = scale.plan_scale(self.root, self.archive)
+            self.assertEqual(len(report["operations"]), 3)
+            self.assertEqual(self.snapshot(), before)
+            self.assertIn("2024-12-31", scale.markdown(report))
+            self.assertEqual({call.kwargs["adjustment"] for call in us.call_args_list}, {"raw", "split"})
+            tw.assert_called_once_with("2330.TW", "2024-12-31")
+            scale.apply_scale(self.root, self.archive, report)
+        self.assertEqual(pd.read_csv(self.main).Close.tolist(), [100, 100, 100])
+        self.assertEqual(pd.read_csv(self.tw).Close.tolist(), [100, 100, 100])
+        self.assertEqual([e["reason"] for e in k.read_log(self.log)["events"]], ["scale-outlier-corrected"] * 2)
+        archive.verify(self.archive, base=self.base)
+        # A hash audit is not permission to change any unrelated row.
+        path = self.archive / "us/AAPL/2024.csv"
+        path.write_text(path.read_text().replace("100.0000,102.0000,99.0000,100.0000,100", "101.0000,102.0000,99.0000,100.0000,100", 1))
+        archive.update_manifest(self.archive)
+        with self.assertRaises(ValueError):
+            archive.verify(self.archive, base=self.base)
+
+    def test_invalid_or_far_sources_only_reported(self):
+        from scripts import repair_scale_outliers as scale
+        before = self.snapshot()
+        with patch.object(a, "alpaca_bar", return_value=(self.new | {"Low": 150}, URL, NOW.isoformat())), \
+             patch.object(k, "official_bar", return_value=(dict(Open=50, High=51, Low=49, Close=50, Volume=100), "https://www.twse.com.tw/test", NOW.isoformat())):
+            report = scale.plan_scale(self.root, self.archive)
+        self.assertFalse(report["operations"])
+        self.assertEqual({i["reason"] for i in report["skipped"]}, {"invalid-source-bar", "neighbor-close-mismatch-25pct"})
+        self.assertEqual(self.snapshot(), before)
+
+    def test_correct_bar_default_reason(self):
+        k.correct_bar(self.main, "AAPL", "2024-12-31", self.new, URL, NOW.isoformat(), self.log)
+        self.assertEqual(k.read_log(self.log)["events"][-1]["reason"], "verified-official-correction")
+
+    def test_audit_filled_is_read_only(self):
+        from scripts import repair_scale_outliers as scale
+        k.log_event("AAPL", "2024-12-31", "corrected", new=BAR,
+                    reason="missing-bar-filled-alpaca", log_path=self.log)
+        before = self.snapshot()
+        with patch.object(a, "alpaca_bar", return_value=(self.new, URL, NOW.isoformat())):
+            report = scale.audit_filled(self.root, self.archive)
+        self.assertEqual(report["checked"], 2)
+        self.assertEqual(len(report["skipped"]), 2)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_symbol_report_classes_and_cap(self):
+        from scripts.compare_us_bars_alpaca import symbol_details, largest_details
+        def detail(symbol, i, ratio):
+            return dict(symbol=symbol, date=f"2024-07-{i+1:02d}",
+                        yahoo={"Close": ratio * 100}, alpaca={"Close": 100},
+                        differencePct={"Close": abs(ratio - 1) * 100})
+        rows = [detail("SNDK", i, 8) for i in range(10)] + [detail("APH", i, .5 if i == 0 else 1) for i in range(10)]
+        rows += [detail("MIX", i, 2 if i % 2 else .5) for i in range(5)]
+        result = {x["symbol"]: x["classification"] for x in symbol_details(rows)}
+        self.assertEqual(result, {"SNDK": "constant-scale", "MIX": "mixed", "APH": "isolated"})
+        self.assertEqual(sum(x["symbol"] == "SNDK" for x in largest_details(rows)), 2)
 
 
 if __name__ == "__main__":

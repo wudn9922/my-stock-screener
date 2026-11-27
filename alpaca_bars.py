@@ -11,6 +11,10 @@ from zoneinfo import ZoneInfo
 URL = "https://data.alpaca.markets/v2/stocks/bars"
 NY = ZoneInfo("America/New_York")
 MIN_DAY = date(2016, 1, 1)
+MAIN_ADJUSTMENT = "raw"
+ARCHIVE_ADJUSTMENT = "split"
+# Fresh Yahoo chart OHLC is split-adjusted, even with auto_adjust=False.
+LATEST_ADJUSTMENT = ARCHIVE_ADJUSTMENT
 _cache = {}
 _coverage = {}
 _lock = threading.RLock()
@@ -71,7 +75,7 @@ def _request(params):
     return None
 
 
-def prefetch(symbols, start, end):
+def prefetch(symbols, start, end, adjustment=LATEST_ADJUSTMENT):
     """Fetch inclusive NY dates in batches, caching only fully fetched ranges.
 
     Return True for a successful fetch (including empty results), None when
@@ -79,6 +83,8 @@ def prefetch(symbols, start, end):
     """
     if not enabled():
         return None
+    if adjustment not in ('raw', 'split'):
+        raise ValueError('Unsupported Alpaca adjustment')
     from kline_integrity import session_complete, utcnow
     start = max(date.fromisoformat(str(start)[:10]), MIN_DAY)
     end = min(date.fromisoformat(str(end)[:10]), datetime.now(NY).date())
@@ -92,7 +98,7 @@ def prefetch(symbols, start, end):
         return None
     with _lock:
         names = {a: s for a, s in names.items()
-                 if not any(lo <= start and hi >= end for lo, hi in _coverage.get(s, ()))}
+                 if not any(lo <= start and hi >= end for lo, hi in _coverage.get((s, adjustment), ()))}
         keys = sorted(names)
         for offset in range(0, len(keys), 100):
             chunk = keys[offset:offset + 100]
@@ -101,7 +107,7 @@ def prefetch(symbols, start, end):
                         now - timedelta(minutes=16, seconds=1))
             params = dict(symbols=",".join(chunk), timeframe="1Day",
                           start=datetime.combine(start, day_time.min, NY).astimezone(timezone.utc).isoformat(),
-                          end=upper.isoformat(), adjustment="split", feed="sip", limit=10000)
+                          end=upper.isoformat(), adjustment=adjustment, feed="sip", limit=10000)
             staged = {}
             seen_tokens = set()
             while True:
@@ -122,7 +128,7 @@ def prefetch(symbols, start, end):
                             if start <= day <= end and day.weekday() < 5 and session_complete(day, names[name], now):
                                 values = dict(zip(("Open", "High", "Low", "Close", "Volume"),
                                                   (item.get(k) for k in ("o", "h", "l", "c", "v"))))
-                                staged[(names[name], day.isoformat())] = (values, source, fetched)
+                                staged[(names[name], day.isoformat(), adjustment)] = (values, source, fetched)
                     token = payload.get("next_page_token")
                     if not token:
                         break
@@ -134,14 +140,14 @@ def prefetch(symbols, start, end):
                     return None
             _cache.update(staged)
             for name in chunk:
-                _coverage.setdefault(names[name], []).append((start, end))
+                _coverage.setdefault((names[name], adjustment), []).append((start, end))
         return True
 
 
-def alpaca_bar(symbol, day):
+def alpaca_bar(symbol, day, adjustment=LATEST_ADJUSTMENT):
     if not enabled() or not alpaca_symbol(symbol):
         return None
     day = str(day)[:10]
-    if prefetch([symbol], day, day) is None:
+    if prefetch([symbol], day, day, adjustment=adjustment) is None:
         return None
-    return _cache.get((symbol, day))
+    return _cache.get((symbol, day, adjustment))
