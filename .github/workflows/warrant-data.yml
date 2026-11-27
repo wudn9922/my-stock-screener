@@ -1,0 +1,71 @@
+name: Taiwan warrant data
+on:
+  schedule:
+    - cron: '24 12 * * *' # 20:24 Asia/Taipei, after the daily exchange releases
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/build_warrants.py'
+      - 'tests/test_warrants.py'
+      - '.github/workflows/warrant-data.yml'
+      - '.github/generated-paths.json'
+      - 'supabase/functions/market-chart/**'
+      - 'atlas/tests/market-chart-handler.test.ts'
+env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+permissions:
+  contents: read
+concurrency:
+  group: warrant-data-${{ github.event.pull_request.number || 'daily' }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install lxml
+      - run: python -m unittest discover -s tests -p test_warrants.py -v
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --no-lock --config supabase/functions/market-chart/deno.json supabase/functions/market-chart/index.ts
+  refresh:
+    if: github.event_name != 'pull_request' && vars.GENERATED_BRANCH_MODE == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install lxml
+      - name: Restore the previous generated warrant catalogue
+        run: python scripts/generated_branch.py restore
+      - name: Build the warrant catalogue from official releases
+        run: python -u scripts/build_warrants.py
+      - name: Publish the warrant-owned files
+        run: python scripts/generated_branch.py publish warrants
+  notify-system-failure:
+    needs: ["verify", "refresh"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

@@ -4,6 +4,9 @@ Primary self-review. Currency defaults and compact average cost verified with 99
 ## 2026-11-25 日 K 封存重試
 自我審查。用兩版 ZTS 封存重現 226 根日 K 缺口，確認重抓後恢復 1,481 根且保留 SHA-256 驗證。全市場掃描可用 `scripts/diagnose-daily-gaps.ts` 重播。
 
+## 2026-11-26 Taiwan warrant data
+Primary self-review. Official reference releases and MIS order-book replay, with Python, Edge, and iPhone WebKit regression coverage.
+
 ## 2026-11-25 Screener EPS pill
 Primary self-review. 103 related Vitest cases, 123 Python tests, lint and build passed.
 

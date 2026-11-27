@@ -71,3 +71,4 @@ docs/report/**/*.tmp
 # Public display-only IPO/extended-session snapshots (generated owner: marketExtras).
 /docs/report/ipo-watch.json
 /docs/report/extended-quotes/*.json
+/docs/report/warrants/*.json

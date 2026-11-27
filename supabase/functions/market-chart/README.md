@@ -1,5 +1,36 @@
 # market-chart (Supabase Edge Function)
 
+## 權證最佳買賣價
+
+```http
+GET /functions/v1/market-chart?warrantQuotes=066186.TW,04917T.TW,714060.TWO
+X-Atlas-Token: <LINE ID token or atlasdev device token>
+```
+
+權證代號須帶 `.TW` 或 `.TWO`，可用逗號分隔。伺服器會正規化大小寫並去重。預設上限 20 檔，可用 `limit=40` 等值覆寫為 1 到 40 檔。超過上限回 HTTP 400，不截斷。登入、配額、CORS 與現有行情路由共用。
+
+```json
+{
+  "asOf": 1795673460,
+  "source": "twse-mis",
+  "session": "closed",
+  "results": {
+    "04917T.TW": {
+      "status": "available",
+      "quoteTime": 1795671000,
+      "bid": 2.07,
+      "bidSize": 10,
+      "ask": null,
+      "askSize": null
+    }
+  }
+}
+```
+
+`asOf` 是代理回應時間，`quoteTime` 是 MIS 掛單時間，單位都為 Unix 秒。`session` 依台北時間正規交易時段回 `regular` 或 `closed`。交易日仍由 MIS 資料日期確認。盤中超過 60 秒或跨日的掛單回 `stale` 並清空價量。收盤後可以回同日 13:30 快照，`session` 為 `closed`。
+
+`results` 包含每一個請求代號。`available` 允許單邊有價，`no_book` 表示有效時間的空掛單，`no_quote` 表示代號、時間或欄位無可用報價，`stale` 保留過期的掛單時間，`source_unavailable` 表示 MIS 或佇列暫時不可用。各價格、數量及無法確認的時間以 `null` 表示。此路由回 HTTP 200 與逐檔狀態，驗證及配額錯誤則沿用既有 400、401、429、503 回應形狀。
+
 Read-only Yahoo Finance history proxy with a best-effort Taiwan MIS overlay for today. The browser cannot call Yahoo directly
 (no CORS), so Atlas (`atlas/src/market-data/EdgeYahooProvider.ts`) calls this function, which returns
 Yahoo's **raw** chart JSON. Atlas normalizes and validates it client-side.
