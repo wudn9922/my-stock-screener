@@ -11,6 +11,7 @@ import { useCompactLayout } from '../ui/useCompactLayout';
 import type { ConsoleView, Route } from '../app/routes';
 import { DataStatusPanel } from '../ui/DataStatusPanel';
 import { WatchlistBoard } from '../ui/WatchlistBoard';
+import { UpcomingEventsCard } from '../ui/UpcomingEventsCard';
 import { WatchlistChanges } from '../ui/WatchlistChanges';
 import { explainWatchlistChanges, type WatchlistChangeReasons } from '../watchlists/reasons';
 import { HelpDisclosure } from '../ui/HelpDisclosure';
@@ -403,6 +404,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
             {/* The top bar already names the page; the heading stays in the document for assistive technology and tests. */}
             <div className="page-head"><div><h2 className="page-title">我的</h2></div></div>
             <PageFooterNote><p>設定選股條件、追蹤名單變化；保存方式由帳號授權決定。</p></PageFooterNote>
+            <UpcomingEventsCard lists={document.lists} />
             <MeGroup label="個人化">
               {/* One place for 自選清單, 分組 and 圖表收藏 (the old 自訂分組 row and ?view=groups open it). */}
               <MeRow label="清單" route={{ page: 'console', view: 'lists' }} navigate={go}
@@ -453,6 +455,7 @@ export default function ConsolePage({ report, navigate, openChart, list: request
         <WatchlistBoard viewSwitch={viewSwitch} holdingsActive={listsView === 'holdings'} onShowLists={() => setListsView('lists')} list={selected} lists={document.lists} parameters={stockParameters.stocks} parameterError={stockParameters.error}
           onSelectList={id => navigate({ page: 'watchlist', list: id })} openChart={openChart} navigate={navigate} />
       )}
+      <UpcomingEventsCard lists={document.lists} />
       {section === 'settings' && <a className="console-card console-watchlist-link" href="?page=watchlist" onClick={event => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); navigate({ page: 'watchlist' });
