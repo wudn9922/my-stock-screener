@@ -66,6 +66,7 @@ jobs:
         with:
           name: alpaca-us-repair-${{ github.run_id }}
           path: .cache/alpaca-repair/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
   publish:
@@ -127,3 +128,17 @@ jobs:
           archive_head=$(git -C "$archive" rev-parse HEAD)
           # Either both permanent copies publish or neither does. No force/rebase.
           git push --atomic origin HEAD:refs/heads/main "$archive_head:refs/heads/kline-archive"
+  notify-system-failure:
+    needs: [prepare, publish]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: '${{ github.workflow }} · 執行失敗／取消'
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
