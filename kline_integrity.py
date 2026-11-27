@@ -436,6 +436,36 @@ def _write_preserving_lines(path, updates):
     _atomic(path, lines[0] + "".join(records[d] for d in sorted(records)))
 
 
+SCALE_FACTORS = tuple(f for n in (2, 3, 4, 5, 8, 10) for f in (n, 1 / n))
+
+
+def isolated_scale(previous, current, following):
+    """A single common split-like jump which immediately reverses."""
+    try:
+        a, x, z = map(float, (previous, current, following))
+    except (TypeError, ValueError):
+        return False
+    if not all(math.isfinite(v) and v > 0 for v in (a, x, z)):
+        return False
+    if max(a, z) / min(a, z) > 1.08 + 1e-12:
+        return False
+    return any(abs(x / a / factor - 1) <= .08 + 1e-12 and
+               abs(x / z / factor - 1) <= .08 + 1e-12 for factor in SCALE_FACTORS)
+
+
+def scale_replacement_reason(previous, current, following, new):
+    if any(violation(row) for row in (previous, current, following)):
+        return "invalid-original-or-neighbor"
+    if not isolated_scale(previous["Close"], current["Close"], following["Close"]):
+        return "not-isolated-scale"
+    if violation(new):
+        return "invalid-source-bar"
+    if any(abs(float(new["Close"]) / float(row["Close"]) - 1) > .25 + 1e-12
+           for row in (previous, following)):
+        return "neighbor-close-mismatch-25pct"
+    return None
+
+
 def correct_bar(path, symbol, day, values, source_url, fetched_at, log_path=None,
                 reason="verified-official-correction"):
     if violation(values):
