@@ -63,6 +63,11 @@ class DigestTests(unittest.TestCase):
         for nets in ([1, 0, 3, -1], [1, 2, 3, 0], [1, -2, 3, -1]):
             self.assertEqual(digest.reversal_events(institutional(nets), SESSIONS, TODAY), [])
         self.assertEqual(digest.reversal_events(institutional([1, 2, 3, -1]), SESSIONS + ["2026-11-28"], TODAY), [])
+        # The source misses a session for every stock, not only this stock.
+        missing = ["2026-11-23", *SESSIONS[1:]]
+        record = institutional([1, 2, 3, -1])
+        record["rows"][0]["date"] = missing[0]
+        self.assertEqual(digest.reversal_events(record, missing, TODAY, ["2026-11-23", *SESSIONS]), [])
 
     def test_build_and_keep_output_on_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,6 +75,9 @@ class DigestTests(unittest.TestCase):
             (report / "financials").mkdir()
             file = report / "financials/AAPL.json"
             file.write_text(json.dumps(financial()))
+            (report / "market-calendar.json").write_text(json.dumps({
+                "version": 1, "markets": {"TW": {"sessions": dict.fromkeys(SESSIONS, {})}},
+            }))
             research = report / "research"
             store = MarketStore(research, "institutions")
             store.put("2330.TW", institutional([1, 2, 3, -1]))
