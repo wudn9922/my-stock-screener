@@ -47,9 +47,11 @@ def build(report, now):
     end = (today + timedelta(days=97)).isoformat()
     stocks = {}
     skipped = 0
+    financial_count = 0
     for path in sorted((report / "financials").glob("*.json")):
         if not SYMBOL.fullmatch(path.stem):
             continue
+        financial_count += 1
         try:
             doc = read(path)
             block = doc.get("stockDividends")
@@ -58,8 +60,8 @@ def build(report, now):
             stocks[path.stem] = stock_block(block, start, end)
         except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
             skipped += 1
-    if not stocks:
-        raise ValueError("No valid cash dividend records")
+    if not financial_count or (not stocks and skipped):
+        raise ValueError("Missing financial inputs or all available cash records invalid")
     return dict(version=1, generatedAt=now.replace(microsecond=0).isoformat(), stocks=stocks), skipped
 
 
@@ -79,6 +81,8 @@ def run(report, now, dry_run=False):
         print("Cash dividend bytes:", json.dumps(sizes), "stocks:", len(result["stocks"]), "skipped:", skipped)
         if skipped:
             print(f"::warning::Skipped {skipped} invalid cash dividend stock records")
+        if not result['stocks']:
+            print('::warning::No cash dividend coverage yet; awaiting normal FinMind refresh')
         if not dry_run:
             # Refresh snapshot freshness, even if source events have not changed.
             output.parent.mkdir(parents=True, exist_ok=True)

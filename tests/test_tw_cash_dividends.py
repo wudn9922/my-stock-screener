@@ -51,3 +51,22 @@ class CashDividendSnapshotTests(unittest.TestCase):
             self.assertFalse(cash.run(report, NOW))
             self.assertEqual(target.read_bytes(), good)
             self.assertEqual(upcoming.read_bytes(), old)
+
+    def test_initial_uncollected_data_is_empty_but_not_missing_financials(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp)
+            self.assertFalse(cash.run(report, NOW))
+            self.assertFalse((report / "tw-cash-dividends.json").exists())
+            fin = report / "financials"
+            fin.mkdir()
+            record = fin / "2330.TW.json"
+            record.write_text(json.dumps({"stockDividends": {"checked": "2026-11-28", "events": []}}))
+            self.assertTrue(cash.run(report, NOW))
+            target = report / "tw-cash-dividends.json"
+            self.assertEqual(json.loads(target.read_bytes())["stocks"], {})
+            record.write_text(json.dumps({"stockDividends": {"checked": "2026-11-28", "cashEvents": []}}))
+            self.assertTrue(cash.run(report, NOW))
+            covered = target.read_bytes()
+            record.write_text(json.dumps({"stockDividends": {"checked": "2026-11-28", "events": []}}))
+            self.assertFalse(cash.run(report, NOW))
+            self.assertEqual(target.read_bytes(), covered)
