@@ -566,3 +566,31 @@ test('holdings poll only visible positions in the active account and stop when b
   await expect(panel(page)).toContainText('尚未匯入持股');
   await noPoll();
 });
+
+
+test('Taiwan dividend cashflow converts imported lots once and stays local', async ({ page }, info) => {
+  await mockMarketLogin(page);
+  const requests: string[] = [];
+  await open(page, async () => {
+    await page.route('**/report/upcoming-events.json', route => {
+      requests.push(route.request().url() + (route.request().postData() ?? ''));
+      const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
+      return route.fulfill({ json: { version: 1, generatedAt: new Date().toISOString(), coverage: { earnings: 0, alerts: 0, dividends: 1, cashDividends: 1 },
+        events: [], moves: {}, cashDividends: { '2330.TW': { checked: today, events: [{ exDate: today, paymentDate: null, perShare: 20, year: today }] } } } });
+    });
+  });
+  await create(page);
+  await paste(page, '代號\t張數\t平均成本\n2330\t1\t812.34567');
+  await expect(importer(page).getByRole('textbox', { name: '第 1 列股數' })).toHaveValue('1000');
+  await save(page);
+  await panel(page).locator('summary').filter({ hasText: '台股股息現金流' }).click();
+  const card = panel(page).locator('details').filter({ has: page.locator('summary', { hasText: '台股股息現金流' }) });
+  await expect(card).toContainText('20,000.00');
+  await expect(card).toContainText('422.00');
+  await expect(card).toContainText('發放日未公告');
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).not.toMatch(/2330|812\.34567|PRIVATE-LOCAL-ONLY|quantity/);
+  await layout(page);
+  if (info.project.name === 'mobile-chromium' && page.viewportSize()?.width === 390)
+    await card.screenshot({ path: info.outputPath('dividend-cashflow-390.png') });
+});
