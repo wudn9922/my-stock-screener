@@ -362,12 +362,12 @@ const finalClose = Date.parse('2026-11-27T13:30:00+08:00');
 const previousCloses = { '2330.TW': 2145, '6488.TWO': 518 };
 type LiveSymbol = keyof typeof previousCloses;
 
-async function seedHoldings(page: Page, accounts: { name: string; positions: [LiveSymbol, string, string][] }[]) {
+async function seedHoldings(page: Page, accounts: { name: string; principal?: string; positions: [LiveSymbol, string, string][] }[]) {
   const uuid = (index: number) => '10000000-0000-4000-8000-' + String(index).padStart(12, '0');
-  const entries = accounts.map(({ name, positions }, index) => {
+  const entries = accounts.map(({ name, principal, positions }, index) => {
     const accountId = uuid(index + 1);
     return {
-      account: { id: accountId, name, kind: 'tw-broker', broker: 'other', currency: 'TWD' }, revision: 1,
+      account: { id: accountId, name, kind: 'tw-broker', broker: 'other', currency: 'TWD', ...(principal === undefined ? {} : { principal }) }, revision: 1,
       holdings: positions.map(([symbol, quantity, averageCost], n) => ({
         id: uuid(101 + index * 100 + n), accountId, symbol, quantity, averageCost, market: 'TW',
         costCurrency: 'TWD', source: 'manual', updatedAt: '2026-11-26T09:00:00Z',
@@ -416,10 +416,53 @@ function recordedClosingPrice() {
   return payload;
 }
 
+test('W3 principal setting validates, persists across import and correction, and clears', async ({ page }) => {
+  await mockDeviceAccount(page);
+  await open(page);
+  await create(page, 'kgi');
+  await paste(page, '代號,股數,平均成本\n2330,1000,800');
+  await save(page);
+  const principal = panel(page).getByRole('region', { name: '帳戶本金摘要' });
+  const input = panel(page).getByRole('textbox', { name: '本金（TWD）' });
+  const submit = panel(page).getByRole('button', { name: '儲存本金', exact: true });
+  await expect(principal).toHaveCount(0);
+  await input.fill('0');
+  await submit.click();
+  await expect(panel(page).getByRole('form', { name: '本金設定' }).getByRole('alert')).toBeVisible();
+  await input.fill('500000');
+  await submit.click();
+  await expect(principal).toContainText('本金小於持股成本');
+  await expect(principal).toContainText('-300,000.00');
+  await input.fill('1000000');
+  await submit.click();
+  await expect(principal).toContainText('200,000.00');
+  await expect(principal).not.toContainText('本金小於持股成本');
+  await expect(principal).toContainText('本金報酬率只含未實現盈虧');
+  await panel(page).getByRole('button', { name: '匯入持股', exact: true }).click();
+  await paste(page, '代號,股數,平均成本\n2330,500,800');
+  await save(page);
+  await expect(principal).toContainText('600,000.00');
+  await panel(page).getByRole('button', { name: '修正持股', exact: true }).click();
+  await save(page);
+  await expect(principal).toContainText('600,000.00');
+  await page.reload();
+  await selectHoldings(page);
+  await panel(page).getByRole('combobox', { name: '持股帳戶' }).selectOption({ label: 'PRIVATE-LOCAL-ONLY · TWD' });
+  await expect(input).toHaveValue('1000000');
+  await expect(principal).toContainText('600,000.00');
+  await layout(page);
+  await panel(page).getByRole('button', { name: '清除本金', exact: true }).click();
+  await expect(principal).toHaveCount(0);
+  await expect(input).toHaveValue('');
+  await page.reload();
+  await selectHoldings(page);
+  await expect(principal).toHaveCount(0);
+});
+
 test('received MIS prints update holding, account and market totals and preserve the final close', async ({ page }, info) => {
   await page.clock.install({ time: liveStart });
   await mockDeviceAccount(page);
-  await seedHoldings(page, [{ name: '測試台股', positions: [['2330.TW', '1000', '2000']] }]);
+  await seedHoldings(page, [{ name: '測試台股', principal: '3000000', positions: [['2330.TW', '1000', '2000']] }]);
   const accountChoice = panel(page).getByRole('combobox', { name: '持股帳戶' });
   let phase: 'first' | 'second' | 'close' = 'first';
   let release!: () => void;
@@ -452,6 +495,10 @@ test('received MIS prints update holding, account and market totals and preserve
     await expect(position).toContainText('+20,000.00');
     await expect(total).toContainText('2,165,000.00 TWD');
     await expect(total).toContainText('165,000.00 TWD');
+    const principal = panel(page).getByRole('region', { name: '帳戶本金摘要' });
+    await expect(principal).toContainText('3,165,000.00');
+    await expect(principal).toContainText('5.50%');
+    await expect(total).toContainText('5.50%');
     await account.locator('summary').click();
     await expect(account).toContainText('TWD 市值 2,165,000.00');
     await expect(account).toContainText('今日損益 +20,000.00');
@@ -465,6 +512,15 @@ test('received MIS prints update holding, account and market totals and preserve
     await expect(total).toContainText('2,170,000.00 TWD');
     await expect(account).toContainText('今日損益 +25,000.00');
     await expect(market).toContainText('未實現損益 +170,000.00');
+    await expect(principal).toContainText('3,170,000.00');
+    await expect(principal).toContainText('5.67%');
+    await expect(total).toContainText('5.67%');
+    await expect(market).toContainText('5.67%');
+    if (info.project.name === 'iphone-webkit' && process.env.ATLAS_HOLDINGS_PRINCIPAL_SCREENSHOT) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await principal.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('holdings-principal-390.png'), scale: 'css' });
+    }
     if (info.project.name === 'iphone-webkit' && process.env.ATLAS_HOLDINGS_LIVE_SCREENSHOT) {
       await page.setViewportSize({ width: 390, height: 844 });
       await position.scrollIntoViewIfNeeded();

@@ -241,3 +241,8 @@
 .holdings-statement-log { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .holdings-statement-log li { display: flex; gap: 12px; flex-wrap: wrap; }
 .holdings-statement-log li span:first-child { color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 84px; }
+
+.holdings-principal-summary { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin: 6px 0; }
+.holdings-principal-summary p, .holdings-principal-group p { margin: 4px 0; }
+.holdings-principal-group { overflow-wrap: anywhere; font-size: 12px; }
+.holdings-principal-settings { display: grid; gap: 8px; margin-bottom: 12px; }

@@ -31,6 +31,8 @@ import { holdingChartTarget } from './chartTarget';
 import { ALL_ACCOUNTS, holdingsViewPreference, resolveView } from './viewPreference';
 import { DividendCashflowCard } from './DividendCashflowCard';
 import { HoldingsTotals } from './HoldingsTotals';
+import { accountPrincipal, principalByCurrency } from './principal';
+import { PrincipalSummary, PrincipalGroupSummary, PrincipalSettings } from './PrincipalSummary';
 import { retainQuotes, retainRates } from './quoteRetention';
 import { useFuturesRefresh } from './useFuturesRefresh';
 import { mexcStore } from './mexc';
@@ -222,6 +224,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
   });
   // Hidden holdings are a view preference: every total, subtotal and note below uses `all` (visible only).
   const all = evaluated.filter((row) => row.hidden === null);
+  const principalGroups = principalByCurrency(document.accounts.map((entry) => entry.account), all, pendingAccounts);
   const hiddenRows = evaluated.filter(
     (row): row is (typeof evaluated)[number] & { hidden: HiddenReason } => row.hidden !== null,
   );
@@ -350,6 +353,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       {shownAccounts.map((entry) => {
         const accountRows = rowsOf(entry.account.id);
         const accountHidden = hiddenRows.filter((row) => row.holding.accountId === entry.account.id);
+        const principal = accountPrincipal(entry.account, accountRows, pendingAccounts);
         return (
           <section
             className="holdings-account"
@@ -359,6 +363,7 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             <h3 className={selected ? 'holdings-sr-only' : 'holdings-account-title'}>
               {entry.account.name} · {entry.account.currency}
             </h3>
+            {principal && <PrincipalSummary account={entry.account} metrics={principal} />}
             {entry.account.broker === 'mexc' &&
               mexcSnapshot.state.connections.some((c) => c.accountId === entry.account.id) && (
                 <MexcFuturesPanel
@@ -425,15 +430,18 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
           }))}
           pending={pendingAccounts.size > 0}
           hidden={hiddenRows.length}
+          principalGroups={principalGroups}
         >
           <details data-testid="holdings-spot-subtotals">
             <summary>市場小計</summary>
             {(['TW', 'US', 'CRYPTO'] as const)
-              .filter((market) => all.some((row) => row.holding.market === market))
-              .map((market) => (
+              .map((market) => ({ market, currency: ({ TW: 'TWD', US: 'USD', CRYPTO: 'USDT' } as const)[market] }))
+              .filter(({ market, currency }) => all.some((row) => row.holding.market === market) || principalGroups.has(currency))
+              .map(({ market, currency }) => (
                 <div key={market}>
                   <h4>{{ TW: '台股', US: '美股', CRYPTO: '加密貨幣' }[market]}</h4>
                   {subtotal(all.filter((row) => row.holding.market === market))}
+                  {principalGroups.has(currency) && <PrincipalGroupSummary currency={currency} metrics={principalGroups.get(currency)!} />}
                 </div>
               ))}
           </details>
@@ -831,6 +839,16 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
       )}
       {selected && (
         <section className="console-card" aria-label="帳戶設定">
+          <PrincipalSettings key={selected.account.id + ':' + (selected.account.principal ?? '')} account={selected.account}
+            disabled={blocked || editing || creating || connecting || mexcSnapshot.loading}
+            onSave={async (principal) => {
+              setBusy(true);
+              try {
+                await store.setPrincipal(selected.account.id, principal);
+                if (selected.account.broker === 'mexc' && access.storageMode === 'cloud') await mexc.load();
+                setMessage(principal === null ? '已清除帳戶本金。' : '已更新帳戶本金。');
+              } finally { setBusy(false); }
+            }} />
           <details>
             <summary>帳戶小計</summary>
             {subtotal(all.filter((row) => row.holding.accountId === selected.account.id))}

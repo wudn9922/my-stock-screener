@@ -111,6 +111,12 @@ describe('holdings use the existing verified storage context', () => {
     const { holdingsStore, HoldingsStore } = await import('../src/holdings/store');
     await holdingsStore().replace(account, [holding]);
     expect(new HoldingsStore().getSnapshot().document.accounts[0]!.holdings).toHaveLength(1);
+    await holdingsStore().setPrincipal(account.id, '1234.56');
+    expect(new HoldingsStore().getSnapshot().document.accounts[0]!.account.principal).toBe('1234.56');
+    await holdingsStore().replace(account, [holding]);
+    expect(new HoldingsStore().getSnapshot().document.accounts[0]!.account.principal).toBe('1234.56');
+    await holdingsStore().setPrincipal(account.id, null);
+    expect(new HoldingsStore().getSnapshot().document.accounts[0]!.account).not.toHaveProperty('principal');
     expect(disk.size).toBe(0);
     expect(h.calls).toEqual([]);
   });
@@ -122,6 +128,10 @@ describe('holdings use the existing verified storage context', () => {
     const { holdingsStore, HoldingsStore } = await import('../src/holdings/store');
     const original = holdingsStore();
     await original.replace(account, [holding]);
+    await original.setPrincipal(account.id, '999.123456789012345678');
+    expect(new HoldingsStore().getSnapshot().document.accounts[0]!.account.principal).toBe('999.123456789012345678');
+    await original.replace(account, [{ ...holding, quantity: '2' }]);
+    expect(new HoldingsStore().getSnapshot().document.accounts[0]!.account.principal).toBe('999.123456789012345678');
     expect(new HoldingsStore().getSnapshot().document.accounts).toHaveLength(1);
     expect([...disk.keys()]).toEqual([expect.stringContaining(`:${h.userId}:device:holdings:v1`)]);
     h.userId = `U${'2'.repeat(32)}`;

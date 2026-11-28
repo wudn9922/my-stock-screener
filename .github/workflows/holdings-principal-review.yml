@@ -1,0 +1,57 @@
+name: Holdings principal review
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'atlas/src/holdings/principal.ts'
+      - 'atlas/src/holdings/PrincipalSummary.tsx'
+      - 'supabase/functions/user-settings/holdings.ts'
+      - 'supabase/manual/atlas_holdings.sql'
+      - '.github/workflows/holdings-principal-review.yml'
+permissions:
+  contents: read
+jobs:
+  principal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit account reconstruction paths
+        run: git grep -n -E 'HoldingAccount|validateHoldingAccount|replaceAccount|atlas_holdings_action|atlas_holding_accounts|repo\.replace' -- atlas/src/holdings supabase/functions supabase/manual sinopac_sync statement_sync
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: atlas/package-lock.json
+      - run: npm ci
+        working-directory: atlas
+      - name: Related Vitest and Edge handler tests
+        working-directory: atlas
+        run: npx vitest run tests/holdings-principal.test.ts tests/holdings-storage.test.ts tests/storage-access-handler.test.ts tests/mexc.test.ts tests/holdings.test.ts tests/holdings-visibility.test.ts tests/holdings-portfolio.test.ts tests/holdings-live.test.ts
+      - name: Related PostgreSQL and SinoPac tests
+        run: |
+          if ! command -v pg_config >/dev/null || [ ! -x "$(pg_config --bindir)/initdb" ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql
+          fi
+          export ATLAS_PG_BIN="$(pg_config --bindir)"
+          python supabase/tests/test_account_storage_permissions.py HoldingsSqlTests
+          python supabase/tests/test_statement_sync_sql.py
+          python -m unittest discover -s tests -p test_sinopac_sync.py
+      - name: Install WebKit
+        working-directory: atlas
+        env:
+          PLAYWRIGHT_PREFER_OFFICIAL_ARCHIVE: '1'
+        run: bash ../.github/scripts/install-playwright.sh webkit
+      - name: Holdings principal on mobile WebKit
+        working-directory: atlas
+        env:
+          ATLAS_HOLDINGS_PRINCIPAL_SCREENSHOT: '1'
+        run: npm run test:site -- holdings.spec.ts --project=iphone-webkit -g 'W3 principal|received MIS prints'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: holdings-principal-390
+          path: atlas/test-results/site/**/holdings-principal-390.png
+          if-no-files-found: error
+          retention-days: 7

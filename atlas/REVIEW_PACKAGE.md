@@ -1,3 +1,6 @@
+## 2026-11-28 Holdings principal
+Primary self-review; no independent sign-off. Principal, storage/sync and 390px WebKit tests added; CI and screenshot evidence in PR (local checkout unavailable).
+
 ## 2026-11-27 Holdings live quotes
 Primary self-review. Replayed official MIS trades through position, account, and market totals. Verified subscription cleanup, close-based visibility, expiry, and the closing-price fallback in Vitest and iPhone WebKit.
 

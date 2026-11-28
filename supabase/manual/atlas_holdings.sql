@@ -61,6 +61,10 @@ begin
         or jsonb_typeof(definition_value->'kind') is distinct from 'string'
         or jsonb_typeof(definition_value->'currency') is distinct from 'string'
         or jsonb_typeof(definition_value->'broker') is distinct from 'string'
+        or (definition_value ? 'principal' and (
+          jsonb_typeof(definition_value->'principal') is distinct from 'string'
+          or definition_value->>'principal' !~ '^(0|[1-9][0-9]{0,14})(\.[0-9]{1,18})?$'
+          or definition_value->>'principal' !~ '[1-9]'))
         or length(btrim(definition_value->>'name')) not between 1 and 40
         or definition_value->>'kind' not in ('tw-broker','us-broker','crypto-exchange')
         -- CASE is parenthesized: inside IF, PL/pgSQL would otherwise end the condition at the CASE's first THEN.
@@ -82,9 +86,31 @@ begin
     select count(*) into old_count from public.atlas_holdings h where h.line_user_id = owner_id and h.account_id = account_uuid;
     select count(*) into total_count from public.atlas_holdings h where h.line_user_id = owner_id;
     if operation = 'replaceAccount' then
+      -- An omitted optional principal is not permission to erase it (older clients and broker sync).
+      -- Clearing requires the dedicated, revision-checked setPrincipal action.
+      if not (definition_value ? 'principal') and existing.definition ? 'principal' then
+        definition_value := definition_value || jsonb_build_object('principal',existing.definition->'principal');
+      end if;
       next_count := jsonb_array_length(payload->'holdings');
       if next_count > 1000 or total_count - old_count + next_count > 2000 then return jsonb_build_object('status','limit'); end if;
       target := payload->'holdings';
+    elsif operation = 'setPrincipal' then
+      if not (payload ? 'principal') or (payload->'principal' <> 'null'::jsonb and (
+        jsonb_typeof(payload->'principal') is distinct from 'string'
+        or payload->>'principal' !~ '^(0|[1-9][0-9]{0,14})(\.[0-9]{1,18})?$'
+        or payload->>'principal' !~ '[1-9]')) then return jsonb_build_object('status','invalid'); end if;
+      definition_value := existing.definition - 'principal';
+      if payload->'principal' <> 'null'::jsonb then
+        definition_value := definition_value || jsonb_build_object('principal',payload->'principal');
+      end if;
+      update public.atlas_holding_accounts a set definition=definition_value
+        where a.line_user_id=owner_id and a.id=account_uuid;
+      -- Metadata-only edit: preserve the MEXC cost-review state and advance a matching
+      -- snapshot revision atomically. A stale snapshot remains stale. No grants change.
+      if existing.definition->>'broker' = 'mexc' and pg_catalog.to_regclass('atlas_private.atlas_mexc_connections') is not null then
+        update atlas_private.atlas_mexc_connections c set holding_revision=existing.revision+1
+          where c.line_user_id=owner_id and c.account_id=account_uuid and c.holding_revision=existing.revision;
+      end if;
     elsif operation = 'upsert' then
       definition_value := existing.definition;
       item := payload->'holding';

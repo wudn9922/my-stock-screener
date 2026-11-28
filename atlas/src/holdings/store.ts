@@ -3,6 +3,7 @@ import { canPersist, getStorageContextKey, userStorage } from '../auth/storage';
 import { holdingsContextApi } from './contextApi';
 import {
   emptyHoldings,
+  holdingDecimal,
   replaceAccount,
   validateHoldingsDocument,
   type HoldingAccount,
@@ -66,10 +67,25 @@ export class HoldingsStore {
     if (this.blocked) throw new Error('儲存空間無法讀取，原資料保持不變。');
     const next = replaceAccount(this.snapshot.document, account, holdings);
     await this.write(next, 'holdings.replaceAccount', {
-      account,
+      account: next.accounts.find((entry) => entry.account.id === account.id)!.account,
       holdings,
       expectedRevision: this.snapshot.document.accounts.find((a) => a.account.id === account.id)?.revision ?? null,
     });
+  }
+  async setPrincipal(id: string, principal: string | null) {
+    this.active();
+    const previous = this.snapshot.document.accounts.find((entry) => entry.account.id === id);
+    if (!previous) throw new Error('帳戶不存在，請重新載入。');
+    const account = { ...previous.account };
+    if (principal === null) delete account.principal;
+    else account.principal = holdingDecimal(principal);
+    const next = validateHoldingsDocument({
+      version: 1,
+      accounts: this.snapshot.document.accounts.map((entry) =>
+        entry.account.id === id ? { ...entry, account, revision: entry.revision + 1 } : entry,
+      ),
+    });
+    await this.write(next, 'holdings.setPrincipal', { accountId: id, principal, expectedRevision: previous.revision });
   }
   async removeAccount(id: string) {
     this.active();
