@@ -28,7 +28,7 @@ describe('P/E river output quality gate', () => {
       const tw = join(directory, 'pe-river-tw.json');
       const u = join(directory, 'pe-river-us.json');
       const prior = await fixture();
-      const raw = JSON.stringify(prior, null, 2) + '\\n';
+      const raw = JSON.stringify(prior, null, 2) + '\n';
       const entries = Object.entries(prior.items);
       await writeFile(tw, raw);
       const previousUs = { ...prior, market: 'US', items: Object.fromEntries(us) };
@@ -45,8 +45,9 @@ describe('P/E river output quality gate', () => {
       expect(await readFile(u, 'utf8')).toBe(beforeUs);
       expect(await publishMarkets(directory, { TW: entries.slice(0, 17), US: us }, dates, 10, 20)).toBe(0);
       expect(Object.keys(JSON.parse(await readFile(tw, 'utf8')).items)).toHaveLength(17);
+      const acceptedUs = await readFile(u, 'utf8');
       expect(await publishMarkets(directory, { TW: entries, US: [] }, dates, 0, 20)).toBe(1);
-      expect(await readFile(u, 'utf8')).not.toBe('');
+      expect(await readFile(u, 'utf8')).toBe(acceptedUs);
       expect(Object.keys(JSON.parse(await readFile(tw, 'utf8')).items)).toHaveLength(20);
     } finally {
       await rm(directory, { recursive: true, force: true });
