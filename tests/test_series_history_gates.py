@@ -74,14 +74,14 @@ class SeriesGateTest(unittest.TestCase):
     def test_actual_writer_and_empty_tpex_status(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"RUNNER_TEMP": folder}):
             status.reset_status()
-            dates = pd.date_range("2026-01-01", periods=20)
+            dates = pd.bdate_range("2026-01-01", periods=40)
             frame = pd.DataFrame({"Open": 100, "High": 101, "Low": 99, "Close": 100, "Volume": 10}, index=dates)
             path = Path(folder) / "^TWOII.json"
             series.write_report_series("^TWOII", frame, "OTC", "fixture", series_dir=folder)
             first = path.read_bytes()
             series.write_report_series("^TWOII", frame.drop(dates[5]), "OTC", "fixture", series_dir=folder)
             self.assertNotEqual(path.read_bytes(), first)
-            self.assertEqual(len(json.loads(path.read_text())["bars"]), 19)
+            self.assertEqual(len(json.loads(path.read_text())["bars"]), 39)
             self.assertEqual(status.main(), 0)
             prior = path.read_bytes()
             real_writer = series.write_report_series
@@ -89,6 +89,47 @@ class SeriesGateTest(unittest.TestCase):
                     series, "write_report_series", side_effect=lambda *args: real_writer(*args, series_dir=folder)):
                 self.assertIsNone(series.write_tpex_otc_series())
             self.assertEqual(path.read_bytes(), prior)
+            self.assertEqual(status._read(), ["series/^TWOII.json: OutputRejected"])
+
+    def test_two_missing_days_in_short_window_rejects_without_write(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"RUNNER_TEMP": folder}):
+            status.reset_status()
+            dates = pd.bdate_range("2026-01-01", periods=20)
+            frame = pd.DataFrame({"Open": 100, "High": 101, "Low": 99, "Close": 100, "Volume": 10}, index=dates)
+            path = Path(folder) / "AAPL.json"
+            series.write_report_series("AAPL", frame, "Apple", "fixture", series_dir=folder)
+            self.assertEqual(len(json.loads(path.read_text())["bars"]), 20)
+            prior = path.read_bytes()
+            self.assertIsNone(series.write_report_series("AAPL", frame.drop([dates[5], dates[6]]), "Apple", "fixture", series_dir=folder))
+            self.assertEqual(path.read_bytes(), prior)
+            self.assertEqual(status._read(), ["series/AAPL.json: OutputRejected"])
+
+    def test_empty_optional_cold_start_is_not_failure_but_empty_existing_is(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"RUNNER_TEMP": folder}):
+            status.reset_status()
+            dest = Path(folder) / "series"
+            with patch.object(series, "record_failure", wraps=status.record_failure) as failure:
+                self.assertIsNone(series.write_report_series("UNKNOWN", pd.DataFrame(), "Unknown", "fixture", series_dir=dest))
+                failure.assert_not_called()
+                self.assertFalse(dest.exists())
+                with patch.object(series, "build_series_payload", return_value=series_doc("UNKNOWN", bars(1))):
+                    series.write_report_series("UNKNOWN", None, "Unknown", "fixture", series_dir=dest)
+                path = dest / "UNKNOWN.json"
+                prior = path.read_bytes()
+                self.assertIsNone(series.write_report_series("UNKNOWN", pd.DataFrame(), "Unknown", "fixture", series_dir=dest))
+                self.assertEqual(path.read_bytes(), prior)
+                failure.assert_called_once()
+            self.assertEqual(status._read(), ["series/UNKNOWN.json: OutputRejected"])
+
+    def test_empty_tpex_cold_start_is_failure(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"RUNNER_TEMP": folder}):
+            status.reset_status()
+            dest = Path(folder) / "series"
+            real_writer = series.write_report_series
+            with patch.object(series, "get_tpex_otc_full_history", return_value=pd.DataFrame()), patch.object(
+                    series, "write_report_series", side_effect=lambda *args: real_writer(*args, series_dir=dest)):
+                self.assertIsNone(series.write_tpex_otc_series())
+            self.assertFalse(dest.exists())
             self.assertEqual(status._read(), ["series/^TWOII.json: OutputRejected"])
 
 

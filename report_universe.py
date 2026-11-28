@@ -270,6 +270,11 @@ def write_report_series(
         series_dir,
         f"{symbol}.json"
     )
+    # An unknown/delisted optional symbol may legitimately have no history.
+    # The fixed TPEx index is required even on a cold start.
+    if not payload["bars"] and not os.path.exists(path) and symbol != TPEX_OTC_SYMBOL:
+        print(f"⚠️ {symbol} 沒有可用 K 線，不寫出 series JSON")
+        return None
     try:
         previous = None
         if os.path.exists(path):
