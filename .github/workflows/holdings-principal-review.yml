@@ -37,6 +37,7 @@ jobs:
           export ATLAS_PG_BIN="$(pg_config --bindir)"
           python supabase/tests/test_account_storage_permissions.py HoldingsSqlTests
           python supabase/tests/test_statement_sync_sql.py
+          python -m pip install -r sinopac_sync/requirements.txt
           python -m unittest discover -s tests -p test_sinopac_sync.py
       - name: Install WebKit
         working-directory: atlas
