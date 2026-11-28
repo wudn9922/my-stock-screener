@@ -587,6 +587,51 @@ class HoldingsSqlTests(_PostgresFixture):
         replaced = self.replace([holding("2a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2317.TW")], revision=1)
         self.assertEqual([h["symbol"] for h in replaced["document"]["accounts"][0]["holdings"]], ["2317.TW"])
 
+    def test_principal_validation_preservation_and_clear(self):
+        account = {"id": ACCOUNT, "name": "凱基", "kind": "tw-broker", "currency": "TWD", "broker": "kgi"}
+        for invalid in (None, 12, "0", "-1", "1e3", "0.1234567890123456789"):
+            self.assertEqual(self.action("replaceAccount", payload={"account": dict(account, principal=invalid), "holdings": []})["status"], "invalid")
+        created = self.action("replaceAccount", payload={"account": dict(account, principal="10000.0001"), "holdings": []})
+        self.assertEqual(created["status"], "ok")
+        replaced = self.replace([], revision=1)
+        self.assertEqual(replaced["document"]["accounts"][0]["account"]["principal"], "10000.0001")
+        row = holding("0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2330.TW")
+        upserted = self.action("upsert", payload={"accountId": ACCOUNT, "holding": row}, revision=2)
+        self.assertEqual(upserted["document"]["accounts"][0]["account"]["principal"], "10000.0001")
+        deleted = self.action("delete", payload={"accountId": ACCOUNT, "holdingId": row["id"]}, revision=3)
+        self.assertEqual(deleted["document"]["accounts"][0]["account"]["principal"], "10000.0001")
+        self.assertEqual(self.action("setPrincipal", payload={"accountId": ACCOUNT, "principal": "0"}, revision=4)["status"], "invalid")
+        self.assertEqual(self.action("setPrincipal", payload={"accountId": ACCOUNT}, revision=4)["status"], "invalid")
+        self.assertEqual(self.action("setPrincipal", OTHER, {"accountId": ACCOUNT, "principal": "99"}, 4)["status"], "conflict")
+        self.assertEqual(self.action("setPrincipal", payload={"accountId": ACCOUNT, "principal": "99"}, revision=3)["status"], "conflict")
+        edited = self.action("setPrincipal", payload={"accountId": ACCOUNT, "principal": "99.12"}, revision=4)
+        self.assertEqual(edited["document"]["accounts"][0]["account"]["principal"], "99.12")
+        cleared = self.action("setPrincipal", payload={"accountId": ACCOUNT, "principal": None}, revision=5)
+        self.assertNotIn("principal", cleared["document"]["accounts"][0]["account"])
+        self.assertNotIn("principal", self.action("list")["document"]["accounts"][0]["account"])
+
+    def test_principal_edit_keeps_mexc_snapshot_revision_and_sync_preserves_principal(self):
+        self.run_sql((MIGRATION.parent / "atlas_mexc_holdings.sql").read_text())
+        try:
+            account = {"id": ACCOUNT, "name": "MEXC", "kind": "crypto-exchange", "currency": "USDT", "broker": "mexc"}
+            self.assertEqual(self.action("replaceAccount", payload={"account": account, "holdings": []})["status"], "ok")
+            self.run_sql(f"insert into atlas_private.atlas_mexc_connections(line_user_id,account_id,credential,key_last4,snapshot_id,holding_revision,needs_review,balances,quotes) values ('{USER}','{ACCOUNT}','{{}}','test','{ACCOUNT}',1,false,'[]','{{}}');")
+            result = self.action("setPrincipal", payload={"accountId": ACCOUNT, "principal": "2000"}, revision=1)
+            self.assertEqual(result["document"]["accounts"][0]["revision"], 2)
+            self.assertEqual(self.run_sql("select holding_revision || ':' || needs_review::text from atlas_private.atlas_mexc_connections;"), "2:false")
+            def mexc(operation, payload):
+                body = json.dumps(payload).replace("'", "''")
+                return json.loads(self.run_sql(f"set role service_role; select public.atlas_mexc_action('{operation}','{USER}','{body}'::jsonb);").splitlines()[-1])
+            request_id = "1a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d"
+            args = {"accountId": ACCOUNT, "purpose": "sync", "requestId": request_id}
+            self.assertEqual(mexc("claim", args)["status"], "ok")
+            sync = mexc("finish", dict(args, expectedRevision=2, balances=[], quotes={}))
+            self.assertEqual(sync["status"], "ok")
+            self.assertEqual(sync["document"]["accounts"][0]["account"]["principal"], "2000")
+            self.assertEqual(sync["connections"][0]["holdingRevision"], 3)
+        finally:
+            self.run_sql("drop function public.atlas_mexc_action(text,text,jsonb); drop table atlas_private.atlas_mexc_connections,atlas_private.atlas_mexc_rate_limits;")
+
     def test_invalid_market_and_duplicates_change_nothing(self):
         self.replace([holding("0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "2330.TW")])
         wrong = holding("1a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d", "AAPL", market="US", currency="USD")

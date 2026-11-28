@@ -131,6 +131,17 @@ export function createMexcFixture(mode: policy.StorageMode = 'cloud') {
           documents.set(owner, next);
           return result({ status: 'ok', document: next });
         }
+        if (operation === 'setPrincipal') {
+          const entry = document.accounts.find((a) => a.account.id === payload.accountId);
+          if (!entry || entry.revision !== parameters.expected_revision) return result({ status: 'conflict' });
+          if (payload.principal === null) delete entry.account.principal;
+          else entry.account.principal = holdings.holdingDecimal(payload.principal);
+          const connection = connections.get(slot(owner, entry.account.id));
+          if (connection?.holdingRevision === entry.revision) connection.holdingRevision++;
+          entry.revision++;
+          documents.set(owner, document);
+          return result({ status: 'ok', document });
+        }
         if (operation === 'deleteAccount') {
           document.accounts = document.accounts.filter((a) => a.account.id !== payload.accountId);
           connections.delete(slot(owner, String(payload.accountId)));

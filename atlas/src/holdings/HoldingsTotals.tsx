@@ -2,12 +2,16 @@ import type { ReactNode } from 'react';
 import { formatDateTime, toneClass } from '../ui/format';
 import { formatAmount, type Holding, type HoldingValue, type FxRate } from './model';
 import { portfolioTotals, type PortfolioAmount, type FuturesTotalInput } from './portfolioTotals';
+import { PrincipalGroupSummary } from './PrincipalSummary';
+import type { PrincipalMetrics } from './principal';
+import type { HoldingCurrency } from './model';
 export function HoldingsTotals({
   rows,
   futures,
   rates,
   pending,
   hidden,
+  principalGroups,
   children,
 }: {
   rows: { holding: Holding; result: HoldingValue }[];
@@ -15,9 +19,14 @@ export function HoldingsTotals({
   rates: FxRate[];
   pending: boolean;
   hidden: number;
+  principalGroups?: ReadonlyMap<HoldingCurrency, PrincipalMetrics>;
   children?: ReactNode;
 }) {
   const total = portfolioTotals(rows, futures, rates);
+  const principalGroup = (currency: HoldingCurrency) => {
+    const group = principalGroups?.get(currency);
+    return group ? <PrincipalGroupSummary currency={currency} metrics={group} /> : null;
+  };
   const metrics = (value: PortfolioAmount, currency: string) => (
     <dl className="portfolio-total-values">
       <div>
@@ -50,6 +59,8 @@ export function HoldingsTotals({
             美股 <small>含加密資產</small>
           </h4>
           {metrics(total.foreign, 'USD')}
+          {principalGroup('USD')}
+          {principalGroup('USDT')}
           {!total.factor && (
             <div aria-label="USDT 分列總計">
               <p className="holdings-muted">
@@ -72,6 +83,7 @@ export function HoldingsTotals({
         <section aria-label="台股總計">
           <h4>台股</h4>
           {metrics(total.tw, 'TWD')}
+          {principalGroup('TWD')}
         </section>
       </div>
       {(pending || total.tw.missing + total.foreign.missing > 0) && (

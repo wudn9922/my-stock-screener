@@ -20,6 +20,7 @@ export interface HoldingAccount {
   currency: HoldingCurrency;
   broker: Broker;
   mapping?: ColumnMapping;
+  principal?: string;
 }
 export interface Holding {
   id: string;
@@ -82,7 +83,7 @@ export function accountMarket(account: HoldingAccount): HoldingMarket {
 }
 export function validateHoldingAccount(value: unknown): HoldingAccount {
   const row = holdingsObject(value);
-  keys(row, ['id', 'name', 'kind', 'currency', 'broker', 'mapping']);
+  keys(row, ['id', 'name', 'kind', 'currency', 'broker', 'mapping', 'principal']);
   const id = holdingsId(row.id);
   if (typeof row.name !== 'string' || !row.name.trim() || row.name.length > 40 || /[\x00-\x1f\x7f]/.test(row.name))
     fail();
@@ -110,7 +111,8 @@ export function validateHoldingAccount(value: unknown): HoldingAccount {
       unit: choice(m.unit, ['shares', 'lots'] as const),
     };
   }
-  return { id, name: row.name.trim(), kind, currency, broker, ...(mapping ? { mapping } : {}) };
+  const principal = row.principal === undefined ? undefined : holdingDecimal(row.principal);
+  return { id, name: row.name.trim(), kind, currency, broker, ...(mapping ? { mapping } : {}), ...(principal === undefined ? {} : { principal }) };
 }
 export function validateHolding(value: unknown, account?: HoldingAccount): Holding {
   const row = holdingsObject(value);
@@ -199,6 +201,10 @@ export async function handleHoldings(db: HoldingsDatabase, owner: string, body: 
     const entry = validateAccountState({ account, holdings: body.holdings, revision: 0 });
     payload = { account: entry.account, holdings: entry.holdings };
     expected = holdingsRevision(body.expectedRevision);
+  } else if (operation === 'setPrincipal') {
+    payload = { accountId: holdingsId(body.accountId), principal: body.principal === null ? null : holdingDecimal(body.principal) };
+    expected = holdingsRevision(body.expectedRevision);
+    if (expected === null) fail();
   } else if (operation === 'upsert') {
     const holding = validateHolding(body.holding);
     payload = { accountId: holding.accountId, holding };

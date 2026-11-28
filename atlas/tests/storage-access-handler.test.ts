@@ -43,10 +43,14 @@ function database(seed: Record<string, Row[]> = {}, policyError: DbError | null 
           if ((current?.revision ?? null) !== parameters.expected_revision || (!current && operation !== 'replaceAccount')) return result('conflict');
           if (account) {
             if (!current && document.accounts.length >= holdings.HOLDINGS_LIMITS.accounts) return result('limit');
+            if (account.principal === undefined && current?.account.principal !== undefined) account.principal = current.account.principal;
             const next = holdings.validateAccountState({ account, holdings: payload.holdings, revision: (current?.revision ?? 0) + 1 });
             document.accounts = [...document.accounts.filter(entry => entry.account.id !== accountId), next];
           } else if (current) {
-            if (operation === 'upsert') {
+            if (operation === 'setPrincipal') {
+              if (payload.principal === null) delete current.account.principal;
+              else current.account.principal = holdings.holdingDecimal(payload.principal);
+            } else if (operation === 'upsert') {
               const next = holdings.validateHolding(payload.holding, current.account);
               current.holdings = [...current.holdings.filter(item => item.id !== next.id), next];
             } else if (operation === 'delete') current.holdings = current.holdings.filter(item => item.id !== payload.holdingId);
@@ -136,6 +140,29 @@ function handler(kind: 'user-settings' | 'chart-drawings', user = A, seed: Recor
 
 describe('holdings actual request handler', () => {
   const create = { action: 'holdings.replaceAccount', account: holdingAccount, holdings: [holdingRow], expectedRevision: null };
+  it('validates, reads, preserves, changes and clears principal through the actual handler', async () => {
+    const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
+    for (const principal of [0, null, '0', '-1', '1e3', '0.1234567890123456789']) {
+      expect((await fixture.request({ ...create, account: { ...holdingAccount, principal } })).status).toBe(400);
+    }
+    expect(fixture.rpcCalls).toHaveLength(0);
+    expect((await fixture.request({ ...create, account: { ...holdingAccount, principal: '1234.567' } })).status).toBe(200);
+    const read = async () => (await fixture.request({ action: 'holdings.list' })).body.data.accounts[0].account;
+    expect((await read()).principal).toBe('1234.567');
+    expect((await fixture.request({ ...create, expectedRevision: 1 })).status).toBe(200);
+    expect((await read()).principal).toBe('1234.567');
+    expect((await fixture.request({ action: 'holdings.upsert', holding: { ...holdingRow, quantity: '2' }, expectedRevision: 2 })).status).toBe(200);
+    expect((await read()).principal).toBe('1234.567');
+    expect((await fixture.request({ action: 'holdings.delete', accountId: holdingAccount.id, holdingId: holdingRow.id, expectedRevision: 3 })).status).toBe(200);
+    expect((await read()).principal).toBe('1234.567');
+    const set = { action: 'holdings.setPrincipal', accountId: holdingAccount.id, expectedRevision: 4 };
+    expect((await fixture.request({ ...set, principal: '0' })).status).toBe(400);
+    expect((await fixture.request({ ...set, principal: '9000', expectedRevision: 3 })).status).toBe(409);
+    expect((await fixture.request({ ...set, principal: '9000' })).status).toBe(200);
+    expect((await read()).principal).toBe('9000');
+    expect((await fixture.request({ ...set, expectedRevision: 5, principal: null })).status).toBe(200);
+    expect(await read()).not.toHaveProperty('principal');
+  });
   it('scopes every action to the verified owner, ignoring forged ownership, and replaces rather than appends', async () => {
     const fixture = handler('user-settings', A, { atlas_storage_access: [grant(A, 'cloud')] });
     fixture.portfolios.set(B, { version: 1, accounts: [{ account: { ...holdingAccount, name: 'B only' }, holdings: [holdingRow], revision: 1 }] });

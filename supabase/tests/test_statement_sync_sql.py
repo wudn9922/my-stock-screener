@@ -36,9 +36,11 @@ class StatementSyncSqlTests(_PostgresFixture):
         rev = "null" if revision is None else str(revision)
         return json.loads(self.call(f"select public.atlas_holdings_action('{operation}','{owner}','{body}'::jsonb,{rev});"))
 
-    def account(self, kind="us-broker", holdings=(), revision=None):
+    def account(self, kind="us-broker", holdings=(), revision=None, principal=None):
         currency = {"us-broker": "USD", "tw-broker": "TWD"}[kind]
         definition = {"id": ACCOUNT, "name": "國泰美股", "kind": kind, "currency": currency, "broker": "cathay"}
+        if principal is not None:
+            definition["principal"] = principal
         return self.holdings("replaceAccount", {"account": definition, "holdings": list(holdings)}, revision)
 
     def link(self, market="US", owner=OWNER, broker="cathay"):
@@ -77,6 +79,13 @@ class StatementSyncSqlTests(_PostgresFixture):
         self.link()
         self.assertEqual(self.apply()["status"], "no-account")  # linked, but the account was never created
         self.assertEqual(self.call("select count(*) from public.atlas_statement_trades where applied_at is null;"), "1")
+
+    def test_statement_application_preserves_principal(self):
+        self.account(principal="1234.567")
+        self.link()
+        self.trade("2026-11-19:00000001", "buy", 2, 100, 200.3)
+        self.assertEqual(self.apply()["status"], "ok")
+        self.assertEqual(self.current()[0]["account"]["principal"], "1234.567")
 
     def test_buys_and_sells_update_weighted_cost_once(self):
         self.account()

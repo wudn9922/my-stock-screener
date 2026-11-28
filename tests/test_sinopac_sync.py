@@ -127,6 +127,16 @@ class Tests(unittest.TestCase):
         repo.replace.assert_not_called()
         repo.finish.assert_called_once()
 
+    def test_changed_snapshot_preserves_account_principal(self):
+        repo = Mock()
+        repo.claim.return_value = True
+        account = {"id": ACCOUNT, "name": "永豐", "broker": "sinopac",
+                   "kind": "tw-broker", "currency": "TWD", "principal": "123456.789"}
+        repo.list.return_value = {"accounts": [{"account": account, "revision": 4, "holdings": []}]}
+        self.sync(repo, lambda: ([row()], []))
+        self.assertEqual(repo.replace.call_args.args[1], account)
+        self.assertEqual(repo.replace.call_args.args[-1], 4)
+
     def test_changed_and_empty_write_cas(self):
         for positions in [([row()], []), ([], [])]:
             repo = Mock()

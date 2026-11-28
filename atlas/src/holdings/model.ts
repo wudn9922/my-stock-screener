@@ -27,7 +27,15 @@ export function replaceAccount(
     version: 1,
     accounts: [
       ...document.accounts.filter((a) => a.account.id !== account.id),
-      { account, holdings, revision: (previous?.revision ?? 0) + 1 },
+      {
+        account: {
+          ...account,
+          ...(account.principal === undefined && previous?.account.principal !== undefined
+            ? { principal: previous.account.principal } : {}),
+        },
+        holdings,
+        revision: (previous?.revision ?? 0) + 1,
+      },
     ],
   });
 }

@@ -172,6 +172,31 @@ describe('actual user-settings handler with fake MEXC and relational storage', (
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(f.errorLogs).toEqual([]);
   });
+  it('preserves principal through initial cost review, confirmed sync and account reconnect', async () => {
+    const f = await connected();
+    const set = await f.request({ action: 'holdings.setPrincipal', accountId: MEXC_ACCOUNT.id, expectedRevision: f.connection.holdingRevision, principal: '12345.678' });
+    expect(set.status).toBe(200);
+    const status = await f.request({ action: 'holdings.mexc.status' });
+    const connection = status.body.data.connections[0];
+    expect(connection.needsReview).toBe(true);
+    expect(connection.holdingRevision).toBe(f.connection.holdingRevision + 1);
+    const applied = await f.request({ action: 'holdings.mexc.apply', accountId: MEXC_ACCOUNT.id, snapshotId: connection.snapshotId, expectedRevision: connection.holdingRevision, costs });
+    expect(applied.status).toBe(200);
+    expect(applied.body.data.document.accounts[0].account.principal).toBe('12345.678');
+    const revision = applied.body.data.document.accounts[0].revision;
+    expect((await f.request({ action: 'holdings.setPrincipal', accountId: MEXC_ACCOUNT.id, expectedRevision: revision, principal: '54321' })).status).toBe(200);
+    const confirmed = await f.request({ action: 'holdings.mexc.status' });
+    expect(confirmed.body.data.connections[0].needsReview).toBe(false);
+    f.advance();
+    f.setBalances([{ asset: 'BTC', free: '0.05', locked: '0' }]);
+    const sync = await f.request({ action: 'holdings.mexc.sync', accountId: MEXC_ACCOUNT.id });
+    expect(sync.status).toBe(200);
+    expect(sync.body.data.document.accounts[0].account.principal).toBe('54321');
+    f.advance();
+    const reconnect = await f.request({ ...connect, expectedRevision: sync.body.data.document.accounts[0].revision });
+    expect(reconnect.status).toBe(200);
+    expect(reconnect.body.data.document.accounts[0].account.principal).toBe('54321');
+  });
   it('requires initial costs, preserves average on decreases, and stages increases without false profit', async () => {
     const f = await connected();
     const invalid = await f.request({
