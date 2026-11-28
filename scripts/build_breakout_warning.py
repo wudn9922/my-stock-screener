@@ -32,6 +32,7 @@ from breakout_outcomes import GATE_ATR_PERIOD, OBSERVATION_DAYS, evaluate_attemp
 from swing_breakouts import wilder_atr
 from swing_cohort import included, swing_attempts
 from build_breadth import write_json_atomic
+from output_guard import OutputRejected, require, retain_count, unique_keys
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = 1
@@ -191,7 +192,10 @@ def method_payload(rate, n, pct, dd, label):
 def _work(args):
     root, market, symbol, calendar, methods = args
     try:
-        return stock_events(load_bars(root, market, symbol), calendar, market, methods)
+        bars = load_bars(root, market, symbol)
+        if bars.empty:
+            raise ValueError('empty archived bars')
+        return stock_events(bars, calendar, market, methods)
     except Exception as exc:  # noqa: BLE001 - one broken file must not stop the market
         print(f"⚠️ {symbol}: {type(exc).__name__}: {exc}")
         return None
@@ -206,6 +210,7 @@ def build_market(root, market, workers=None):
     symbols = archive_symbols(root, market, "stock")
     if len(symbols) < MIN_STOCKS:
         raise ValueError(f"{market} 封存只有 {len(symbols)} 檔股票")
+    unique_keys(symbols, f'{market} archive stocks')
     jobs = [(root, market, s, calendar, cfg["methods"]) for s in symbols]
     if workers == 1:
         results = list(map(_work, jobs))
@@ -224,7 +229,19 @@ def build_market(root, market, workers=None):
     closes = [{"date": d.strftime("%Y-%m-%d"), "close": round(float(c), 2)}
               for d, c in index.Close.items() if first and d.strftime("%Y-%m-%d") >= first]
     return {"asOf": calendar[-1].strftime("%Y-%m-%d"), "index": {"symbol": cfg["index"], "name": cfg["indexName"]},
-            "stocks": len(symbols), "failedStocks": failed, "note": cfg["note"], "methods": methods, "closes": closes}
+            "stocks": len(symbols), "evaluated": len(symbols) - failed, "failedStocks": failed, "note": cfg["note"], "methods": methods, "closes": closes}
+
+
+def validate_market(market, current, previous):
+    label = f"{market} breakout-warning {current['asOf']}"
+    evaluated, failed = current["evaluated"], current["failedStocks"]
+    total = current["stocks"]
+    require(evaluated + failed == total and evaluated >= 0 and failed >= 0 and total > 0,
+            label, f"invalid evaluated/failed counts {evaluated}/{failed}/{total}")
+    require(failed * 10 <= total, label, f"failedStocks {failed}/{total} exceeds 10%")
+    # Legacy snapshots already record stocks and failedStocks, so they supply a baseline.
+    prior = previous.get("evaluated", previous.get("stocks", 0) - previous.get("failedStocks", 0))
+    retain_count(evaluated, prior, label, min_share=.85)
 
 
 def main(argv=None):
@@ -240,16 +257,23 @@ def main(argv=None):
             previous = json.loads(Path(args.out).read_text()).get("markets", {})
         except (OSError, ValueError):
             previous = {}
-    markets, errors = {}, []
+    markets, errors, rejected = dict(previous), [], []
     for market in [m.strip() for m in args.markets.split(",") if m.strip()]:
         try:
-            markets[market] = build_market(args.archive_dir, market, args.workers)
-            print(f"{market}: asOf {markets[market]['asOf']}, {markets[market]['stocks']} stocks")
+            candidate = build_market(args.archive_dir, market, args.workers)
+            validate_market(market, candidate, previous.get(market, {}))
+            markets[market] = candidate
+            print(f"{market}: asOf {candidate['asOf']}, {candidate['evaluated']} evaluated, {candidate['failedStocks']} failed")
+        except OutputRejected as exc:
+            rejected.append(str(exc))
         except Exception as exc:  # noqa: BLE001 - keep the other market and the previous file
             errors.append(f"{market}: {type(exc).__name__}: {exc}")
             if market in previous:
                 markets[market] = previous[market]
-    if not any(m in markets for m in MARKETS) or len(errors) == len(MARKETS):
+    if rejected:
+        print('⚠️ ' + '; '.join(rejected + errors))
+        return 1
+    if not any(m in markets for m in MARKETS) or len(errors) == len([m for m in args.markets.split(',') if m.strip()]):
         print("⚠️ 兩個市場都失敗，保留舊檔：" + "; ".join(errors))
         return 1
     write_json_atomic(args.out, {"version": VERSION, "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),

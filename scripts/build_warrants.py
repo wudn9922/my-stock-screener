@@ -21,6 +21,11 @@ from zoneinfo import ZoneInfo
 from lxml import etree
 from lxml import html as lxml_html
 
+if __package__:
+    from .output_guard import require, retain_keys, unique_keys
+else:
+    from output_guard import require, retain_keys, unique_keys
+
 
 MASTERS = {
     "TWSE": "https://openapi.twse.com.tw/v1/opendata/t187ap37_L",
@@ -285,7 +290,7 @@ def read_previous(output, as_of):
     return identities
 
 
-def documents(warrants, as_of, through, issues, underlyings, issuers, previous, details=None):
+def documents(warrants, as_of, through, issues, underlyings, issuers, previous, details=None, skipped=None):
     groups = defaultdict(list)
     unknown_underlyings = set()
     details = details or {}
@@ -304,6 +309,8 @@ def documents(warrants, as_of, through, issues, underlyings, issuers, previous, 
             underlying = previous_symbol
         if not underlying:
             unknown_underlyings.add(warrant.underlying_name)
+            if skipped is not None:
+                skipped[warrant.market] += 1
             continue
         issuer_matches = issuers.get((warrant.code, normalize_name(warrant.name)), set())
         issuer = detail_issuer or (next(iter(issuer_matches)) if len(issuer_matches) == 1 else None)
@@ -338,6 +345,30 @@ def write_documents(output, contents):
         for path in output.glob("*.json"):
             if path.stem not in contents:
                 path.unlink()
+
+
+def validate_catalogue(output, contents, as_of, through):
+    # Compare active prior warrant codes by listing venue, not by underlying suffix.
+    current, prior = defaultdict(list), defaultdict(list)
+    for symbol, doc in contents.items():
+        for row in doc["warrants"]:
+            current[row["market"]].append(row["code"])
+    for path in output.glob("*.json"):
+        doc = json.loads(path.read_text())
+        for row in doc["warrants"]:
+            if date.fromisoformat(row["expiryDate"]) >= through:
+                prior[row["market"]].append(row["code"])
+    for market in MASTERS:
+        label = f"{market} warrants {as_of[market]} through {through}"
+        now = unique_keys(current[market], label)
+        before = unique_keys(prior[market], label + " prior active")
+        retain_keys(now, before, label, min_share=.85)
+    require(bool(contents), f"warrants {through}", "no mapped underlying documents")
+
+
+def publish_documents(output, contents, as_of, through):
+    validate_catalogue(output, contents, as_of, through)
+    write_documents(output, contents)
 
 
 def main():
@@ -407,8 +438,10 @@ def main():
                     underlyings.names[normalize_name(row.underlying_name)].add(symbol)
         except (OSError, ValueError, etree.LxmlError) as exc:
             print(f"MOPS warrant {row.code}: {exc}", file=sys.stderr)
-    contents, missing = documents(warrants, as_of, through, issues, underlyings, issuers, previous, details)
-    write_documents(args.output, contents)
+    skipped = defaultdict(int)
+    contents, missing = documents(warrants, as_of, through, issues, underlyings, issuers, previous, details, skipped)
+    print(f'Unmapped warrant counts {as_of}: ' + str({market: skipped[market] for market in MASTERS}), flush=True)
+    publish_documents(args.output, contents, as_of, through)
     rows = [row for doc in contents.values() for row in doc["warrants"]]
     print(f"Published {len(rows)} warrants across {len(contents)} underlyings. Missing issuer: "
           f"{sum(row['issuer'] is None for row in rows)}. Unmapped underlyings: {missing}")
