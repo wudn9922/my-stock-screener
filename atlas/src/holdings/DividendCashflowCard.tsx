@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchUpcomingEvents, type CashDividends } from '../events/UpcomingEvents';
+import { fetchCashDividends, type CashDividends } from './twCashDividends';
 import { dividendCashflow, taipeiDay } from './dividendCashflow';
 import { formatAmount, type Holding } from './model';
 import '../ui/upcoming-events.css';
@@ -12,10 +12,10 @@ export function DividendCashflowCard({ holdings }: { holdings: readonly Holding[
     if (!open) return;
     const abort = new AbortController();
     // One public all-market file; no symbols, account IDs, costs or quantities in the request.
-    void fetchUpcomingEvents(abort.signal).then(result => {
+    void fetchCashDividends(abort.signal).then(result => {
       if (!abort.signal.aborted) {
-        setData(result.cashDividends ?? null);
-        setError(!result.cashDividends);
+        setData(result);
+        setError(false);
       }
     }).catch(() => {
       if (!abort.signal.aborted) { setData(null); setError(true); }

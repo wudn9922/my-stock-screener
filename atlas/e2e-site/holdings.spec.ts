@@ -572,11 +572,10 @@ test('Taiwan dividend cashflow converts imported lots once and stays local', asy
   await mockMarketLogin(page);
   const requests: string[] = [];
   await open(page, async () => {
-    await page.route('**/report/upcoming-events.json', route => {
+    await page.route('**/report/tw-cash-dividends.json', route => {
       requests.push(route.request().url() + (route.request().postData() ?? ''));
       const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
-      return route.fulfill({ json: { version: 1, generatedAt: new Date().toISOString(), coverage: { earnings: 0, alerts: 0, dividends: 1, cashDividends: 1 },
-        events: [], moves: {}, cashDividends: { '2330.TW': { checked: today, events: [{ exDate: today, paymentDate: null, perShare: 20, year: today }] } } } });
+      return route.fulfill({ json: { version: 1, generatedAt: new Date().toISOString(), stocks: { '2330.TW': { checked: today, events: [{ exDate: today, paymentDate: null, perShare: 20, year: today }] }, '6488.TWO': { checked: today, events: [{ exDate: 'bad', perShare: 3 }] } } } });
     });
   });
   await create(page);

@@ -1,5 +1,5 @@
 import { Money, decimalText, type Holding } from './model';
-import type { CashDividends } from '../events/UpcomingEvents';
+import type { CashDividends } from './twCashDividends';
 
 export const DIVIDEND_WINDOW_DAYS = 90;
 const DAY = 86400000;

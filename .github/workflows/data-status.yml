@@ -72,6 +72,9 @@ jobs:
       - name: Calculate public signal outcomes
         if: always() && !cancelled() && steps.signal_capture.outcome == 'success' && steps.signal_archive.outcome == 'success'
         run: python scripts/build_signal_outcomes.py --outcomes-only
+      - name: Build independent Taiwan cash dividends snapshot (offline)
+        if: always() && !cancelled() && steps.inputs.outcome == 'success'
+        run: python scripts/build_tw_cash_dividends.py
       - name: Build public upcoming events and earnings moves (offline)
         if: always() && !cancelled() && steps.signal_archive.outcome == 'success'
         run: python scripts/build_upcoming_events.py

@@ -18,18 +18,10 @@ const moveSchema = z.object({
 }).refine(row => row.samples === 0
   ? row.gapPct === null && row.dayPct === null && row.first === null && row.last === null
   : row.gapPct !== null && row.dayPct !== null && row.first !== null && row.last !== null && row.first <= row.last);
-const cashDividendSchema = z.object({
-  exDate: day, paymentDate: day.nullable(), perShare: z.number().finite().positive(), year: z.string(),
-}).refine(row => row.paymentDate === null || row.paymentDate >= row.exDate);
-export const cashDividendsSchema = z.record(z.string().regex(/^\d{4,6}[A-Z]?\.(TW|TWO)$/), z.object({
-  checked: day.nullable(), events: z.array(cashDividendSchema),
-}));
-export type CashDividends = z.infer<typeof cashDividendsSchema>;
 export const upcomingEventsSchema = z.object({
   version: z.literal(1), generatedAt: z.string().refine(s => Number.isFinite(Date.parse(s))),
   coverage: z.object({ earnings: nonnegative, alerts: nonnegative, dividends: nonnegative, cashDividends: nonnegative }),
   events: z.array(eventSchema), moves: z.record(z.string(), moveSchema),
-  cashDividends: cashDividendsSchema.optional(),
 });
 export type UpcomingEvents = z.infer<typeof upcomingEventsSchema>;
 export type UpcomingEvent = z.infer<typeof eventSchema>;

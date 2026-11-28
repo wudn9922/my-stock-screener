@@ -158,9 +158,6 @@ def build(root, archive, now=None):
     # Read only the public financials records; no per-user selection is sent to a server.
     count = 0
     cash_count = 0
-    cash_dividends = {}
-    cash_start = (date.fromisoformat(today['TW']) - timedelta(days=367)).isoformat()
-    cash_end = (date.fromisoformat(today['TW']) + timedelta(days=97)).isoformat()
     for path in sorted((report / "financials").glob("*.json")):
         symbol = path.stem
         if not symbol.endswith((".TW", ".TWO")):
@@ -177,14 +174,8 @@ def build(root, archive, now=None):
                                   f"配股 NT$ {item['perShare']:g}/股（面額）", "FinMind"))
         if "cashEvents" in block:
             cash_count += 1
-            cash_dividends[symbol] = {"checked": block.get("checked"), "events": []}
             for item in block["cashEvents"]:
                 require(finite(item["perShare"]) and item["perShare"] > 0, LABEL, "invalid cash dividend")
-                stamp = iso(item["exDate"])
-                if cash_start <= stamp <= cash_end:
-                    payment = item.get("paymentDate")
-                    cash_dividends[symbol]["events"].append(dict(exDate=stamp, perShare=item["perShare"],
-                        paymentDate=iso(payment) if payment else None, year=str(item.get("year", ""))))
                 rows.append(event(symbol, "TW", "cash-dividend", item["exDate"],
                                   f"現金股利 NT$ {item['perShare']:g}/股", "FinMind"))
     retain_count(count, previous.get("coverage", {}).get("dividends", 0), LABEL + " dividends", min_share=.8)
@@ -201,7 +192,7 @@ def build(root, archive, now=None):
               <= row["date"] <= (date.fromisoformat(end[row["market"]]) + timedelta(days=7)).isoformat()}
     payload = dict(version=1, generatedAt=now.isoformat(), coverage=coverage,
                    events=sorted(result.values(), key=lambda r: (r["date"], r["market"], r["symbol"] or "", r["kind"])),
-                   moves=moves, cashDividends=cash_dividends)
+                   moves=moves)
     json.dumps(payload, allow_nan=False)
     write(output, payload)
     return payload

@@ -125,11 +125,8 @@ class UpcomingEventsTests(unittest.TestCase):
             kinds = {row["kind"] for row in doc["events"]}
             self.assertTrue({"earnings", "stock-dividend", "cash-dividend",
                              "disposal-start", "disposal-end", "fomc"} <= kinds)
-            cash = doc["cashDividends"]["2330.TW"]
-            self.assertEqual(cash["checked"], "2026-11-28")
-            self.assertEqual(len(cash["events"]), 3)
-            self.assertIsNone(cash["events"][0]["paymentDate"])
-            self.assertEqual(cash["events"][1]["paymentDate"], "2027-03-01")
+            self.assertEqual(set(doc), {"version", "generatedAt", "coverage", "events", "moves"})
+            self.assertFalse((root / "docs/report/tw-cash-dividends.json").exists())
             report = root / "docs/report/upcoming-events.json"
             old = report.read_bytes()
             price.write_text("Date,Open,High,Low,Close,Volume\n"
