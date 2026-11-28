@@ -5,6 +5,8 @@ on:
       - '.github/actions/notify-failure/**'
       - '.github/workflows/**'
       - 'scripts/check_data_freshness.py'
+      - 'docs/WORKFLOWS.md'
+      - 'tests/test_workflow_catalog.py'
       - 'tests/test_failure_notifications.py'
       - 'tests/test_data_freshness.py'
       - 'tests/test_cancelled_notification_policy.py'
@@ -21,8 +23,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pyyaml
-      - name: Fake delivery and session-date regressions only
+      - name: Offline notification, session-date and workflow catalog checks
         run: |
+          python -m unittest tests/test_workflow_catalog.py -v
           python -m unittest discover -s tests -p test_failure_notifications.py -v
           python -m unittest discover -s tests -p test_data_freshness.py -v
           python -m unittest discover -s tests -p test_cancelled_notification_policy.py -v

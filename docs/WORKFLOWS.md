@@ -18,7 +18,7 @@
 
 ### Pages 組裝的上游
 
-Daily Stock Screener、Atlas Research Terminal、Financial Statement History、Official Fundamentals (TW / US)、Taiwan stock dividends backfill、Full-Market Universe、Research public data、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Conservative PE AI、Taiwan Chips、Taiwan Theme Rotation、Refresh US Rates、MA Recommendations、TW Margin Temperature、Squash generated snapshot。
+Daily Stock Screener、Atlas Research Terminal、Financial Statement History、Official Fundamentals (TW / US)、Taiwan stock dividends backfill、Full-Market Universe、Research public data、Market trading calendar、IPO and extended quotes、Taiwan Chips、Taiwan Theme Rotation、Refresh US Rates、MA Recommendations、TW Margin Temperature、Conservative PE AI、Squash generated snapshot。
 
 ## 定期資料更新
 
@@ -51,7 +51,8 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 | 檔名 | 名稱 | 分類 | 觸發方式 | 用途 | 失敗通知 |
 |---|---|---|---|---|---|
 | [`atlas-review.yml`](../.github/workflows/atlas-review.yml) | Atlas PR verification | PR 驗證 | PR 至 `main`（限定路徑） | 驗證 Atlas 建置、單元與瀏覽器回歸，以及資料和帳戶儲存整合。 | 否 |
-| [`failure-notice-review.yml`](../.github/workflows/failure-notice-review.yml) | System notification verification | PR 驗證 | PR（限定路徑） | 離線驗證故障通知、取消通知規則和資料日期檢查。 | 否 |
+| [`failure-notice-review.yml`](../.github/workflows/failure-notice-review.yml) | System notification verification | PR 驗證 | PR（限定路徑） | 離線驗證故障通知、取消通知規則、資料日期與 workflow 對照表一致性。 | 否 |
+| [`holdings-principal-review.yml`](../.github/workflows/holdings-principal-review.yml) | Holdings principal review | PR 驗證 | PR 至 `main`（限定持股本金相關路徑） | 稽核帳戶重建路徑，執行相關 Vitest／Edge handler、PostgreSQL、永豐及手機 WebKit 測試並上傳 390px 截圖。 | 否 |
 | [`kline-archive-review.yml`](../.github/workflows/kline-archive-review.yml) | Permanent K-line archive verification | PR 驗證 | PR 至 `main`（限定路徑） | 驗證永久日 K 封存格式、追加與修正規則，以及每日追加效能。 | 否 |
 | [`research-review.yml`](../.github/workflows/research-review.yml) | Research Python verification | PR 驗證 | PR 至 `main`（限定路徑） | 在隔離環境執行研究資料相關的 Python 測試。 | 否 |
 | [`sinopac-sync-test.yml`](../.github/workflows/sinopac-sync-test.yml) | Read-only SinoPac tests | PR 驗證 | PR（限定路徑）；手動 | 用模擬資料驗證永豐唯讀服務、Edge Function 和 Atlas 持股介面。 | 否 |
@@ -68,6 +69,8 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 
 | 檔名 | 名稱 | 分類 | 觸發方式 | 用途 | 失敗通知 |
 |---|---|---|---|---|---|
+| [`kline-alpaca-us-compare.yml`](../.github/workflows/kline-alpaca-us-compare.yml) | Compare Yahoo and Alpaca US daily bars | 一次性／手動回補 | 手動（限 `main`） | 抽樣比對 Yahoo 與 Alpaca 的美股日 K 並上傳報告，不修改永久資料。 | 是 |
+| [`kline-alpaca-us-repair.yml`](../.github/workflows/kline-alpaca-us-repair.yml) | Alpaca US missing daily bars repair | 一次性／手動回補 | 手動（限 `main`） | 預檢 Alpaca 美股缺漏日 K、既有補檔或尺度異常，明確啟用套用且有變更時驗證並原子發布兩份永久資料。 | 是 |
 | [`kline-archive-backfill.yml`](../.github/workflows/kline-archive-backfill.yml) | Permanent K-line Backfill | 一次性／手動回補 | 手動 | 從 Yahoo 分批補齊永久日 K 封存缺漏，並保留來源衝突紀錄。 | 是 |
 | [`kline-archive-five-years.yml`](../.github/workflows/kline-archive-five-years.yml) | Permanent K-line five-year expansion | 一次性／手動回補 | 手動 | 將永久日 K 封存補至五個完整年度加上當年。 | 是 |
 | [`kline-archive-official-repair.yml`](../.github/workflows/kline-archive-official-repair.yml) | Official TW archive repair | 一次性／手動回補 | 手動 | 預檢並選擇是否套用台股官方日 K 補檔、還原或加權指數成交量修正。 | 是 |
@@ -83,7 +86,7 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 
 ### 故障通知備援的上游
 
-Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Conservative PE AI、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Taiwan Chips、Full-Market Universe、TW Margin Temperature。
+Deploy read-only SinoPac sync、Deploy statement sync、Atlas Research Terminal、Recalibrate US breadth signals、Deploy Cloud Run (breakout alert)、Daily Report Watchdog、Data status、Financial Statement History、Official Fundamentals (TW / US)、Deploy assembled Pages、Squash generated snapshot、Official TW archive repair、Alpaca US missing daily bars repair、Compare Yahoo and Alpaca US daily bars、Permanent K-line Backfill、Permanent K-line five-year expansion、MA Recommendations、Taiwan stock dividends backfill、Market trading calendar、IPO and extended quotes、Taiwan warrant data、Conservative PE AI、Q4 EPS from 8-K (manual)、Refresh US Rates、Research public data、Daily Stock Screener、Deploy Supabase Edge Functions、Taiwan Theme Rotation、Taiwan Chips、Full-Market Universe、TW Margin Temperature。
 
 ### 每日權證清單
 
