@@ -1,1 +1,1 @@
-{"day": "2026-11-28", "used": 1, "providers": {"gemini-hydrogen": 1}, "windows": {"GEMINI_API_KEY:gemini-4-hydrogen": {"day": "2026-11-28", "used": 1, "tokens": 11681}}, "attempted": {"1503.TW": "2026-11-28"}}
+{"day": "2026-11-28", "used": 1, "providers": {"gemini-hydrogen": 2}, "windows": {"GEMINI_API_KEY:gemini-4-hydrogen": {"day": "2026-11-28", "used": 2, "tokens": 23362}}, "attempted": {"1503.TW": "2026-11-28"}}
