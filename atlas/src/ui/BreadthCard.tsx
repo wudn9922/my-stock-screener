@@ -2,7 +2,6 @@ import { HelpDisclosure } from './HelpDisclosure';
 import { useEffect, useState } from 'react';
 import { Gauge } from 'lucide-react';
 import {
-  linePath,
   loadBreadth,
   type BreadthHistory,
   type BreadthLoadResult,
@@ -20,6 +19,7 @@ import {
   type TwBreadthSignals,
 } from '../report/breadthSignals';
 import { formatDateTime } from './format';
+import { TimeChart, type ChartLine, type ChartScale } from './rates/TimeChart';
 import './breadth.css';
 
 const MARKET_NAMES: Record<BreadthMarketKey, string> = {
@@ -96,6 +96,9 @@ function BreadthRow({
   );
 }
 
+const breadthFormat = (value: number) => value.toFixed(0) + '%';
+const breadthScale: ChartScale = { range: { min: 0, max: 100 }, format: breadthFormat };
+
 function BreadthChart({
   history,
   signals,
@@ -113,6 +116,21 @@ function BreadthChart({
     [...history.ma20Pct].reverse().find((value) => value !== null) ?? null;
   const latest60 =
     [...history.ma60Pct].reverse().find((value) => value !== null) ?? null;
+  const points = (values: (number | null)[]) => history.dates.map((time, i) => ({ time, value: values[i] ?? null }));
+  const markers = (selected?.markers ?? []).filter(day => {
+    const i = history.dates.indexOf(day);
+    return i >= 0 && history.ma20Pct[i] != null;
+  }).sort();
+  const thresholds = signals ? (['ma20', 'ma60'] as const).flatMap(ma => (['p10', 'p90'] as const).map(p => ({
+    id: ma.toUpperCase() + ' ' + p.toUpperCase(), color: ma === 'ma20' ? '#4699ef' : '#dfb550',
+    value: signals.thresholds[ma][p],
+  }))) : [];
+  const lines: ChartLine[] = [
+    { id: 'MA20', color: '#4699ef', points: points(history.ma20Pct), markers: markers.map(time => ({ time, position: 'inBar', color: '#d3ddec', shape: 'circle' })) },
+    { id: 'MA60', color: '#dfb550', points: points(history.ma60Pct) },
+    { id: '50% 參考', color: '#6b7587', dashed: true, width: 1, points: history.dates.map(time => ({ time, value: 50 })) },
+    ...thresholds.map(({id,color,value}): ChartLine => ({ id, color, dashed: true, width: 1, points: history.dates.map(time => ({ time, value })) })),
+  ];
   return (
     <figure className="breadth-chart">
       {signals && selected ? (
@@ -131,72 +149,12 @@ function BreadthChart({
           </select>
         </label>
       ) : null}
-      <div className="breadth-chart-plot">
-        <span className="breadth-axis top">100</span>
-        <span className="breadth-axis mid">50</span>
-        <span className="breadth-axis bottom">0</span>
-        <svg
-          viewBox="0 0 300 100"
-          preserveAspectRatio="none"
-          role="img"
-          aria-label={`近 ${history.dates.length} 個交易日站上 MA20 與 MA60 的比例走勢，最新 MA20 ${latest20 ?? '—'}%、MA60 ${latest60 ?? '—'}%`}
-        >
-          <line
-            className="breadth-ref"
-            x1="0"
-            x2="300"
-            y1="50"
-            y2="50"
-            vectorEffect="non-scaling-stroke"
-          />
-          {signals
-            ? (['ma20', 'ma60'] as const).flatMap((ma) =>
-                (['p10', 'p90'] as const).map((p) => {
-                  const value = signals.thresholds[ma][p];
-                  return (
-                    <line
-                      key={`${ma}-${p}`}
-                      className={`breadth-threshold ${ma}`}
-                      x1="0"
-                      x2="300"
-                      y1={100 - value}
-                      y2={100 - value}
-                      vectorEffect="non-scaling-stroke"
-                    >
-                      <title>{`${ma.toUpperCase()} ${p.toUpperCase()}：${value}%`}</title>
-                    </line>
-                  );
-                }),
-              )
-            : null}
-          <path
-            className="breadth-line ma60"
-            d={linePath(history.ma60Pct)}
-            vectorEffect="non-scaling-stroke"
-          />
-          <path
-            className="breadth-line ma20"
-            d={linePath(history.ma20Pct)}
-            vectorEffect="non-scaling-stroke"
-          />
-          {selected?.markers.map((day) => {
-            const i = history.dates.indexOf(day),
-              value = history.ma20Pct[i];
-            return i >= 0 && value !== null && value !== undefined ? (
-              <circle
-                key={day}
-                className="breadth-signal-marker"
-                data-signal-date={day}
-                cx={(i * 300) / (history.dates.length - 1)}
-                cy={100 - Math.min(100, Math.max(0, value))}
-                r="3"
-              >
-                <title>{`${selected.name} 抓低點訊號 ${day}`}</title>
-              </circle>
-            ) : null;
-          })}
-        </svg>
-      </div>
+      <TimeChart lines={lines} format={breadthFormat} rightScale={breadthScale} zoom className="breadth-chart-canvas"
+        ariaLabel={`近 ${history.dates.length} 個交易日站上 MA20 與 MA60 的比例走勢，最新 MA20 ${latest20 ?? '—'}%、MA60 ${latest60 ?? '—'}%`} />
+      {signals && <details className="breadth-chart-data"><summary>門檻與訊號日期</summary>
+        <ul>{thresholds.map(row => <li key={row.id} data-threshold={row.id}>{row.id}：{row.value}%</li>)}
+          {markers.map(day => <li key={day} data-marker-date={day}>{selected?.name} 抓低點訊號 {day}</li>)}</ul>
+      </details>}
       <figcaption className="breadth-chart-axis">
         <span>{formatDateTime(history.dates[0]!, false)}</span>
         <span>{formatDateTime(history.dates.at(-1)!, false)}</span>

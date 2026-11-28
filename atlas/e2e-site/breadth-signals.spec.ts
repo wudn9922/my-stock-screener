@@ -45,11 +45,12 @@ test('US calibrated plans, selectable history markers and folded explanations fi
   await expect(card.getByText(/下一個交易日開盤進場/)).toBeVisible();
   await expect(card.getByText(/指數收盤跌破 6,015 即觸發/)).toBeVisible();
   await expect(card.getByText('參考性較低', { exact: true })).toBeVisible();
-  await expect(card.locator('.breadth-threshold')).toHaveCount(4);
-  await expect(card.locator('[data-signal-date="2026-10-27"]')).toHaveCount(1);
+  await expect(card.locator('[data-threshold]')).toHaveCount(4);
+  await expect(card.getByRole('img', { name: /比例走勢/ })).toHaveAttribute('data-chart-series', /MA20:right\|MA60:right.*MA20 P10:right.*MA60 P90:right/);
+  await expect(card.locator('[data-marker-date="2026-10-27"]')).toHaveCount(1);
   await card.getByLabel('歷史訊號指數').selectOption('^RUT');
-  await expect(card.locator('[data-signal-date="2026-10-27"]')).toHaveCount(0);
-  await expect(card.locator('[data-signal-date="2026-10-29"]')).toHaveCount(1);
+  await expect(card.locator('[data-marker-date="2026-10-27"]')).toHaveCount(0);
+  await expect(card.locator('[data-marker-date="2026-10-29"]')).toHaveCount(1);
   const help = card
     .locator('details')
     .filter({ has: page.locator('summary', { hasText: '樣本與歷史說明' }) });
@@ -89,7 +90,7 @@ test('TW keeps numbers and history with no calibrated labels or trade plans', as
   await expect(card.getByText(/台股回測未勝過隨便進場/)).toBeVisible();
   await expect(
     card.locator(
-      '.breadth-low-signals, .breadth-marker-select, .breadth-threshold',
+      '.breadth-low-signals, .breadth-marker-select, [data-threshold]',
     ),
   ).toHaveCount(0);
   expect(
