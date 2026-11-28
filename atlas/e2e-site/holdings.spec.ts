@@ -591,6 +591,8 @@ test('Taiwan dividend cashflow converts imported lots once and stays local', asy
   expect(requests).toHaveLength(1);
   expect(requests[0]).not.toMatch(/2330|812\.34567|PRIVATE-LOCAL-ONLY|quantity/);
   await layout(page);
-  if (info.project.name === 'mobile-chromium' && page.viewportSize()?.width === 390)
-    await card.screenshot({ path: info.outputPath('dividend-cashflow-390.png') });
+  if (info.project.name === 'mobile-chromium' && page.viewportSize()?.width === 390) {
+    await card.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('dividend-cashflow-390.png') });
+  }
 });
