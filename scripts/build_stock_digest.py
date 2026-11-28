@@ -60,7 +60,9 @@ def margin_events(document, previous, today):
         return []
     _, i, end = latest
     q = document["quarterly"]
-    if i == 0 or q["fy"][i - 1] * 4 + q["fq"][i - 1] != latest[0] - 1:
+    if (i == 0 or type(q["fy"][i - 1]) is not int
+            or q["fq"][i - 1] not in (1, 2, 3, 4)
+            or q["fy"][i - 1] * 4 + q["fq"][i - 1] != latest[0] - 1):
         return []
     prev_end = day(q["end"][i - 1])
     if not prev_end or not 70 <= (day(end) - prev_end).days <= 110:
@@ -194,13 +196,15 @@ def run(report, today, dry_run=False):
         previous = read(output) if output.exists() else {}
         result = build(report, today, previous)
         counts = Counter(kind for rows in result["stocks"].values() for kind in {r["kind"] for r in rows})
+        for kind in ("sec-restatement", "gross-margin", "operating-margin", "foreign-reversal", "trust-reversal"):
+            counts.setdefault(kind, 0)
         print("Digest stocks by condition:", json.dumps(dict(sorted(counts.items()))))
         if not previous:
             print("First run: baseline quarter periods, no unproven new-quarter alerts.")
         if not dry_run:
             write(output, result)
         return True
-    except (OSError, ValueError, KeyError, TypeError, IndexError, ArithmeticError):
+    except (OSError, ValueError, KeyError, TypeError, IndexError, ArithmeticError, AttributeError):
         print("::warning::Stock digest unavailable; previous output retained")
         return False
 
