@@ -57,7 +57,6 @@ PR 的路徑篩選以各 workflow 連結內的 `on.pull_request.paths` 為準。
 | [`research-review.yml`](../.github/workflows/research-review.yml) | Research Python verification | PR 驗證 | PR 至 `main`（限定路徑） | 在隔離環境執行研究資料相關的 Python 測試。 | 否 |
 | [`sinopac-sync-test.yml`](../.github/workflows/sinopac-sync-test.yml) | Read-only SinoPac tests | PR 驗證 | PR（限定路徑）；手動 | 用模擬資料驗證永豐唯讀服務、Edge Function 和 Atlas 持股介面。 | 否 |
 | [`statement-sync-test.yml`](../.github/workflows/statement-sync-test.yml) | Statement sync tests | PR 驗證 | PR（限定路徑）；手動 | 驗證對帳單解析、同步服務、PostgreSQL 套用邏輯和 Edge Function。 | 否 |
-
 | [`workflow-lint.yml`](../.github/workflows/workflow-lint.yml) | Workflow syntax verification | PR 驗證 | PR 至 `main`、push `main`（`.github/workflows/**`、`.github/actions/**`） | 以固定版本 actionlint 檢查 workflow 語法及 expressions。 | 否 |
 
 ## 維護
