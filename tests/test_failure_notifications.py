@@ -155,7 +155,7 @@ class CompositeDeliveryTest(unittest.TestCase):
 class WorkflowCoverageTest(unittest.TestCase):
     REVIEW = {'atlas-review.yml', 'research-review.yml', 'generated-verify.yml', 'kline-archive-review.yml',
               'failure-notice-review.yml', 'sinopac-sync-test.yml',
-              'statement-sync-test.yml', 'holdings-principal-review.yml'}
+              'statement-sync-test.yml', 'holdings-principal-review.yml', 'workflow-lint.yml'}
     HELPERS = {'notify-failure.yml', 'failure-notice-fallback.yml'}
 
     def test_all_producers_notify_without_altering_review_workflows(self):
