@@ -18,7 +18,7 @@ import { parseFinancials } from '../src/fundamentals/FinancialHistory';
 import { buildPeRiver } from '../src/fundamentals/peRiver';
 import { KlineArchive } from '../src/market-data/KlineArchive';
 import { archivePeriod } from '../src/market-data/ArchiveFirstProvider';
-import { PE_RIVER_FILE_VERSION, type PeRiverFile, type PeRiverMarket } from '../src/fundamentals/peRiverRank';
+import { PE_RIVER_FILE_VERSION, type PeRiverFile, type PeRiverMarket, type PeRiverRow, parsePeRiverFile } from '../src/fundamentals/peRiverRank';
 
 const ARCHIVE_DIR = resolve(process.env.ATLAS_ARCHIVE_DIR || '../.cache/kline-archive');
 const FINANCIALS_DIR = resolve(process.env.ATLAS_FINANCIALS_DIR || '../docs/report/financials');
@@ -72,10 +72,83 @@ async function writeJson(path: string, value: unknown) {
   return body.length;
 }
 
-async function main() {
+const MARKETS = ['TW', 'US'] as const;
+const ANCHORS: Record<PeRiverMarket, readonly string[]> = { TW: ['2330.TW', '2317.TW'], US: ['AAPL', 'MSFT'] };
+export type RankedEntry = readonly [string, PeRiverRow];
+
+function validRow(row: PeRiverRow): boolean {
+  return Number.isFinite(row[0]) && row[0] >= 0 && row[0] <= 100 && (row[1] === 0 || row[1] === 1);
+}
+
+/** Keep both count and prior identities: replacement symbols cannot hide missing coverage. */
+export function validateMarket(market: PeRiverMarket, entries: readonly RankedEntry[], previous: PeRiverFile | null, priceThrough: string | null): Record<string, PeRiverRow> {
+  const label = `${market} P/E river ${priceThrough ?? 'unknown date'}`;
+  const reject = (reason: string): never => { throw new Error(`${label}: ${reason}; previous output kept`); };
+  const seen = new Set<string>();
+  for (const [symbol, row] of entries) {
+    if (!symbol.trim() || seen.has(symbol)) reject(`missing or duplicate symbol ${symbol} (${entries.length} rows)`);
+    if (!validRow(row)) reject(`invalid percentile for ${symbol} (${entries.length} rows)`);
+    seen.add(symbol);
+  }
+  if (!seen.size) reject('0 usable symbols');
+  const prior = Object.keys(previous?.items ?? {});
+  const missing = ANCHORS[market].filter(symbol => prior.includes(symbol) && !seen.has(symbol));
+  if (missing.length) reject(`missing anchors ${missing.join(', ')} (${seen.size}/${prior.length})`);
+  const retained = prior.filter(symbol => seen.has(symbol)).length;
+  if (seen.size * 100 < prior.length * 85 || retained * 100 < prior.length * 85)
+    reject(`usable ${seen.size}/${prior.length}, retained ${retained}/${prior.length} below 85%`);
+  return Object.fromEntries(entries);
+}
+
+async function readPrevious(path: string, market: PeRiverMarket): Promise<PeRiverFile | null> {
+  let raw: string;
+  try { raw = await readFile(path, 'utf8'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+  const previous = parsePeRiverFile(JSON.parse(raw), market);
+  if (!previous) throw new Error(`${market} previous P/E river schema invalid`);
+  return previous;
+}
+
+/** Validate all candidates before writing any. Each accepted market is independent. */
+export async function publishMarkets(outDir: string, entries: Record<PeRiverMarket, readonly RankedEntry[]>,
+  lastDates: Record<PeRiverMarket, string>, failures: number, files: number): Promise<number> {
+  if (failures > files / 2) {
+    console.warn(`TW/US P/E river ${lastDates.TW}/${lastDates.US}: read errors ${failures}/${files} exceed 50%; previous outputs kept`);
+    return 1;
+  }
+  const accepted: { path: string; doc: PeRiverFile }[] = [];
+  let rejected = false;
+  for (const market of MARKETS) {
+    const path = join(outDir, `pe-river-${market.toLowerCase()}.json`);
+    try {
+      const previous = await readPrevious(path, market);
+      const items = validateMarket(market, entries[market], previous, lastDates[market] || null);
+      accepted.push({ path, doc: {
+        version: PE_RIVER_FILE_VERSION, market, generatedAt: new Date().toISOString(),
+        priceThrough: lastDates[market] || null,
+        basis: '永久封存週線（2021 年起）；個股頁另併 Yahoo 較早週線，分位可能略有差異',
+        items,
+      } });
+    } catch (error) {
+      rejected = true;
+      console.warn(`${market} ${lastDates[market]} (${entries[market].length} rows): ${String(error)}`);
+    }
+  }
+  if (accepted.length) await mkdir(outDir, { recursive: true });
+  for (const { path, doc } of accepted) {
+    const bytes = await writeJson(path, doc);
+    console.log(`${doc.market}：${Object.keys(doc.items).length} 檔，${bytes} bytes`);
+  }
+  return rejected ? 1 : 0;
+}
+
+export async function main() {
   const files = (await readdir(FINANCIALS_DIR)).filter((name) => name.endsWith('.json')).sort();
   const archive = new KlineArchive({ baseUrl: BASE, fetcher: localFetch, cache: false, timeoutMs: 60_000 });
-  const items: Record<PeRiverMarket, Record<string, [number, 0 | 1]>> = { TW: {}, US: {} };
+  const entries: Record<PeRiverMarket, RankedEntry[]> = { TW: [], US: [] };
   const lastDates: Record<PeRiverMarket, string> = { TW: '', US: '' };
   const counts: Record<string, number> = {};
   let failures = 0;
@@ -87,7 +160,7 @@ async function main() {
         const outcome = await rankOne(file, archive);
         counts[outcome.status] = (counts[outcome.status] ?? 0) + 1;
         if (outcome.status === 'ok') {
-          items[outcome.market][outcome.symbol] = outcome.row;
+          entries[outcome.market].push([outcome.symbol, outcome.row]);
           if (outcome.lastDate && outcome.lastDate > lastDates[outcome.market]) lastDates[outcome.market] = outcome.lastDate;
         }
       } catch {
@@ -97,26 +170,5 @@ async function main() {
     }
   }));
   console.log(`本益比河流分位：${files.length} 個財報檔`, JSON.stringify(counts));
-  await mkdir(OUT_DIR, { recursive: true });
-  for (const market of ['TW', 'US'] as const) {
-    const total = Object.keys(items[market]).length;
-    if (!total) {
-      console.warn(`${market}：沒有任何股票算出目前河流分位，保留上次部署的檔案`);
-      continue;
-    }
-    const doc: PeRiverFile = {
-      version: PE_RIVER_FILE_VERSION,
-      market,
-      generatedAt: new Date().toISOString(),
-      priceThrough: lastDates[market] || null,
-      basis: '永久封存週線（2021 年起）；個股頁另併 Yahoo 較早週線，分位可能略有差異',
-      items: items[market],
-    };
-    const bytes = await writeJson(join(OUT_DIR, `pe-river-${market.toLowerCase()}.json`), doc);
-    console.log(`${market}：${total} 檔，${bytes} bytes`);
-  }
-  // Unreadable inputs are a partial failure for the workflow's notice, never silent.
-  if (failures > files.length / 2) process.exitCode = 1;
+  return publishMarkets(OUT_DIR, entries, lastDates, failures, files.length);
 }
-
-await main();

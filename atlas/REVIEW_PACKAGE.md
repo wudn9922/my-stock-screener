@@ -1641,3 +1641,5 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 ## 2026-11-27 Warrant page
 - 官方 W4 清單逐批查詢 MIS，跨批排序並標明完成度及過期報價。盤中實測 73285U 最佳賣價 1.38 → 1.39。未獨立審查。[390px WebKit 截圖（測試資料）](docs/screenshots/warrant-page-390.png)
+
+- P/E river output gate: validate both market candidates before writing accepted markets; offline fixture coverage, no independent review.
