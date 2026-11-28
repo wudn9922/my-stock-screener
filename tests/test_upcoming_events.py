@@ -56,9 +56,11 @@ class UpcomingEventsTests(unittest.TestCase):
 
     def test_cash_only_does_not_change_stock_eps_events(self):
         rows = [{"CashExDividendTradingDate": "2026-12-01", "CashEarningsDistribution": 3,
-                 "CashStatutorySurplus": 0.5, "StockEarningsDistribution": 0, "StockStatutorySurplus": 0}]
+                 "CashStatutorySurplus": 0.5, "CashDividendPaymentDate": "2026-12-30", "StockEarningsDistribution": 0, "StockStatutorySurplus": 0}]
         self.assertEqual(dividends.parse_events(rows), [])
         self.assertEqual(dividends.parse_cash_events(rows)[0]["perShare"], 3.5)
+        self.assertEqual(dividends.parse_cash_events(rows)[0]["paymentDate"], "2026-12-30")
+        self.assertNotIn("paymentDate", dividends.parse_cash_events([dict(rows[0], CashDividendPaymentDate="")])[0])
 
     def test_bad_input_preserves_output(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -101,7 +103,10 @@ class UpcomingEventsTests(unittest.TestCase):
             })
             put("docs/report/financials/2330.TW.json", {"stockDividends": {
                 "events": [{"exDate": "2026-12-01", "perShare": 1.5}],
-                "cashEvents": [{"exDate": "2026-12-01", "perShare": 3.5}],
+                "checked": "2026-11-28",
+                "cashEvents": [{"exDate": "2026-12-01", "perShare": 3.5},
+                               {"exDate": "2027-02-01", "perShare": 4, "paymentDate": "2027-03-01"},
+                               {"exDate": "2026-04-01", "perShare": 2}],
             }})
             put("config/fomc-decisions.json", {
                 "version": 1, "validThrough": "2027-12-31", "dates": ["2026-12-09"],
@@ -120,6 +125,8 @@ class UpcomingEventsTests(unittest.TestCase):
             kinds = {row["kind"] for row in doc["events"]}
             self.assertTrue({"earnings", "stock-dividend", "cash-dividend",
                              "disposal-start", "disposal-end", "fomc"} <= kinds)
+            self.assertEqual(set(doc), {"version", "generatedAt", "coverage", "events", "moves"})
+            self.assertFalse((root / "docs/report/tw-cash-dividends.json").exists())
             report = root / "docs/report/upcoming-events.json"
             old = report.read_bytes()
             price.write_text("Date,Open,High,Low,Close,Volume\n"

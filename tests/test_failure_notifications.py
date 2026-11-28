@@ -185,8 +185,19 @@ class WorkflowCoverageTest(unittest.TestCase):
                                and f"steps.{step.get('id')}.outcome == 'failure'" in later.get('if', '')
                                for later in steps[steps.index(step) + 1:])
 
+                # External heartbeat is deliberately after collection: Healthchecks.io
+                # independently alerts on a missing ping, and its transport must not
+                # change the existing Discord/LINE notification flows.
+                heartbeat = [s for s in steps if s.get('id') == 'external_heartbeat']
+                if heartbeat:
+                    self.assertEqual(path.name, 'daily-watchdog.yml')
+                    self.assertEqual(name, 'check')
+                    self.assertEqual(heartbeat, [steps[-1]])
+                    self.assertEqual(heartbeat[0]['continue-on-error'], 'true')
+                    self.assertEqual(heartbeat[0]['if'], '${{ always() && !cancelled() }}')
+                    self.assertEqual(heartbeat[0]['env']['WATCHDOG_FAILED'], '${{ failure() }}')
                 partial = [s for s in steps if s.get('continue-on-error') == 'true'
-                           and s.get('id') != 'collect_notification_outcomes' and not retried(s)]
+                           and s.get('id') not in ('collect_notification_outcomes', 'external_heartbeat') and not retried(s)]
                 if partial:
                     self.assertTrue(all(s.get('id') for s in partial), path.name)
                     self.assertIn('notify_partial', producer['outputs'], path.name)

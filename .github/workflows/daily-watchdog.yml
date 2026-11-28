@@ -83,6 +83,26 @@ jobs:
               stream.write('has_partial=' + str(bool(failed)).lower() + '\n')
               stream.write('summary=' + json.dumps(failed, ensure_ascii=False) + '\n')
           PY
+      - name: Ping external watchdog heartbeat
+        id: external_heartbeat
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        env:
+          HEALTHCHECK_PING_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
+          WATCHDOG_FAILED: ${{ failure() }}
+        run: |
+          if [ -z "$HEALTHCHECK_PING_URL" ]; then
+            echo "::notice::External watchdog heartbeat not configured"
+            exit 0
+          fi
+          url="${HEALTHCHECK_PING_URL%/}"
+          if [ "$WATCHDOG_FAILED" = "true" ]; then
+            url="$url/fail"
+          fi
+          curl --fail --silent --show-error --max-time 10 --retry 3 --output /dev/null -- "$url" 2>/dev/null || {
+            echo "::warning::External watchdog heartbeat failed"
+            exit 1
+          }
   notify-system-failure:
     needs: ["check"]
     if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled() || needs['check'].outputs.notify_partial == 'true') }}

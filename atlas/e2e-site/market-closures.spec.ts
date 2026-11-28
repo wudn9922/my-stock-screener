@@ -1,7 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mockMarketLogin } from './account-fixture';
 import { mockSite } from './mocks';
 import { archiveIndexFixture } from '../tests/fixtures/archive-index';
+import { corsHeaders } from '../../supabase/functions/market-chart/validate';
 
 const root = 'https://raw.githubusercontent.com/wudn9922/my-stock-screener/kline-archive/';
 // Synthetic prices: 10/22 is an individual halt on an open market date and must
@@ -10,6 +11,18 @@ const body = 'Date,Open,High,Low,Close,Volume\n2026-10-21,99,101,98,100,1000\n20
 
 // market-chart needs a LINE login; these tests are about the market data it returns.
 test.beforeEach(({ page }) => mockMarketLogin(page));
+
+// The production Edge returns CORS headers even for upstream errors and accepts
+// preflight for X-Atlas-Token. Preserve the HTTP 502 failure without converting it
+// into an unrelated browser access-control failure (especially in WebKit).
+async function mockUnavailableMarketChart(page: Page) {
+  await page.route('**/functions/v1/market-chart?**', async route => {
+    const origin = (await route.request().allHeaders()).origin ?? 'http://127.0.0.1:4177';
+    const headers = corsHeaders(origin, [origin]);
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    return route.fulfill({ status: 502, headers, json: { error: { code: 'upstream_error', message: 'Upstream market data unavailable' } } });
+  });
+}
 
 for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading'] as const) {
   test(`closed market: ${mode} filters daily/weekly/monthly without erasing individual halts`, async ({ page }, info) => {
@@ -32,7 +45,7 @@ for (const mode of ['audited-offline', 'published-evidence', 'gap-with-trading']
       if (path === 'index/tw/2330.TW.json') return route.fulfill({ json: archiveIndexFixture('2330.TW', { 2026: csv }) });
       return route.fulfill(path === 'tw/2330.TW/2026.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
     });
-    await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502, body: 'unavailable' }));
+    await mockUnavailableMarketChart(page);
     const cutoff = traded ? '2026-11-04' : mode === 'audited-offline' ? '2026-10-22' : '2026-10-21';
     for (const tf of ['1D', '1W', '1M']) {
       await page.goto(`./?page=chart&symbol=2330.TW&tf=${tf}`);
@@ -57,7 +70,7 @@ test('calendar session gap retains official April 6 in daily, weekly and monthly
     if (path === 'index/tw/%5ETWOII.json') return route.fulfill({ json: archiveIndexFixture('^TWOII', { 2021: csv }) });
     return route.fulfill(path === 'tw/^TWOII/2021.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
   });
-  await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502, body: 'unavailable' }));
+  await mockUnavailableMarketChart(page);
   for (const tf of ['1D', '1W', '1M']) {
     await page.goto(`./?page=chart&symbol=%5ETWOII&tf=${tf}`);
     await expect(page.getByTestId('chart')).toBeVisible();
@@ -80,7 +93,7 @@ test('physically removed placeholder keeps chart dates and prices aligned', asyn
     if (path === 'index/tw/2330.TW.json') return route.fulfill({ json: archiveIndexFixture('2330.TW', { 2026: csv }) });
     return route.fulfill(path === 'tw/2330.TW/2026.csv' ? { contentType: 'text/csv', body: csv } : { status: 404 });
   });
-  await page.route('**/functions/v1/market-chart?**', route => route.fulfill({ status: 502 }));
+  await mockUnavailableMarketChart(page);
   for (const tf of ['1D', '1W', '1M']) {
     await page.goto(`./?page=chart&symbol=2330.TW&tf=${tf}`);
     await expect(page.getByTestId('chart')).toBeVisible();

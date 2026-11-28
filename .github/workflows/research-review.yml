@@ -68,3 +68,6 @@ jobs:
           cp docs/report/kline-corrections.json "$KLINE_CORRECTIONS_LOG"
           python -m unittest discover -s tests -v
           python -m pytest tests/test_breadth_signals.py -q
+      - name: Offline cash dividends dry-run on actual financial records
+        if: matrix.inputs == 'generated' && vars.GENERATED_BRANCH_MODE == '1'
+        run: python scripts/build_tw_cash_dividends.py --dry-run --strict

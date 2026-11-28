@@ -262,5 +262,44 @@ class DedupeRecoveryTest(unittest.TestCase):
                 self.assertNotIn('PRIVATE-TEST-TOKEN', path.read_text())
 
 
+class ExternalHeartbeatTest(unittest.TestCase):
+    def test_heartbeat_structure_and_offline_shell(self):
+        import subprocess
+        import yaml
+
+        workflow = yaml.safe_load((ROOT / '.github/workflows/daily-watchdog.yml').read_text())
+        steps = workflow['jobs']['check']['steps']
+        step = steps[-1]
+        self.assertEqual(step['name'], 'Ping external watchdog heartbeat')
+        self.assertTrue(step['continue-on-error'])
+        self.assertEqual(step['if'], '${{ always() && !cancelled() }}')
+        self.assertEqual(step['env']['WATCHDOG_FAILED'], '${{ failure() }}')
+        self.assertEqual(step['env']['HEALTHCHECK_PING_URL'], '${{ secrets.HEALTHCHECK_PING_URL }}')
+        self.assertNotIn('secrets.', step['run'])
+        with tempfile.TemporaryDirectory() as folder:
+            fake = Path(folder) / 'curl'
+            fake.write_text('#!/bin/sh' + chr(10) + 'printf "%s\\n" "$@" > "$CAPTURE"' + chr(10))
+            fake.chmod(0o755)
+            capture = Path(folder) / 'args'
+            env = dict(os.environ, PATH=folder + os.pathsep + os.environ['PATH'], CAPTURE=str(capture))
+            for url, failed, expected in (
+                ('', 'false', None),
+                ('https://example.invalid/heartbeat', 'false', 'https://example.invalid/heartbeat'),
+                ('https://example.invalid/heartbeat/', 'true', 'https://example.invalid/heartbeat/fail'),
+            ):
+                capture.unlink(missing_ok=True)
+                result = subprocess.run(['bash', '-e', '-c', step['run']],
+                    env=dict(env, HEALTHCHECK_PING_URL=url, WATCHDOG_FAILED=failed),
+                    capture_output=True, text=True, check=True)
+                if expected is None:
+                    self.assertFalse(capture.exists())
+                    self.assertEqual(result.stdout.count('::notice::'), 1)
+                else:
+                    self.assertEqual(capture.read_text().splitlines(), [
+                        '--fail', '--silent', '--show-error', '--max-time', '10',
+                        '--retry', '3', '--output', '/dev/null', '--', expected])
+                    self.assertNotIn(url, result.stdout + result.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
