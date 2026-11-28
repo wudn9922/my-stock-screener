@@ -22,6 +22,7 @@ import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
 import { ConservativePeCard } from '../ui/financials/ConservativePeCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
+import { StockDigestBanner } from '../ui/research/StockDigestBanner';
 import { VolumePanel } from '../ui/research/VolumePanel';
 import { InstitutionPanel } from '../ui/research/InstitutionPanel';
 import { OfficialAlerts } from '../ui/research/OfficialAlerts';
@@ -341,6 +342,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit
         onHomeListing={onHomeListing}
       />
       <div className="page financials-page-body">
+        {symbol && key && <StockDigestBanner symbol={symbol} />}
         {body}
         {symbol && isChipsPageSymbol(symbol) && <><ChipsSection symbol={symbol} /><InstitutionPanel key={symbol} symbol={symbol}/><OfficialAlerts symbol={symbol}/></>}
         {symbol && key && <VolumePanel key={`volume-${symbol}`} symbol={symbol}/>}

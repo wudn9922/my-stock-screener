@@ -817,3 +817,27 @@ test('AI conservative PE uses the financial period and suppresses a stale scenar
   await expect(panel).toHaveCount(0);
   await expect(card).not.toContainText(report.concern);
 });
+
+
+test('stock digest displays only current-symbol recent rows and hides missing data', async ({ page }, info) => {
+  await mockFinancials(page);
+  await page.route('**/report/stock-digest.json', route => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
+    return route.fulfill({ json: { version: 1, generatedAt: new Date().toISOString(), stocks: {
+      AAPL: [{ kind: 'gross-margin', date: today, period: '2026Q3', before: 42.1, after: 38.6 },
+        { kind: 'sec-restatement', date: '2000-01-01', period: '1999-12-31' }],
+    } } });
+  });
+  await page.goto('./?page=financials&symbol=AAPL');
+  const banner = page.getByRole('region', { name: '近期異動摘要' });
+  await expect(banner).toContainText('2026Q3 毛利率 42.1% → 38.6%');
+  await expect(banner.locator('li')).toHaveCount(1);
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  if (info.project.name === 'mobile-chromium' && page.viewportSize()?.width === 390)
+    await page.screenshot({ path: info.outputPath('stock-digest-390.png') });
+  const response = page.waitForResponse(r => r.url().endsWith('/stock-digest.json'));
+  await page.goto('./?page=financials&symbol=JPM');
+  await response;
+  await expect(page.locator('.fin-title')).toContainText('JPM');
+  await expect(banner).toHaveCount(0);
+});
