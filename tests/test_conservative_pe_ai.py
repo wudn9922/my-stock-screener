@@ -253,6 +253,128 @@ class ScenarioTests(unittest.TestCase):
         self.assertEqual(len(set(prompts)), 1)
         self.assertEqual(sum(provider.used.values()), 4)
 
+    def test_probe_symbols_are_balanced_sorted_and_backfilled(self):
+        def selected(us, tw):
+            return {s: dict(PUBLIC, symbol=s, market=market)
+                    for market, symbols in (("US", us), ("TW", tw)) for s in symbols}
+
+        us = ["E", "C", "A", "F", "B", "D"]
+        tw = ["6666.TWO", "2222.TW", "4444.TW", "1111.TW", "3333.TW", "5555.TW"]
+        for a, b, expected in (
+            (us, tw, ["A", "B", "C", "1111.TW", "2222.TW"]),
+            (us, [], ["A", "B", "C", "D", "E"]),
+            ([], tw, ["1111.TW", "2222.TW", "3333.TW", "4444.TW", "5555.TW"]),
+            (["E"], tw, ["E", "1111.TW", "2222.TW", "3333.TW", "4444.TW"]),
+            (us, ["6666.TWO"], ["A", "B", "C", "D", "6666.TWO"]),
+            (["A"], ["1111.TW"], ["A", "1111.TW"]),
+            ([], [], []),
+        ):
+            with self.subTest(us=a, tw=b):
+                self.assertEqual(m.probe_symbols(selected(a, b)), expected)
+
+    def test_all_provider_failure_codes_in_both_modes_and_safe_summary(self):
+        secret = "FAKE-SECRET-DO-NOT-LOG"
+        private = "PRIVATE-RESPONSE-DO-NOT-LOG"
+        prompt_marker = "PRIVATE-PROMPT-DO-NOT-LOG"
+        header_marker = "PRIVATE-HEADER-DO-NOT-LOG"
+        public = dict(PUBLIC, companyName=prompt_marker)
+        cases = [
+            ("gemini", response(429, payload={"error": private}, headers={"X-Test": header_marker}), "http-429"),
+            ("gemini", response(503, payload={"error": private}), "http-503"),
+            ("gemini", requests.Timeout(secret), "timeout"),
+            ("gemini", requests.ConnectionError(secret), "connection"),
+            ("gemini", response(payload={"candidates": [{"finishReason": "MAX_TOKENS"}]}), "incomplete:MAX_TOKENS"),
+            ("groq", response(payload={"choices": [{"finish_reason": "length"}]}), "incomplete:length"),
+            ("groq", response(payload={"choices": [{"finish_reason": private}]}), "incomplete:unknown"),
+            ("groq", response(payload={"choices": [{}]}), "incomplete:missing"),
+            ("gemini", response(payload={"error": private}), "invalid-json"),
+            ("gemini", Mock(status_code=200, **{"json.side_effect": ValueError(private)}), "invalid-json"),
+            ("gemini", model_answer("gemini", private), "invalid-json"),
+            ("gemini", model_answer("gemini", "[]"), "validation:schema"),
+        ]
+        for change, reason in (
+            ({"concern": private + " https://example.com"}, "concern-text"),
+            ({"evidence": None}, "evidence-text"),
+            ({"affectedEarningsRatio": True}, "ratio"),
+            ({"confidence": private}, "confidence"),
+            ({"news": []}, "news-count"),
+            ({"news": [{"url": private}]}, "citation-schema"),
+            ({"news": [{"url": "https://example.com", "date": NEWS[0]["date"]}]}, "citation-not-in-input"),
+            ({"segmentEvidence": private}, "segment-not-in-input"),
+            ({"affectedEarningsRatio": 0.41}, "ratio-exceeds-segment"),
+        ):
+            cases.append(("groq", model_answer("groq", json.dumps(dict(ANSWER, **change))), "validation:" + reason))
+        for family, outcome, reason in cases:
+            for mode in ("probe", "normal"):
+                with self.subTest(family=family, reason=reason, mode=mode):
+                    session = Mock()
+                    session.post.side_effect = [outcome]
+                    config = [row for row in m.load_providers() if row["id"] ==
+                              ("gemini-hydrogen" if family == "gemini" else "groq-qwen")]
+                    provider = self.provider(session, {config[0]["secret"]: secret}, config=config)
+                    key = config[0]["id"]
+                    with patch.object(m, "evidence_for", return_value=(public, NEWS, SEGMENTS)):
+                        if mode == "probe":
+                            content = m.probe({"TEST": public}, Mock(), Mock(), provider, current=lambda: NOW)
+                            self.assertIn(f"| TEST | {reason} |", content)
+                        else:
+                            with self.assertRaises((m.Invalid, m.Transient)):
+                                provider.analyze(public, NEWS, SEGMENTS)
+                            content = m.provider_failure_summary(provider)
+                            self.assertIn(f"| {key} | {reason} | 1 |", content)
+                    self.assertEqual(provider.failures, {key: {reason: 1}})
+                    session.post.assert_called_once()
+                    self.assertEqual(bool(provider.disabled), reason.startswith("http-") or reason in ("timeout", "connection"))
+                    with TemporaryDirectory() as directory:
+                        path = Path(directory) / "summary"
+                        m.summary({"GITHUB_STEP_SUMMARY": str(path)}, content)
+                        saved = path.read_text(encoding="utf-8")
+                    for forbidden in (secret, private, prompt_marker, header_marker, "Authorization", "x-goog-api-key"):
+                        self.assertNotIn(forbidden, saved)
+
+    def test_probe_disabled_cells_do_not_count_additional_requests(self):
+        session = Mock()
+        session.post.return_value = response(429)
+        provider = self.provider(session, {"GROQ_API_KEY": "fake"})
+        with patch.object(m, "evidence_for", return_value=(PUBLIC, NEWS, SEGMENTS)):
+            content = m.probe({s: dict(PUBLIC, symbol=s) for s in ("AAA", "BBB")}, Mock(), Mock(), provider,
+                              current=lambda: NOW)
+        self.assertIn("| AAA | http-429 |", content)
+        self.assertIn("| BBB | disabled |", content)
+        self.assertEqual(provider.failures, {"groq-qwen": {"http-429": 1}})
+        session.post.assert_called_once()
+
+    def test_normal_main_summary_counts_fallback_and_repeated_invalid_answers(self):
+        session = Mock()
+        session.post.side_effect = [
+            response(429), model_answer("gemini", "not JSON"), model_answer("gemini", "not JSON"),
+        ]
+        stamp = m.now()
+        state = m.empty_budget(stamp)
+        provider = m.Providers(session, {"GEMINI_API_KEY": "fake"}, state=state,
+                               sleep=Mock(), clock=lambda: 0, current=lambda: stamp)
+        selected = [dict(PUBLIC, symbol=s) for s in ("AAA", "BBB")]
+        with TemporaryDirectory() as directory:
+            output = Path(directory) / "reports"
+            path = Path(directory) / "summary"
+            env = {"CONSERVATIVE_PE_AI_ENABLED": "1", "CONSERVATIVE_PE_AI_FREE_TIER": "1",
+                   "GITHUB_STEP_SUMMARY": str(path)}
+            with (patch.dict(os.environ, env, clear=True),
+                  patch.object(sys, "argv", ["build_conservative_pe.py", "--selector", "unused"]),
+                  patch.object(m, "public_symbols", return_value=["AAA", "BBB"]),
+                  patch.object(m.subprocess, "run", return_value=Mock(stdout=json.dumps(selected))),
+                  patch.object(m, "budget_state", return_value=state),
+                  patch.object(m.requests, "Session", return_value=session),
+                  patch.object(m, "Providers", return_value=provider),
+                  patch.object(m, "publish_budget"), patch.object(m, "OUTPUT", output),
+                  patch.object(m, "evidence_for", return_value=(PUBLIC, NEWS, SEGMENTS))):
+                m.main()
+            content = path.read_text(encoding="utf-8")
+        self.assertIn("| gemini-hydrogen | http-429 | 1 |", content)
+        self.assertIn("| gemini-flash | invalid-json | 2 |", content)
+        self.assertNotIn("not JSON", content)
+        self.assertEqual(session.post.call_count, 3)
+
     def test_config_validation_and_news_pacing(self):
         config = m.load_providers()
         self.assertEqual([r["id"] for r in config], ["gemini-hydrogen", "gemini-flash", "groq-qwen", "cloudflare-qwen"])
