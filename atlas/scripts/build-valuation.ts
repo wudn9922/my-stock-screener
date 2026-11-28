@@ -190,7 +190,8 @@ async function main() {
       for (const exchange of ['TWSE', 'TPEx'] as const) {
         try {
           const result = await buildTaiwanExchange(fetcher, exchange, previous, supplementalAnnual, todayIso);
-          const count = Object.keys(result.items).length;
+          // Preserve the original usable-exchange-record coverage gate: blank rows alone cannot pass it.
+          const count = Object.values(result.items).filter(record => record.epsTtm !== null || record.epsAnnual !== null || record.exchangePeTtm != null).length;
           if (count < (offline ? 1 : 500)) throw new Error(`only ${count} records`);
           Object.assign(items, await enrichTaiwanValuation(result.items, financialsDir, todayIso));
           stats[exchange] = { records: count, ...result.stats };

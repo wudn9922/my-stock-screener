@@ -1258,10 +1258,11 @@ export function App({
     disabled: !state.ready,
     onClick: () => setListPickerOpen(true),
   };
-  const peTitle = (label: string, value: number | null) =>
+  const peTitle = (label: string, value: number | null, ttm = false) =>
     value !== null
       ? `${label}${peFigures?.source ? ` · ${peFigures.source}` : ''}${peFigures?.asOf ? ` · ${peFigures.asOf}` : ''}`
-      : `${label}：${peFigures?.reason ?? '暫無資料'}`;
+      : `${label}：${(ttm ? peFigures?.peTtmLoss : peFigures?.peLoss) ? '虧損，本益比不適用'
+        : peFigures?.reason === '近四季 EPS 資料不足' && !ttm ? '暫無 EPS 資料' : peFigures?.reason ?? '暫無資料'}`;
   const ticker = asset?.ticker ?? symbol;
   const compactTicker = ticker.startsWith(displayTicker(symbol)) ? displayTicker(symbol) : ticker;
   const dataStateLabel = providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲';
@@ -1434,7 +1435,7 @@ export function App({
                 </dl>
                 <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={14} />}>
                   <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
-                  <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+                  <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null, true)}</p>
                   {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
                   {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
                 </StockStatsMenu>
@@ -1503,7 +1504,7 @@ export function App({
             </dl>
             <StockStatsMenu label="本益比說明" testId="valuation-help-toggle" trigger={<Info size={13} />}>
               <p>{peTitle(`本益比（${peFigures?.fiscalYear ?? '年度'} EPS）`, peFigures?.pe ?? null)}</p>
-              <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null)}</p>
+              <p>{peTitle('本益比 TTM（近四季 EPS）', peFigures?.peTtm ?? null, true)}</p>
               {peFigures?.epsNote && <p data-testid="valuation-eps-note">{peFigures.epsNote}</p>}
               {onShowPeChart && <button type="button" className="ghost-button" onClick={onShowPeChart}>查看下方本益比圖表</button>}
             </StockStatsMenu>
