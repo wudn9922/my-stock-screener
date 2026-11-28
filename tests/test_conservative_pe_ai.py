@@ -37,6 +37,11 @@ def model_answer(provider, raw):
     return response(payload={"choices": [{"finish_reason": "stop", "message": {"content": raw}}]})
 
 
+def configured(*ids):
+    rows = {row["id"]: row for row in m.load_providers()}
+    return [rows[key] for key in ids]
+
+
 class ScenarioTests(unittest.TestCase):
     def test_refresh_is_off_without_both_workflow_opt_ins(self):
         for flags in ({}, {"CONSERVATIVE_PE_AI_ENABLED": "1"}, {"CONSERVATIVE_PE_AI_FREE_TIER": "1"}):
@@ -81,7 +86,8 @@ class ScenarioTests(unittest.TestCase):
             response(429), model_answer("groq", json.dumps(ANSWER)),
             model_answer("groq", json.dumps(ANSWER)),
         ]
-        provider = self.provider(session)
+        # Explicit order: this test covers fallback and separate Gemini quotas, not production order.
+        provider = self.provider(session, config=configured("gemini-hydrogen", "gemini-flash", "groq-qwen"))
         self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "gemini-flash")
         self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "groq-qwen")
         self.assertEqual(provider.analyze(PUBLIC, NEWS, SEGMENTS)["provider"], "groq-qwen")
@@ -482,12 +488,12 @@ class ScenarioTests(unittest.TestCase):
             for timeout in (10, 300):
                 m.write_json(path, [dict(config[0], timeout_seconds=timeout)])
                 self.assertEqual(m.load_providers(path)[0]["timeout_seconds"], timeout)
-            m.write_json(path, [dict(config[3], daily_limit=8)])
+            m.write_json(path, [dict(configured("cloudflare-qwen")[0], daily_limit=8)])
             with self.assertRaises(m.Invalid):
                 m.load_providers(path)
 
     def test_groq_estimate_prompt_trimming_and_daily_budget(self):
-        row = m.load_providers()[2]
+        row = configured("groq-qwen")[0]
         self.assertEqual(m.request_tokens(row, "中"), 2 + 128 + 4500)
         self.assertEqual(m.request_tokens(row, "abc"), 2 + 128 + 4500)
         self.assertEqual(m.request_tokens(row, "a" * m.MAX_PROMPT_BYTES), 7728)
@@ -515,7 +521,7 @@ class ScenarioTests(unittest.TestCase):
 
     def test_config_validation_and_news_pacing(self):
         config = m.load_providers()
-        self.assertEqual([r["id"] for r in config], ["gemini-hydrogen", "gemini-flash", "groq-qwen", "cloudflare-qwen"])
+        self.assertEqual([r["id"] for r in config], ["gemini-hydrogen", "groq-qwen", "cloudflare-qwen", "gemini-flash"])
         with TemporaryDirectory() as directory:
             path = Path(directory) / "providers.json"
             m.write_json(path, [dict(config[0], base_url="https://unreviewed.example")])

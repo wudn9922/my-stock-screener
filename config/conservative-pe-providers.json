@@ -11,18 +11,6 @@
     "thinking_level": "MEDIUM"
   },
   {
-    "id": "gemini-flash",
-    "type": "gemini",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta",
-    "model": "gemini-3.8-flash",
-    "secret": "GEMINI_API_KEY",
-    "daily_limit": 18,
-    "min_interval_seconds": 15,
-    "max_output_tokens": 4096,
-    "thinking_level": "LOW",
-    "timeout_seconds": 180
-  },
-  {
     "id": "groq-qwen",
     "type": "openai-compatible",
     "base_url": "https://api.groq.com/openai/v1",
@@ -44,6 +32,18 @@
     "min_interval_seconds": 15,
     "max_output_tokens": 4000,
     "reasoning_effort": "medium",
+    "timeout_seconds": 180
+  },
+  {
+    "id": "gemini-flash",
+    "type": "gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "model": "gemini-3.8-flash",
+    "secret": "GEMINI_API_KEY",
+    "daily_limit": 18,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 4096,
+    "thinking_level": "LOW",
     "timeout_seconds": 180
   }
 ]
