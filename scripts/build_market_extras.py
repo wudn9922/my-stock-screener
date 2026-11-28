@@ -51,8 +51,11 @@ def ipo_companies(payload, checked_at):
         require(isinstance(table, dict), label, f'{section}: missing table')
         if section == 'upcoming':
             table = table.get('upcomingTable', table)
-        require(isinstance(table, dict) and isinstance(table.get('rows'), list), label, f'{section}: missing or invalid rows array')
-        rows = table['rows']
+        # Nasdaq explicitly uses null for an empty table; an absent rows field is a schema failure.
+        require(isinstance(table, dict) and 'rows' in table
+                and (table['rows'] is None or isinstance(table['rows'], list)),
+                label, f'{section}: missing or invalid rows (expected array or null)')
+        rows = table['rows'] or []
         require(all(isinstance(row, dict) for row in rows), label, f'{section}: malformed rows ({len(rows)})')
         for row in rows:
             if not isinstance(row, dict):

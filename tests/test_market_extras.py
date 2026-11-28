@@ -29,7 +29,7 @@ class MarketExtrasTests(unittest.TestCase):
     def test_empty_current_month_calendar_has_explicit_reason(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            collect(root, lambda url: calendar() if '/ipo/' in url else {'data': None}, NOW, limit=1)
+            collect(root, lambda url: {'data': {'filed': {'rows': None}, 'upcoming': {'upcomingTable': {'rows': None}}, 'priced': {'rows': None}}} if '/ipo/' in url else {'data': None}, NOW, limit=1)
             value = json.loads((root / 'docs/report/ipo-watch.json').read_text())
             self.assertEqual(value['reason'], '本月行事曆暫無資料')
             self.assertEqual(value['companies'], [])
@@ -93,12 +93,26 @@ class MarketExtrasTests(unittest.TestCase):
             fixture = json.loads((Path(__file__).parent / 'fixtures/market-extras/nasdaq-calendar-shape.json').read_text())
             self.assertEqual(collect(root, lambda url: fixture if '/ipo/' in url else payload(), NOW, limit=1), 0)
             before = path.read_bytes()
-            for bad in ({}, [], None, {'data': {}}, calendar(filed={}), calendar(priced={'rows': None}), calendar(upcoming={'rows': 'bad'})):
+            for bad in ({}, [], None, {'data': {}}, calendar(filed={}), calendar(priced={'rows': 0}), calendar(upcoming={'rows': 'bad'}), calendar(filed=None), calendar(priced=[]), calendar(upcoming={'upcomingTable': {}}), {'data': {'filed': {'rows': []}, 'priced': {'rows': []}}}):
                 with self.subTest(bad=bad):
                     self.assertEqual(collect(root, lambda url: bad if '/ipo/' in url else payload(), NOW, limit=1), 1)
                     self.assertEqual(path.read_bytes(), before)
             self.assertEqual(collect(root, lambda url: calendar() if '/ipo/' in url else payload(), NOW, limit=1), 0)
             self.assertEqual(json.loads(path.read_text())['companies'], [])
+            self.assertNotEqual(path.read_bytes(), before)
+
+    def test_null_calendar_replaces_previous_nasdaq_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / 'docs/report/ipo-watch.json'
+            fixture = json.loads((Path(__file__).parent / 'fixtures/market-extras/nasdaq-calendar-shape.json').read_text())
+            self.assertEqual(collect(root, lambda url: fixture if '/ipo/' in url else payload(), NOW, limit=1), 0)
+            before = path.read_bytes()
+            null_calendar = calendar(filed={'rows': None}, upcoming={'upcomingTable': {'rows': None}}, priced={'rows': None})
+            self.assertEqual(collect(root, lambda url: null_calendar if '/ipo/' in url else payload(), NOW, limit=1), 0)
+            value = json.loads(path.read_text())
+            self.assertEqual(value['reason'], '本月行事曆暫無資料')
+            self.assertEqual(value['companies'], [])
             self.assertNotEqual(path.read_bytes(), before)
 
 if __name__ == '__main__': unittest.main()
