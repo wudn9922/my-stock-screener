@@ -195,7 +195,7 @@ class WorkflowCoverageTest(unittest.TestCase):
                     self.assertEqual(heartbeat, [steps[-1]])
                     self.assertEqual(heartbeat[0]['continue-on-error'], 'true')
                     self.assertEqual(heartbeat[0]['if'], '${{ always() && !cancelled() }}')
-                    self.assertEqual(heartbeat[0]['env']['WATCHDOG_FAILED'], '${{ failure() }}')
+                    self.assertEqual(heartbeat[0]['env']['WATCHDOG_FAILED'], "${{ job.status == 'failure' }}")
                 partial = [s for s in steps if s.get('continue-on-error') == 'true'
                            and s.get('id') not in ('collect_notification_outcomes', 'external_heartbeat') and not retried(s)]
                 if partial:

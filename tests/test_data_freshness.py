@@ -273,7 +273,7 @@ class ExternalHeartbeatTest(unittest.TestCase):
         self.assertEqual(step['name'], 'Ping external watchdog heartbeat')
         self.assertTrue(step['continue-on-error'])
         self.assertEqual(step['if'], '${{ always() && !cancelled() }}')
-        self.assertEqual(step['env']['WATCHDOG_FAILED'], '${{ failure() }}')
+        self.assertEqual(step['env']['WATCHDOG_FAILED'], "${{ job.status == 'failure' }}")
         self.assertEqual(step['env']['HEALTHCHECK_PING_URL'], '${{ secrets.HEALTHCHECK_PING_URL }}')
         self.assertNotIn('secrets.', step['run'])
         with tempfile.TemporaryDirectory() as folder:
