@@ -1,0 +1,1 @@
+.loupe{position:absolute;border:1px solid #7988a5;border-radius:8px;box-shadow:0 4px 14px #0008;z-index:4;pointer-events:none}.loupe[data-corner=left]{left:12px}.loupe[data-corner=right]{right:12px}
