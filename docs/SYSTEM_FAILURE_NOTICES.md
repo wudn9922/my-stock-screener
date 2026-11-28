@@ -81,6 +81,13 @@ PR review 工作 **atlas-review、research-review、generated-verify、kline-arc
 
 日曆需涵蓋市場當地今天；日曆讀不到、過期或沒有已收盤 session 時，通知「交易日曆不可用」，不把未檢查來源誤報為已恢復。來源缺檔／缺資料日也會明確列異常。日曆只保留約30天過去資料，長時間落後以已知 session 計算「至少落後 N 日」，仍可判定超過1日；不宣稱精確總天數。
 
+### 外部心跳監控
+
+Healthchecks.io 獨立監控 watchdog 是否完成；資料過期仍由現有通知處理，非容許失敗的步驟失敗則送出 fail 心跳。
+1. 建立 Healthchecks.io check：Period 1 day、Grace 2 hours（26 小時未收到即告警）。
+2. 設定 Email 或 Discord 告警通道。
+3. 將 ping URL 存為 repo Actions secret `HEALTHCHECK_PING_URL`；未設定時跳過。
+
 ### 同日一次與恢復通知
 
 每個來源／市場（以及每日報告）各有穩定 problem key。以台北日期計算，每個問題同日只送一次；隔日仍異常可以再提醒。恢復時發「已恢復」，重複健康檢查不再發。同一問題同日反覆恢復／異常也維持每天各一則的上限。
