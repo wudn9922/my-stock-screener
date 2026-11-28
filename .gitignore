@@ -38,6 +38,7 @@ docs/report/**/*.tmp
 /docs/atlas/
 /docs/report/latest.json
 /docs/report/trending-stocks.json
+/docs/report/news-digest.json
 /docs/report/universe.json
 /docs/report/breadth.json
 /docs/report/breadth-signals.json

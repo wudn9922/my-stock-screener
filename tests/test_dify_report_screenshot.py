@@ -2,6 +2,9 @@ import os
 import sys
 import types
 import unittest
+import json
+import tempfile
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -589,3 +592,37 @@ class NewsDedupTest(unittest.TestCase):
         self.assertEqual(publish.call_count, 2)
         state = dify_report.load_news_state()
         self.assertEqual(state["sources"]["Barron's"]["failStreak"], 2)
+
+
+class NewsDigestTest(unittest.TestCase):
+    def test_public_report_history_images_and_empty_retention(self):
+        from breakout_alert.account_permissions import DEFAULT_ADMIN_LINE_ID
+        with tempfile.TemporaryDirectory() as folder, mock.patch.dict(os.environ, {"ADMIN_LINE_USER_ID": DEFAULT_ADMIN_LINE_ID}):
+            root = Path(folder)
+            news = root / "news"
+            news.mkdir()
+            path = root / "news-digest.json"
+            image = news / "wsj-20261128-abc.jpg"
+            image.write_bytes(b"fixture")
+            now = datetime(2026, 11, 28, tzinfo=timezone.utc)
+            item = {"name": "WSJ", "publish_path": str(image), "url": "https://example.invalid/image.jpg", "snapshot": now.isoformat()}
+            state = {"sources": {"WSJ": {"file": str(image), "sentAt": now.isoformat()}}}
+            def save(text, **kwargs):
+                return dify_report.save_news_digest(text, [item], source_user_id=DEFAULT_ADMIN_LINE_ID, path=path,
+                    news_dir=news, state=state, **kwargs)
+            self.assertTrue(save("📰 Barron's：今日無新聞（網站擋下截圖）\n\n摘要\n\n📈 Atlas 圖表\nhttps://example.invalid", now=now))
+            first = json.loads(path.read_text())["latest"]
+            self.assertEqual(first["text"], "📰 Barron's：今日無新聞（網站擋下截圖）\n\n摘要")
+            self.assertEqual(first["screenshots"], [{"source": "WSJ", "file": image.name, "snapshot": now.isoformat(), "sentAt": now.isoformat()}])
+            raw = path.read_bytes()
+            self.assertFalse(save("", now=now + timedelta(days=1)))
+            self.assertEqual(path.read_bytes(), raw)
+            self.assertFalse(dify_report.save_news_digest("private", [], source_user_id="private", path=path))
+            self.assertEqual(path.read_bytes(), raw)
+            image.unlink()
+            self.assertTrue(save("new", now=now + timedelta(days=1)))
+            value = json.loads(path.read_text())
+            self.assertEqual(value["latest"]["screenshots"], [])
+            self.assertEqual(value["history"][0]["screenshots"], [])
+            self.assertTrue(save("later", now=now + timedelta(days=16)))
+            self.assertEqual(json.loads(path.read_text())["history"], [])
