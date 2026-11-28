@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -10,6 +11,8 @@ from report_json import write_json_atomic
 from screener_common import clean_ohlcv_dataframe, get_tw_stock_name, round_report_number, safe_float
 from screener_config import REPORT_DIR, REPORT_SERIES_DIR
 from tpex_otc import TPEX_OTC_NAME, TPEX_OTC_SYMBOL, TPEX_SOURCE_LABEL, get_tpex_otc_full_history
+from scripts.output_guard import OutputRejected, finite, require, retain_count
+from scripts.report_run_status import record_failure
 
 
 # =========================================================================
@@ -201,6 +204,46 @@ def build_series_payload(
     }
 
 
+def validate_series(payload, previous):
+    """Validate the published daily bars, allowing an intentionally rolling start."""
+    symbol = payload["symbol"]
+    market = "TW" if symbol == TPEX_OTC_SYMBOL or symbol.endswith((".TW", ".TWO")) else "US" if not symbol.startswith("^") else "index"
+    label = f"{market} series {symbol}"
+
+    def dates(doc, context):
+        bars = doc.get("bars")
+        require(isinstance(bars, list) and bool(bars), context, "0 usable bars")
+        days = []
+        for row in bars:
+            require(isinstance(row, dict), context, f"invalid bar ({len(bars)} rows)")
+            stamp = row.get("time")
+            require(finite(stamp) and int(stamp) == stamp, context, f"invalid timestamp ({len(bars)} rows)")
+            try:
+                day = datetime.fromtimestamp(stamp, timezone.utc).date()
+            except (OverflowError, OSError, ValueError):
+                require(False, context, f"invalid timestamp {stamp} ({len(bars)} rows)")
+            require(finite(row.get("close")) and row["close"] > 0,
+                    context, f"invalid close on {day} ({len(bars)} rows)")
+            require(not days or day > days[-1], context,
+                    f"duplicate or non-increasing date {day} ({len(bars)} rows)")
+            days.append(day)
+        return days
+
+    current = dates(payload, f"{label} asOf={payload.get('asOf')}")
+    if previous is None:
+        return
+    require(isinstance(previous, dict) and previous.get("symbol") == symbol,
+            label, f"invalid previous series identity ({len(current)} bars through {current[-1]})")
+    prior = dates(previous, label + " previous")
+    context = f"{label} {current[0]}..{current[-1]}"
+    require(current[-1] >= prior[-1], context,
+            f"last date regressed from {prior[-1]} ({len(current)}/{len(prior)} bars)")
+    expected = {day for day in prior if day >= current[0]}
+    retained = len(expected.intersection(current))
+    retain_count(retained, len(expected), context + " overlapping prior dates",
+                 min_share=.95, minimum=0)
+
+
 def write_report_series(
     symbol,
     df,
@@ -223,17 +266,28 @@ def write_report_series(
         as_of=as_of
     )
 
-    if not payload["bars"]:
-        print(
-            f"⚠️ {symbol} 沒有可用 K 線，"
-            "不寫出 series JSON"
-        )
-        return None
-
     path = os.path.join(
         series_dir,
         f"{symbol}.json"
     )
+    # An unknown/delisted optional symbol may legitimately have no history.
+    # The fixed TPEx index is required even on a cold start.
+    if not payload["bars"] and not os.path.exists(path) and symbol != TPEX_OTC_SYMBOL:
+        print(f"⚠️ {symbol} 沒有可用 K 線，不寫出 series JSON")
+        return None
+    try:
+        previous = None
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as file:
+                    previous = json.load(file)
+            except (OSError, ValueError) as exc:
+                raise OutputRejected(f"{symbol} series asOf={payload.get('asOf')}: cannot read previous snapshot; previous output kept") from exc
+        validate_series(payload, previous)
+    except OutputRejected as exc:
+        print(f"⚠️ {exc}")
+        record_failure(f"series/{symbol}.json", exc)
+        return None
 
     write_json_atomic(path, payload)
 
@@ -286,13 +340,7 @@ def write_report_series(
 def write_tpex_otc_series():
     history = get_tpex_otc_full_history()
 
-    if history.empty:
-        print(
-            "⚠️ 沒有 TPEx 櫃買指數歷史，"
-            "略過 series JSON"
-        )
-        return None
-
+    # Empty history must also reach the per-symbol gate/status path.
     return write_report_series(
         TPEX_OTC_SYMBOL,
         history,
