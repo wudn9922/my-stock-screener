@@ -29,6 +29,7 @@ import { MexcFuturesPanel } from './MexcFuturesPanel';
 import { HoldingPosition } from './HoldingPosition';
 import { holdingChartTarget } from './chartTarget';
 import { ALL_ACCOUNTS, holdingsViewPreference, resolveView } from './viewPreference';
+import { DividendCashflowCard } from './DividendCashflowCard';
 import { HoldingsTotals } from './HoldingsTotals';
 import { retainQuotes, retainRates } from './quoteRetention';
 import { useFuturesRefresh } from './useFuturesRefresh';
@@ -458,6 +459,9 @@ export function HoldingsPanel({ openChart, navigate }: Pick<PageProps, 'openChar
             </p>
           </details>
         </HoldingsTotals>
+      )}
+      {!snapshot.loading && !snapshot.error && document.accounts.some(entry => entry.holdings.some(h => h.market === 'TW')) && (
+        <DividendCashflowCard holdings={document.accounts.flatMap(entry => entry.holdings)} />
       )}
       {snapshot.error && <p role="alert">{snapshot.error}</p>}
       {error && <p role="alert">{error}</p>}

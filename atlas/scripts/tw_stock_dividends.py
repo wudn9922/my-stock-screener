@@ -70,7 +70,11 @@ def parse_cash_events(rows):
         if ex is None or earnings < 0 or surplus < 0 or earnings + surplus <= 0:
             continue
         year = str(row.get("year") or row.get("date") or "")
-        events[(ex.isoformat(), year)] = {"exDate": ex.isoformat(), "perShare": round(earnings + surplus, 6), "year": year}
+        payment = day_of(row.get("CashDividendPaymentDate"))
+        event = {"exDate": ex.isoformat(), "perShare": round(earnings + surplus, 6), "year": year}
+        if payment is not None and payment >= ex:
+            event["paymentDate"] = payment.isoformat()
+        events[(ex.isoformat(), year)] = event
     return sorted(events.values(), key=lambda e: (e["exDate"], e["year"]))
 
 
