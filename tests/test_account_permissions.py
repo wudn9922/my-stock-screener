@@ -227,6 +227,11 @@ class PublicReportingPrivacyTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_owner_writer_retains_atomic_output(self):
+        from report_json import validate_report
+        payload = {"reportDate": "2026-10-23", "markets": [
+            {"key": "tw", "indices": [{"symbol": "^TWII", "close": 100}]},
+            {"key": "us", "indices": [{"symbol": "^GSPC", "close": 100}]},
+        ], "groups": [], "worldIndices": []}
         with tempfile.TemporaryDirectory() as directory:
             write = Mock(
                 side_effect=lambda path, value: Path(path).write_text(json.dumps(value))
@@ -238,12 +243,13 @@ class PublicReportingPrivacyTests(unittest.TestCase):
                 is_public_report_owner=is_public_report_owner,
                 os=os,
                 write_json_atomic=write,
+                validate_report=validate_report,
             )["write_report_json"]
-            writer({"date": "2026-10-23"}, source_user_id=DEFAULT_ADMIN_LINE_ID)
+            writer(payload, source_user_id=DEFAULT_ADMIN_LINE_ID)
             write.assert_called_once()
             self.assertEqual(
                 json.loads((Path(directory) / "latest.json").read_text()),
-                {"date": "2026-10-23"},
+                payload,
             )
 
     def test_public_entrypoint_stops_before_any_foreign_account_read_or_output(self):
