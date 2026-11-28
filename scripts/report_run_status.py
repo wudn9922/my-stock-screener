@@ -36,7 +36,11 @@ def _read():
 def record_failure(output, error):
     # Log only the output name and exception class in the run-only status file.
     # The existing producer logs include the detailed validation reason.
-    failures = _read()
+    try:
+        failures = _read()
+    except FileNotFoundError:
+        # Standalone series writers may be invoked outside the daily entry point.
+        failures = []
     failures.append(f"{output}: {type(error).__name__}")
     _write(failures)
 

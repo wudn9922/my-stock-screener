@@ -40,7 +40,11 @@ class ScreenerHistoryTests(unittest.TestCase):
             history.mkdir(parents=True)
             days = [f"2026-10-{d:02d}" for d in range(1, KEEP_DATES + 3)]
             for day in days[:-1]:
-                (history / f"TW-{day}.json").write_text("{}")
+                (history / f"TW-{day}.json").write_text(json.dumps({
+                    "market": "TW", "dataDate": day, "universe": {
+                        "fields": ["symbol"], "markets": {"TW": {"asOf": day, "rows": [["2330.TW"]]}}
+                    }
+                }))
             (history / "US-2026-09-30.json").write_text("{}")
             source = {"version": 1, "fields": ["symbol"], "markets": {"TW": {"asOf": days[-1], "rows": [["2330.TW"]]}}}
             (report / "universe.json").write_text(json.dumps(source))
