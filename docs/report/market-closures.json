@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-27T18:31:40.849909+00:00",
+  "generatedAt": "2026-11-28T11:55:31.500183+00:00",
   "threshold": 0.95,
   "method": "calendar-session-guard-v3",
   "markets": {
@@ -3432,7 +3432,7 @@
     }
   },
   "scan": {
-    "archiveCommit": "42beb9d96e26a57314df0827ce2b4f060034bd7c",
+    "archiveCommit": "d16456984dc780f07030d45431bc92b1f7a68ac6",
     "symbols": 7817,
     "rows": 9921981,
     "yearFiles": 41735,
@@ -3440,6 +3440,6 @@
     "errors": [],
     "suspectedDatesWithRows": 0,
     "suspectedRows": 0,
-    "seconds": 44.09
+    "seconds": 58.47
   }
 }
