@@ -10,7 +10,7 @@ import { createWatchlist, evaluateWatchlist, watchlistSchema } from '../src/watc
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 
 const figure = (peTtm: number | null, extra: Partial<PeFigures> = {}): PeFigures => ({
-  pe: null, peTtm, peLoss: false, peTtmLoss: false, reason: null, fiscalYear: 2025, source: 'Yahoo Finance', asOf: '2026-10-27', ...extra,
+  pe: null, peTtm, peLoss: false, peTtmLoss: false, peTtmMissing: false, reason: null, fiscalYear: 2025, source: 'Yahoo Finance', asOf: '2026-10-27', ...extra,
 });
 const rows = ['LOW', 'HIGH', 'OUT', 'ANNUAL', 'LOSS', 'MISSING'].map(symbol => groupItemSchema.parse({ symbol, close: 100 }));
 const pe = { LOW: figure(10), HIGH: figure(20), OUT: figure(20.01), ANNUAL: figure(null, { pe: 15 }), LOSS: figure(null, { pe: 5, peTtmLoss: true }) };

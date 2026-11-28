@@ -53,6 +53,20 @@ describe('watchlist transition evidence', () => {
     expect(reasons.exited.AAPL.conditions[0]).toMatchObject({ passed: false, value: 'RS 百分位 未提供' });
     expect(() => evaluateWatchlist(list, [row('AAPL', { rsRank: null })], undefined)).toThrow();
   });
+  it('distinguishes missing Taiwan TTM from proven losses in watchlist exit reasons', () => {
+    const list = listOf('pe:10:20', 'TW');
+    const items = [row('2330.TW'), row('2317.TW'), row('2002.TW')];
+    const base = { pe: 15, peTtm: null, peLoss: false, peTtmLoss: false, peTtmMissing: false, reason: null, fiscalYear: 2025, source: 'TWSE', asOf: '2026-10-30' };
+    const context = { market: 'TW' as const, pe: {
+      '2330.TW': { ...base, peTtmMissing: true, reason: '近四季 EPS 資料不足' },
+      '2317.TW': { ...base, peTtmLoss: true, reason: '虧損，本益比不適用' },
+      '2002.TW': { ...base, peTtm: 15 },
+    } };
+    const reasons = explainWatchlistChanges(visit(list, ['2330.TW', '2317.TW'], ['2002.TW']), list, items, context);
+    expect(reasons.exited['2330.TW'].conditions[0]).toMatchObject({ passed: false, value: '近四季 EPS 資料不足' });
+    expect(reasons.exited['2317.TW'].conditions[0]).toMatchObject({ passed: false, value: '近四季虧損，本益比不適用' });
+    expect(reasons.entered['2002.TW'].conditions[0]).toMatchObject({ passed: true, value: '本益比 15 倍' });
+  });
   it('explains repeated growth gates separately using the original shared evaluator', () => {
     const growth = parseGrowthFile(JSON.parse(readFileSync('tests/fixtures/screener/us-growth.json', 'utf8')))!;
     const record = growth.items.get('AAPL')!;

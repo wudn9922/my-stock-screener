@@ -14,6 +14,11 @@ export interface Valuation {
   epsTtm: number | null;
   /** Latest full fiscal-year EPS. */
   epsAnnual: number | null;
+  /** Taiwan only: TTM from four financial-report quarters, on current share basis when available. */
+  epsTtmCalculated?: number;
+  epsTtmCalculation?: 'restated' | 'reported';
+  epsAnnualRestated?: number;
+  epsNote?: string;
   fiscalYear: number | null;
   /** Taiwan only: the exchange's own P/E on `asOf` (TTM basis). */
   exchangePeTtm: number | null;
@@ -66,6 +71,10 @@ const nullableNumber = z.number().finite().nullable().optional();
 const recordSchema = z.object({
   epsTtm: nullableNumber,
   epsAnnual: nullableNumber,
+  epsTtmCalculated: z.number().finite().optional(),
+  epsTtmCalculation: z.enum(['restated', 'reported']).optional(),
+  epsAnnualRestated: z.number().finite().optional(),
+  epsNote: z.string().optional(),
   fiscalYear: z.number().int().nullable().optional(),
   exchangePeTtm: nullableNumber,
   asOf: z.string().nullable().optional(),
@@ -142,6 +151,10 @@ export class ValuationProvider {
       market,
       epsTtm: record.epsTtm ?? null,
       epsAnnual: record.epsAnnual ?? null,
+      ...(record.epsTtmCalculated === undefined ? {} : { epsTtmCalculated: record.epsTtmCalculated }),
+      ...(record.epsTtmCalculation === undefined ? {} : { epsTtmCalculation: record.epsTtmCalculation }),
+      ...(record.epsAnnualRestated === undefined ? {} : { epsAnnualRestated: record.epsAnnualRestated }),
+      ...(record.epsNote === undefined ? {} : { epsNote: record.epsNote }),
       fiscalYear: record.fiscalYear ?? null,
       exchangePeTtm: record.exchangePeTtm ?? null,
       asOf: record.asOf ?? null,
