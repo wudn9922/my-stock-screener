@@ -60,6 +60,20 @@ def parse_events(rows):
     return sorted(events.values(), key=lambda e: (e["exDate"] or "9999", e["year"]))
 
 
+def parse_cash_events(rows):
+    """Dated cash distributions only; independent of EPS share-basis events."""
+    events = {}
+    for row in rows:
+        ex = day_of(row.get("CashExDividendTradingDate"))
+        earnings = number(row.get("CashEarningsDistribution"))
+        surplus = number(row.get("CashStatutorySurplus"))
+        if ex is None or earnings < 0 or surplus < 0 or earnings + surplus <= 0:
+            continue
+        year = str(row.get("year") or row.get("date") or "")
+        events[(ex.isoformat(), year)] = {"exDate": ex.isoformat(), "perShare": round(earnings + surplus, 6), "year": year}
+    return sorted(events.values(), key=lambda e: (e["exDate"], e["year"]))
+
+
 def delay_days(end):
     """Days after a period end before its report is due: Q4 / annual 90, Q2 60, Q1 / Q3 45."""
     month = end.month

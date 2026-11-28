@@ -1,6 +1,7 @@
 import { itemStatusOf, type GroupItem } from '../report/schema';
 import type { GrowthFile, GrowthOrigin, GrowthRecord } from '../fundamentals/GrowthProvider';
 import { formatPercent, toneClass } from '../ui/format';
+import { LEVEL_TEXT } from '../ui/financials/qualityLabels';
 import { epsStreak, gateTally, growthRecordFor, maDeviation, screenerMa, type FixedScreenerMas, type FilterState, type GrowthGate, type YearGate } from './screenerFilters';
 
 export type SortMode = 'default' | 'gain' | 'loss' | 'symbol' | 'ma' | 'rs' | 'hi' | 'vr' | 'ma50' | 'r21' | 'eps';
@@ -124,6 +125,7 @@ const MAX_PILLS = 2;
 /** Fundamental pills (EPS / revenue growth) have their own allowance so a growth filter always shows its numbers. */
 const MAX_GROWTH_PILLS = 5;
 const GROWTH_PILLS: readonly MetricPill[] = ['eps', 'rev', 'epsY', 'revY', 'epss'];
+export const isGrowthPill = (key: MetricPill): boolean => GROWTH_PILLS.includes(key);
 
 /**
  * Extra row pills: the sort's metric first, then the filtered ones (at most two technical ones plus the
@@ -145,8 +147,8 @@ export function rowMetricPills(sort: SortMode, state: FilterState, maList: reado
   for (const entry of state.extraGates ?? []) add(entry.kind);
   if (state.epss !== null) add('epss');
   if (state.ema20 || sort === 'ma') add('ema20');
-  const technical = keys.filter((key) => !GROWTH_PILLS.includes(key)).slice(0, MAX_PILLS);
-  const growth = keys.filter((key) => GROWTH_PILLS.includes(key)).slice(0, MAX_GROWTH_PILLS);
+  const technical = keys.filter((key) => !isGrowthPill(key)).slice(0, MAX_PILLS);
+  const growth = keys.filter(isGrowthPill).slice(0, MAX_GROWTH_PILLS);
   return keys.filter((key) => technical.includes(key) || growth.includes(key));
 }
 
@@ -154,6 +156,7 @@ export interface PillContent {
   text: string;
   title: string;
   tone: 'up' | 'down' | 'flat';
+  growth?: { marks: string[]; details: string[] };
 }
 
 /** The growth gate a metric pill counts its periods against (the applied condition of that metric), or null. */
@@ -224,23 +227,21 @@ export function metricPill(
       const turns = isEps ? (annual ? record.epsTurnAnnual : record.epsTurnQ) : [];
       const latest = values[0] ?? null;
       const name = { eps: 'EPS', rev: '營收', epsY: 'EPS年', revY: '營收年' }[key];
-      const detail = growthDetail(record, isEps);
+      const excluded = isEps ? record.excludedEpsQ : 0;
+      const { details, derived } = growthDetail(record, isEps, excluded);
       const gates = Array.isArray(gate) ? gate : gate ? [gate] : [];
-      const tallies = gates.map((entry) => gateTallyOfPill(entry, values, turns, includeTurn, annual));
+      const tallies = gates.map((entry) => gateDetail(entry, values, turns, includeTurn, annual ? 0 : excluded));
       const tally = tallies[0] ?? null;
       const tallyText = tally ? ` 成${tally.growth}／衰${tally.decline}` : '';
-      const tallyTitle = tallies.length ? `；${tallies.map((entry) => entry.text).join('；')}` : '';
-      if (latest === null && turns[0])
-        return {
-          text: `${name} 轉盈${tallyText}`,
-          title: `${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。${detail}${tallyTitle}`,
-          tone: 'up',
-        };
-      if (latest === null) return null;
+      const isTurn = latest === null && turns[0];
+      if (latest === null && !isTurn && (annual || !(excluded & 1))) return null;
+      if (isTurn) details.unshift(`${annual ? '最新一年' : '最新一季'}由虧轉盈（去年同期為虧損，YoY 無法計算）。`);
+      details.push(...tallies.map((entry) => entry.text));
       return {
-        text: `${name} ${formatPercent(latest, 0)}${tallyText}`,
-        title: `${isEps ? 'EPS' : '營收'} YoY ${detail}${tallyTitle}`,
-        tone: toneClass(latest),
+        text: `${name} ${isTurn ? '轉盈' : formatPercent(latest, 0)}${tallyText}`,
+        title: details.join('；'),
+        tone: isTurn ? 'up' : toneClass(latest),
+        growth: { details, marks: growthMarks(record, !annual && derived, !annual && excluded !== 0) },
       };
     }
     case 'epss': {
@@ -250,29 +251,43 @@ export function metricPill(
       if (streak.years < 1) return null;
       // Ten is the stored horizon: a streak that reaches it may be longer.
       const count = `${streak.years}${streak.stop === null ? '+' : ''}`;
+      const { details } = growthDetail(record, true, record.excludedEpsQ);
+      details.unshift(`年度 EPS 連續成長 ${count} 年（從最新年度往回數，年增率 > 0${includeTurn ? '，含虧轉盈' : ''}）。`);
       return {
         text: `EPS連增 ${count}年`,
-        title: `年度 EPS 連續成長 ${count} 年（從最新年度往回數，年增率 > 0${includeTurn ? '，含虧轉盈' : ''}）。${growthDetail(record, true)}`,
+        title: details.join('；'),
         tone: 'up',
+        growth: { details, marks: growthMarks(record, false, false) },
       };
     }
   }
 }
 
-/** The 成長 / 衰退 counts of one row against its gate, with the sentence for the pill's tooltip. */
-function gateTallyOfPill(
+/** Label the missing slots for display, leaving the filter's tally and denominator intact. */
+function gateDetail(
   gate: GrowthGate | YearGate,
   values: readonly (number | null)[],
   turns: readonly boolean[],
   includeTurn: boolean,
-  annual: boolean,
+  excluded: number,
 ) {
   const periods = 'years' in gate ? gate.years : gate.quarters;
   const tally = gateTally(values, periods, gate.min, turns, includeTurn);
-  const unit = annual ? '年' : '季';
-  const missing = tally.missing ? `、缺資料 ${tally.missing} ${unit}（不計入）` : '';
-  const text = `近${periods}${unit}：成長 ${tally.growth} ${unit}、衰退 ${tally.decline} ${unit}${missing}（YoY ≥ ${Number(gate.min.toFixed(2))}% 算成長）`;
+  const unit = 'years' in gate ? '年' : '季';
+  let low = 0;
+  for (let slot = 0; slot < periods; slot++) {
+    if ((excluded & (1 << slot)) && values[slot] == null && !turns[slot]) low += 1;
+  }
+  const missing = tally.missing - low;
+  const omitted = [low ? `低信心排除 ${low} 季` : '', missing ? `缺資料 ${missing} ${unit}` : ''].filter(Boolean);
+  const omissionText = omitted.length ? `、${omitted.join('、')}（不計入）` : '';
+  const text = `近${periods}${unit}：成長 ${tally.growth} ${unit}、衰退 ${tally.decline} ${unit}${omissionText}（YoY ≥ ${Number(gate.min.toFixed(2))}% 算成長）`;
   return { ...tally, text };
+}
+
+function growthMarks(record: GrowthRecord, derived: boolean, excluded: boolean): string[] {
+  const quality = record.quality && record.quality !== 'good' ? LEVEL_TEXT[record.quality] : '';
+  return [derived ? '推' : '', excluded ? '低' : '', quality].filter(Boolean);
 }
 
 /** Plain names of the growth sources (growth.json `src` / `srcY`, the us-growth file). */
@@ -289,32 +304,36 @@ const originText = (origin: GrowthOrigin | null) => (origin ? GROWTH_ORIGIN_LABE
  * `+30% / +20% / —`: newest first; a dash is a period without a number, 轉盈 a loss-to-profit turn. The periods
  * older than the last one with a number or a turn are left out (the masks always span the whole horizon).
  */
-const historyText = (values: readonly (number | null)[], turns: readonly boolean[]) => {
+const historyText = (values: readonly (number | null)[], turns: readonly boolean[], excluded = 0) => {
   let count = Math.max(values.length, turns.length);
   while (count > 0 && values[count - 1] == null && !turns[count - 1]) count -= 1;
+  if (excluded) count = Math.max(count, 32 - Math.clz32(excluded));
   return count
-    ? Array.from({ length: count }, (_, slot) => (values[slot] != null ? formatPercent(values[slot]!, 0) : turns[slot] ? '轉盈' : '—')).join(' / ')
+    ? Array.from({ length: count }, (_, slot) => (values[slot] != null ? formatPercent(values[slot]!, 0) : turns[slot] ? '轉盈' : excluded & (1 << slot) ? '低' : '—')).join(' / ')
     : '—';
 };
 
 /**
- * Tooltip text with both quarterly and annual YoY (newest → older), the latest period ends, the source of each
+ * Details with both quarterly and annual YoY (newest → older), the latest period ends, the source of each
  * block and whether a quarterly slot compares a derived Q4 (full year − first three quarters).
  */
-function growthDetail(record: GrowthRecord, eps: boolean): string {
+function growthDetail(record: GrowthRecord, eps: boolean, excluded: number) {
   const quarterlyValues = eps ? record.epsYoY : record.revYoY;
-  const quarterly = historyText(quarterlyValues, eps ? record.epsTurnQ : []);
+  const quarterly = historyText(quarterlyValues, eps ? record.epsTurnQ : [], excluded);
   const annual = historyText(eps ? record.epsYoYAnnual : record.revYoYAnnual, eps ? record.epsTurnAnnual : []);
   const origin = eps ? record.originQ.eps : record.originQ.rev;
   // derivedQ describes growth.json's quarters; the Yahoo quarterly file has no derived Q4 flags
   const derived =
     origin !== 'us-growth' &&
     record.derivedQ.some((flag, slot) => flag && (quarterlyValues[slot] != null || (eps && record.epsTurnQ[slot])));
-  return [
+  const details = [
     `季度（最新→較舊）${quarterly}${record.latest ? `，最新季 ${record.latest}` : ''}${derived ? '（含以全年減前三季推算的第 4 季）' : ''}`,
     `年度（最新→較舊）${annual}${record.latestAnnual ? `，最新年度 ${record.latestAnnual}` : ''}`,
     `來源：季度 ${originText(origin)}、年度 ${originText(record.originY)}`,
-  ].join('；');
+  ];
+  if (record.quality && record.quality !== 'good') details.push(`財報品質：${LEVEL_TEXT[record.quality]}`);
+  if (excluded) details.push('「低」表示該季 EPS 年增因低信心資料被排除而缺值。');
+  return { details, derived };
 }
 
 // ---------------------------------------------------------------- row note

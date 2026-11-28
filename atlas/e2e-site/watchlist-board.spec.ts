@@ -98,3 +98,66 @@ test('board rows keep 44px targets and no horizontal overflow at 320px', async (
     expect((await source(page, name).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.querySelector('#main')!.scrollWidth - document.querySelector('#main')!.clientWidth)).toBeLessThanOrEqual(0);
 });
+
+test('guest upcoming events use only in-memory list symbols and group dates on both pages', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    const state = globalThis as unknown as { __eventWrites: string[] };
+    state.__eventWrites = [];
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) { state.__eventWrites.push(key); return setItem.call(this, key, value); };
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (...args) { state.__eventWrites.push(args[0]); return open.apply(this, args); };
+    if (globalThis.CacheStorage) {
+      const cacheOpen = CacheStorage.prototype.open;
+      CacheStorage.prototype.open = function (name) { state.__eventWrites.push(name); return cacheOpen.call(this, name); };
+    }
+  });
+  await mockSite(page);
+  await trending(page, ['MSFT']);
+  const now = Date.now();
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const late = new Date(Date.parse(today) + 15 * 86400000).toISOString().slice(0, 10);
+  const event = (symbol: string | null, date: string, kind = 'earnings') => ({ symbol, market: 'US', date, kind, detail: '測試資料', source: 'fixture' });
+  const requests: string[] = [];
+  await page.route('**/report/upcoming-events.json', route => {
+    requests.push(route.request().url());
+    return route.fulfill({ json: {
+      version: 1, generatedAt: new Date(now).toISOString(),
+      coverage: { earnings: 3, alerts: 1, dividends: 1, cashDividends: 0 },
+      events: [event('NVDA', today), event('MSFT', today), event('NVDA', late), event(null, today, 'fomc')],
+      moves: { NVDA: { samples: 2, gapPct: 4.2, dayPct: 5.1, first: '2025-01-01', last: '2025-04-01' } },
+    } });
+  });
+  await page.goto('./?page=watchlist');
+  await openListActions(page);
+  await page.getByRole('button', { name: '建立手動清單', exact: true }).click();
+  await page.getByRole('textbox', { name: '手動清單名稱' }).fill('事件測試');
+  await page.getByRole('combobox', { name: '手動清單市場' }).selectOption('US');
+  await page.getByRole('textbox', { name: '手動清單股票' }).fill('NVDA');
+  await page.getByRole('button', { name: '套用手動清單', exact: true }).click();
+  const card = page.locator('.upcoming-events');
+  await card.getByText('未來 14 天事件', { exact: true }).click();
+  await expect(card).toContainText('NVDA · 財報公布');
+  await expect(card).toContainText('過去 2 次：開盤平均 ±4.2%');
+  await expect(card).toContainText('FOMC 利率決議');
+  await expect(card).not.toContainText('MSFT');
+  await expect(card.locator('.upcoming-event-day')).toHaveCount(1);
+  await expect(card.locator('li')).toHaveCount(2);
+  if (testInfo.project.name === 'iphone-webkit' && page.viewportSize()?.width === 390) {
+    await card.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('upcoming-events-390.png') });
+  }
+  expect(await page.locator('#main').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  // Navigation via the app, not a reload (RAM-only list remains in this session).
+  await page.locator('nav:visible').getByRole('button', { name: '我的', exact: true }).click();
+  await expect(page.locator('.site')).toHaveAttribute('data-page', 'console');
+  await expect(page.locator('[data-storage-mode]')).toHaveAttribute('data-storage-mode', 'none');
+  const myCard = page.locator('.upcoming-events');
+  await myCard.getByText('未來 14 天事件', { exact: true }).click();
+  await expect(myCard).toContainText('NVDA · 財報公布');
+  expect(requests.every(url => new URL(url).search === '' && !url.includes('NVDA'))).toBe(true);
+  expect(await page.evaluate(() => ({
+    local: localStorage.length, session: sessionStorage.length,
+    writes: (globalThis as unknown as { __eventWrites: string[] }).__eventWrites,
+  }))).toEqual({ local: 0, session: 0, writes: [] });
+});

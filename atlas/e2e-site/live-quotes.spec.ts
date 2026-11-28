@@ -41,6 +41,41 @@ test('the open chart takes the fresh price at once, keeping its loaded history',
   expect(batches).toContainEqual(['AAPL']);
 });
 
+test('Taiwan opens with the MIS quote while intraday history is still loading', async ({ page }) => {
+  await page.clock.install({ time: new Date(MIS_NOW) });
+  await mockSite(page);
+  let releaseLive!: () => void, releaseHistory!: () => void;
+  const liveResponse = new Promise<void>(resolve => { releaseLive = resolve; });
+  const historyResponse = new Promise<void>(resolve => { releaseHistory = resolve; });
+  let requested = false;
+  await page.route('https://edge.test/functions/v1/market-chart**', async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get('quotes')?.split(',').includes('2330.TW')) {
+      requested = true;
+      await liveResponse;
+      const stock = misRows().find(row => row.c === '2330')!;
+      const row = parseMisRow({ ...stock, z: '1828' }, '2330.TW', MIS_NOW)!;
+      return route.fulfill({ json: { results: { '2330.TW': overlayMis(misYahoo('2330.TW', true), row) } } });
+    }
+    if (params.get('symbol') === '2330.TW' && params.get('interval') === '5m') await historyResponse;
+    return route.fallback();
+  });
+  try {
+    await page.goto('./?page=chart&symbol=2330.TW&tf=5m');
+    await expect.poll(() => requested).toBe(true);
+    await expect(page.getByText('報價載入中…')).toBeVisible();
+    releaseLive();
+    await expect(page.getByTestId('header-quote')).toContainText('1,828.00');
+    await expect(page.getByTestId('live-time')).toContainText('即時報價');
+    releaseHistory();
+    await expect(page.getByTestId('ohlc-header')).toContainText('O ');
+    await expect(page.getByTestId('header-quote')).toContainText('1,828.00');
+  } finally {
+    releaseLive();
+    releaseHistory();
+  }
+});
+
 test('watchlist rows on screen show the fresh price in one batched request', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-04T16:00:00Z') });
   await mockSite(page);

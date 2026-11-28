@@ -53,7 +53,7 @@ def rebuild(report=ROOT / 'docs/report', data=ROOT / 'data'):
                     history = pd.DataFrame({f:quote[f.lower()] for f in kline.FIELDS},
                         index=pd.to_datetime([datetime.fromtimestamp(t,zone).date() for t in raw['timestamp']]))
                     receipt = json.loads(source_path.with_suffix('.receipt.json').read_text())
-                    history = kline.accept_frame(history, symbol, official=None,
+                    history = kline.accept_frame(history, symbol, official=None, us_source=None,
                         source_url=receipt['sourceUrl'], fetched_at=receipt['fetchedAt'])
                     source_rebuilds.append(dict(symbol=symbol, previousClose=previous['close'],
                         source=receipt, newClose=float(history.iloc[-1]['Close']), asOf=str(history.index[-1])[:10]))

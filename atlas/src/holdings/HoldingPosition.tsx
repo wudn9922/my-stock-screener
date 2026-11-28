@@ -69,6 +69,7 @@ export function HoldingPosition({
           <span className="holding-number">
             <small>數量</small>
             <span>{quantity}</span>
+            <small title={holding.averageCost}>均價 {formatHoldingPrice(holding.averageCost)}</small>
           </span>
           <span className="holding-number">
             <small>市值</small>
@@ -143,7 +144,7 @@ export function HoldingPosition({
         <details><summary>完整精度</summary><p className="holdings-muted">現價 {quote?.price ?? '—'} · 平均成本 {holding.averageCost} · 市值 {result.value ?? '—'} · 未實現盈虧 {result.profit ?? '—'} · 報酬率 {result.percent ?? '—'}% · 今日損益 {result.today ?? '—'} · 預估賣出成本 {result.fee ?? '—'}</p></details>
         <p className="holdings-muted">
           {holding.costCurrency} ·{' '}
-          {quote ? `${quote.asOf} · ${quote.source}（非即時）` : '目前來源無可用報價'} · 持股更新{' '}
+          {quote ? `${quote.liveState ? formatDateTime(quote.asOf) : quote.asOf} · ${quote.source}（${quote.liveState === 'live' ? '即時' : quote.liveState === 'delayed' ? '延遲' : '非即時'}）` : '目前來源無可用報價'} · 持股更新{' '}
           {formatDateTime(holding.updatedAt)}
         </p>
         <button type="button" className="text-button" title="不顯示，也不計入總計" onClick={onHide}>

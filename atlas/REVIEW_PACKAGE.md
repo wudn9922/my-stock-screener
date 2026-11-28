@@ -1,3 +1,24 @@
+## 2026-11-27 Holdings live quotes
+Primary self-review. Replayed official MIS trades through position, account, and market totals. Verified subscription cleanup, close-based visibility, expiry, and the closing-price fallback in Vitest and iPhone WebKit.
+
+## 2026-11-26 Holdings display
+Primary self-review. Currency defaults and compact average cost verified with 99 related Vitest cases, iPhone WebKit holdings and visibility tests, lint, build, and one 390px screenshot.
+
+## 2026-11-25 日 K 封存重試
+自我審查。用兩版 ZTS 封存重現 226 根日 K 缺口，確認重抓後恢復 1,481 根且保留 SHA-256 驗證。全市場掃描可用 `scripts/diagnose-daily-gaps.ts` 重播。
+
+## 2026-11-26 Taiwan warrant data
+Primary self-review. Official reference releases and MIS order-book replay, with Python, Edge, and iPhone WebKit regression coverage.
+
+## 2026-11-25 Screener EPS pill
+Primary self-review. 103 related Vitest cases, 123 Python tests, lint and build passed.
+
+## 2026-11-27 Conservative PE AI
+Primary self-review. Verified public evidence, owner-only REST, free-tier opt-in, partial publication and weekly rotation. [390px iPhone WebKit screenshot with test data](docs/screenshots/conservative-pe-ai-390.png)
+
+## 2026-11-24 Chart loupe and opening quote
+Primary self-review. 85 related Vitest cases, 9 mobile Playwright regressions, lint and build passed.
+
 ## 2026-11-24 Alert delivery and stock links
 Primary self-review of VAPID token reuse, notification navigation fallback, and Discord stock links.
 
@@ -1608,3 +1629,12 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 ### 台股分割／面額變更 (fix/tw-split-events) — no independent review
 - FinMind `TaiwanStockSplitPrice` / `TaiwanStockParValueChange` per stock → `twSplits`; applied as dated split events (TS `epsBasis.ts`, Python `build_growth.py` via `tw_splits.py`); without an event a clean near-integer implied-share step is inferred (11 TW files on main, 5904.TWO included). Field values not verified live (API blocked in sandbox).
+
+- 選股成長率用 `gQ` 標示低信心 EPS 排除，手機可點成長率看來源及缺值明細。[390px WebKit 截圖（測試資料）](docs/screener-data-grade-390.png)
+- 未獨立審查。測試比較有無 `gQ` 的篩選名單和排序，並逐欄核對 6,663 筆重建結果的既有資料。
+
+## 2026-11-26 Conservative PE inertia
+- 檢查連續財報期別與 EPS 口徑。依三期年增率外推，以標明日期的日 K 收盤估值。未獨立審查。[390px WebKit 截圖（測試資料）](docs/screenshots/conservative-pe-390.png)
+
+## 2026-11-27 Warrant page
+- 官方 W4 清單逐批查詢 MIS，跨批排序並標明完成度及過期報價。盤中實測 73285U 最佳賣價 1.38 → 1.39。未獨立審查。[390px WebKit 截圖（測試資料）](docs/screenshots/warrant-page-390.png)

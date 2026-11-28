@@ -2,6 +2,7 @@
 // directly because of CORS). GET ?symbol=&interval=&range=&events=1 → Yahoo's raw chart JSON.
 // GET ?quotes=AAPL,2330.TW → { results: { SYMBOL: slim chart JSON }, errors: { SYMBOL: code } }
 // with the last month of daily rows per symbol (the site's once-a-minute live refresh).
+// GET ?warrantQuotes=066186.TW,714060.TWO → Taiwan MIS best bids and asks.
 // Every request needs a signed-in Atlas user (X-Atlas-Token: LINE ID token or atlasdev. device token)
 // and passes the per-user / site-wide usage quota in access.ts. Atlas normalizes and validates the
 // payload client-side.
@@ -32,6 +33,7 @@ import {
   slimChartPayload,
   validateChartRequest,
   validateQuotesRequest,
+  validateWarrantQuotesRequest,
   YAHOO_HOSTS,
 } from "./validate.ts";
 import {
@@ -309,6 +311,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!access.ok) return gateResponse(origin, access);
 
   const params = new URL(req.url).searchParams;
+  if (params.has("warrantQuotes")) {
+    const validation = validateWarrantQuotesRequest(params);
+    if (!validation.ok) {
+      return errorResponse(
+        origin,
+        validation.status,
+        validation.code,
+        validation.message,
+      );
+    }
+    return new Response(
+      JSON.stringify(await mis.getWarrantQuotes(validation.symbols)),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders(origin, allowedOrigins),
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "private, no-store",
+        },
+      },
+    );
+  }
   const quotes = params.get("quotes");
   if (quotes !== null) return quoteBatch(origin, quotes);
 

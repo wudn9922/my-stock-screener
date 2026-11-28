@@ -128,7 +128,7 @@ test('market section inventory and remembered selectors, screener filters, chart
   await fixtures(page);
   await page.goto('./');
   await primary(page).getByRole('button', { name: '市場', exact: true }).click();
-  await expect(sections(page).getByRole('link')).toHaveText(['大盤', '全球', '題材']);
+  await expect(sections(page).getByRole('link')).toHaveText(['大盤', '全球', '題材', '權證']);
   await expect(sections(page).getByRole('link', { name: '大盤', exact: true })).toHaveAttribute('aria-current', 'page');
   for (const [key, label, section] of [['tw', '台灣', '大盤'], ['jp', '日本', '大盤'], ['kr', '韓國', '大盤'], ['eu', '歐洲', '大盤'], ['us', '美國', '大盤']]) {
     const tab = page.getByRole('tab', { name: new RegExp(label!) });

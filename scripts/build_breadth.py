@@ -6,7 +6,7 @@ F5 市場寬度：站上 MA20 / MA60 的股票比例 → docs/report/breadth.jso
 本檔 CLI 保留舊 data/ 分析用途；排程不再以部分名單覆蓋正式報表。
 
 只讀 data/ 內的日 K CSV（Date,Open,High,Low,Close,Volume），不需要行情網路。
-美股 universe 的 S&P 500 名單會呼叫 main.get_us_tickers（只在直接執行時延遲匯入）。
+美股 universe 的 S&P 500 名單會呼叫 ticker_lists.get_us_tickers（只在直接執行時延遲匯入）。
 
 計算規則：
 - 台股：檔名 4 碼、非 0 開頭的 .TW（上市）與 .TWO（上櫃）；0 開頭的 ETF、^ 指數不納入。
@@ -39,7 +39,7 @@ HISTORY_MIN_COVERAGE = 0.5
 HISTORY_REF_WINDOW = 20
 # 用下四分位數而不是中位數：停更的 CSV 讓近期檔數逐日下滑時，asOf 當日仍要能達標；單日缺資料的異常日仍遠低於它
 HISTORY_REF_QUANTILE = 0.25
-# S&P 500 名單少於這個數量視為抓取失敗（main.get_us_tickers 失敗時會回傳 3 檔預設名單）
+# S&P 500 名單少於這個數量視為抓取失敗（ticker_lists.get_us_tickers 失敗時會回傳 3 檔預設名單）
 US_UNIVERSE_MIN = 400
 
 TW_SYMBOL_PATTERN = re.compile(r"^[1-9]\d{3}\.(TW|TWO)\.csv$")
@@ -328,10 +328,10 @@ def main(argv=None, us_tickers_fn=None):
 
 
 def us_tickers_from_main():
-    """延遲匯入 main.get_us_tickers：main.py 頂層會 import yfinance，只在實際執行時才載入。"""
+    """延遲從 ticker_lists 匯入美股清單。"""
     if REPO_ROOT not in sys.path:
         sys.path.insert(0, REPO_ROOT)
-    from main import get_us_tickers
+    from ticker_lists import get_us_tickers
 
     return get_us_tickers()
 

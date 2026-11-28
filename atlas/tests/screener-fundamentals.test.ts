@@ -340,6 +340,25 @@ describe('merging growth.json with the Yahoo quarters', () => {
 describe('fundamental filters on the market lists', () => {
   const record = (symbol: string) => reportGrowth.items.get(growthKey(symbol))!;
 
+  it('keeps the same results and EPS sort order when growth.json adds quality exclusion metadata', () => {
+    const original = JSON.parse(growthText) as { fields: string[]; rows: unknown[][] };
+    const withGrades = parseReportGrowth({
+      ...original,
+      fields: [...original.fields, 'gQ'],
+      rows: original.rows.map((data) => [...data, data[0] === 'AMZN' ? 0b101 : 0]),
+    });
+    const graded = mergeGrowth(yahoo, withGrades)!;
+    expect(graded.items.get('AMZN')?.excludedEpsQ).toBe(0b101);
+    for (const filter of ['eps:4:20', 'eps:4:20:50;nd:keep', 'eps:3:10;eps:2:20;tn:0', 'acc:1', 'epsy:2:0;revy:2:0']) {
+      const filters = state(filter);
+      const before = applyFilters(US, filters, us);
+      const after = applyFilters(US, filters, { ...us, growth: graded });
+      expect(symbols(after)).toEqual(symbols(before));
+      expect(symbols(filterAndSortItems(after, '', 'eps', { growth: graded })))
+        .toEqual(symbols(filterAndSortItems(before, '', 'eps', { growth: merged })));
+    }
+  });
+
   it('filters Taiwan stocks on quarterly EPS growth', () => {
     const result = applyFilters(TW, state('eps:2:20'), tw);
     expect(result.length).toBeGreaterThan(0);
@@ -730,6 +749,38 @@ describe('growth terms in the link: periods, threshold and 成長佔比 P', () =
     expect(metricPill(row('1301.TW'), 'eps', reportGrowth, false, { quarters: 2, min: 25, share: 100 })).toMatchObject({ text: 'EPS 轉盈 成1／衰1' });
     // Without an applied gate the pill is unchanged
     expect(metricPill(tsmc, 'eps', reportGrowth)).toMatchObject({ text: 'EPS +30%' });
+  });
+
+  it('labels exclusions separately from missing quarters and keeps the markings specific to the metric', () => {
+    const file = parseReportGrowth({
+      version: 1,
+      fields: ['symbol', 'lv', 'src', 'qEnd', 'epsQ', 'revQ', 'dQ', 'gQ'],
+      rows: [
+        ['RIVN', 'partial', 'sec', '2026-06-30', [45, null, 25], [60], 0b1, 0b10],
+        ['AMZN', 'limited', 'sec', '2026-06-30', [null, 30], [15], 0, 0b1],
+        ['MSFT', 'good', 'sec', '2026-06-30', [50], [20], 0, 0],
+      ],
+    })!;
+    const pill = metricPill(row('RIVN'), 'eps', file, true, { quarters: 4, min: 20, share: 100 })!;
+    expect(pill.text).toBe('EPS +45% 成2／衰0');
+    expect(pill.growth?.marks).toEqual(['推', '低', '部分缺漏']);
+    expect(pill.title).toContain('成長 2 季、衰退 0 季、低信心排除 1 季、缺資料 1 季（不計入）');
+    expect(metricPill(row('RIVN'), 'rev', file)?.growth?.marks).toEqual(['推', '部分缺漏']);
+    expect(metricPill(row('AMZN'), 'eps', file)).toMatchObject({ text: 'EPS —', growth: { marks: ['低', '資料有限'] } });
+    expect(metricPill(row('MSFT'), 'eps', file)?.growth?.marks).toEqual([]);
+  });
+
+  it('shows an empty EPS pill only when the latest quarter was excluded', () => {
+    const file = parseReportGrowth({
+      version: 1,
+      fields: ['symbol', 'epsQ', 'gQ'],
+      rows: [
+        ['LATEST', [null, 30, 20], 0b001],
+        ['OLDER', [null, 30, null], 0b100],
+      ],
+    })!;
+    expect(metricPill(plain('LATEST'), 'eps', file)).toMatchObject({ text: 'EPS —', growth: { marks: ['低'] } });
+    expect(metricPill(plain('OLDER'), 'eps', file)).toBeNull();
   });
 
   it('counts the rows with every year a streak of N needs (a gap or a short history leaves them out)', () => {

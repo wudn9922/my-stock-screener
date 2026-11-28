@@ -62,10 +62,10 @@ function brokerSenders(base, secret) {
   }
 }
 
-/** 執行一次即可：建立每天晚上 9 點的自動觸發。 */
+/** 執行一次即可：建立每天下午 2 點的自動觸發。 */
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'syncStatements')
     .forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('syncStatements').timeBased().everyDays(1).atHour(21).create();
+  ScriptApp.newTrigger('syncStatements').timeBased().everyDays(1).atHour(14).create();
 }

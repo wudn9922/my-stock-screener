@@ -2,7 +2,7 @@ import { mockDeviceAccount, mockMarketLogin } from './account-fixture';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mockSite } from './mocks';
+import { mockSite, yahooChart } from './mocks';
 
 /** Synthetic financials files (made-up numbers in the builder's format), keyed by file name. */
 const fixtures: Record<string, string> = Object.fromEntries(
@@ -732,4 +732,88 @@ test('annual provenance identifies Yahoo fields inside official rows', async ({ 
   await expect(page.locator('.fin-card[data-group="growth"] .fin-detail .fin-source')).toContainText('SEC ＋ Yahoo 欄位回補');
   await page.getByRole('group', { name: '顯示方式' }).getByRole('button', { name: '表格' }).click();
   await expect(page.locator('.fin-table').getByText('SEC ＋ Yahoo 欄位回補', { exact: true })).toBeVisible();
+});
+
+function conservativePeFinancials() {
+  const fixture = JSON.parse(fixtures.AAPL!);
+  fixture.annual = {
+    end: Array.from({ length: 10 }, (_, i) => `${2016 + i}-12-31`),
+    fy: Array.from({ length: 10 }, (_, i) => 2016 + i),
+    fq: Array(10).fill(null), src: Array(10).fill('sec'),
+    values: { epsDiluted: Array(10).fill(10) },
+  };
+  fixture.quarterly = {
+    end: Array.from({ length: 7 }, (_, i) => `${2024 + Math.floor(i / 4)}-${['03-31', '06-30', '09-30', '12-31'][i % 4]}`),
+    fy: Array.from({ length: 7 }, (_, i) => 2024 + Math.floor(i / 4)),
+    fq: Array.from({ length: 7 }, (_, i) => i % 4 + 1),
+    src: Array(7).fill('sec'), values: { epsDiluted: [10, 10, 10, 20, 11, 12, 13] },
+  };
+  fixture.quality.issues = [];
+  return JSON.stringify(fixture);
+}
+
+test('conservative PE explains eligibility and both inertia calculations at 390px', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockMarketLogin(page);
+  await mockFinancials(page, {}, { AAPL: conservativePeFinancials() });
+  await page.goto('./?page=financials&symbol=AAPL&p=a');
+  const section = page.locator('[data-group="conservative-pe"]');
+  await expect(section).toContainText('符合適用條件');
+  await openFold(section);
+  await expect(section).toContainText(/估值參考（日 K 收盤）：USD .* · 2026-10-08 · Yahoo/);
+  await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('下一期年增率 40%');
+  await expect(section.getByRole('region', { name: '季度慣性本益比' })).toContainText('本益比分母 EPS 64');
+  await expect(section.getByRole('region', { name: '年度慣性本益比' })).toContainText('本益比分母 EPS 10');
+  await expect(section).toContainText('尚未產生');
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  await section.scrollIntoViewIfNeeded();
+  if (info.project.name.includes('webkit') && process.env.ATLAS_CONSERVATIVE_PE_SCREENSHOT === '1')
+    await page.screenshot({ path: info.outputPath('conservative-pe-390.png'), scale: 'css' });
+});
+
+test('AI conservative PE uses the financial period and suppresses a stale scenario at 390px', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.setFixedTime(new Date('2026-11-27T10:00:00Z'));
+  await mockMarketLogin(page);
+  await mockFinancials(page, {}, { AAPL: conservativePeFinancials() });
+  const report = {
+    version: 1, symbol: 'AAPL', generatedAt: '2026-11-27T00:00:00Z',
+    baseline: { eps: 10, basis: 'annual', end: '2025-12-31', annualEnd: '2025-12-31', currency: 'USD', shareBasis: 'us-reported', adrRatio: null },
+    scenarioEps: 7, affectedEarningsRatio: 0.3, concern: '新機換機需求疲弱，可能壓縮相關市場的獲利。',
+    evidence: '依測試財報的分部營業利益與公開新聞標題，假設合併盈餘減少三成。',
+    confidence: 'medium', provider: 'gemini-hydrogen', model: 'gemini-4-hydrogen',
+    news: [{ url: 'https://news.google.com/rss/articles/example', date: '2026-11-25', title: 'Apple earnings — scenario fixture' }],
+    segment: { url: 'https://www.sec.gov/Archives/edgar/test.htm', date: '2026-02-05', periodEnd: '2025-12-31',
+      metric: 'operating-income', excerpt: 'Segment operating income 40 USD out of consolidated 100 USD', maxRatio: 0.4 },
+  };
+  let data = report;
+  await page.route('**/my-stock-screener/report/conservative-pe/AAPL.json', route => route.fulfill({ json: data }));
+  await page.goto('./?page=financials&symbol=AAPL&p=a');
+  const card = page.locator('[data-group="conservative-pe"]');
+  await openFold(card);
+  const panel = card.getByRole('region', { name: '市場擔憂情境' });
+  const close = yahooChart('AAPL', '1d').chart.result[0]!.meta.regularMarketPrice;
+  await expect(panel).toContainText(`情境本益比 ${(close / 7).toFixed(2)} 倍`);
+  await expect(panel).toContainText('基期 EPS USD 10.0000（年度，2025-12-31）');
+  await expect(panel).toContainText('假設盈餘損失 30.0%');
+  await expect(panel).toContainText('AI 分析 2026-11-27 · gemini-4-hydrogen');
+  await panel.getByText('財報分部營業利益', { exact: true }).click();
+  await expect(panel.getByRole('link', { name: '2025-12-31 財報' })).toBeVisible();
+  expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
+  if (info.project.name.includes('webkit') && process.env.ATLAS_CONSERVATIVE_PE_AI_SCREENSHOT === '1') {
+    await card.getByRole('heading', { name: '方法二：市場擔憂情境' }).evaluate(element => element.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: info.outputPath('conservative-pe-ai-390.png'), scale: 'css' });
+  }
+  data = { ...report, generatedAt: '2026-11-18T00:00:00Z', news: [{ ...report.news[0]!, date: '2026-11-17' }] };
+  await page.reload();
+  await openFold(card);
+  // 9 days is within the 21-day frontend grace period.
+  await expect(panel).toContainText(`情境本益比 ${(close / 7).toFixed(2)} 倍`);
+  await expect(panel).toContainText('AI 分析 2026-11-18');
+  data = { ...report, generatedAt: '2026-11-06T00:00:00Z', news: [{ ...report.news[0]!, date: '2026-11-05' }] };
+  await page.reload();
+  await openFold(card);
+  await expect(card).toContainText('AI 分析已逾期，等待重新分析');
+  await expect(panel).toHaveCount(0);
+  await expect(card).not.toContainText(report.concern);
 });

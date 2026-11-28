@@ -8,6 +8,7 @@ describe('市場 sections', () => {
     for (const market of ['jp', 'kr', 'eu'] as const) expect(marketSectionOf({ page: 'markets', market })).toBe('markets');
     expect(marketSectionOf({ page: 'world', view: 'fx' })).toBe('world');
     expect(marketSectionOf({ page: 'themes', market: 'tw', v: 'map' })).toBe('themes');
+    expect(marketSectionOf({ page: 'warrants', symbol: '2330.TW' })).toBe('warrants');
     expect(marketSectionOf({ page: 'screener' })).toBeNull();
     expect(marketSectionOf({ page: 'watchlist' })).toBeNull();
   });
@@ -16,11 +17,13 @@ describe('市場 sections', () => {
     let memory = rememberMarketSection(INITIAL_MARKET_SECTIONS, { page: 'markets', market: 'eu' });
     memory = rememberMarketSection(memory, { page: 'world', view: 'commodities' });
     memory = rememberMarketSection(memory, { page: 'themes', market: 'tw', v: 'map', theme: 'ai-chips' });
+    memory = rememberMarketSection(memory, { page: 'warrants', symbol: '6488.TWO' });
     memory = rememberMarketSection(memory, { page: 'screener', group: 'tw_g1' });
     expect(memory).toEqual({
       markets: { page: 'markets', market: 'eu' },
       world: { page: 'world', view: 'commodities' },
       themes: { page: 'themes', market: 'tw', v: 'map' },
+      warrants: { page: 'warrants', symbol: '6488.TWO' },
     });
     expect(INITIAL_MARKET_SECTIONS.markets).toEqual({ page: 'markets', market: 'tw' });
   });

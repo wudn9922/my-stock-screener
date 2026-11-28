@@ -29,15 +29,15 @@ def response(body, status=200):
     return Mock(status_code=status, json=Mock(return_value=body), text=json.dumps(body))
 
 
-def main_functions(*names, **namespace):
+def main_functions(*names, source_path="main.py", **namespace):
     """Run actual reporting functions without importing the network-heavy script."""
-    source = ast.parse((ROOT / "main.py").read_text(encoding="utf-8"))
+    source = ast.parse((ROOT / source_path).read_text(encoding="utf-8"))
     nodes = [
         node
         for node in source.body
         if isinstance(node, ast.FunctionDef) and node.name in names
     ]
-    exec(compile(ast.Module(body=nodes, type_ignores=[]), "main.py", "exec"), namespace)
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), source_path, "exec"), namespace)
     return namespace
 
 
@@ -215,6 +215,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             writer = main_functions(
                 "write_report_json",
+                source_path="report_json.py",
                 REPORT_DIR=directory,
                 is_public_report_owner=is_public_report_owner,
                 os=os,
@@ -232,6 +233,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
             )
             writer = main_functions(
                 "write_report_json",
+                source_path="report_json.py",
                 REPORT_DIR=directory,
                 is_public_report_owner=is_public_report_owner,
                 os=os,
@@ -263,6 +265,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
         request = Mock(side_effect=AssertionError("must not read private tables"))
         namespace = main_functions(
             "load_configs_from_supabase",
+            source_path="group_config.py",
             requests=Mock(get=request),
             get_supabase_settings=lambda: (REST, "offline-test-only"),
             get_default_group_metadata=lambda: {"us_g1": {"ma_list": [20]}},
@@ -316,6 +319,7 @@ class PublicReportingPrivacyTests(unittest.TestCase):
         )
         namespace = main_functions(
             "load_configs_from_supabase",
+            source_path="group_config.py",
             requests=Mock(get=request),
             get_supabase_settings=lambda: (REST, "offline-test-only"),
             get_default_group_metadata=lambda: {

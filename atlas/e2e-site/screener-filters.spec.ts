@@ -5,6 +5,41 @@ import { buildReport, mockSite, screenerFixtures } from './mocks';
 // Set SCREENSHOT_DIR to keep a picture of the sheet (used for manual visual checks, not by CI).
 const shotDir = process.env.SCREENSHOT_DIR;
 
+test('growth grades and sources can be read by tapping a growth value', async ({ page }, info) => {
+  await mockSite(page, { report: buildReport(20), fundamentals: true });
+  const growth = screenerFixtures.growth() as { fields: string[]; rows: unknown[][] };
+  growth.fields.push('gQ');
+  const rivian = growth.rows.find((row) => row[0] === 'RIVN')!;
+  rivian[growth.fields.indexOf('lv')] = 'partial';
+  rivian[growth.fields.indexOf('epsQ')] = [45, null, 25];
+  rivian[growth.fields.indexOf('gQ')] = 0b10;
+  await page.route('**/my-stock-screener/report/growth.json', (route) => route.fulfill({ json: growth }));
+  await page.goto('./?page=screener&group=universe-us&f=eps:4:20');
+  await page.getByRole('searchbox', { name: '在群組內篩選' }).fill('RIVN');
+
+  const row = page.locator('.screener-row', { hasText: 'RIVN' });
+  const details = row.getByRole('button', { name: /EPS .*推 低 部分缺漏 資料說明/ });
+  await expect(details).toBeVisible();
+  await expect(details.locator('.growth-pill-marks')).toHaveText('推低部分缺漏');
+  await expect(page.getByText('推＝含推算第 4 季', { exact: false })).toBeVisible();
+  if (process.env.GROWTH_GRADE_SCREENSHOT && info.project.name === 'iphone-webkit') {
+    expect(page.viewportSize()?.width).toBe(390);
+    await page.screenshot({ path: process.env.GROWTH_GRADE_SCREENSHOT, scale: 'css' });
+  }
+
+  if (info.project.use.hasTouch) await details.tap();
+  else await details.click();
+  const dialog = page.getByRole('dialog', { name: 'RIVN 成長率資料' });
+  await expect(dialog).toContainText('低信心排除 1 季、缺資料 1 季');
+  await expect(dialog).toContainText('含以全年減前三季推算的第 4 季');
+  await expect(dialog).toContainText('財報品質：部分缺漏');
+  await expect(dialog).toContainText('來源：季度 SEC XBRL frames');
+  await dialog.getByRole('button', { name: '關閉' }).click();
+  await expect(dialog).toHaveCount(0);
+  await row.getByRole('link', { name: /RIVN.*圖表/ }).click();
+  await expect(page).toHaveURL(/page=chart&symbol=RIVN/);
+});
+
 test('temporary filters reset across groups and markets, start from the URL on fresh visits, survive a nav round trip and reset on a repeated nav tap', async ({ page }) => {
   await mockDeviceAccount(page);
   const key = accountPreference('atlas-screener-filters-v1');

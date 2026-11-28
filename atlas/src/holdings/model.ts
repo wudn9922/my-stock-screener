@@ -36,6 +36,7 @@ export interface HoldingQuote {
   previous: string | null;
   asOf: string;
   source: string;
+  liveState?: 'live' | 'delayed';
 }
 export interface SellCosts {
   enabled: boolean;

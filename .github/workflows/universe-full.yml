@@ -138,6 +138,8 @@ jobs:
       - name: Build full-market universe
         if: steps.archive_checkout.outcome == 'success' && steps.archive_bootstrap.outcome == 'success'
         env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
           UNIVERSE_CACHE_DIR: .cache/universe-full
           UNIVERSE_BUDGET_SECONDS: ${{ inputs.budget || '2400' }}
         run: python -u scripts/build_universe_full.py --markets "${{ inputs.markets || 'TW,US' }}" --archive-dir .cache/kline-archive
@@ -158,6 +160,9 @@ jobs:
 
       # 即使上一步失敗或時間不夠，也保存已補到的日 K，下次接著補
       - name: Refresh archive-only ETFs and indices through the existing Yahoo batch reader
+        env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
         id: archive_instruments
         if: always() && !cancelled() && steps.archive_bootstrap.outcome == 'success'
         continue-on-error: true

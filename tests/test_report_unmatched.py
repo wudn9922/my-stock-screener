@@ -2,14 +2,12 @@
 Unmatched / failed stocks in the Atlas report (non-scan groups).
 
 Run: python3 -m unittest discover -s tests
-Synthetic prices only; yfinance is stubbed before main is imported and the
-downloader is patched, so nothing touches the network.
+Synthetic prices only; the downloader is patched, so nothing touches the network.
 """
 import json
 import os
 import sys
 import tempfile
-import types
 import unittest
 
 import pandas as pd
@@ -18,15 +16,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-
-def import_main():
-    if "main" in sys.modules:
-        return sys.modules["main"]
-    sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
-    import main  # noqa: E402
-
-    return main
-
+import custom_groups  # noqa: E402
+import report_json  # noqa: E402
+import screener_config  # noqa: E402
 
 def make_df(closes, volume=1000.0, end="2026-10-09"):
     closes = [float(value) for value in closes]
@@ -49,24 +41,20 @@ FALLING = make_df([200.0 - i for i in range(60)], volume=3000.0)  # far below MA
 
 
 class ProcessCustomGroupsTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.main = import_main()
-
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.saved = {
-            name: getattr(self.main, name)
-            for name in ("DATA_DIR", "download_custom_stock")
+            (target, name): getattr(target, name)
+            for target, name in ((screener_config, "DATA_DIR"), (custom_groups, "download_custom_stock"))
         }
-        self.main.DATA_DIR = self.tmp.name
+        screener_config.DATA_DIR = self.tmp.name
         self.frames = {"AAA": FLAT, "BBB": RISING, "DDD": FALLING}
-        self.main.download_custom_stock = self.fake_download
+        custom_groups.download_custom_stock = self.fake_download
 
     def tearDown(self):
-        for name, value in self.saved.items():
-            setattr(self.main, name, value)
+        for (target, name), value in self.saved.items():
+            setattr(target, name, value)
 
     def fake_download(self, raw_ticker, group_key=None, group_market=None):
         if raw_ticker == "BOOM":
@@ -90,7 +78,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
         }
 
     def run_group(self, **kwargs):
-        return self.main.process_custom_groups(
+        return custom_groups.process_custom_groups(
             self.group(),
             "custom_1",
             test_mode=False,
@@ -155,7 +143,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
 
     def test_empty_group_collects_nothing(self):
         bucket = []
-        result = self.main.process_custom_groups(
+        result = custom_groups.process_custom_groups(
             {}, "custom_1", test_mode=False, group_metadata={}, unmatched_out=bucket
         )
         self.assertEqual(result, [])
@@ -163,7 +151,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
 
     def test_test_mode_matches_everything(self):
         bucket = []
-        result = self.main.process_custom_groups(
+        result = custom_groups.process_custom_groups(
             {"BBB": [20]},
             "custom_1",
             test_mode=True,
@@ -175,7 +163,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
 
     def test_failed_symbol_uses_first_candidate_for_digits(self):
         bucket = []
-        self.main.process_custom_groups(
+        custom_groups.process_custom_groups(
             {"2330": [20]},
             "tw_g1",
             test_mode=False,
@@ -188,7 +176,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
     def test_group_for_data_dict_keeps_data_dict_clean(self):
         data_dict = {}
         unmatched = {}
-        self.main.process_group_for_data_dict(
+        custom_groups.process_group_for_data_dict(
             data_dict,
             {"custom_1": self.group()},
             {"custom_1": {"market": "us"}},
@@ -199,7 +187,7 @@ class ProcessCustomGroupsTest(unittest.TestCase):
         self.assertEqual(len(unmatched["custom_1"]), 5)
 
         plain = {}
-        self.main.process_group_for_data_dict(
+        custom_groups.process_group_for_data_dict(
             plain, {"custom_1": self.group()}, {"custom_1": {"market": "us"}}, "custom_1"
         )
         self.assertEqual(list(plain), ["custom_1"])
@@ -209,45 +197,40 @@ class FailedRecordHardeningTest(unittest.TestCase):
     """Review fixes: recording a failure must never raise, and the failed row shows the right code."""
 
     def setUp(self):
-        self.main = import_main()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.saved_dir = self.main.DATA_DIR
-        self.main.DATA_DIR = self.tmp.name
-        self.addCleanup(setattr, self.main, "DATA_DIR", self.saved_dir)
+        self.saved_dir = screener_config.DATA_DIR
+        screener_config.DATA_DIR = self.tmp.name
+        self.addCleanup(setattr, screener_config, "DATA_DIR", self.saved_dir)
 
     def test_garbage_ma_list_does_not_raise(self):
         out = []
-        self.main._record_failed_stock(out, "AAA", "g", "下載失敗", 20)  # int is not iterable
+        custom_groups._record_failed_stock(out, "AAA", "g", "下載失敗", 20)  # int is not iterable
         self.assertEqual(out, [])
 
     def test_failed_symbol_prefers_candidate_with_a_csv(self):
         open(os.path.join(self.tmp.name, "6488.TWO.csv"), "w").close()
-        self.assertEqual(self.main._failed_stock_symbol("6488", group_market="tw"), "6488.TWO")
+        self.assertEqual(custom_groups._failed_stock_symbol("6488", group_market="tw"), "6488.TWO")
 
     def test_failed_symbol_defaults_to_first_candidate(self):
-        self.assertEqual(self.main._failed_stock_symbol("6488", group_market="tw"), "6488.TW")
-        self.assertEqual(self.main._failed_stock_symbol("brk.b", group_market="us"), "BRK-B")
+        self.assertEqual(custom_groups._failed_stock_symbol("6488", group_market="tw"), "6488.TW")
+        self.assertEqual(custom_groups._failed_stock_symbol("brk.b", group_market="us"), "BRK-B")
 
     def test_failed_row_carries_the_taiwan_name(self):
         out = []
-        self.main._record_failed_stock(out, "2330.TW", "g", "下載失敗", [20], group_market="tw")
+        custom_groups._record_failed_stock(out, "2330.TW", "g", "下載失敗", [20], group_market="tw")
         self.assertEqual(out[0]["status"], "failed")
         self.assertTrue(out[0]["name"])
 
     def test_unmatched_calculation_error_is_recorded_as_failed(self):
         out = []
         broken = make_df([10.0] * 5)  # no MA column for the requested window
-        self.main._record_unmatched_stock(out, "AAA", "g", "us", [20], broken)
+        custom_groups._record_unmatched_stock(out, "AAA", "g", "us", [20], broken)
         self.assertEqual([row["status"] for row in out], ["failed"])
         self.assertEqual(out[0]["ticker"], "AAA")
 
 
 class BuildReportGroupsTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.main = import_main()
-
     def matched(self, symbol, volume=100):
         return {
             "ticker": symbol,
@@ -285,7 +268,7 @@ class BuildReportGroupsTest(unittest.TestCase):
 
     def groups(self, data_dict, unmatched=None, lookup=None):
         metadata = {key: {"name": key, "market": "us"} for key in data_dict}
-        return self.main.build_report_groups(
+        return report_json.build_report_groups(
             data_dict,
             metadata,
             list(data_dict),
@@ -424,10 +407,10 @@ class BuildReportGroupsTest(unittest.TestCase):
             {},
             {},
         )
-        plain = self.main.build_report_payload(*args, analyze=analyze)
+        plain = report_json.build_report_payload(*args, analyze=analyze)
         self.assertEqual(plain["groups"][0]["unmatchedCount"], 0)
 
-        payload = self.main.build_report_payload(
+        payload = report_json.build_report_payload(
             *args,
             analyze=analyze,
             unmatched_by_group={"custom_1": [self.unmatched("BBB")]},

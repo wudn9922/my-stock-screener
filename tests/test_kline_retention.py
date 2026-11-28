@@ -1,4 +1,4 @@
-"""Run the real CSV retention hook without importing network clients from main."""
+"""Run the real CSV retention hook without importing the report entry point."""
 import ast
 import os
 from pathlib import Path
@@ -6,13 +6,15 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import screener_config
+
 
 class KLineRetentionTest(unittest.TestCase):
     def test_stale_delisted_and_invalid_csvs_are_never_deleted_in_either_mode(self):
-        source = Path(__file__).resolve().parents[1] / "main.py"
+        source = Path(__file__).resolve().parents[1] / "git_publish.py"
         tree = ast.parse(source.read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "prune_stale_csv")
-        namespace = {"DATA_DIR": "data"}
+        namespace = {"screener_config": screener_config}
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"), namespace)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -31,7 +33,7 @@ class KLineRetentionTest(unittest.TestCase):
 
     def test_failed_atomic_update_preserves_the_existing_k_line_csv(self):
         import pandas as pd
-        source = Path(__file__).resolve().parents[1] / "main.py"
+        source = Path(__file__).resolve().parents[1] / "tpex_otc.py"
         tree = ast.parse(source.read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "write_ohlcv_csv_atomic")
         import kline_integrity

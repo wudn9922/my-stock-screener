@@ -20,6 +20,7 @@ import { EpsBasisToggle, readEpsBasis, writeEpsBasis } from '../ui/financials/Ep
 import { hasEpsRestatement, restatedEpsLabel, twSplitNote, type EpsDisplayBasis } from '../fundamentals/epsBasis';
 import { StatementTable } from '../ui/financials/StatementTable';
 import { PeRiverCard } from '../ui/financials/PeRiverCard';
+import { ConservativePeCard } from '../ui/financials/ConservativePeCard';
 import { SummaryChips } from '../ui/financials/SummaryChips';
 import { VolumePanel } from '../ui/research/VolumePanel';
 import { InstitutionPanel } from '../ui/research/InstitutionPanel';
@@ -290,6 +291,7 @@ export default function FinancialsPage({ report, navigate, symbol, p, tf, onExit
           </>
         )}
         <div className="fin-folds">
+          <ConservativePeCard history={displayHistory} />
           <KeyMetrics history={displayHistory} view={view} />
           <SummaryChips history={displayHistory} annual={annualView} current={view} />
           <PeRiverCard history={history.market === 'US' ? { ...displayHistory, quarterly: emptySeries() } : displayHistory} />

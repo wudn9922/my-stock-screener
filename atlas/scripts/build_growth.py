@@ -55,7 +55,8 @@ Output (compact, rows sorted by symbol; keys as in the financials file names):
   src (sec|yahoo|mops|frames|finmind: of the quarterly block, else of the annual one), qEnd, yEnd (period end
   of slot 0 for quarterly / annual), epsQ (up to 12), revQ (up to 12), epsY (up to 10), revY (up to 10),
   tQ, tY (bit i set = EPS turnaround in slot i of quarterly / annual), srcY (source of the annual block,
-  null without one), dQ (bit i set = quarterly slot i compares a derived Q4). Trailing nulls of the arrays
+  null without one), dQ (bit i set = quarterly slot i compares a derived Q4), gQ (bit i set = the EPS YoY
+  in quarter i is missing because low-confidence EPS was excluded). Trailing nulls of the arrays
   are cut, so a row carries as many quarters as its source has (a file written with the old 4-slot horizon
   is still valid: its arrays are just shorter). A symbol without any usable value gets no row. The market
   is the symbol's suffix (.TW / .TWO = Taiwan). The file is only rewritten when its content changes, so
@@ -72,6 +73,8 @@ with it when it wins.
 import json
 import math
 import os
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from build_valuation_us import finite_number, read_json, write_atomic
@@ -79,9 +82,12 @@ import tw_capital_reductions as capital_reductions
 import tw_splits
 import tw_stock_dividends as stock_dividends
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.output_guard import finite, require, retain_keys, unique_keys
+
 VERSION = 1
 SOURCE = "financials+official"
-FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ"]
+FIELDS = ["symbol", "lv", "src", "qEnd", "yEnd", "epsQ", "revQ", "epsY", "revY", "tQ", "tY", "srcY", "dQ", "gQ"]
 # Quarterly YoY values per row: the newest 12 quarters (each needs the same quarter a year earlier, so 16 quarters of history).
 QUARTER_SLOTS = 12
 # Annual YoY values per row from the financials files (each needs the year before it: 11 fiscal years for 10 values).
@@ -169,12 +175,14 @@ def read_periods(section, quarterly, market=None):
             continue
         grade = eps_quality[i] if i < len(eps_quality) and isinstance(eps_quality[i], dict) else {}
         us, q4 = market != "TW", bool(quarterly and fq == 4)
-        gated = False
+        gated = {}
         if us and not eps_usable(grade.get("epsDiluted"), us, q4):
-            gated = gated or eps_d[i] is not None
+            if eps_d[i] is not None:
+                gated["epsD"] = eps_d[i]
             eps_d[i] = None
         if us and not eps_usable(grade.get("epsBasic"), us, q4):
-            gated = gated or eps_b[i] is not None
+            if eps_b[i] is not None:
+                gated["epsB"] = eps_b[i]
             eps_b[i] = None
         src = srcs[i] if i < len(srcs) and isinstance(srcs[i], str) else "yahoo"
         periods.append({
@@ -182,6 +190,7 @@ def read_periods(section, quarterly, market=None):
             "epsD": eps_d[i], "epsB": eps_b[i], "rev": revenue[i], "shares": shares[i], "ni": income[i],
             # a gated Q4 still anchors this filing block's recency (dropping it could switch to a shorter block)
             "gatedQ4Eps": bool(gated and q4),
+            "gatedEps": gated,
             "src": src if src in ("sec", "finmind") else "yahoo",
         })
     return periods
@@ -298,7 +307,7 @@ def trim(values):
 
 def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     """
-    → block {eps, rev, mask, end, src, derived} over `slots` periods (newest first, trailing nulls cut),
+    → block {eps, rev, mask, end, src, derived, excluded} over `slots` periods (newest first, trailing nulls cut),
     or None when nothing is computable or the newest period is stale. `pair(current, base)` →
     (EPS yoy, turnaround, revenue yoy) (default: default_pair with the split events). A period dict
     with "derived": True sets the slot's bit in `derived`.
@@ -312,7 +321,7 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     by_number = index_periods(periods, quarterly)
     top = period_number(latest, quarterly)
     step = 4 if quarterly else 1
-    eps, rev, mask, derived = [], [], 0, 0
+    eps, rev, mask, derived, excluded = [], [], 0, 0, 0
     for slot in range(slots):
         current, base = by_number.get(top - slot), by_number.get(top - slot - step)
         if current is None or base is None or not same_period(current, base):
@@ -321,6 +330,13 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
             continue
         if pair is None:
             value, turn, revenue = default_pair(current, base, events)
+            if quarterly and value is None and not turn and (current.get("gatedEps") or base.get("gatedEps")):
+                # Restore excluded values only for attribution. The published numbers and block choice stay gated.
+                raw_current = {**current, **current.get("gatedEps", {})}
+                raw_base = {**base, **base.get("gatedEps", {})}
+                raw_value, _ = eps_pair(raw_current, raw_base, events)
+                if raw_value is not None:
+                    excluded |= 1 << slot
         else:
             value, turn, revenue = pair(current, base)
         eps.append(value)
@@ -332,7 +348,8 @@ def yoy_series(periods, quarterly, slots, events, today, stale_days, pair=None):
     eps, rev = trim(eps), trim(rev)
     if not (eps or rev or mask):
         return None
-    return {"eps": eps, "rev": rev, "mask": mask, "end": latest["end"], "src": latest["src"], "derived": derived}
+    return {"eps": eps, "rev": rev, "mask": mask, "end": latest["end"], "src": latest["src"],
+            "derived": derived, "excluded": excluded}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -346,7 +363,7 @@ def make_row(key, level, quarterly, annual):
     return [
         key, level, (quarterly or annual)["src"], q.get("end"), y.get("end"),
         q.get("eps", []), q.get("rev", []), y.get("eps", []), y.get("rev", []),
-        q.get("mask", 0), y.get("mask", 0), y.get("src"), q.get("derived", 0),
+        q.get("mask", 0), y.get("mask", 0), y.get("src"), q.get("derived", 0), q.get("excluded", 0),
     ]
 
 
@@ -836,6 +853,61 @@ def finmind_candidates(fundamentals_dir, symbols, today, official, tw_rows, summ
     return finmind.combine(tw_rows, rows)
 
 
+GROWTH_RETENTION = .85
+GROWTH_ANCHORS = ("2330.TW", "AAPL", "MSFT")
+
+
+def usable_growth(document):
+    """Count usable symbols and quarterly/annual values, not placeholder rows."""
+    if not isinstance(document, dict) or not isinstance(document.get("fields"), list) or not isinstance(document.get("rows"), list):
+        return {}
+    fields = document["fields"]
+    if "symbol" not in fields:
+        return {}
+    groups = {}
+    keys = []
+    for row in document["rows"]:
+        if not isinstance(row, list) or len(row) <= fields.index("symbol"):
+            continue
+        item = dict(zip(fields, row))
+        key = item["symbol"]
+        keys.append(key)
+        if not isinstance(key, str):
+            continue
+        for period in ("Q", "Y"):
+            mask = item.get("t" + period)
+            eps = item.get("eps" + period)
+            rev = item.get("rev" + period)
+            valid_eps = isinstance(eps, list) and any(finite(v) for v in eps)
+            valid_eps = valid_eps or (isinstance(mask, int) and not isinstance(mask, bool) and mask > 0)
+            valid_rev = isinstance(rev, list) and any(finite(v) for v in rev)
+            if (valid_eps or valid_rev) and parse_day(item.get(period.lower() + "End")):
+                market = market_of(key)
+                groups.setdefault(market, set()).add(key)
+                if valid_eps:
+                    groups.setdefault(market + ":eps" + period, set()).add(key)
+                if valid_rev:
+                    groups.setdefault(market + ":rev" + period, set()).add(key)
+    unique_keys(keys, "growth.json")
+    return groups
+
+
+def validate_output(document, previous):
+    current = usable_growth(document)
+    old = usable_growth(previous)
+    require(any(current.get(m) for m in ("TW", "US")), "growth.json", "no usable growth rows")
+    for market in ("TW", "US"):
+        if market in old:
+            retain_keys(current.get(market, set()), old[market], f"growth.json {market}",
+                        min_share=GROWTH_RETENTION, anchors=GROWTH_ANCHORS)
+    # Sparse metrics/young companies naturally change availability. Guard only
+    # established cohorts; a row count alone misses a widespread null field.
+    for cohort, keys in old.items():
+        if ":" in cohort and len(keys) >= 100:
+            retain_keys(current.get(cohort, set()), keys, f"growth.json {cohort}",
+                        min_share=GROWTH_RETENTION)
+
+
 def run(financials_dir, out_path, now=None, fundamentals_dir=None, universe_path=None):
     now = now or datetime.now(timezone.utc).replace(microsecond=0)
     files, bad = read_documents(financials_dir)
@@ -846,6 +918,7 @@ def run(financials_dir, out_path, now=None, fundamentals_dir=None, universe_path
         raise RuntimeError(f"no readable financials files in {financials_dir} and no official fundamentals")
     document = build_document(files, now, extra)
     previous = read_json(out_path)
+    validate_output(document, previous)
     written = False
     if not same_content(previous, document):
         size = write_atomic(out_path, document)
@@ -878,3 +951,4 @@ if __name__ == "__main__":
         main()
     except Exception as error:  # noqa: BLE001
         print(f"::warning::growth.json not rebuilt (the previous file stays): {error}")
+        sys.exit(1)

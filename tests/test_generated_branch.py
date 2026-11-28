@@ -101,6 +101,36 @@ class GeneratedStorageTests(unittest.TestCase):
             self.store.assemble(self.base, self.seed, b)
             self.assertEqual(gb.digest_tree(a), gb.digest_tree(b))
 
+    def test_conservative_pe_reserves_before_reports_and_assembles_partial_results(self):
+        budget = "docs/report/conservative-pe-budget.json"
+        report = "docs/report/conservative-pe/AAPL.json"
+        budget_bytes = b'{"day":"2026-11-28","used":2,"providers":{},"windows":{},"attempted":{}}'
+        self.write(budget, budget_bytes)
+        self.write("docs/internal-private.txt", b"unrelated local file")
+        self.store.publish("conservativePeAiBudget")
+        budget_tip = self.remote("generated")
+        self.assertEqual(self.body(budget_tip, budget), budget_bytes)
+        self.assertNotIn(report, self.store.entries(budget_tip))
+
+        self.write(report, b'{"version":1,"symbol":"AAPL"}')
+        # Multiple budget commits in the same restore must not conflict with our own prior commit
+        # or accidentally publish/discard the pending report.
+        budget_bytes = b'{"day":"2026-11-28","used":2,"providers":{"gemini-flash":1},"windows":{},"attempted":{}}'
+        self.write(budget, budget_bytes)
+        self.store.publish("conservativePeAiBudget")
+        self.assertNotIn(report, self.store.entries(self.remote("generated")))
+        self.assertEqual(self.body(self.remote("generated"), budget), budget_bytes)
+        self.store.publish("conservativePeAi")
+        tip = self.remote("generated")
+        self.assertEqual(self.body(tip, budget), budget_bytes)
+        self.assertEqual(self.remote("main"), self.base)
+        self.assertNotIn("docs/internal-private.txt", self.store.entries(tip))
+        assembled = Path(self.temp.name) / "site"
+        self.store.assemble(self.base, tip, assembled)
+        self.assertEqual((assembled / "report/conservative-pe/AAPL.json").read_bytes(), self.body(tip, report))
+        self.assertEqual((assembled / "report/conservative-pe-budget.json").read_bytes(), budget_bytes)
+        self.assertFalse((assembled / "internal-private.txt").exists())
+
     def test_world_candle_records_stay_on_main_and_report_is_overwritten_on_generated(self):
         self.write("data/world/CMD-WTI.csv", b"Date,Open,High,Low,Close,Volume\n2026-10-21,1,3,0,2,100\n")
         self.write("docs/report/research/world-assets.json", b'{"version":1}')
@@ -235,7 +265,7 @@ class GeneratedStorageTests(unittest.TestCase):
         self.assertEqual(self.remote("main"), self.base)
 
     def test_legacy_main_publisher_keeps_committing_csvs_with_switch_off(self):
-        function = next(n for n in ast.parse((REPO / "main.py").read_text(encoding="utf-8-sig")).body
+        function = next(n for n in ast.parse((REPO / "git_publish.py").read_text(encoding="utf-8-sig")).body
                         if isinstance(n, ast.FunctionDef) and n.name == "push_report_to_github")
 
         def run_git_command(command):
@@ -245,7 +275,7 @@ class GeneratedStorageTests(unittest.TestCase):
             return subprocess.run(command, capture_output=True).returncode
 
         namespace = {"os": os, "subprocess": subprocess, "run_git_command": run_git_command}
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "main.py", "exec"), namespace)
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "git_publish.py", "exec"), namespace)
         self.git("branch", "--set-upstream-to=origin/main", "main")
         self.write("data/AAPL.csv", b"updated retained K-line")
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):
@@ -695,11 +725,11 @@ class InventoryTests(unittest.TestCase):
     def test_main_embedded_publisher_cannot_push_when_switch_is_enabled(self):
         # Execute the actual publisher without importing main's network clients.
         import ast
-        tree = ast.parse((REPO / "main.py").read_text(encoding="utf-8-sig"))
+        tree = ast.parse((REPO / "git_publish.py").read_text(encoding="utf-8-sig"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "push_report_to_github")
         sentinel = RuntimeError("legacy git path reached")
         namespace = {"os": os, "run_git_command": lambda *a: (_ for _ in ()).throw(sentinel)}
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "main.py", "exec"), namespace)
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "git_publish.py", "exec"), namespace)
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": "1"}):
             self.assertTrue(namespace["push_report_to_github"]())
         with patch.dict(os.environ, {"GENERATED_BRANCH_MODE": ""}):

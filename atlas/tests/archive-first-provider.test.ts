@@ -1,7 +1,7 @@
 import { archiveIndexFixture } from './fixtures/archive-index';
 import { describe, expect, it, vi } from 'vitest';
 import { ArchiveFirstProvider, archiveQuote, mergeArchivedLive } from '../src/market-data/ArchiveFirstProvider';
-import { KlineArchive } from '../src/market-data/KlineArchive';
+import { KlineArchive, parseArchiveCsv } from '../src/market-data/KlineArchive';
 import { EdgeYahooProvider } from '../src/market-data/EdgeYahooProvider';
 import { aggregateBars } from '../src/market-data/StaticSeriesProvider';
 import { getMarketProfile, type BarResult, type MarketDataProvider } from '../src/market-data/MarketDataProvider';
@@ -108,20 +108,36 @@ describe('archive-first chart C2', () => {
     expect(new URL(urls[0]!, 'https://example.test').searchParams.get('interval')).toBe('1mo');
     expect(new URL(urls[0]!, 'https://example.test').searchParams.get('events')).toBe('1');
   });
-  it('does not join older Yahoo periods on a different split basis; ignores the still-forming period for this check',async()=>{
-    const {archive,fallback}=make();
-    const yahoo=new EdgeYahooProvider('https://edge.test/market-chart');
-    const provider=new ArchiveFirstProvider(fallback,archive,yahoo);
-    const current=await provider.getBars('AAPL','1W');
-    const half=(bar:typeof current.bars[number])=>({...bar,open:bar.open/2,high:bar.high/2,low:bar.low/2,close:bar.close/2});
-    const native=vi.spyOn(yahoo,'getArchiveHistory').mockResolvedValue({...current,bars:current.bars.map((bar,i)=>i===current.bars.length-1?half(bar):bar)});
-    const full=vi.spyOn(yahoo,'getBars').mockResolvedValue({...current,bars:(await archive.getDaily('AAPL'))!.bars.map(half)});
-    expect((await provider.getOlderBars('AAPL','1W',current)).archive?.status).toBe('archive');
+  it.each(['1W', '1M'] as const)('%s ignores period outliers and requires consistent evidence or a matching historical join', async timeframe => {
+    const { archive, fallback } = make();
+    const yahoo = new EdgeYahooProvider('https://edge.test/market-chart');
+    const provider = new ArchiveFirstProvider(fallback, archive, yahoo);
+    const daily = (await archive.getDaily('AAPL'))!;
+    const sample = daily.bars[0]!;
+    const dates = Array.from({ length: 7 }, (_, i) => Date.UTC(2026, i, 7, 16) / 1000);
+    const periods = aggregateBars(dates.map(time => ({ ...sample, time })), timeframe, getMarketProfile('AAPL'));
+    const [earlier, ...overlap] = periods;
+    const current = { ...daily, bars: overlap };
+    const half = (bar: typeof sample) => ({ ...bar, open: bar.open / 2, high: bar.high / 2, low: bar.low / 2, close: bar.close / 2 });
+    const native = vi.spyOn(yahoo, 'getArchiveHistory');
+    const full = vi.spyOn(yahoo, 'getBars').mockResolvedValue({ ...daily, bars: daily.bars.map(half) });
+    native.mockResolvedValue({ ...current, bars: periods.map((bar, i) => i === 3 || i === periods.length - 1 ? half(bar) : bar) });
+    expect((await provider.getOlderBars('AAPL', timeframe, current)).bars).toEqual(periods);
     expect(full).not.toHaveBeenCalled();
-    native.mockResolvedValue({...current,bars:current.bars.map(half)});
-    const result=await provider.getOlderBars('AAPL','1W',current);
-    expect(result.archive?.status).toBe('split');expect(result.bars.every(bar=>bar.close<60)).toBe(true);
+    native.mockResolvedValue({ ...current, bars: [half(earlier!), half(overlap[0]!), ...overlap.slice(1)] });
+    const held = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(held.bars).toEqual(overlap);
+    expect(held.source).toContain('價格基準待確認');
+    expect(full).not.toHaveBeenCalled();
+    native.mockResolvedValue({ ...current, bars: periods.map(half) });
+    const result = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(result.archive?.status).toBe('split');
+    expect(result.bars.every(bar => bar.close < 60)).toBe(true);
     expect(full).toHaveBeenCalledTimes(1);
+    full.mockRejectedValueOnce(new Error('Yahoo unavailable'));
+    const unavailable = await provider.getOlderBars('AAPL', timeframe, current);
+    expect(unavailable.archive?.status).toBe('archive');
+    expect(unavailable.bars).toBe(current.bars);
   });
   it('merges missing dates, retains same-date archive values, and replaces a split price basis as a whole', async () => {
     const { archive, fallback } = make();
@@ -130,18 +146,32 @@ describe('archive-first chart C2', () => {
     const next = { ...last, time: last.time + 86400, close: 104 };
     const value = { symbol: 'AAPL', bars: [last, next], retrievedAt: 1800000000 };
     expect((await mergeArchivedLive(current, value, '1D', archive)).bars).toHaveLength(3);
-    const split = { ...last, open: 50, high: 52, low: 49, close: 51 };
-    const result = await mergeArchivedLive(current, { ...value, bars: [split] }, '1D', archive);
-    expect(result.bars).toEqual([split]);
-    expect(result.archive?.status).toBe('split'); expect(result.source).toContain('超過 2%');
+    const extended = parseArchiveCsv(body + '2026-01-06,103,105,102,104,1000\n2026-01-07,104,106,103,105,1000\n2026-01-08,105,107,104,106,1000\n', 'AAPL', 2026).bars;
+    const extendedCurrent = { ...current, bars: extended, archive: { ...current.archive!, lastDate: '2026-01-08' } };
+    vi.spyOn(archive, 'getDaily').mockResolvedValue(extendedCurrent);
+    const fullBars = extended.map(bar => ({ ...bar, open: bar.open / 2, high: bar.high / 2, low: bar.low / 2, close: bar.close / 2 }));
+    const split = fullBars.at(-1)!;
+    const result = await mergeArchivedLive(extendedCurrent, { ...value, bars: fullBars }, '1D', archive);
+    expect(result.bars).toEqual(fullBars);
+    expect(result.archive?.status).toBe('split'); expect(result.source).toContain('一致倍率差異');
     const yahoo = new EdgeYahooProvider('https://edge.test/market-chart');
-    const fullBars = [{ ...split, time: split.time-86400 }, split];
     const fetchFull = vi.spyOn(yahoo, 'getBars').mockResolvedValue({ ...current, bars: fullBars });
     const full = await new ArchiveFirstProvider(fallback, archive, yahoo).getOlderBars('AAPL', '1D', result);
     expect(full.bars).toEqual(fullBars);
     expect(fetchFull).toHaveBeenCalledExactlyOnceWith('AAPL','1D',undefined,undefined);
     const updated = await mergeArchivedLive(full, { ...value, bars: [split] }, '1D', archive);
     expect(updated.bars).toEqual(fullBars); // later live ticks must not discard restored Yahoo history
+  });
+  it('preserves the partial archive status and source when live data arrives', async () => {
+    const { archive, fallback } = make();
+    const current = await new ArchiveFirstProvider(fallback, archive).getBars('AAPL', '1D');
+    vi.spyOn(archive, 'getDaily').mockResolvedValue({ ...current, archive: { ...current.archive!, incomplete: true } });
+    const last = current.bars.at(-1)!;
+    const newer = { ...last, time: last.time + 86400 };
+    const result = await mergeArchivedLive(current, { symbol: 'AAPL', bars: [newer], retrievedAt: 1800000000 }, '1D', archive);
+    expect(result.bars).toHaveLength(3);
+    expect(result.archive).toMatchObject({ status: 'live', incomplete: true });
+    expect(result.source).toContain('部分年度暫時無法讀取');
   });
   it('archive quotes report the actual TW/US close (including daylight saving) rather than midnight', () => {
     const sample = (iso: string): BarResult => ({ bars: [{ time: Date.parse(iso)/1000, open:100,high:101,low:99,close:100,volume:1 }], source:'archive',session:'regular',delayed:true,adjusted:true });

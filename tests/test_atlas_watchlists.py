@@ -132,7 +132,7 @@ class WatchlistMonitorTests(unittest.TestCase):
 
     def test_daily_report_applies_fixed_parameters_without_adding_dormant_stocks(self):
         # Execute the actual loader without importing data downloaders or sending requests.
-        source = ast.parse((Path(__file__).resolve().parents[1] / 'main.py').read_text())
+        source = ast.parse((Path(__file__).resolve().parents[1] / 'group_config.py').read_text())
         loader = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == 'load_configs_from_supabase')
         fixed = {'ticker': 'NVDA', 'line_user_id': 'U-test', 'group_id': 'ungrouped', 'ma1': 13, 'ma2': 34}
         grouped = dict(fixed, group_id='us_g1', ma1=20, ma2=50)
@@ -148,7 +148,7 @@ class WatchlistMonitorTests(unittest.TestCase):
             'parameter_ticker_key': parameter_ticker_key, 'FIXED_STOCK_GROUP_ID': FIXED_STOCK_GROUP_ID,
             'normalize_custom_ticker': lambda ticker: ticker, 'get_stock_ma_list': get_ma_list,
         }
-        exec(compile(ast.Module(body=[loader], type_ignores=[]), 'main.py', 'exec'), namespace)
+        exec(compile(ast.Module(body=[loader], type_ignores=[]), 'group_config.py', 'exec'), namespace)
         configs, _, _ = namespace['load_configs_from_supabase']('U-test')
         self.assertEqual(configs['us_g1'], {'NVDA': [13, 34]})
         self.assertNotIn('ungrouped', configs)

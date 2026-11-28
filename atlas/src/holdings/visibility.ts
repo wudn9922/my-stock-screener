@@ -31,7 +31,10 @@ export interface HoldingsVisibility {
 }
 export type HiddenReason = 'manual' | 'dust' | 'usdt';
 
-export const defaultRules = (): AccountVisibilityRules => ({ dust: { enabled: false, threshold: '1' }, hideUsdt: false });
+export const defaultRules = (currency?: string): AccountVisibilityRules => ({
+  dust: { enabled: true, threshold: currency === 'TWD' ? '100' : '1' },
+  hideUsdt: false,
+});
 export const emptyVisibility = (): HoldingsVisibility => ({ version: 1, hidden: [], shown: [], accounts: {} });
 export function holdingKey(accountId: string, symbol: string) {
   return `${accountId}|${symbol}`;
@@ -92,7 +95,7 @@ export function hiddenReason(
   const key = holdingKey(holding.accountId, holding.symbol);
   if (preferences.hidden.includes(key)) return 'manual';
   if (preferences.shown.includes(key)) return null;
-  return ruleReason(holding, account, value, preferences.accounts[holding.accountId] ?? defaultRules());
+  return ruleReason(holding, account, value, preferences.accounts[holding.accountId] ?? defaultRules(account?.currency ?? holding.costCurrency));
 }
 export function hide(preferences: HoldingsVisibility, key: string): HoldingsVisibility {
   return {
@@ -138,7 +141,7 @@ class VisibilityStore {
       const raw = userStorage.getItem(VISIBILITY_KEY);
       if (raw) value = validateVisibility(JSON.parse(raw));
     } catch {
-      /* Unreadable or invalid preferences fall back to "show everything"; nothing is written until a change. */
+      /* Unreadable or invalid preferences fall back to the default rules; nothing is written until a change. */
     }
     this.snapshot = value;
   }

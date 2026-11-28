@@ -14,6 +14,10 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
 import main  # noqa: E402
+import index_history  # noqa: E402
+import market_scan  # noqa: E402
+import report_universe  # noqa: E402
+import screener_config  # noqa: E402
 import report_metrics  # noqa: E402
 
 END = "2026-10-20"
@@ -31,10 +35,10 @@ def frame(closes, volume=2_000_000, end=END):
 
 
 def scan(frames, **options):
-    with patch.object(main, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
-         patch.object(main, "build_stock_data", return_value={}), \
+    with patch.object(market_scan, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
+         patch.object(market_scan, "build_stock_data", return_value={}), \
          contextlib.redirect_stdout(io.StringIO()):
-        return main._market_scan_report(list(frames), frames, **options)
+        return market_scan._market_scan_report(list(frames), frames, **options)
 
 
 def tickers_of(matches):
@@ -63,11 +67,11 @@ class LatentRulesTest(unittest.TestCase):
         }
 
     def test_requires_rising_ma20_and_volume_floor(self):
-        matches = scan(self.frames(), report_min_volume=main.TW_MIN_VOLUME, latent_rules=True)
+        matches = scan(self.frames(), report_min_volume=screener_config.TW_MIN_VOLUME, latent_rules=True)
         self.assertEqual(set(tickers_of(matches)), {"UP.TW", "EDGE.TW"})
 
     def test_without_latent_rules_the_slope_is_not_required(self):
-        matches = scan(self.frames(), report_min_volume=main.TW_MIN_VOLUME)
+        matches = scan(self.frames(), report_min_volume=screener_config.TW_MIN_VOLUME)
         self.assertEqual(set(tickers_of(matches)), {"UP.TW", "DOWN.TW", "FLAT.TW", "EDGE.TW"})
 
     def test_slope_uses_the_ma20_slope5_definition(self):
@@ -90,7 +94,7 @@ class LatentRulesTest(unittest.TestCase):
         }
         ranks = {"A.TW": 40, "B.TW": 90, "C.TW": 90, "D.TW": None, "E.TW": 99}
         rank_of = Mock(side_effect=lambda ticker: ranks.get(ticker))
-        matches = scan(frames, report_min_volume=main.TW_MIN_VOLUME, latent_rules=True, rs_rank_of=rank_of)
+        matches = scan(frames, report_min_volume=screener_config.TW_MIN_VOLUME, latent_rules=True, rs_rank_of=rank_of)
         # E(99) → B／C(90，同百分位依成交量) → A(40) → 沒有百分位的 D、F（依成交量）
         self.assertEqual(tickers_of(matches), ["E.TW", "B.TW", "C.TW", "A.TW", "D.TW", "F.TW"])
         self.assertEqual(sorted(call.args[0] for call in rank_of.call_args_list), sorted(frames))
@@ -151,20 +155,20 @@ class UsListUnchangedTest(unittest.TestCase):
         self.assertEqual(tickers_of(scan(frames, report_min_volume=2)), ["DOWN", "FLAT"])
 
     def test_signature_defaults_leave_latent_rules_off(self):
-        parameters = inspect.signature(main._market_scan_report).parameters
+        parameters = inspect.signature(market_scan._market_scan_report).parameters
         self.assertIs(parameters["latent_rules"].default, False)
         self.assertIsNone(parameters["rs_rank_of"].default)
-        self.assertEqual(inspect.signature(main.scan_market).parameters["report_options"].kind, inspect.Parameter.VAR_KEYWORD)
+        self.assertEqual(inspect.signature(market_scan.scan_market).parameters["report_options"].kind, inspect.Parameter.VAR_KEYWORD)
 
 
 class ReportRsRankOfTest(unittest.TestCase):
     def test_reads_rs_rank_from_the_metrics_lookup(self):
         lookup = {"A.TW": {"rsRank": 77}, "B.TW": {"rsRank": None}, "C.TW": None}
-        rank_of = main.report_rs_rank_of(lambda ticker: lookup.get(ticker))
+        rank_of = market_scan.report_rs_rank_of(lambda ticker: lookup.get(ticker))
         self.assertEqual([rank_of(ticker) for ticker in ("A.TW", "B.TW", "C.TW", "D.TW")], [77, None, None, None])
 
     def test_without_a_lookup_every_rank_is_missing(self):
-        rank_of = main.report_rs_rank_of(None)
+        rank_of = market_scan.report_rs_rank_of(None)
         self.assertIsNone(rank_of("A.TW"))
 
 
@@ -222,23 +226,24 @@ class WiringTest(unittest.TestCase):
 
             tickers = list(frames_by_symbol)
 
-            with patch.object(main, "DATA_DIR", str(data_dir)), \
-                 patch.dict(main.INDEX_HISTORY_CACHE, {"^TWII": {"df": bench, "source": "test"}}), \
-                 patch.dict(main.REPORT_NON_TRADING_DATES, clear=True), \
-                 patch.object(main, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
-                 patch.object(main, "build_stock_data", return_value={}), \
+            with patch.object(screener_config, "DATA_DIR", str(data_dir)), \
+                 patch.dict(index_history.INDEX_HISTORY_CACHE, {"^TWII": {"df": bench, "source": "test"}}), \
+                 patch.dict(screener_config.REPORT_NON_TRADING_DATES, clear=True), \
+                 patch.object(report_universe, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
+                 patch.object(market_scan, "get_tw_stock_name", side_effect=lambda ticker: ticker), \
+                 patch.object(market_scan, "build_stock_data", return_value={}), \
                  contextlib.redirect_stdout(io.StringIO()):
-                frames = main._scan_analysis_frames(tickers)
-                universes, lookup = main.build_report_universe(
+                frames = market_scan._scan_analysis_frames(tickers)
+                universes, lookup = report_universe.build_report_universe(
                     tickers, [], data_dir=str(data_dir), downloader=downloader, report_dir=str(report_dir)
                 )
-                matches = main._market_scan_report(
-                    tickers, frames, main.TW_MIN_VOLUME,
-                    latent_rules=True, rs_rank_of=main.report_rs_rank_of(lookup)
+                matches = market_scan._market_scan_report(
+                    tickers, frames, screener_config.TW_MIN_VOLUME,
+                    latent_rules=True, rs_rank_of=market_scan.report_rs_rank_of(lookup)
                 )
-                fallback = main._market_scan_report(
-                    tickers, frames, main.TW_MIN_VOLUME,
-                    latent_rules=True, rs_rank_of=main.report_rs_rank_of(None)
+                fallback = market_scan._market_scan_report(
+                    tickers, frames, screener_config.TW_MIN_VOLUME,
+                    latent_rules=True, rs_rank_of=market_scan.report_rs_rank_of(None)
                 )
 
         self.assertEqual(downloads, ["SPY"])  # 台股基準取自 INDEX_HISTORY_CACHE，沒有額外下載

@@ -153,7 +153,7 @@ def _price(value):
 def write_bars(path, frame, keep=KEEP_BARS, refetch=None, now=None, exclude_dates=()):
     """CSV 原子寫入：價格 4 位、已知成交量整數、未知成交量空欄；回傳相容的計算 frame。"""
     symbol = os.path.basename(path).removesuffix(".csv")
-    frame = accept_frame(_volume_source_frame(frame), symbol, refetch=refetch, now=now,
+    frame = accept_frame(_volume_source_frame(frame), symbol, refetch=refetch, now=now, retained_path=path,
                          source_url="https://query1.finance.yahoo.com/v8/finance/chart/" + symbol)
     if exclude_dates:
         from market_sessions import analysis_prices

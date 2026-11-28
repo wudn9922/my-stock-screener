@@ -92,13 +92,15 @@ jobs:
 
       - name: Check Python Syntax
         if: steps.guard.outputs.skip != 'true'
-        run: python -m py_compile main.py dify_report.py
+        run: python -m py_compile main.py dify_report.py news_screenshots.py trending_stocks.py us_rates_report.py dify_client.py report_line_messages.py dify_config.py
 
       
       # 這裡把 Supabase 金鑰直接餵給 Python
       - name: Run Screener
         if: steps.guard.outputs.skip != 'true'
         env:
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           SUPABASE_USER_ID: ${{ secrets.SUPABASE_USER_ID }}

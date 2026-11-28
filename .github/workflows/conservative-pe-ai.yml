@@ -1,0 +1,123 @@
+name: Conservative PE AI
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [normal, probe]
+        default: normal
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/build_conservative_pe.py'
+      - 'config/conservative-pe-providers.json'
+      - 'atlas/src/ui/financials/ConservativePeAiPanel.tsx'
+      - 'atlas/e2e-site/financials.spec.ts'
+      - 'tests/test_conservative_pe_ai.py'
+      - 'atlas/scripts/select-conservative-pe.ts'
+      - 'atlas/src/fundamentals/conservativePe*.ts'
+      - '.github/workflows/conservative-pe-ai.yml'
+      - '.github/generated-paths.json'
+      - 'scripts/generated_branch.py'
+      - 'tests/test_generated_branch.py'
+env:
+  GENERATED_BRANCH_MODE: ${{ vars.GENERATED_BRANCH_MODE }}
+permissions:
+  contents: read
+concurrency:
+  group: conservative-pe-ai-${{ github.event.pull_request.number || 'daily' }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests lxml
+      - run: python -m unittest discover -s tests -p test_conservative_pe_ai.py -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: atlas
+      - run: npx esbuild scripts/select-conservative-pe.ts --bundle --platform=node --format=esm --define:import.meta.env='{}' --outfile=/tmp/conservative-pe-selector.mjs
+        working-directory: atlas
+      - name: Verify full public financials selection without network or writes
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from collections import Counter
+          from scripts.build_conservative_pe import public_symbols, validate_selection, now, FINANCIALS
+          symbols = public_symbols(FINANCIALS)
+          raw = json.loads(subprocess.run(["node", "/tmp/conservative-pe-selector.mjs"],
+                                         input=json.dumps(symbols), text=True, check=True,
+                                         capture_output=True, timeout=120).stdout)
+          eligible = validate_selection(raw, set(symbols), now())
+          print("Public financial file stems:", len(symbols))
+          print("Eligible:", len(eligible), dict(Counter(row["market"] for row in eligible.values())))
+          assert eligible, "No eligible stocks in real public financial records"
+          PY
+      - run: npx vitest run tests/conservative-pe-ai.test.ts
+        working-directory: atlas
+  refresh:
+    if: github.event_name != 'pull_request' && vars.GENERATED_BRANCH_MODE == '1' && vars.CONSERVATIVE_PE_AI_ENABLED == '1' && vars.CONSERVATIVE_PE_AI_FREE_TIER == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - run: echo "CONSERVATIVE_PE_AI_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests lxml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: atlas
+      - run: npx esbuild scripts/select-conservative-pe.ts --bundle --platform=node --format=esm --define:import.meta.env='{}' --outfile=/tmp/conservative-pe-selector.mjs
+        working-directory: atlas
+      - run: python scripts/generated_branch.py restore
+      - name: Analyze eligible public financial records
+        id: analyze
+        run: python -u scripts/build_conservative_pe.py --selector /tmp/conservative-pe-selector.mjs --mode "$ANALYSIS_MODE"
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ANALYSIS_MODE: ${{ inputs.mode || 'normal' }}
+          CONSERVATIVE_PE_AI_LIMIT: ${{ vars.CONSERVATIVE_PE_AI_LIMIT }}
+          CONSERVATIVE_PE_AI_ENABLED: ${{ vars.CONSERVATIVE_PE_AI_ENABLED }}
+          CONSERVATIVE_PE_AI_FREE_TIER: ${{ vars.CONSERVATIVE_PE_AI_FREE_TIER }}
+      - name: Publish completed reports even after a partial failure
+        if: always() && !cancelled() && inputs.mode != 'probe' && steps.analyze.outputs.publish_reports == 'true'
+        run: python scripts/generated_branch.py publish conservativePeAi
+      - name: Report partial analysis failure after publishing successful results
+        if: always() && !cancelled() && steps.analyze.outputs.failure_threshold_exceeded == 'true'
+        run: exit 1
+  notify-system-failure:
+    needs: ["verify", "refresh"]
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (failure() || cancelled()) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/notify-failure.yml
+    with:
+      title: "${{ github.workflow }} · ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && '執行失敗／取消' || '部分失敗' }}"
+      needs-json: ${{ toJSON(needs) }}
+    secrets:
+      DISCORD_WEBHOOK_URL1: ${{ secrets.DISCORD_WEBHOOK_URL1 }}
+      LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}

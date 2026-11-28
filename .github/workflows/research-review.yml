@@ -5,7 +5,7 @@ on:
     paths:
       - 'scripts/**'
       - 'kline_integrity.py'
-      - 'main.py'
+      - '*.py'
       - 'report_metrics.py'
       - 'docs/report/research/**'
       - 'tests/**'

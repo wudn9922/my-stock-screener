@@ -760,7 +760,8 @@ class Run:
                         checked = kline.accept_frame(raw, symbol,
                             refetch=lambda: (self.fetch_raw_chart_once(symbol, RECENT_RANGE),
                                              'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol, kline.utcnow()), now=self.now,
-                            source_url='https://query1.finance.yahoo.com/v7/finance/quote')
+                            source_url='https://query1.finance.yahoo.com/v7/finance/quote',
+                            retained_path=uc.bars_path(self.cache_dir, symbol))
                         if checked.empty:
                             continue
                         bar = dict(bar, **{k.lower():float(checked.iloc[-1][k]) for k in uc.PRICE_COLUMNS})
@@ -839,7 +840,8 @@ class Run:
                         raw = pd.DataFrame([row[1:] for row in filled],
                             index=pd.to_datetime([row[0] for row in filled]), columns=uc.PRICE_COLUMNS)
                 checked = kline.accept_frame(raw, symbol, refetch=lambda:self.fetch_raw_chart_once(symbol, range_), now=self.now,
-                    source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol)
+                    source_url='https://query1.finance.yahoo.com/v8/finance/chart/' + symbol,
+                    retained_path=uc.bars_path(self.cache_dir, symbol))
                 return sessions.analysis_prices(uc.drop_unfinished(checked, market, self.now),self.closed_dates(market))
             except RateLimited:
                 continue

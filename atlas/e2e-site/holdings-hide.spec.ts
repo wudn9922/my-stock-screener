@@ -79,13 +79,33 @@ test('MEXC: USDT and dust rules plus a manual hide exclude holdings from every t
   await expect(hidden(page)).toHaveCount(0);
 
   const rules = await settings(page);
+  const dust = rules.getByRole('checkbox', { name: '隱藏小額持倉' });
+  const threshold = rules.getByRole('combobox', { name: '小額門檻' });
+  const custom = rules.getByRole('textbox', { name: '自訂小額門檻（USDT）' });
+  await expect(dust).toBeChecked();
+  await expect(threshold).toHaveValue('1');
+  await threshold.selectOption('custom');
+  await custom.fill('8.5');
+  await expect(account(page).getByRole('article', { name: 'ETH/USDT 持股' })).toHaveCount(0);
+  await dust.uncheck();
+  await expect(account(page).getByRole('article', { name: 'ETH/USDT 持股' })).toBeVisible();
+  await page.reload();
+  await openHoldings(page);
+  await settings(page);
+  await expect(dust).not.toBeChecked();
+  await expect(account(page).getByRole('article', { name: 'ETH/USDT 持股' })).toBeVisible();
+  await dust.check();
+  await expect(threshold).toHaveValue('custom');
+  await expect(custom).toHaveValue('8.5');
+  await expect(account(page).getByRole('article', { name: 'ETH/USDT 持股' })).toHaveCount(0);
+  await threshold.selectOption('1');
+
   await rules.getByRole('checkbox', { name: '隱藏 USDT（計價單位）' }).check();
   await expect(account(page).getByRole('article', { name: 'USDT/USDT 持股' })).toHaveCount(0);
   await expect(subtotal).toContainText('USDT 市值 7,807.00');
   await expect(hidden(page).locator('summary')).toHaveText('已隱藏 1 檔');
 
-  await rules.getByRole('checkbox', { name: '隱藏小額持倉' }).check();
-  await rules.getByRole('combobox', { name: '小額門檻' }).selectOption('10');
+  await threshold.selectOption('10');
   await expect(account(page).getByRole('article', { name: 'ETH/USDT 持股' })).toHaveCount(0);
   // A holding without a price is never auto-hidden.
   await expect(account(page).getByRole('article', { name: 'SHIB/USDT 持股' })).toHaveCount(1);

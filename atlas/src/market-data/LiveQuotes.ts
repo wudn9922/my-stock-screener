@@ -29,6 +29,8 @@ export interface LiveDaily {
 export type LiveListener = (value: LiveDaily) => void;
 export interface LiveSubscriptionOptions {
   onError?: () => void;
+  /** Chart entry may reuse a recent batch, but asks now if the retained quote is older. */
+  freshOnSubscribe?: boolean;
   /** Minimum source refresh interval; the shortest active subscriber wins for this symbol. */
   minIntervalMs?: number;
 }
@@ -111,7 +113,7 @@ export function quotesUrl(proxyUrl: string, symbols: readonly string[]): string 
   return `${proxyUrl}${separator}quotes=${symbols.map(encodeURIComponent).join(',')}`;
 }
 
-/** Normalizes one symbol of a batch with the same validation as the chart; invalid rows give null. */
+/** Normalizes one symbol of a batch with the same validation as the chart; returns null when no usable response remains. */
 export function normalizeLive(raw: unknown, symbol: string, retrievedAt: number): LiveDaily | null {
   try {
     const result: BarResult = normalizeYahooResponse(raw, retrievedAt, '1D', symbol);
@@ -204,9 +206,11 @@ export class LiveQuoteFeed {
     } else if (entry.last && requested < this.minimumInterval(entry) && this.now()-entry.fetchedAt >= FRESH_MS) {
       entry.fetchedAt = 0;
     }
-    entry.listeners.set(listener, options);
     const last = entry.last;
-    if (last) queueMicrotask(() => entry!.listeners.has(listener) && listener(last));
+    const recent = last && this.now() - last.retrievedAt * 1000 < FRESH_MS;
+    if (options.freshOnSubscribe && !recent) entry.fetchedAt = 0;
+    entry.listeners.set(listener, options);
+    if (last && (!options.freshOnSubscribe || recent)) queueMicrotask(() => entry!.listeners.has(listener) && listener(last));
     this.start();
     this.kick();
     let subscribed = true;
@@ -255,6 +259,11 @@ export class LiveQuoteFeed {
     if (this.kickTimer) return;
     this.kickTimer = setTimeout(() => {
       this.kickTimer = null;
+      if (this.running) {
+        // A symbol opened mid-batch still needs its first fetch once that batch finishes.
+        void this.running.finally(() => { if (this.entries.size) this.kick(); });
+        return;
+      }
       void this.poll(false);
     }, 250);
   }
