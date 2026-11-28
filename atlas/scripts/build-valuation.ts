@@ -5,7 +5,8 @@
  *   node scripts/build-valuation.mjs [--market=us|tw|all] [--fixtures=tests/fixtures/valuation]
  *   Env: SEC_USER_AGENT (default "my-stock-screener-atlas (https://github.com/wudn9922/my-stock-screener)"),
  *        ATLAS_VALUATION_OUT_DIR (default public/valuation), ATLAS_TODAY (YYYY-MM-DD, fixtures/tests),
- *        ATLAS_FIXTURE_DIR (same as --fixtures).
+ *        ATLAS_FIXTURE_DIR (same as --fixtures), ATLAS_FINANCIALS_DIR (default ../docs/report/financials;
+ *        fixture runs default to the fixture directory's financials subdirectory).
  *
  * The workflow runs this with --market=tw only: SEC answers 403 to GitHub Actions runners, so
  * public/valuation/us.json is built by scripts/build_valuation_us.py (Yahoo Finance) instead. The SEC
@@ -22,6 +23,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createSourceFetcher, fixtureDirFromEnv, type SourceFetcher } from './lib/source-fetcher';
 import { directoryItemsFromDocument } from './symbol-directory';
+import { enrichTaiwanValuation, taipeiBuildDate } from './taiwan-valuation-history';
 import {
   addFrame,
   annualYearsToFetch,
@@ -130,7 +132,7 @@ async function buildTaiwanExchange(
   const annual = await fetcher.json(urls.eps[0]!, { fixture: urls.eps[1]! }).then(parseTaiwanAnnualEps, () => new Map());
   const previousForExchange = Object.fromEntries(Object.entries(previous).filter(([, record]) => record.source === exchange));
   return {
-    items: buildTaiwanRecords({ exchange, pe, close, annual, previous: previousForExchange, supplementalAnnual, fallbackDate }),
+    items: buildTaiwanRecords({ exchange, pe, close, annual, previous: previousForExchange, supplementalAnnual, fallbackDate, includeBlank: true }),
     stats: { pe: pe.length, close: close.size, annualEps: annual.size },
   };
 }
@@ -141,7 +143,9 @@ async function main() {
   if (markets.some((market) => !['us', 'tw'].includes(market))) throw new Error(`Unknown --market=${marketArg}`);
   const fixtureDir = fixtureDirFromEnv();
   const offline = !!fixtureDir;
-  const { ms: todayMs, iso: todayIso } = today();
+  const { ms: todayMs } = today();
+  const todayIso = taipeiBuildDate(todayMs);
+  const financialsDir = process.env.ATLAS_FINANCIALS_DIR || (fixtureDir ? join(fixtureDir, 'financials') : '../docs/report/financials');
   const generatedAt = new Date(Number(process.env.ATLAS_NOW_MS) || Date.now()).toISOString();
   let failed = false;
 
@@ -188,7 +192,7 @@ async function main() {
           const result = await buildTaiwanExchange(fetcher, exchange, previous, supplementalAnnual, todayIso);
           const count = Object.keys(result.items).length;
           if (count < (offline ? 1 : 500)) throw new Error(`only ${count} records`);
-          Object.assign(items, result.items);
+          Object.assign(items, await enrichTaiwanValuation(result.items, financialsDir, todayIso));
           stats[exchange] = { records: count, ...result.stats };
         } catch (error) {
           failed = true;
@@ -204,7 +208,7 @@ async function main() {
         market: 'TW',
         generatedAt,
         source: 'TWSE OpenAPI BWIBBU_ALL / STOCK_DAY_ALL / t187ap14_L; TPEx OpenAPI tpex_mainboard_peratio_analysis / daily_close_quotes / mopsfin_t187ap14_O; Yahoo Finance annual EPS (tw-annual.json)',
-        notes: 'exchangePeTtm is the exchange P/E (latest four quarters); epsTtm = close / exchangePeTtm; epsAnnual from a full-year (Q4) exchange statement, kept until the next one, or from Yahoo Finance annual EPS in TWD (annualSource) when no exchange statement for that or a later year is stored.',
+        notes: 'exchangePeTtm is the exchange P/E (latest four quarters); epsTtm = close / exchangePeTtm; epsAnnual from a full-year (Q4) exchange statement, kept until the next one, or from Yahoo Finance annual EPS in TWD (annualSource) when no exchange statement for that or a later year is stored. Optional financial-history EPS fields supersede exchange P/E when restated or when exchange P/E is unavailable.',
         items,
       };
       const bytes = await writeAtomic(join(OUT_DIR, 'tw.json'), document);

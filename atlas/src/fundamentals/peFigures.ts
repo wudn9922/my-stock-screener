@@ -5,7 +5,7 @@ import { getMarketProfile } from '../market-data/MarketProfile';
 export interface PeFigures {
   /** Price / annual EPS. */
   pe: number | null;
-  /** Price / TTM EPS (Taiwan: the exchange-published TTM P/E when present). */
+  /** Price / TTM EPS (Taiwan: calculated financial EPS takes priority when supplied). */
   peTtm: number | null;
   /** True when annual EPS is zero or negative (P/E not meaningful: show 「虧損」). */
   peLoss: boolean;
@@ -16,7 +16,7 @@ export interface PeFigures {
   fiscalYear: number | null;
   source: string | null;
   asOf: string | null;
-  /** Set when restatedPe.ts recomputed a figure from restated EPS (配股 / splits): what was changed, for the help text. */
+  /** Explanation of the build-time EPS calculation, for the help text. */
   epsNote?: string | null;
 }
 
@@ -35,28 +35,25 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
   // Not memoized here: the provider caches (and periodically reloads) its market files itself.
   const valuation: Valuation | null = await source(symbol).catch(() => null);
   if (!valuation) return empty('暫無 EPS 資料');
-  const annual = describePe(price, valuation.epsAnnual);
+  const taiwan = getMarketProfile(symbol).market === 'TW';
+  const annual = describePe(price, taiwan ? valuation.epsAnnualRestated ?? valuation.epsAnnual : valuation.epsAnnual);
   const exchangeTtm =
-    getMarketProfile(symbol).market === 'TW' && typeof valuation.exchangePeTtm === 'number' && valuation.exchangePeTtm > 0
+    taiwan && typeof valuation.exchangePeTtm === 'number' && valuation.exchangePeTtm > 0
       ? valuation.exchangePeTtm
       : null;
-  const ttm = exchangeTtm !== null ? { pe: exchangeTtm, negativeEarnings: false } : describePe(price, valuation.epsTtm);
-  // Taiwan: the exchange leaves its TTM P/E blank when the last four quarters lost money. A stock that has a
-  // full-year EPS on record but no TTM figure at all is therefore treated as loss-making over the last four quarters.
-  const ttmLoss =
-    ttm.negativeEarnings ||
-    (getMarketProfile(symbol).market === 'TW' &&
-      valuation.exchangePeTtm == null &&
-      valuation.epsTtm == null &&
-      valuation.epsAnnual != null);
+  const calculated = taiwan ? valuation.epsTtmCalculated : undefined;
+  const ttm = calculated !== undefined ? describePe(price, calculated)
+    : exchangeTtm !== null ? { pe: exchangeTtm, negativeEarnings: false } : describePe(price, valuation.epsTtm);
+  const ttmMissing = taiwan && calculated === undefined && exchangeTtm === null && valuation.epsTtm == null;
   const reasonOf = (result: { pe: number | null; negativeEarnings: boolean; reason?: string }) =>
     result.pe !== null ? null : result.negativeEarnings ? '虧損，本益比不適用' : result.reason === 'missing-price' ? '暫無股價' : '暫無 EPS 資料';
   return {
     pe: annual.pe,
     peTtm: ttm.pe,
     peLoss: annual.negativeEarnings,
-    peTtmLoss: ttmLoss,
-    reason: annual.negativeEarnings || ttmLoss ? '虧損，本益比不適用' : reasonOf(annual) ?? reasonOf(ttm),
+    peTtmLoss: ttm.negativeEarnings,
+    reason: ttmMissing ? '近四季 EPS 資料不足' : annual.negativeEarnings || ttm.negativeEarnings ? '虧損，本益比不適用' : reasonOf(annual) ?? reasonOf(ttm),
+    ...(taiwan && valuation.epsNote ? { epsNote: valuation.epsNote } : {}),
     fiscalYear: valuation.fiscalYear,
     source: valuation.source,
     asOf: valuation.asOf,
@@ -67,7 +64,7 @@ export type ScreenerPeFigures = Readonly<Record<string, PeFigures>>;
 
 /** Same TTM-first, annual-fallback figure shown in the screener; losses never pass a numeric range. */
 export function screenerPeValue(figures: PeFigures | undefined): number | null {
-  if (!figures || figures.peTtmLoss) return null;
+  if (!figures || figures.peTtmLoss || figures.reason === '近四季 EPS 資料不足') return null;
   const value = figures.peTtm ?? figures.pe;
   return value !== null && Number.isFinite(value) && value > 0 ? value : null;
 }

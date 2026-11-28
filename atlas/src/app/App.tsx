@@ -113,8 +113,6 @@ import { MarketLoginPrompt } from '../ui/MarketLogin';
 import { ListPicker } from '../ui/ListPicker';
 import { symbolInAnyList } from '../lists/unifiedLists';
 import { watchlistStore } from '../watchlists/store';
-import { loadFinancials } from '../fundamentals/FinancialHistory';
-import { restatePeFigures } from '../fundamentals/restatedPe';
 
 type Panel = 'indicators' | 'drawings' | 'backtest' | 'alerts' | 'settings';
 const StockResearch = lazy(() => import('../ui/research/StockResearch'));
@@ -767,12 +765,6 @@ export function App({
     if (!state.ready || providerId === 'demo') return;
     let live = true;
     void getPeFigures(symbol, headerPrice)
-      .then(async (figures) => {
-        // Taiwan: EPS printed before a later 配股 / split are put on today's share basis (financials file).
-        if (getMarketProfile(symbol).market !== 'TW') return figures;
-        const financials = await loadFinancials(symbol).catch(() => null);
-        return restatePeFigures(figures, financials?.status === 'ok' ? financials.data : null, headerPrice, new Date().toISOString().slice(0, 10));
-      })
       .then((figures) => {
         if (live) setPe({ symbol, figures });
       });

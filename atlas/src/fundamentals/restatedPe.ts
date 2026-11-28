@@ -42,12 +42,31 @@ export interface RestatedEpsFigure {
   periodEnd: string;
 }
 
+function latestTtmIndex(history: FinancialHistory, today: string): number | null {
+  const series = history.quarterly;
+  let index = series.end.length - 1;
+  while (index >= 0 && (series.end[index]! > today || reportedEpsAt(series, index) === null)) index--;
+  return index < 3 || series.end[index]! < latestDueQuarter(today) || !consecutiveQuarters(series.end, index, 4) ? null : index;
+}
+
+/** Reported EPS only, when corporate-action coverage is unavailable; never fill a missing quarter. */
+export function reportedTtmEps(history: FinancialHistory, today: string): number | null {
+  const index = latestTtmIndex(history, today);
+  if (index === null) return null;
+  let sum = 0;
+  for (let i = index - 3; i <= index; i++) {
+    const value = reportedEpsAt(history.quarterly, i);
+    if (value === null) return null;
+    sum += value;
+  }
+  return Math.round(sum * 1e4) / 1e4;
+}
+
 /** Latest four consecutive quarters, restated and as reported; null when the file is behind the newest due quarter or a quarter lacks a restated EPS. */
 export function restatedTtmEps(history: FinancialHistory, today: string): RestatedEpsFigure | null {
   const series = history.quarterly;
-  let index = series.end.length - 1;
-  while (index >= 0 && reportedEpsAt(series, index) === null) index--;
-  if (index < 3 || series.end[index]! < latestDueQuarter(today) || !consecutiveQuarters(series.end, index, 4)) return null;
+  const index = latestTtmIndex(history, today);
+  if (index === null) return null;
   const adjustments = epsAdjustments(history, 'quarterly');
   let restated = 0;
   let reported = 0;
