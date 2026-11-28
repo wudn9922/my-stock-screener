@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { dividendCashflow, supplementaryPremium, taipeiDay } from '../src/holdings/dividendCashflow';
 import type { Holding } from '../src/holdings/model';
-import { cashDividendsSchema } from '../src/holdings/twCashDividends';
+import { cashDividendsSchema, fetchCashDividends } from '../src/holdings/twCashDividends';
 
 const holding: Holding = { id: 'a', accountId: 'b', symbol: '2330.TW', market: 'TW', costCurrency: 'TWD', quantity: '1000', averageCost: '100', source: 'manual', updatedAt: '2026-01-01T00:00:00Z' };
 const event = (exDate: string, perShare: number, paymentDate: string | null = null) => ({ exDate, perShare, paymentDate, year: exDate });
@@ -46,5 +46,19 @@ describe('Taiwan dividend cashflow', () => {
     expect(cashDividendsSchema.safeParse({ ...source, version: 2 }).success).toBe(false);
     expect(cashDividendsSchema.safeParse({ ...source, stocks: null }).success).toBe(false);
     expect(taipeiDay(Date.parse('2026-11-27T16:00:00Z'))).toBe(today);
+  });
+  it('uses the independent snapshot URL and rejects stale envelopes', async () => {
+    const now = Date.now();
+    const doc = { version: 1, generatedAt: new Date(now).toISOString(), stocks: {} };
+    const fetcher = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => doc })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...doc, generatedAt: new Date(now - 5 * 86400000).toISOString() }) });
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      await expect(fetchCashDividends()).resolves.toEqual({});
+      expect(String(fetcher.mock.calls[0]?.[0])).toMatch(/\/tw-cash-dividends\.json$/);
+      await expect(fetchCashDividends()).rejects.toThrow('Cash dividends unavailable');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

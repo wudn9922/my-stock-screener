@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 
-from research_io import read, write
+from research_io import read
 
 ROOT = Path(__file__).resolve().parents[1]
 SYMBOL = re.compile(r"^[0-9]{4,6}[A-Z]?\.(?:TW|TWO)$")
@@ -60,7 +60,7 @@ def build(report, now):
             skipped += 1
     if not stocks:
         raise ValueError("No valid cash dividend records")
-    return dict(version=1, generatedAt=now.isoformat(), stocks=stocks), skipped
+    return dict(version=1, generatedAt=now.replace(microsecond=0).isoformat(), stocks=stocks), skipped
 
 
 def run(report, now, dry_run=False):
@@ -70,9 +70,7 @@ def run(report, now, dry_run=False):
         previous = read(output, {})
         if len(result["stocks"]) < .8 * len(previous.get("stocks", {})):
             raise ValueError("Cash dividend coverage dropped")
-        # Match the compact writer's actual bytes. The independent timeline stays untouched.
-        if previous and previous.get("stocks") == result["stocks"]:
-            result["generatedAt"] = previous["generatedAt"]
+        # Measure exactly the compact UTF-8 bytes that would be published.
         body = (json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode()
         upcoming = report / "upcoming-events.json"
         sizes = {"tw-cash-dividends.json": len(body)}
@@ -82,8 +80,14 @@ def run(report, now, dry_run=False):
         if skipped:
             print(f"::warning::Skipped {skipped} invalid cash dividend stock records")
         if not dry_run:
-            # Unchanged data retain their existing generation timestamp.
-            write(output, result)
+            # Refresh snapshot freshness, even if source events have not changed.
+            output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = output.with_suffix(".json.tmp")
+            try:
+                temporary.write_bytes(body)
+                temporary.replace(output)
+            finally:
+                temporary.unlink(missing_ok=True)
         return True
     except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
         print("::warning::Cash dividend snapshot unavailable; previous output retained")

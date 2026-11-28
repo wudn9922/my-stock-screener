@@ -29,6 +29,7 @@ export async function fetchCashDividends(signal?: AbortSignal): Promise<CashDivi
   const response = await fetch(new URL('tw-cash-dividends.json', reportUrl()), { signal, cache: 'no-cache' });
   if (!response.ok) throw new Error('Cash dividends unavailable');
   const data = cashDividendsSchema.parse(await response.json());
-  if (Date.parse(data.generatedAt) > Date.now() + 300000) throw new Error('Cash dividends unavailable');
+  const age = Date.now() - Date.parse(data.generatedAt);
+  if (age < -300000 || age > 4 * 86400000) throw new Error('Cash dividends unavailable');
   return data.stocks;
 }
