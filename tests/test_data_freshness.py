@@ -278,7 +278,7 @@ class ExternalHeartbeatTest(unittest.TestCase):
         self.assertNotIn('secrets.', step['run'])
         with tempfile.TemporaryDirectory() as folder:
             fake = Path(folder) / 'curl'
-            fake.write_text('#!/bin/sh\\nprintf "%s\\n" "$@" > "$CAPTURE"\\n')
+            fake.write_text('#!/bin/sh' + chr(10) + 'printf "%s\\n" "$@" > "$CAPTURE"' + chr(10))
             fake.chmod(0o755)
             capture = Path(folder) / 'args'
             env = dict(os.environ, PATH=folder + os.pathsep + os.environ['PATH'], CAPTURE=str(capture))
