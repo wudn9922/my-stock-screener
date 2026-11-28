@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { reportUrl } from './loadReport';
 
 export const DIGEST_MAX_AGE_DAYS = 30;
+export const FLOW_MAX_AGE_SESSIONS = 5;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
   const stamp = Date.parse(value);
   return Number.isFinite(stamp) && new Date(stamp).toISOString().slice(0, 10) === value;
@@ -20,8 +21,10 @@ export const stockDigestSchema = z.object({
 export type StockDigest = z.infer<typeof stockDigestSchema>;
 export type DigestRow = z.infer<typeof row>;
 
-export function visibleDigest(data: StockDigest, symbol: string, today: string): DigestRow[] {
+export function visibleDigest(data: StockDigest, symbol: string, today: string, taiwanSessions: readonly string[] = []): DigestRow[] {
+  const flowDays = new Set([...new Set(taiwanSessions)].filter(d => d <= today).sort().slice(-FLOW_MAX_AGE_SESSIONS));
   return (data.stocks[symbol] ?? []).filter(row => {
+    if (row.kind === 'foreign-reversal' || row.kind === 'trust-reversal') return flowDays.has(row.date);
     const age = (Date.parse(today) - Date.parse(row.date)) / 86400000;
     return age >= 0 && age <= DIGEST_MAX_AGE_DAYS;
   });

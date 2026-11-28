@@ -57,6 +57,12 @@ export class MarketCalendarStore {
     })().finally(() => { if (this.day === requestDay) this.loading = null; });
     return this.loading;
   }
+  /** Calendar-date inclusive; unavailable calendars must not extend an alert's lifetime. */
+  recentSessions(market: 'TW' | 'US', today: string, count: number, closed: ReadonlySet<string>): string[] {
+    const doc = this.document;
+    if (!doc || today < doc.validFrom || today > doc.validTo) return [];
+    return Object.keys(doc.markets[market].sessions).filter(d => d <= today && !closed.has(d)).sort().slice(-count);
+  }
   /** undefined: unavailable/outside coverage (use old rules); null: known closed day. */
   session(profile: MarketProfile, nowMs: number): CalendarSession | null | undefined {
     const doc = this.document;

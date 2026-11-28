@@ -8,11 +8,16 @@ from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 
-from research_io import write
+from research_io import semantic
+from market_sessions import read_policy, verified_closures
+import os
+import tempfile
 from research_store import MarketStore
 
 MARGIN_PP_THRESHOLD = Decimal("3")
 STREAK_DAYS = 3
+FLOW_MAX_AGE_SESSIONS = 5
+STATE_PATH = Path('.cache/stock-digest-state.json')
 DIGEST_MAX_AGE_DAYS = 30
 ROOT = Path(__file__).resolve().parents[1]
 SYMBOL = re.compile(r"^(?:[0-9]{4,6}[A-Z]?\.(?:TW|TWO)|[A-Z][A-Z0-9.-]{0,19})$")
@@ -39,6 +44,17 @@ def number(value):
 def recent(stamp, today):
     d = day(stamp)
     return d is not None and today - timedelta(days=DIGEST_MAX_AGE_DAYS) <= d <= today
+
+
+def recent_flow_sessions(calendar_sessions, today):
+    """Exactly the last five exchange sessions through the Taipei calendar date."""
+    return set(sorted(d for d in calendar_sessions if d <= today.isoformat())[-FLOW_MAX_AGE_SESSIONS:])
+
+
+def row_recent(row, today, flow_sessions):
+    if row["kind"] in ("foreign-reversal", "trust-reversal"):
+        return row["date"] in flow_sessions
+    return recent(row["date"], today)
 
 
 def latest_quarter(document):
@@ -149,13 +165,23 @@ def reversal_events(record, sessions, today, calendar_sessions=None):
     return result
 
 
-def build(report, today, previous):
+def build(report, today, previous, state):
     if previous and previous.get("version") != 1:
         raise ValueError("Unsupported previous digest")
-    entries = {symbol: [r for r in rows if recent(r["date"], today)]
+    if state and state.get("version") != 1:
+        raise ValueError("Unsupported digest state")
+    calendar = read(report / "market-calendar.json")
+    if calendar.get("version") != 1:
+        raise ValueError("Invalid trading calendar")
+    if not calendar.get("validFrom", today.isoformat()) <= today.isoformat() <= calendar.get("validTo", today.isoformat()):
+        raise ValueError("Trading calendar outside coverage")
+    closed = set(verified_closures("tw")) | set(read_policy(report / "market-closures.json").get("tw", {}))
+    calendar_sessions = set(calendar["markets"]["TW"]["sessions"]) - closed
+    flow_sessions = recent_flow_sessions(calendar_sessions, today)
+    entries = {symbol: [r for r in rows if row_recent(r, today, flow_sessions)]
                for symbol, rows in previous.get("stocks", {}).items()}
-    quarters = dict(previous.get("latestQuarters", {}))
-    undated = dict(previous.get("undatedRestatements", {}))
+    quarters = dict(state.get("latestQuarters", {}))
+    undated = {k: v for k, v in state.get("undatedRestatements", {}).items() if v}
     paths = sorted((report / "financials").glob("*.json"))
     if not paths:
         raise ValueError("Financial inputs missing")
@@ -167,21 +193,23 @@ def build(report, today, previous):
         if doc.get("symbol") != symbol:
             raise ValueError("Financial symbol mismatch")
         rows = entries.setdefault(symbol, [])
+        known = symbol in quarters or symbol in undated
         rows.extend(margin_events(doc, quarters.get(symbol), today))
         latest = latest_quarter(doc)
         if latest:
-            quarters[symbol] = max(latest[0], quarters.get(symbol, 0))
-        restated, seen = restatement_events(doc, undated.get(symbol), today)
+            quarters[symbol] = max(latest[0], quarters.get(symbol) or 0)
+        else:
+            quarters.setdefault(symbol, None)
+        restated, seen = restatement_events(doc, undated.get(symbol, []) if known else None, today)
         rows.extend(restated)
-        undated[symbol] = seen
+        if seen:
+            undated[symbol] = seen
+        else:
+            undated.pop(symbol, None)
     research = report / "research"
     index = read(research / "institutions.json")
     if index.get("version") != 1:
         raise ValueError("Invalid institution index")
-    calendar = read(report / "market-calendar.json")
-    if calendar.get("version") != 1:
-        raise ValueError("Invalid trading calendar")
-    calendar_sessions = set(calendar["markets"]["TW"]["sessions"])
     for market, records in MarketStore(research, "institutions").records.items():
         sessions = index.get("sources", {}).get(market, {}).get("dates", [])
         for symbol, record in records.items():
@@ -190,26 +218,72 @@ def build(report, today, previous):
             entries.setdefault(symbol, []).extend(reversal_events(record, sessions, today, calendar_sessions))
     stocks = {}
     for symbol, rows in sorted(entries.items()):
-        unique = {json.dumps(r, sort_keys=True): r for r in rows}
+        unique = {json.dumps(r, sort_keys=True): r for r in rows if row_recent(r, today, flow_sessions)}
         if unique:
             stocks[symbol] = sorted(unique.values(), key=lambda r: (r["date"], r["kind"], r.get("period", "")), reverse=True)
-    return dict(version=1, generatedAt=datetime.now(timezone.utc).isoformat(),
-                stocks=stocks, latestQuarters=quarters, undatedRestatements=undated)
+    public = dict(version=1, generatedAt=datetime.now(timezone.utc).isoformat(), stocks=stocks)
+    state = dict(version=1, latestQuarters=quarters)
+    if undated:
+        state["undatedRestatements"] = undated
+    return public, state
 
 
-def run(report, today, dry_run=False):
+def serialized(value):
+    return (json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+
+
+def publish_pair(outputs):
+    """Stage both files before replacing; restore the first if the second fails."""
+    staged = []
+    replaced = []
+    try:
+        for path, body in outputs:
+            old = path.read_bytes() if path.exists() else None
+            if old == body:
+                continue
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+                staged.append((path, Path(stream.name), old))
+                stream.write(body)
+        for path, temp, old in staged:
+            os.replace(temp, path)
+            replaced.append((path, old))
+    except OSError:
+        for path, old in reversed(replaced):
+            if old is None:
+                path.unlink(missing_ok=True)
+            else:
+                with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+                    stream.write(old)
+                os.replace(stream.name, path)
+        raise
+    finally:
+        for _, temp, _ in staged:
+            temp.unlink(missing_ok=True)
+
+
+def run(report, today, dry_run=False, state_path=None):
     output = report / "stock-digest.json"
+    state_path = state_path or report.parent.parent / STATE_PATH
     try:
         previous = read(output) if output.exists() else {}
-        result = build(report, today, previous)
+        state = read(state_path) if state_path.exists() else {
+            "version": 1, "latestQuarters": previous.get("latestQuarters", {}),
+            "undatedRestatements": previous.get("undatedRestatements", {}),
+        }
+        result, new_state = build(report, today, previous, state)
+        if set(previous) == set(result) and semantic(previous) == semantic(result):
+            result["generatedAt"] = previous["generatedAt"]
+        public_bytes, state_bytes = serialized(result), serialized(new_state)
         counts = Counter(kind for rows in result["stocks"].values() for kind in {r["kind"] for r in rows})
         for kind in ("sec-restatement", "gross-margin", "operating-margin", "foreign-reversal", "trust-reversal"):
             counts.setdefault(kind, 0)
         print("Digest stocks by condition:", json.dumps(dict(sorted(counts.items()))))
-        if not previous:
+        print("Digest bytes:", json.dumps({"stock-digest.json": len(public_bytes), "stock-digest-state.json": len(state_bytes)}))
+        if not state.get("latestQuarters"):
             print("First run: baseline quarter periods, no unproven new-quarter alerts.")
         if not dry_run:
-            write(output, result)
+            publish_pair([(output, public_bytes), (state_path, state_bytes)])
         return True
     except (OSError, ValueError, KeyError, TypeError, IndexError, ArithmeticError, AttributeError):
         print("::warning::Stock digest unavailable; previous output retained")
@@ -219,9 +293,10 @@ def run(report, today, dry_run=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-dir", type=Path, default=ROOT / "docs/report")
+    parser.add_argument("--state-path", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--strict", action="store_true", help="Fail only offline verification on invalid input")
     args = parser.parse_args()
-    ok = run(args.report_dir, datetime.now(ZoneInfo("Asia/Taipei")).date(), args.dry_run)
+    ok = run(args.report_dir, datetime.now(ZoneInfo("Asia/Taipei")).date(), args.dry_run, args.state_path)
     if args.strict and not ok:
         raise SystemExit(1)

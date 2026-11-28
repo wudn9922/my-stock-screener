@@ -84,15 +84,34 @@ class DigestTests(unittest.TestCase):
             (research / "institutions.json").write_text(json.dumps({
                 "version": 1, "storage": store.save(), "sources": {"TW": {"dates": SESSIONS}}
             }))
-            self.assertTrue(digest.run(report, TODAY))
+            state_path = report / "private/state.json"
+            self.assertTrue(digest.run(report, TODAY, state_path=state_path))
             output = report / "stock-digest.json"
             old = output.read_bytes()
             doc = json.loads(old)
             self.assertEqual(doc["version"], 1)
-            self.assertIn("generatedAt", doc)
+            self.assertEqual(set(doc), {"version", "generatedAt", "stocks"})
+            state = json.loads(state_path.read_text())
+            self.assertEqual(state["latestQuarters"], {"AAPL": 2026 * 4 + 3})
+            self.assertNotIn("undatedRestatements", state)
+            state_before = state_path.read_bytes()
             self.assertEqual(set(doc["stocks"]), {"2330.TW"})
-            self.assertTrue(digest.run(report, TODAY, dry_run=True))
+            self.assertTrue(digest.run(report, TODAY, dry_run=True, state_path=state_path))
             self.assertEqual(output.read_bytes(), old)
+            self.assertEqual(state_path.read_bytes(), state_before)
             file.write_text("{")
-            self.assertFalse(digest.run(report, TODAY))
+            self.assertFalse(digest.run(report, TODAY, state_path=state_path))
             self.assertEqual(output.read_bytes(), old)
+            self.assertEqual(state_path.read_bytes(), state_before)
+
+    def test_flow_five_sessions_inclusive_and_financial_thirty_days(self):
+        calendar = ["2026-11-20", "2026-11-23", "2026-11-24", "2026-11-25",
+                    "2026-11-26", "2026-11-27", "2026-11-30"]
+        recent = digest.recent_flow_sessions(calendar, TODAY)
+        self.assertEqual(recent, set(calendar[1:6]))
+        for kind in ("foreign-reversal", "trust-reversal"):
+            self.assertTrue(digest.row_recent({"kind": kind, "date": "2026-11-23"}, TODAY, recent))
+            self.assertFalse(digest.row_recent({"kind": kind, "date": "2026-11-20"}, TODAY, recent))
+            self.assertFalse(digest.row_recent({"kind": kind, "date": "2026-11-28"}, TODAY, recent))
+        self.assertTrue(digest.row_recent({"kind": "gross-margin", "date": "2026-10-29"}, TODAY, recent))
+        self.assertFalse(digest.row_recent({"kind": "sec-restatement", "date": "2026-10-28"}, TODAY, recent))
