@@ -244,7 +244,8 @@ function Row({
   const shownPills = compact
     ? [...metricPills.filter(({ pill }) => pill.growth), ...metricPills.filter(({ pill }) => !pill.growth)].slice(0, 2)
     : metricPills;
-  const hasPe = !!pe && (pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss);
+  const ttmMissing = pe?.peTtmMissing;
+  const hasPe = !!pe && (ttmMissing || pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss);
   const compactTitle = compact
     ? [distances.length ? `距 ${distances.map(({ period, distance }) => `MA${period} ${formatPercent(distance, 1)}`).join('、')}` : '', note]
       .filter(Boolean)
@@ -321,7 +322,9 @@ function Row({
         {hasPe && pe ? (
           <>
             <small>本益比</small>
-            {pe.peTtmLoss || (pe.peTtm === null && pe.pe === null) ? (
+            {ttmMissing ? (
+              <span className="row-pe-none">—</span>
+            ) : pe.peTtmLoss || (pe.peTtm === null && pe.pe === null) ? (
               <span className="pe-loss">虧損</span>
             ) : (
               formatRatio(pe.peTtm ?? pe.pe)

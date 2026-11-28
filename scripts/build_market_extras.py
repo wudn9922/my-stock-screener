@@ -15,6 +15,11 @@ import time
 from zoneinfo import ZoneInfo
 import requests
 
+if __package__:
+    from .output_guard import OutputRejected, require
+else:
+    from output_guard import OutputRejected, require
+
 ROOT = Path(__file__).resolve().parents[1]
 SYMBOL = re.compile(r"^[A-Z][A-Z0-9.-]{0,14}$")
 
@@ -36,15 +41,23 @@ def fetch(url):
     return r.json()
 
 def ipo_companies(payload, checked_at):
+    label = f'US Nasdaq IPO {checked_at[:7]}'
+    require(isinstance(payload, dict), label, 'calendar is not an object')
     data = payload.get('data')
-    if not isinstance(data, dict):
-        raise ValueError('IPO source did not provide a calendar')
+    require(isinstance(data, dict), label, 'calendar data is not an object')
     output = {}
     for section, status in [('filed', '已申報，掛牌日待確認'), ('upcoming', '預計上市（日期可能變動）'), ('priced', '已定價，掛牌狀態請查官方公告')]:
-        table = data.get(section) or {}
+        table = data.get(section)
+        require(isinstance(table, dict), label, f'{section}: missing table')
         if section == 'upcoming':
             table = table.get('upcomingTable', table)
-        for row in table.get('rows') or []:
+        # Nasdaq explicitly uses null for an empty table; an absent rows field is a schema failure.
+        require(isinstance(table, dict) and 'rows' in table
+                and (table['rows'] is None or isinstance(table['rows'], list)),
+                label, f'{section}: missing or invalid rows (expected array or null)')
+        rows = table['rows'] or []
+        require(all(isinstance(row, dict) for row in rows), label, f'{section}: malformed rows ({len(rows)})')
+        for row in rows:
             if not isinstance(row, dict):
                 continue
             name = row.get('companyName')
@@ -124,9 +137,14 @@ def collect(root=ROOT, getter=fetch, now=None, limit=240, budget=150):
                         'sourceUrl': 'https://www.nasdaq.com/market-activity/ipos'}
                     # pricedDate is pricing day, not listing day; never substitute one for the other.
         failure = None if fresh else '本月行事曆暫無資料'
-    except (requests.RequestException, ValueError, TypeError):
-        failure = 'IPO 行事曆更新失敗，保留上次核對資料'
-    write(dest / 'ipo-watch.json', {'version': 1, 'generatedAt': checked, 'reason': failure, 'companies': list(companies.values())[:1000]})
+    except (requests.RequestException, ValueError, TypeError, OutputRejected) as exc:
+        # Failure reason goes to the job log; the previous file (including reason/generatedAt) stays byte-for-byte.
+        reason = str(exc) if isinstance(exc, OutputRejected) else type(exc).__name__
+        print(f"US Nasdaq IPO {now:%Y-%m}: {reason}; 保留前版 {len(previous.get('companies', []))} 筆", flush=True)
+        ipo_failed = True
+    else:
+        ipo_failed = False
+        write(dest / 'ipo-watch.json', {'version': 1, 'generatedAt': checked, 'reason': failure, 'companies': list(companies.values())[:1000]})
     trending = read(dest / 'trending-stocks.json', {}).get('symbols', [])
     report = read(dest / 'latest.json', {})
     symbols = trending + [s for g in report.get('groups', []) for s in [i.get('symbol', '') for i in g.get('items', [])]]
@@ -159,8 +177,10 @@ def collect(root=ROOT, getter=fetch, now=None, limit=240, budget=150):
             if i % 40 == 0 or i == len(symbols):
                 print(f'Market extras: {i}/{len(symbols)} symbols, {time.monotonic()-started:.1f}s', flush=True)
 
+    return 1 if ipo_failed else 0
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--limit', type=int, default=240)
     args = parser.parse_args()
-    collect(limit=max(1, min(500, args.limit)))
+    raise SystemExit(collect(limit=max(1, min(500, args.limit))))

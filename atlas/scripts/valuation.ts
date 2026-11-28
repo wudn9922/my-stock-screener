@@ -14,6 +14,11 @@
 export interface ValuationRecord {
   epsTtm: number | null;
   epsAnnual: number | null;
+  /** Taiwan only: TTM from four financial-report quarters, on current share basis when available. */
+  epsTtmCalculated?: number;
+  epsTtmCalculation?: 'restated' | 'reported';
+  epsAnnualRestated?: number;
+  epsNote?: string;
   fiscalYear: number | null;
   /** Taiwan only: set when `epsAnnual` came from tw-annual.json instead of the exchange statement. */
   annualSource?: 'Yahoo Finance';
@@ -391,6 +396,8 @@ export interface TaiwanBuildInput {
    */
   supplementalAnnual?: ReadonlyMap<string, { eps: number; fiscalYear: number }>;
   fallbackDate: string;
+  /** The financial-history enrichment needs to see even blank exchange rows. */
+  includeBlank?: boolean;
 }
 
 export function buildTaiwanRecords(input: TaiwanBuildInput): Record<string, ValuationRecord> {
@@ -413,7 +420,7 @@ export function buildTaiwanRecords(input: TaiwanBuildInput): Record<string, Valu
     if (supplement && (!annual || supplement.fiscalYear > annual.fiscalYear)) annual = { ...supplement, annualSource: 'Yahoo Finance' };
     const epsAnnual = annual?.eps ?? null;
     // A row without any usable figure (loss-making or suspended: the exchange leaves P/E blank) is omitted.
-    if (epsTtm === null && epsAnnual === null && row.pe === null) continue;
+    if (!input.includeBlank && epsTtm === null && epsAnnual === null && row.pe === null) continue;
     items[symbol] = {
       epsTtm,
       epsAnnual,

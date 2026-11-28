@@ -105,6 +105,7 @@ describe('2755.TWO on today\'s share basis', () => {
       peTtm: Math.round((price / 6.42) * 100) / 100, // exchange P/E on the reported EPS
       peLoss: false,
       peTtmLoss: false,
+      peTtmMissing: false,
       reason: null,
       fiscalYear: 2025,
       source: 'TPEx',

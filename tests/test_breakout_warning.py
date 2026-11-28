@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -141,6 +142,36 @@ class EndToEndTest(unittest.TestCase):
             out.write_text('{"keep": true}')
             self.assertEqual(bw.main(["--archive-dir", tmp, "--out", str(out), "--workers", "1"]), 1)
             self.assertEqual(json.loads(out.read_text()), {"keep": True})
+
+
+class CoverageGateTest(unittest.TestCase):
+    def test_market_gate_before_write_and_legacy_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "breakout-warning.json"
+            old = {"generatedAt": "old", "markets": {"tw": {"stocks": 200, "failedStocks": 0}, "us": {"stocks": 200, "failedStocks": 0}}}
+            raw = json.dumps(old, indent=2).encode()
+            args = ["--out", str(out), "--workers", "1"]
+            def candidate(market, evaluated, failed):
+                return {"asOf": "2026-11-27", "stocks": evaluated + failed, "evaluated": evaluated,
+                        "failedStocks": failed, "methods": {}, "closes": []}
+            for evaluated, failed in [(0, 200), (169, 0), (180, 21)]:
+                out.write_bytes(raw)
+                with patch.object(bw, "build_market", side_effect=lambda root, market, workers: candidate(market, evaluated, failed) if market == "tw" else candidate(market, 200, 0)):
+                    self.assertEqual(bw.main(args), 1)
+                self.assertEqual(out.read_bytes(), raw)
+            out.write_bytes(raw)
+            with patch.object(bw, "build_market", side_effect=lambda root, market, workers: candidate(market, 170, 0) if market == "tw" else candidate(market, 180, 20)):
+                self.assertEqual(bw.main(args), 0)
+            self.assertEqual(json.loads(out.read_text())["markets"]["tw"]["evaluated"], 170)
+            self.assertEqual(json.loads(out.read_text())["markets"]["us"]["failedStocks"], 20)
+
+    def test_no_signals_are_evaluated_not_failed(self):
+        days = pd.bdate_range("2026-01-01", periods=5)
+        with patch.object(bw, "load_bars", return_value=trend_frame(days, 1)), patch.object(bw, "archive_symbols", return_value=[f"S{i}" for i in range(200)]), patch.object(bw, "_work", return_value=[]):
+            market = bw.build_market(".", "tw", 1)
+        self.assertEqual(market["evaluated"], 200)
+        self.assertEqual(market["failedStocks"], 0)
+        bw.validate_market("tw", market, {})
 
 
 if __name__ == "__main__":

@@ -30,6 +30,12 @@ for (const market of ['TW', 'US'] as const) {
     await setup(page, data);
     await page.goto(`./?page=screener&group=${data.group.key}`);
     await expect(page.locator('.screener-row')).toHaveCount(6);
+    if (market === 'TW') {
+      const missingPe = page.locator('.screener-row', { hasText: '5003' }).locator('.row-pe');
+      await expect(missingPe).toHaveAttribute('title', '近四季 EPS 資料不足');
+      await expect(missingPe).toContainText('—');
+      await expect(missingPe).not.toContainText('虧損');
+    }
     await page.getByRole('button', { name: '篩選條件', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: '篩選條件' });
     await sheet.getByRole('navigation', { name: '篩選分類' }).getByRole('button', { name: '基本面', exact: true }).click();
