@@ -125,7 +125,7 @@ def restatement_events(document, previous, today):
     return rows, sorted(undated)
 
 
-def reversal_events(record, sessions, today):
+def reversal_events(record, sessions, today, calendar_sessions=None):
     rows = sorted(record.get("rows", []), key=lambda r: r["date"])
     sample = rows[-(STREAK_DAYS + 1):]
     if len(sample) != STREAK_DAYS + 1:
@@ -133,6 +133,9 @@ def reversal_events(record, sessions, today):
     stamps = [r["date"] for r in sample]
     # Missing stock observations are not consecutive exchange sessions.
     if stamps != sorted(set(sessions))[-(STREAK_DAYS + 1):] or not recent(stamps[-1], today):
+        return []
+    # The exchange calendar also catches a missing day in the entire market source.
+    if calendar_sessions is not None and stamps != sorted(d for d in calendar_sessions if stamps[0] <= d <= stamps[-1]):
         return []
     result = []
     for role in ("foreign", "trust"):
@@ -175,12 +178,16 @@ def build(report, today, previous):
     index = read(research / "institutions.json")
     if index.get("version") != 1:
         raise ValueError("Invalid institution index")
+    calendar = read(report / "market-calendar.json")
+    if calendar.get("version") != 1:
+        raise ValueError("Invalid trading calendar")
+    calendar_sessions = set(calendar["markets"]["TW"]["sessions"])
     for market, records in MarketStore(research, "institutions").records.items():
         sessions = index.get("sources", {}).get(market, {}).get("dates", [])
         for symbol, record in records.items():
             if not SYMBOL.fullmatch(symbol) or record.get("symbol") != symbol:
                 raise ValueError("Institution symbol mismatch")
-            entries.setdefault(symbol, []).extend(reversal_events(record, sessions, today))
+            entries.setdefault(symbol, []).extend(reversal_events(record, sessions, today, calendar_sessions))
     stocks = {}
     for symbol, rows in sorted(entries.items()):
         unique = {json.dumps(r, sort_keys=True): r for r in rows}
