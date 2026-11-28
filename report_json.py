@@ -13,6 +13,7 @@ from index_trend import analyze_index_trend
 from screener_common import clean_json_value, get_tw_stock_name, safe_float, safe_int
 from screener_config import REPORT_DIR, REPORT_JSON_VERSION
 from sector_weekly import SECTOR_WEEKLY_MA_LIST
+from scripts.output_guard import finite, require, retain_count, unique_keys
 
 
 # =========================================================================
@@ -1085,6 +1086,85 @@ def write_json_atomic(path, payload):
     return path
 
 
+def validate_report(payload, previous):
+    """Check the complete report before touching latest.json; group membership is dynamic."""
+    day = payload.get("reportDate") if isinstance(payload, dict) else None
+    label = f"latest.json {day}"
+    require(isinstance(payload, dict), label, "invalid report object")
+
+    def valid_day(value):
+        try:
+            return isinstance(value, str) and datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d") == value
+        except ValueError:
+            return False
+
+    require(valid_day(day), label, "invalid reportDate")
+    if previous is not None:
+        require(isinstance(previous, dict) and valid_day(previous.get("reportDate")), label, "invalid previous reportDate")
+        require(day >= previous["reportDate"], label, f"date regressed from {previous['reportDate']}")
+    prior = previous or {}
+
+    def rows(doc, field, context):
+        value = doc.get(field)
+        require(isinstance(value, list) and all(isinstance(row, dict) for row in value),
+                context, f"invalid {field} rows")
+        return value
+
+    def market_map(doc):
+        markets = rows(doc, "markets", label)
+        unique_keys((m.get("key") for m in markets), label + " markets")
+        return {m["key"]: m for m in markets}
+
+    def positive_indices(market, value):
+        market_label = f"{label} {market}"
+        indices = rows(value, "indices", market_label)
+        unique_keys((i.get("symbol") for i in indices), market_label)
+        return {i["symbol"] for i in indices if finite(i.get("close")) and i["close"] > 0}
+
+    current_markets = market_map(payload)
+    prior_markets = market_map(prior) if previous is not None else {}
+    missing = set(prior_markets) - set(current_markets)
+    require(not missing, label, f"missing markets {sorted(missing)} ({len(current_markets)}/{len(prior_markets)})")
+    current_indices = {key: positive_indices(key, market) for key, market in current_markets.items()}
+    for key, market in prior_markets.items():
+        before = positive_indices(key, market)
+        after = current_indices[key]
+        require(before <= after, f"{label} {key}", f"missing positive indices {sorted(before - after)} ({len(after)}/{len(before)})")
+    for market, symbol in (("tw", "^TWII"), ("us", "^GSPC")):
+        available = current_indices.get(market, set())
+        require(symbol in available, f"{label} {market}", f"missing positive anchor {symbol} ({len(available)} usable indices)")
+
+    def group_counts(doc):
+        groups = rows(doc, "groups", label)
+        unique_keys((g.get("key") for g in groups), label + " groups")
+        stocks = {"TW": set(), "US": set()}
+        for group in groups:
+            market = group.get("market")
+            items = rows(group, "items", f"{label} {market} {group['key']}")
+            if market in stocks:
+                # A stock in several groups is one usable identity, not several.
+                stocks[market].update(item["symbol"] for item in items
+                                      if isinstance(item.get("symbol"), str) and item["symbol"].strip()
+                                      and finite(item.get("close")))
+        return {market: len(symbols) for market, symbols in stocks.items()}
+
+    counts = group_counts(payload)
+    prior_counts = group_counts(prior) if previous is not None else {}
+    for market, count in counts.items():
+        before = prior_counts.get(market, 0)
+        if before >= 20:
+            retain_count(count, before, f"{label} {market} groups", min_share=.85)
+
+    def world_count(doc):
+        return len({i["symbol"] for i in rows(doc, "worldIndices", label)
+                    if isinstance(i.get("symbol"), str) and i["symbol"].strip() and finite(i.get("close"))})
+
+    world = world_count(payload)
+    prior_world = world_count(prior) if previous is not None else 0
+    if prior_world >= 5:
+        retain_count(world, prior_world, label + " worldIndices", min_share=.85)
+
+
 def write_report_json(
     payload,
     report_dir=REPORT_DIR,
@@ -1098,6 +1178,11 @@ def write_report_json(
         "latest.json"
     )
 
+    previous = None
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as file:
+            previous = json.load(file)
+    validate_report(payload, previous)
     write_json_atomic(path, payload)
 
     print(

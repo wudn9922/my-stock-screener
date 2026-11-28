@@ -188,13 +188,19 @@ jobs:
           done
           exit 1
 
+      - name: Check daily report output failures after publication
+        id: notice_soft_04
+        if: always() && !cancelled() && steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        run: python scripts/report_run_status.py
+
       - name: Collect partial failure outcomes without changing this job result
         id: collect_notification_outcomes
         if: always() && !cancelled()
         continue-on-error: true
         env:
           NOTIFY_STEP_RESULTS: ${{ toJSON(steps) }}
-          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Build theme rotation", "notice_soft_02": "Build US rates research", "notice_soft_03": "Build Japanese spreads and monthly yield bands"}'
+          NOTIFY_STEP_NAMES: '{"notice_soft_01": "Build theme rotation", "notice_soft_02": "Build US rates research", "notice_soft_03": "Build Japanese spreads and monthly yield bands", "notice_soft_04": "Check daily report output failures after publication"}'
         run: |
           python - <<'PY'
           import json, os

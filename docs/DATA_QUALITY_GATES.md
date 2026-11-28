@@ -25,7 +25,7 @@
 | `data-status.json` | data-status.yml:37-44 → scripts/build_data_status.py:137-175,206-253 | D | 資料來源異常是此輸出的觀測內容；仍寫 missing/stale/錯誤理由與固定 SOURCES 清單。不能拿上次 ok 蓋掉今日故障。GitHub workflow 資訊缺失仍可降級。 |
 | `industry-rotation.json` | data-status.yml:45-52 → scripts/build_industry_rotation.py:44-86,94-148 | G | 原本只限制每產業至少 3 個有效流動性成員，空 markets / 無有效報酬仍直接覆蓋。新增按市場/期間檢查主報酬覆蓋、基準產業、日期及有效成員。 |
 | `screener-history/*.json` | data-status.yml:53-59 → scripts/build_screener_history.py:33-76 | P* | 同日 first observed wins，不覆蓋已存在快照；空 universe 市場跳過；只保留 10 個交易日/index。新日期的部分資料仍可能固化且推掉舊日期，待獨立 guard。 |
-| `latest.json` | schedule.yml:99-113 → main.py:541-601 → report_json.py:986-1038,1051-1108 | R | 公開報表 owner 檢查、JSON 清理與原子寫；未見整份報表有效指數/群組覆蓋檢查。群組可合法增減；失敗例外被 main 捕捉只記 log。待處理，需分離 LINE 與發布失敗。 |
+| `latest.json` | schedule.yml → main.py → report_json.py::validate_report | G | 日期不倒退、保留前版市場及有效指數、核心錨點、群組唯一、分市場有效個股與世界指數覆蓋；拒絕保留前版，LINE/Dify/發布不被阻斷，由 run-only 狀態及 notice_soft_04 通知。 |
 | `trending-stocks.json` | schedule.yml:118-127 → dify_report.py:55-75,127-131 | P* | 最多 5 個合法、去重代號；無資料保留；1–4 個可發布，需區分真正熱門數量與來源部分失敗，非固定 AAPL 等錨點。 |
 | `universe.json` | universe-full.yml:145,250；schedule.yml:113,166 → scripts/build_universe_full.py:58-64,1043-1048,1199-1219,1280-1320；report_universe.py:85-109 | P | 全市場上市/櫃/美股至少 800/500/3000（美股分 Nasdaq/other 2000/1500），名單時效、完整 K 線 >=90%，分市場保留；每日掃描不蓋新鮮 full 市場；generated_branch.py:52-81 併發合併。 |
 | `series/**` | schedule.yml:113 → main.py:615-621 → report_universe.py:112-203,204-301 | P* | 空 bars 不寫；index 只列存在檔。短但非空歷史仍能覆蓋，例外只記 log；待加同標的歷史/日期覆蓋。 |
@@ -89,6 +89,7 @@
 
 | 輸出 | 驗證與門檻 | 理由及例外 |
 | --- | --- | --- |
+| latest.json | `report_json.py::validate_report`：合法且不倒退 reportDate；前版市場及其正有限指數保留；TW ^TWII / US ^GSPC 必須有效；群組 key 唯一，每市場前版 >=20 有限 close 個股時保持 >=85% 去重 symbol 數；世界指數前版 >=5 時保持 >=85% 有限 close symbol 數；sectors 不設門檻 | generated 703af090（2026-11-27）：5 市場 tw/jp/kr/eu/us、12 個有效市場指數、9 群組、TW 17 unique/17 rows（不套比例）、US 174 unique/179 rows（最低148）、worldIndices 19（最低17）。群組增減/空群合法；失敗保留舊 bytes，LINE 照常，發布後由 notice_soft_04 通知。 |
 | growth.json | `atlas/scripts/build_growth.py::validate_output/usable_growth`：至少一個可用 row；對前版有資料的每市場保持 >=85% 可用 symbols 及前版 identity；原先可用的 2330.TW/AAPL/MSFT 不可消失；對每市場 EPS/營收 Q/Y cohort，前版至少100個可用 symbols 才套85%；有限 YoY/合法 turnaround + 可解析 period end，不是單純 rows；重複 symbol 拒絕 | 15% 比例沿用 us valuation 的既有 MAX_SHRINK_RATIO，較 5% 寬鬆，避免公司除牌、財報過期、正常來源切換阻擋。既有 tests/test_growth.py:502-557 證明目標為全市場（含實際財報與模擬全市場官方資料）；generated growth.json 超過 Contents API 可讀限制，改由 2026-11-27 正式 [financials run](https://github.com/wudn9922/my-stock-screener/actions/runs/45974671256) 與 [fundamentals run](https://github.com/wudn9922/my-stock-screener/actions/runs/45974827729) 日誌確認 6841 rows（TW 1987、US 4854）；最新期 EPS Q/Y 與營收 Q/Y 覆蓋 TW 1645/1650/1950/1982、US 2815/2912/3860/4346。這些是日誌的 leading >=1 counts，而 gate 計算任一有限歷史值，不是相同分母；實際門檻仍由每次前版檔動態計算。100 個 cohort floor 防小樣本稀疏欄位鎖死。非正成長合法；不要求 SPY ETF 有公司財報。 |
 | industry-rotation.json | `scripts/build_industry_rotation.py::validate_output`：非空、不能失去舊市場或倒退 asOf；每市場每期間 d1/w1/m1/m3 有至少一個有限 median，ranked sector identities 與有效成員數各 >=75%；前版已 ranked 的 TW 半導體業/金融保險業、US Technology/Finance 不可消失；重複 sector 拒絕 | 2026-11-27 generated 檔：TW 34 groups/31 ranked/833–835 valid；US 13 groups/13 ranked/2669–2678 valid。流動性與季節性正常變化較大，允許25%下降，仍能擋整市場/主要產業消失與大量 null。TW m1/m3 的 paired/volume count 實際為0，短期 cache 未齊或未知量是合法；不以 optional 量/動能缺值擋主報酬更新。錨點只對前版 ranked 群有效，不硬要求個股一定在流動性排名。 |
 | docs/atlas/valuation/tw-annual.json | `atlas/scripts/build_valuation_tw_annual.py::validate_output`：保留既有500 directory minimum，唯一 directory IDs；至少一個 finite EPS（負/0合法），可用 identities >=85% 且 prior retained >=85%；前版可用 2330.TW/2317.TW/2454.TW 必須保留 | generated 檔實際 1987 records/1977 finite EPS，三個錨點均有值；500 floor 無法攔腰斬而 15% 允許正常退市/改名、逐批更新；以舊可用 EPS 為準，不把新上市/未出財報的 null 當缺陷。cold start 沒舊檔只需有可用值且目錄 >=500，後續續跑逐步累積。 |
@@ -100,7 +101,7 @@
 
 ### 3.1 待處理（後續 PR，每次最多六個輸出）
 
-- P0：latest.json（指數與配置群組正確性，不能因 gate 阻斷原有 LINE；拆 report publish failure propagation）；warrants（近期活躍代號、不同市場有效 coverage 與 mapping，允許到期/分批，不刪有效舊標的）；pe-river-tw/us（archive/financials 讀取成功、有效 identity，先驗後寫）；IPO calendar（分月 schema、空表與缺表區別、同月 drop）；breakout-warning（實際 evaluated/failedStocks、method rows，正常沒有 signal 不等於資料缺）。這些缺口未修改：latest/LINE、權證 mapping 及跨語言/多檔流程需要各自 fixture、數據與 failure contract，避免把本輪變成過大的變更。
+- P0：warrants（近期活躍代號、不同市場有效 coverage 與 mapping，允許到期/分批，不刪有效舊標的）；pe-river-tw/us（archive/financials 讀取成功、有效 identity，先驗後寫）；IPO calendar（分月 schema、空表與缺表區別、同月 drop）；breakout-warning（實際 evaluated/failedStocks、method rows，正常沒有 signal 不等於資料缺）。其餘缺口未修改：權證 mapping 及跨語言/多檔流程需要各自 fixture、數據與 failure contract，避免把本輪變成過大的變更。
 - P1：series 歷史日保留，screener-history 新快照的 universe coverage，Atlas directory/TW valuation/us-growth 相對掉落及缺必需檔、rates-history 日期覆蓋；MA 外部 repo prune 前確認全集 coverage；research volume/store 及財報 index/逐股欄位規則。補 audit 部署後資料 baseline 缺失的通知；有 guard 但吞 exit 的 main.py/chips 等另處理；不得以放鬆 existing gate 解決告警。
 - P2：在確認正常來源變動分布後，逐資料評估合理範圍、歷史唯一日期/欄位完整、publication transaction；對 data-status、合法 zero event、分股/逐日 resume 的 outputs 不使用一刀切的通用筆數。
 

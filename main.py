@@ -39,6 +39,7 @@ from git_publish import push_report_to_github, prune_stale_csv
 from report_json import build_report_payload, write_report_json
 from report_universe import build_report_universe, write_report_universe, write_tpex_otc_series
 from custom_groups import process_group_for_data_dict
+from scripts.report_run_status import reset_status, record_failure
 
 
 def main():
@@ -86,6 +87,7 @@ def main():
         print("ℹ️ 公開日報僅接受管理員帳號；略過私人設定讀取及所有報告產物寫入。")
         return
 
+    reset_status()
     REPORT_NON_TRADING_DATES.update(TW=frozenset(), US=frozenset())
 
     print(
@@ -224,6 +226,7 @@ def main():
             us_tickers
         )
     except Exception as exc:
+        record_failure("universe.json build", exc)
         print(
             "❌ 選股篩選器指標產生失敗："
             f"{type(exc).__name__}: {exc}"
@@ -539,7 +542,7 @@ def main():
 
     # -----------------------------------------------------------------
     # Atlas 報告 JSON（docs/report/latest.json）
-    # 失敗只記錄，不影響 CSV 清理與推送
+    # 失敗記錄到 run-only 狀態，發布後由 workflow 回報，不影響 LINE 或其他輸出
     # -----------------------------------------------------------------
     try:
         report_payload = build_report_payload(
@@ -595,6 +598,7 @@ def main():
         write_report_json(report_payload, source_user_id=supabase_user_id)
 
     except Exception as exc:
+        record_failure("latest.json", exc)
         print(
             "❌ Atlas 報告 JSON 產生失敗："
             f"{type(exc).__name__}: {exc}"
@@ -607,6 +611,7 @@ def main():
                 today_str
             )
         except Exception as exc:
+            record_failure("universe.json write", exc)
             print(
                 "❌ 全市場 universe JSON 產生失敗："
                 f"{type(exc).__name__}: {exc}"
@@ -615,6 +620,7 @@ def main():
     try:
         write_tpex_otc_series()
     except Exception as exc:
+        record_failure("TPEx series", exc)
         print(
             "❌ 櫃買指數 series JSON 產生失敗："
             f"{type(exc).__name__}: {exc}"
