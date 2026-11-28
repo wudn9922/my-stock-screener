@@ -5,7 +5,7 @@
     "base_url": "https://generativelanguage.googleapis.com/v1beta",
     "model": "gemini-4-hydrogen",
     "secret": "GEMINI_API_KEY",
-    "daily_limit": 10,
+    "daily_limit": 18,
     "min_interval_seconds": 15,
     "max_output_tokens": 8192,
     "thinking_level": "LOW"
