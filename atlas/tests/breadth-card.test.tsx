@@ -40,7 +40,7 @@ describe('calibrated breadth presentation', () => {
     expect(withSignals).toContain('（189／450 檔）');
     const legacy = renderToStaticMarkup(<BreadthBody data={breadth()} />);
     expect(legacy).not.toContain('歷史寬度樣本日期');
-    expect(legacy).toContain('breadth-line ma20');
+    expect(legacy).toContain('data-chart-series="MA20:right|MA60:right|50% 參考:right"');
   });
 
   it.each(SIGNAL_STATES)(
@@ -82,10 +82,10 @@ describe('calibrated breadth presentation', () => {
     );
     expect(html).toContain('歷史第 6.5 百分位');
     expect(html).toContain('breadth-tag oversold');
-    expect(html.match(/class="breadth-threshold /g)).toHaveLength(4);
+    expect(html.match(/data-threshold="/g)).toHaveLength(4);
     expect(html).toContain('MA20 P10：22%');
     expect(html).toContain('下限 P10 22.0% · 上限 P90 76.0%');
-    expect(html).toContain('data-signal-date="2026-10-27"');
+    expect(html).toContain('data-marker-date="2026-10-27"');
     expect(html).toContain('歷史訊號指數');
     expect(html).toContain('2004-01-02 至 2026-10-30');
     expect(html).toContain('命中率＝進場後先碰到停利');
@@ -109,7 +109,7 @@ describe('calibrated breadth presentation', () => {
     const html = renderToStaticMarkup(<BreadthBody data={breadth()} />);
     expect(html).toContain('18.0%');
     expect(html).toContain('42.0%');
-    expect(html).toContain('<svg');
+    expect(html).toContain('data-chart-series="MA20:right|MA60:right|50% 參考:right"');
     expect(html).not.toContain('抓低點訊號');
     expect(html).not.toContain('偏弱');
     expect(html).not.toContain('偏熱');
@@ -124,7 +124,7 @@ describe('calibrated breadth presentation', () => {
       />,
     );
     expect(html).toContain('18.0%');
-    expect(html).toContain('<svg');
+    expect(html).toContain('data-chart-series="MA20:right|MA60:right|50% 參考:right"');
     expect(html).toContain('<summary>超買超賣訊號不適用</summary>');
     expect(html).toContain(reason);
     expect(html).not.toContain('breadth-tag');

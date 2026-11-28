@@ -37,7 +37,20 @@ test('US breakout achievement-rate warning shows both methods, history and fits 
   await expect(card.locator('.bw-method[data-state="normal"]')).toContainText('未偏低');
   await expect(card).toContainText('過去 9 次提醒，40 個交易日內大盤跌 7% 以上 4 次');
   await expect(card).toContainText('不是賣出訊號');
-  await expect(card.locator('rect[data-state="low"]').first()).toBeAttached();
+  const combined = card.locator('.bw-method[data-state="low"]');
+  const chart = combined.getByRole('img', { name: /合併圖/ });
+  await expect(chart).toHaveAttribute('data-chart-bands', '10');
+  await expect(chart).toHaveAttribute('data-chart-series', /指數:left\|分位:right\|P10 門檻:right/);
+  await expect(chart.locator('canvas').first()).toBeVisible();
+  const count = combined.getByLabel('顯示資料點數');
+  await expect(count).toHaveText('300');
+  await combined.getByRole('button', {name:'放大圖表'}).click();
+  await expect.poll(async () => Number(await count.textContent())).toBeLessThan(300);
+  const zoomed = Number(await count.textContent());
+  await combined.getByRole('button', {name:'縮小圖表'}).click();
+  await expect.poll(async () => Number(await count.textContent())).toBeGreaterThan(zoomed);
+  await combined.getByRole('button', {name:'重設'}).click();
+  await expect(count).toHaveText('300');
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   if (info.project.name === 'iphone-webkit') {
     await card.scrollIntoViewIfNeeded();

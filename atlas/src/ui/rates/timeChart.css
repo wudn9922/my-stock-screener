@@ -1,0 +1,4 @@
+.time-chart-interactive{min-width:0;width:100%}
+.time-chart-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px}
+.time-chart-controls button{min-height:44px;min-width:44px}
+.time-chart-hover{display:block;min-height:1.4em;font-size:12px;overflow-wrap:anywhere}
