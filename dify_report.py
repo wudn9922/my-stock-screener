@@ -3,13 +3,14 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 
 import requests
 from breakout_alert.atlas_links import plain_ticker_links
+from breakout_alert.account_permissions import is_public_report_owner
 
 
 from dify_config import LINE_ACCESS_TOKEN, LINE_USER_ID
@@ -71,6 +72,65 @@ def save_trending_stocks(stocks, fetched_at, path="docs/report/trending-stocks.j
     }
     temporary = target.with_suffix(".tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+    return True
+
+
+def save_news_digest(report_text, captured_news, *, source_user_id, path="docs/report/news-digest.json",
+                     news_dir="docs/news", state=None, now=None):
+    """Persist only the public report, with immutable, locally present screenshot references."""
+    if not is_public_report_owner(source_user_id):
+        return False
+    # The generated LINE-only links always form the final paragraph.
+    text = report_text.split("\n\n📈 Atlas 圖表\n", 1)[0].strip()
+    if not text:
+        return False
+    now = now or datetime.now(timezone.utc)
+    directory = Path(news_dir)
+    target = Path(path)
+    state = load_news_state() if state is None else state
+
+    def exists(name):
+        return isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_-]+\.jpg", name) and (directory / name).is_file()
+
+    screenshots = []
+    for item in captured_news:
+        if not item.get("url"):
+            continue
+        entry = state.get("sources", {}).get(item["name"], {})
+        name = Path(item.get("publish_path", "")).name
+        if not exists(name) or Path(entry.get("file", "")).name != name or not entry.get("sentAt"):
+            continue
+        screenshots.append({"source": item["name"], "file": name,
+                            "snapshot": item.get("snapshot") or None, "sentAt": entry["sentAt"]})
+    latest = {"generatedAt": now.isoformat(), "text": text, "screenshots": screenshots}
+    try:
+        prior = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        prior = {}
+    history = []
+    cutoff = now - timedelta(days=14)
+    if isinstance(prior, dict):
+        entries = [prior.get("latest"), *(prior.get("history") if isinstance(prior.get("history"), list) else [])]
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("text"), str):
+                continue
+            try:
+                stamp = datetime.fromisoformat(entry["generatedAt"])
+                if not cutoff <= stamp < now:
+                    continue
+            except (KeyError, ValueError, TypeError):
+                continue
+            if any(row["generatedAt"] == entry["generatedAt"] for row in history):
+                continue
+            images = entry.get("screenshots")
+            history.append({**entry, "screenshots": [image for image in images
+                           if isinstance(image, dict) and exists(image.get("file"))] if isinstance(images, list) else []})
+    history.sort(key=lambda row: row["generatedAt"], reverse=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"version": 1, "latest": latest, "history": history},
+                                    ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(target)
     return True
 
@@ -218,6 +278,7 @@ if __name__ == "__main__":
                 image_urls,
             )
             save_trending_stocks(stocks_live, stocks_fetched_at)
+            save_news_digest(report_text, captured_news, source_user_id=LINE_USER_ID)
         else:
             print("沒有報告或圖片可以發送。")
 

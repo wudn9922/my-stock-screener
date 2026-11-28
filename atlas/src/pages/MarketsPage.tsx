@@ -8,6 +8,7 @@ import type { PageProps } from './pageProps';
 import { ChartAttribution, ReportGate, TrendBadge } from './ReportGate';
 import { MARKET_KEYS, type IndexStatus, type MarketKey, type Report } from '../report/schema';
 import { LineTextCard } from '../ui/LineTextCard';
+import { NewsDigestCard } from '../ui/NewsDigestCard';
 import { BreadthCard } from '../ui/BreadthCard';
 import { BreakoutCard } from '../ui/BreakoutCard';
 import { BreakoutWarningCard } from '../ui/BreakoutWarningCard';
@@ -161,6 +162,7 @@ function MarketView({ report, market, openChart }: { report: Report; market: Mar
           </>
         )}
         <LineTextCard title={`${data.flag || meta.flag} ${data.name || meta.name} LINE 摘要`} text={data.lineText} />
+        {market === 'us' && <NewsDigestCard />}
         <HelpDisclosure label="資料來源">
           <p>資料來源：{sources.length ? sources.join('、') : '每日量化報告'}
           {asOf ? ` · 資料時間 ${formatDateTime(asOf)}` : ''}</p>
