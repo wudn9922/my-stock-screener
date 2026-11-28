@@ -77,7 +77,7 @@ jobs:
         run: python scripts/build_upcoming_events.py
       - name: Build public stock digest from restored financial and research snapshots
         if: always() && !cancelled() && steps.inputs.outcome == 'success'
-        run: python scripts/build_stock_digest.py
+        run: python scripts/build_stock_digest.py || echo '::warning::Stock digest process failed; previous output retained'
       - name: Publish only status-owned outputs
         # The existing publisher rebases ONLY this owner's delta onto each fresh
         # generated tip and retries non-force pushes; other owners are preserved.
