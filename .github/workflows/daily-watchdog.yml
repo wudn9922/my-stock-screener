@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
         env:
           HEALTHCHECK_PING_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
-          WATCHDOG_FAILED: ${{ failure() }}
+          WATCHDOG_FAILED: ${{ job.status == 'failure' }}
         run: |
           if [ -z "$HEALTHCHECK_PING_URL" ]; then
             echo "::notice::External watchdog heartbeat not configured"
