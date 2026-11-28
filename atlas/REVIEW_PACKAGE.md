@@ -1644,3 +1644,5 @@ Updated volume unit expectations (spec-driven); raised mobile tab labels to 12px
 
 ## Taiwan P/E evidence and build-time restatement — no independent review
 - Fixture-only checks and 390px WebKit evidence are delegated to PR CI; no production financial files were modified and no independent sign-off is claimed.
+
+- P/E river output gate: validate both market candidates before writing accepted markets; offline fixture coverage, no independent review.
