@@ -11,6 +11,9 @@ from build_market_extras import collect, extended_quote, ipo_companies
 NOW = datetime(2026, 11, 4, 2, tzinfo=timezone.utc)
 def payload(mode='post'):
     return {'data': {'lastUpdateInfo': ['Data last updated Nov 3, 2026 08:00 PM ET.'], 'tradeDetailTable': {'rows': [{'time': '19:59:53' if mode == 'post' else '09:20:00', 'price': '$123.45'}]}}}
+def calendar(**sections):
+    return {'data': {'filed': {'rows': []}, 'upcoming': {'upcomingTable': {'rows': []}}, 'priced': {'rows': []}, **sections}}
+
 class MarketExtrasTests(unittest.TestCase):
     def test_actual_calendar_shape_includes_new_priced_issuers(self):
         fixture = json.loads((Path(__file__).parent / 'fixtures/market-extras/nasdaq-calendar-shape.json').read_text())
@@ -26,7 +29,7 @@ class MarketExtrasTests(unittest.TestCase):
     def test_empty_current_month_calendar_has_explicit_reason(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            collect(root, lambda url: {'data': {'filed': {'rows': None}, 'upcoming': {'upcomingTable': {'rows': None}}, 'priced': {'rows': None}}} if '/ipo/' in url else {'data': None}, NOW, limit=1)
+            collect(root, lambda url: calendar() if '/ipo/' in url else {'data': None}, NOW, limit=1)
             value = json.loads((root / 'docs/report/ipo-watch.json').read_text())
             self.assertEqual(value['reason'], '本月行事曆暫無資料')
             self.assertEqual(value['companies'], [])
@@ -41,7 +44,7 @@ class MarketExtrasTests(unittest.TestCase):
         value = extended_quote(payload(), 'AAPL', 'post', datetime(2026, 11, 1, tzinfo=timezone.utc))
         self.assertIsNone(value['price'])
     def test_calendar_mapping_excludes_priced_and_missing_company(self):
-        rows = ipo_companies({'data': {'upcoming': {'upcomingTable': {'rows': [{'companyName': 'Example', 'proposedTickerSymbol': 'EX', 'expectedPriceDate': '11/12/2026', 'proposedExchange': 'NASDAQ'}]}}, 'priced': {'rows': [{'companyName': 'Already listed'}]}}}, NOW.isoformat())
+        rows = ipo_companies(calendar(upcoming={'upcomingTable': {'rows': [{'companyName': 'Example', 'proposedTickerSymbol': 'EX', 'expectedPriceDate': '11/12/2026', 'proposedExchange': 'NASDAQ'}]}}, priced={'rows': [{'companyName': 'Already listed'}]}), NOW.isoformat())
         self.assertEqual(len(rows), 1)
         self.assertIsNone(rows[0]['price'])
         self.assertIsNone(rows[0]['listingDate'])
@@ -52,7 +55,7 @@ class MarketExtrasTests(unittest.TestCase):
             permanent = root / 'data/AAPL.csv'; permanent.parent.mkdir(); permanent.write_text('do not change')
             (report / 'latest.json').write_text(json.dumps({'groups': [{'items': [{'symbol': 'AAPL'}, {'symbol': '2330.TW'}]}]}))
             def get(url):
-                return {'data': {'upcoming': {'rows': []}}} if '/ipo/' in url else payload('pre' if url.endswith('=pre') else 'post')
+                return calendar() if '/ipo/' in url else payload('pre' if url.endswith('=pre') else 'post')
             collect(root, get, NOW, limit=1)
             path = report / 'extended-quotes/AAPL.json'; before = json.loads(path.read_text())
             def fail(url): raise requests.ConnectionError('sensitive raw response')
@@ -74,7 +77,7 @@ class MarketExtrasTests(unittest.TestCase):
             (root / 'config/ipo-watch.json').write_text(json.dumps([seed]))
             def get(url):
                 if '/ipo/' in url:
-                    return {'data': {'priced': {'rows': [{'companyName': 'Example Inc', 'proposedTickerSymbol': 'EX', 'pricedDate': '11/03/2026', 'proposedSharePrice': '20.00'}]}}}
+                    return calendar(priced={'rows': [{'companyName': 'Example Inc', 'proposedTickerSymbol': 'EX', 'pricedDate': '11/03/2026', 'proposedSharePrice': '20.00'}]})
                 return {'data': None}
             collect(root, get, NOW, limit=1)
             company = json.loads((root / 'docs/report/ipo-watch.json').read_text())['companies'][0]
@@ -83,4 +86,19 @@ class MarketExtrasTests(unittest.TestCase):
             self.assertIsNone(company['listingDate'])
             self.assertEqual(company['pricingDate'], '11/03/2026')
             self.assertEqual(company['aliases'], ['Brand'])
+    def test_schema_rejection_preserves_bytes_and_explicit_zero_replaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / 'docs/report/ipo-watch.json'
+            fixture = json.loads((Path(__file__).parent / 'fixtures/market-extras/nasdaq-calendar-shape.json').read_text())
+            self.assertEqual(collect(root, lambda url: fixture if '/ipo/' in url else payload(), NOW, limit=1), 0)
+            before = path.read_bytes()
+            for bad in ({}, [], None, {'data': {}}, calendar(filed={}), calendar(priced={'rows': None}), calendar(upcoming={'rows': 'bad'})):
+                with self.subTest(bad=bad):
+                    self.assertEqual(collect(root, lambda url: bad if '/ipo/' in url else payload(), NOW, limit=1), 1)
+                    self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(collect(root, lambda url: calendar() if '/ipo/' in url else payload(), NOW, limit=1), 0)
+            self.assertEqual(json.loads(path.read_text())['companies'], [])
+            self.assertNotEqual(path.read_bytes(), before)
+
 if __name__ == '__main__': unittest.main()

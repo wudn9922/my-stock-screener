@@ -156,3 +156,36 @@ class WarrantTests(unittest.TestCase):
         config = json.loads(Path(".github/generated-paths.json").read_text())
         self.assertEqual(config["owners"]["warrants"], ["docs/report/warrants/*.json"])
         self.assertNotIn("warrants", config["records"])
+
+    def test_publication_retains_active_market_codes_and_allows_expiry(self):
+        from scripts.output_guard import OutputRejected
+        def doc(symbol, market, codes, expiry="2027-04-07"):
+            return {"version": 1, "underlying": symbol, "asOf": AS_OF,
+                    "warrants": [{"market": market, "code": code, "expiryDate": expiry} for code in codes]}
+        codes = [f"{i:06d}" for i in range(20)]
+        old = {"2454.TW": doc("2454.TW", "TWSE", codes), "3526.TWO": doc("3526.TWO", "TPEx", codes),
+               "00635U.TW": doc("00635U.TW", "TWSE", ["999999"], "2026-11-25")}
+        with TemporaryDirectory() as temp:
+            target = Path(temp) / "warrants"
+            w.write_documents(target, old)
+            before = {p.name: p.read_bytes() for p in target.iterdir()}
+            for bad in ({}, {"2454.TW": doc("2454.TW", "TWSE", codes[:16]), "3526.TWO": old["3526.TWO"]},
+                        {"2454.TW": doc("2454.TW", "TWSE", codes[:16] + ["123456"]), "3526.TWO": old["3526.TWO"]},
+                        {"2454.TW": doc("2454.TW", "TWSE", codes + [codes[0]]), "3526.TWO": old["3526.TWO"]}):
+                with self.subTest(bad=bad), self.assertRaises(OutputRejected):
+                    w.publish_documents(target, bad, AS_OF, SESSION)
+                self.assertEqual({p.name: p.read_bytes() for p in target.iterdir()}, before)
+            good = {"2454.TW": doc("2454.TW", "TWSE", codes[:17]), "3526.TWO": old["3526.TWO"]}
+            w.publish_documents(target, good, AS_OF, SESSION)
+            self.assertEqual({p.stem for p in target.iterdir()}, set(good))
+            self.assertEqual(len(json.loads((target / "2454.TW.json").read_text())["warrants"]), 17)
+
+    def test_unmapped_counts_warrants_not_names(self):
+        from dataclasses import replace
+        _, listed = w.parse_master([TWSE], "TWSE", SESSION)
+        unknown = replace(listed[0], underlying_name="unknown")
+        skipped = defaultdict(int)
+        docs, names = w.documents([unknown, replace(unknown, code="066187")], AS_OF, SESSION, {}, w.Underlyings(INDEX), {}, {}, skipped=skipped)
+        self.assertEqual(docs, {})
+        self.assertEqual(names, ["unknown"])
+        self.assertEqual(skipped["TWSE"], 2)
