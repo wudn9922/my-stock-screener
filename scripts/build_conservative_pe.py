@@ -56,6 +56,14 @@ class Transient(Exception):
     pass
 
 
+class ProviderInvalid(Invalid):
+    """A provider response failed with a safe diagnostic code."""
+
+
+class ProviderTransient(Transient):
+    """A provider request failed with a safe diagnostic code."""
+
+
 class Exhausted(Transient):
     """No configured provider can take another request this run."""
 
@@ -259,34 +267,34 @@ def validate_answer(raw, news, segments):
     try:
         answer = json.loads(raw)
     except (ValueError, TypeError):
-        raise Invalid("Invalid model JSON") from None
+        raise ProviderInvalid("invalid-json") from None
     fields = {"concern", "evidence", "affectedEarningsRatio", "confidence", "news", "segmentEvidence"}
     if not isinstance(answer, dict) or set(answer) != fields:
-        raise Invalid("Invalid model schema")
+        raise ProviderInvalid("validation:schema")
     for field in ("concern", "evidence"):
         if (not isinstance(answer[field], str) or not 0 < len(answer[field].strip()) <= 2000
                 or re.search(r"https?://|www\.", answer[field], re.I)):
-            raise Invalid("Invalid model text")
+            raise ProviderInvalid(f"validation:{field}-text")
     ratio = answer["affectedEarningsRatio"]
     if ratio is not None and (type(ratio) not in (float, int) or not 0 <= ratio <= 1):
-        raise Invalid("No supported earnings ratio")
+        raise ProviderInvalid("validation:ratio")
     if answer["confidence"] not in ("low", "medium", "high"):
-        raise Invalid("Invalid confidence")
+        raise ProviderInvalid("validation:confidence")
     refs = answer["news"]
     if not isinstance(refs, list) or not 1 <= len(refs) <= 20:
-        raise Invalid("Missing news evidence")
+        raise ProviderInvalid("validation:news-count")
     allowed = {(x["url"], x["date"]): x for x in news}
     selected = {}
     for ref in refs:
         if not isinstance(ref, dict) or set(ref) != {"url", "date"} or not isinstance(ref["url"], str) or not isinstance(ref["date"], str):
-            raise Invalid("Invalid citation")
+            raise ProviderInvalid("validation:citation-schema")
         pair = (ref["url"], ref["date"])
         if pair not in allowed:
-            raise Invalid("Citation not in input")
+            raise ProviderInvalid("validation:citation-not-in-input")
         selected[pair] = allowed[pair]
     excerpt = answer["segmentEvidence"]
     if excerpt is not None and (not isinstance(excerpt, str) or not segments or excerpt not in segments["facts"]):
-        raise Invalid("Segment evidence not in input")
+        raise ProviderInvalid("validation:segment-not-in-input")
     segment = None
     confidence = "low"
     if excerpt:
@@ -294,7 +302,7 @@ def validate_answer(raw, news, segments):
         segment = dict(url=segments["url"], date=segments["date"], periodEnd=segments["periodEnd"],
                        metric="operating-income", excerpt=excerpt, maxRatio=maximum)
         if ratio is not None and ratio > maximum:
-            raise Invalid("Earnings assumption exceeds verified operating-income share")
+            raise ProviderInvalid("validation:ratio-exceeds-segment")
         if ratio is not None and answer["confidence"] != "low":
             confidence = "medium"
     else:
@@ -413,6 +421,18 @@ def build_prompt(public, news, segments):
     return prompt, evidence["news"]
 
 
+def incomplete_reason(reason):
+    # Only documented enum names can enter summaries, never arbitrary response text.
+    known = ("STOP", "MAX_TOKENS", "SAFETY", "RECITATION", "LANGUAGE", "OTHER",
+             "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "MALFORMED_FUNCTION_CALL",
+             "IMAGE_SAFETY", "UNEXPECTED_TOOL_CALL", "TOO_MANY_TOOL_CALLS",
+             "NO_IMAGE", "IMAGE_PROHIBITED_CONTENT", "IMAGE_OTHER", "IMAGE_RECITATION",
+             "FINISH_REASON_UNSPECIFIED", "stop", "length", "content_filter",
+             "tool_calls", "function_call", "error")
+    name = "missing" if reason is None else reason if isinstance(reason, str) and reason in known else "unknown"
+    return "incomplete:" + name
+
+
 class Providers:
     def __init__(self, session, env, state=None, publish=None, config=None,
                  sleep=time.sleep, clock=time.monotonic, deadline=None, current=now):
@@ -426,6 +446,7 @@ class Providers:
         self.disabled = set()
         self.rows = {}
         self.used = {}
+        self.failures = {}
         for row in load_providers() if config is None else config:
             if not env.get(row["secret"]):
                 continue
@@ -442,6 +463,17 @@ class Providers:
         return [key for key, row in self.rows.items()
                 if key not in self.disabled and provider_available(self.state, row, current, prompt)]
 
+    def failure(self, provider, reason, error_type):
+        reasons = self.failures.setdefault(provider, {})
+        reasons[reason] = reasons.get(reason, 0) + 1
+        return error_type(reason)
+
+    def validate(self, provider, raw, sources, segments):
+        try:
+            return validate_answer(raw, sources, segments)
+        except ProviderInvalid as error:
+            raise self.failure(provider, str(error), ProviderInvalid) from None
+
     def call(self, provider, prompt):
         if provider not in self.rows:
             raise Invalid("Provider is not configured")
@@ -451,7 +483,7 @@ class Providers:
         remaining = self.next.get(provider, 0) - self.clock()
         if remaining > 120 or self.deadline - self.clock() < max(0, remaining) + MIN_REMAINING:
             self.disabled.add(provider)
-            raise Transient("Provider deferred")
+            raise ProviderTransient("deferred")
         self.sleep(max(0, remaining))
         if provider not in self.available(prompt):
             raise Exhausted("Provider unavailable")
@@ -480,32 +512,35 @@ class Providers:
         started = self.clock()
         try:
             response = self.session.post(url, json=body, headers=headers, timeout=90, allow_redirects=False)
+        except requests.Timeout:
+            self.disabled.add(provider)
+            raise self.failure(provider, "timeout", ProviderTransient) from None
         except requests.RequestException:
             self.disabled.add(provider)
-            raise Transient("Provider connection unavailable") from None
+            raise self.failure(provider, "connection", ProviderTransient) from None
         finally:
             self.latency[provider] = self.clock() - started
         # 429 can mean a daily quota or zero availability. Do not retry each stock.
         if response.status_code != 200:
             self.disabled.add(provider)
-            raise Transient("Provider HTTP failure")
+            raise self.failure(provider, f"http-{response.status_code}", ProviderTransient)
         try:
             payload = response.json()
             if row["type"] == "gemini":
                 candidate = payload["candidates"][0]
                 if candidate.get("finishReason") != "STOP":
-                    raise Invalid("Incomplete provider response")
+                    raise self.failure(provider, incomplete_reason(candidate.get("finishReason")), ProviderInvalid)
                 raw = "".join(part["text"] for part in candidate["content"]["parts"]
                               if not part.get("thought") and isinstance(part.get("text"), str))
             else:
                 choice = payload["choices"][0]
                 if choice.get("finish_reason") != "stop":
-                    raise Invalid("Incomplete provider response")
+                    raise self.failure(provider, incomplete_reason(choice.get("finish_reason")), ProviderInvalid)
                 raw = choice["message"]["content"]
             if not isinstance(raw, str):
-                raise Invalid("Invalid provider text")
+                raise self.failure(provider, "invalid-json", ProviderInvalid)
         except (ValueError, KeyError, IndexError, TypeError, AttributeError):
-            raise Invalid("Invalid provider response") from None
+            raise self.failure(provider, "invalid-json", ProviderInvalid) from None
         return raw, model
 
     def analyze(self, public, news, segments):
@@ -516,7 +551,7 @@ class Providers:
             except Transient:
                 continue
             # Invalid answer is not an outage. Never ask another model.
-            return dict(validate_answer(raw, sources, segments), provider=provider, model=model)
+            return dict(self.validate(provider, raw, sources, segments), provider=provider, model=model)
         raise Exhausted("All providers unavailable")
 
 def recent(path, current, baseline):
@@ -736,9 +771,26 @@ def exceeds_failure_threshold(counts):
     return counts["failed"] > FAILURE_THRESHOLD * counts["attempted"]
 
 
+def probe_symbols(selected):
+    us = sorted(symbol for symbol, row in selected.items() if row["market"] == "US")
+    tw = sorted(symbol for symbol, row in selected.items() if row["market"] == "TW")
+    return us[:max(3, PROBE_COUNT - len(tw))] + tw[:max(2, PROBE_COUNT - len(us))]
+
+
+def provider_failure_summary(providers):
+    lines = ["## Provider request failures", "", "| Provider | Reason | Count |", "|---|---|---:|"]
+    for key in providers.rows:
+        reasons = providers.failures.get(key, {})
+        if not reasons:
+            lines.append(f"| {key} | none | 0 |")
+        for reason, count in sorted(reasons.items()):
+            lines.append(f"| {key} | {reason} | {count} |")
+    return "\n".join(lines)
+
+
 def probe(selected, session, sec, providers, current=now):
     keys = list(providers.rows)
-    chosen = sorted(selected)[:PROBE_COUNT]
+    chosen = probe_symbols(selected)
     totals = {key: dict(attempts=0, success=0, valid=0, seconds=0.) for key in keys}
     table = ["| Symbol | " + " | ".join(keys) + " |", "|---|" + "---|" * len(keys)]
     for symbol in chosen:
@@ -754,11 +806,17 @@ def probe(selected, session, sec, providers, current=now):
             try:
                 raw, _ = providers.call(key, prompt)
                 totals[key]["success"] += 1
-                answer = validate_answer(raw, sources, segments)
+                answer = providers.validate(key, raw, sources, segments)
                 totals[key]["valid"] += 1
                 values.append(f'{answer["affectedEarningsRatio"]} / {answer["confidence"]}')
-            except (Invalid, Transient, StopRun):
-                values.append("unavailable / invalid")
+            except (ProviderInvalid, ProviderTransient) as error:
+                values.append(str(error))
+            except Exhausted:
+                values.append("disabled" if key in providers.disabled else "quota-exhausted")
+            except StopRun:
+                values.append("run-stopped")
+            except (Invalid, Transient):
+                values.append("not-configured")
             finally:
                 attempts = providers.used.get(key, 0) - before
                 if attempts:
@@ -824,7 +882,7 @@ def main():
                "| Provider | Requests this run | Reserved today |\n|---|---:|---:|\n")
     for key in providers.rows:
         content += f'| {key} | {providers.used.get(key, 0)} | {state["providers"].get(key, 0)} |\n'
-    summary(env, content)
+    summary(env, content + "\n" + provider_failure_summary(providers))
     if output := env.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:
             stream.write(f'failed={counts["failed"]}\n')
