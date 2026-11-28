@@ -115,7 +115,7 @@ export function TimeChart({
       timeScale: { borderVisible: false, rightOffset: 2, minBarSpacing: 0.05 },
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: zoom, pinch: true, axisPressedMouseMove: zoom },
-      localization: { locale: 'zh-TW', priceFormatter: (value: number) => formatRef.current(value) },
+      localization: { locale: 'zh-TW', ...(!scaleRef.current.leftScale && !scaleRef.current.rightScale ? { priceFormatter: (value: number) => formatRef.current(value) } : {}) },
     });
     chartRef.current = chart;
     const series = seriesRef.current;
@@ -140,7 +140,7 @@ export function TimeChart({
     };
     chart.subscribeCrosshairMove(move);
     const updateRange = (range: LogicalRange | null) => {
-      if (countRef.current && range) countRef.current.textContent = String(Math.min(pointsRef.current, Math.max(0, Math.floor(range.to) - Math.ceil(range.from) + 1)));
+      if (countRef.current && range) countRef.current.textContent = String(Math.min(pointsRef.current, Math.max(0, Math.min(pointsRef.current - 1, Math.floor(range.to)) - Math.max(0, Math.ceil(range.from)) + 1)));
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(updateRange);
     return () => {
@@ -164,7 +164,7 @@ export function TimeChart({
     pointsRef.current = new Set(lines.flatMap(line => line.points.map(point => point.time))).size;
     for (const line of lines) {
       const scale = line.scale === 'left' ? leftScale : rightScale;
-      const formatter = scale?.format;
+      const formatter = scale?.format ?? (leftScale || rightScale ? formatRef.current : undefined);
       const range = scale?.range;
       const common = {
         lineWidth: line.width ?? 2,
@@ -227,7 +227,7 @@ export function TimeChart({
     <div className="time-chart-controls" role="group" aria-label={ariaLabel + ' 縮放'}>
       <button type="button" aria-label="縮小圖表" onClick={() => changeZoom(1.5)}>−</button>
       <button type="button" aria-label="放大圖表" onClick={() => changeZoom(2 / 3)}>＋</button>
-      <button type="button" onClick={() => chartRef.current?.timeScale().fitContent()}>重設</button>
+      <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); if (countRef.current) countRef.current.textContent = String(pointsRef.current); }}>重設</button>
       <output ref={countRef} aria-label="顯示資料點數">—</output><span>點</span>
     </div>
     {plot}
