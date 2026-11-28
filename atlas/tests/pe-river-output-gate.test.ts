@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { publishMarkets, validateMarket, type RankedEntry } from '../scripts/build-pe-river';
+import { publishMarkets, validateMarket, type RankedEntry } from '../scripts/build-pe-river.ts';
 import type { PeRiverFile } from '../src/fundamentals/peRiverRank';
 
 const dates = { TW: '2026-11-28', US: '2026-11-28' };
