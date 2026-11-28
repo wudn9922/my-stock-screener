@@ -19,7 +19,8 @@
     "daily_limit": 18,
     "min_interval_seconds": 15,
     "max_output_tokens": 4096,
-    "thinking_level": "LOW"
+    "thinking_level": "LOW",
+    "timeout_seconds": 180
   },
   {
     "id": "groq-qwen",
@@ -27,10 +28,11 @@
     "base_url": "https://api.groq.com/openai/v1",
     "model": "qwen/qwen3.8-27b",
     "secret": "GROQ_API_KEY",
-    "daily_limit": 35,
+    "daily_limit": 25,
     "min_interval_seconds": 60,
-    "max_output_tokens": 1400,
-    "reasoning_effort": "none"
+    "max_output_tokens": 4500,
+    "reasoning_effort": "low",
+    "timeout_seconds": 180
   },
   {
     "id": "cloudflare-qwen",
@@ -38,9 +40,10 @@
     "base_url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
     "model": "@cf/qwen/qwen3.8-27b",
     "secret": "CLOUDFLARE_API_TOKEN",
-    "daily_limit": 13,
+    "daily_limit": 7,
     "min_interval_seconds": 15,
-    "max_output_tokens": 1400,
-    "reasoning_effort": "low"
+    "max_output_tokens": 4000,
+    "reasoning_effort": "medium",
+    "timeout_seconds": 180
   }
 ]

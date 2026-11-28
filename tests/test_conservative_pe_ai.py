@@ -308,7 +308,8 @@ class ScenarioTests(unittest.TestCase):
             for mode in ("probe", "normal"):
                 with self.subTest(family=family, reason=reason, mode=mode):
                     session = Mock()
-                    session.post.side_effect = [outcome]
+                    attempts = 3 if reason in ("http-503", "timeout", "connection") else 1
+                    session.post.side_effect = [outcome] * attempts
                     config = [row for row in m.load_providers() if row["id"] ==
                               ("gemini-hydrogen" if family == "gemini" else "groq-qwen")]
                     provider = self.provider(session, {config[0]["secret"]: secret}, config=config)
@@ -321,9 +322,10 @@ class ScenarioTests(unittest.TestCase):
                             with self.assertRaises((m.Invalid, m.Transient)):
                                 provider.analyze(public, NEWS, SEGMENTS)
                             content = m.provider_failure_summary(provider)
-                            self.assertIn(f"| {key} | {reason} | 1 |", content)
-                    self.assertEqual(provider.failures, {key: {reason: 1}})
-                    session.post.assert_called_once()
+                            self.assertIn(f"| {key} | {reason} | {attempts} |", content)
+                    self.assertEqual(provider.failures, {key: {reason: attempts}})
+                    self.assertEqual(session.post.call_count, attempts)
+                    self.assertEqual(provider.retries.get(key, 0), attempts - 1)
                     self.assertEqual(bool(provider.disabled), reason.startswith("http-") or reason in ("timeout", "connection"))
                     with TemporaryDirectory() as directory:
                         path = Path(directory) / "summary"
@@ -347,7 +349,7 @@ class ScenarioTests(unittest.TestCase):
     def test_normal_main_summary_counts_fallback_and_repeated_invalid_answers(self):
         session = Mock()
         session.post.side_effect = [
-            response(429), model_answer("gemini", "not JSON"), model_answer("gemini", "not JSON"),
+            response(503), response(429), model_answer("gemini", "not JSON"), model_answer("gemini", "not JSON"),
         ]
         stamp = m.now()
         state = m.empty_budget(stamp)
@@ -371,9 +373,145 @@ class ScenarioTests(unittest.TestCase):
                 m.main()
             content = path.read_text(encoding="utf-8")
         self.assertIn("| gemini-hydrogen | http-429 | 1 |", content)
+        self.assertIn("| gemini-hydrogen | http-503 | 1 |", content)
+        self.assertIn("| gemini-hydrogen | 2 | 1 | 2 |", content)
         self.assertIn("| gemini-flash | invalid-json | 2 |", content)
         self.assertNotIn("not JSON", content)
-        self.assertEqual(session.post.call_count, 3)
+        self.assertEqual(session.post.call_count, 4)
+
+    def test_retry_waits_reserve_before_each_post_and_probe_success(self):
+        session, publish = Mock(), Mock()
+        provider = self.provider(session, {"GEMINI_API_KEY": "fake"}, publish=publish)
+        key = "gemini-hydrogen"
+        outcomes = iter([response(503, headers={"Retry-After": "10"}),
+                         response(502, headers={"Retry-After": "61"}),
+                         model_answer("gemini", json.dumps(ANSWER))])
+
+        def post(*args, **kwargs):
+            self.assertEqual(publish.call_count, session.post.call_count)
+            self.assertEqual(provider.state["providers"][key], session.post.call_count)
+            self.assertEqual(kwargs["timeout"], 90)
+            return next(outcomes)
+
+        session.post.side_effect = post
+        provider.rows = {key: provider.rows[key]}
+        with patch.object(m, "evidence_for", return_value=(PUBLIC, NEWS, SEGMENTS)):
+            content = m.probe({"TEST": PUBLIC}, Mock(), Mock(), provider, current=lambda: NOW)
+        self.assertIn("重試 2 次後成功", content)
+        self.assertIn(f"| {key} | 3 | 2 | 1 | 1 |", content)
+        self.assertEqual(provider.failures, {key: {"http-503": 1, "http-502": 1}})
+        # Retry-After 10 is subject to the provider's 15-second pacing; >60 uses backoff.
+        self.assertEqual([c.args[0] for c in provider.sleep.call_args_list], [0, 15, 40])
+        self.assertNotIn(key, provider.disabled)
+
+    def test_retry_defaults_exhaustion_and_last_reason(self):
+        for first in (response(500), response(503, headers={"Retry-After": "invalid"}),
+                      requests.Timeout("secret"), requests.ConnectionError("secret")):
+            session = Mock()
+            session.post.side_effect = [first, response(504), response(503)]
+            provider = self.provider(session, {"GEMINI_API_KEY": "fake"})
+            key = "gemini-hydrogen"
+            provider.rows = {key: provider.rows[key]}
+            with patch.object(m, "evidence_for", return_value=(PUBLIC, NEWS, SEGMENTS)):
+                content = m.probe({"TEST": PUBLIC}, Mock(), Mock(), provider, current=lambda: NOW)
+            self.assertIn("| TEST | http-503 |", content)
+            self.assertEqual([c.args[0] for c in provider.sleep.call_args_list], [0, 20, 40])
+            self.assertEqual(provider.disabled, {key})
+            self.assertEqual(provider.retries, {key: 2})
+            self.assertEqual(session.post.call_count, 3)
+
+    def test_retry_after_valid_date_and_immediate_4xx(self):
+        session = Mock()
+        header = email.utils.format_datetime(NOW + dt.timedelta(seconds=35))
+        session.post.side_effect = [response(503, headers={"Retry-After": header}),
+                                    response(401)]
+        provider = self.provider(session)
+        with self.assertRaisesRegex(m.ProviderTransient, "http-401"):
+            provider.call("gemini-hydrogen", "public")
+        self.assertEqual([c.args[0] for c in provider.sleep.call_args_list], [0, 35])
+        self.assertEqual(provider.disabled, {"gemini-hydrogen"})
+        self.assertEqual(session.post.call_count, 2)
+
+    def test_retry_does_not_reserve_when_deadline_or_quota_insufficient(self):
+        for limited in ("deadline", "quota"):
+            session, publish = Mock(), Mock()
+            provider = self.provider(session, {"GEMINI_API_KEY": "fake"}, publish=publish)
+            key = "gemini-hydrogen"
+            if limited == "deadline":
+                provider.deadline = m.MIN_REMAINING + 10
+            else:
+                provider.rows[key] = dict(provider.rows[key], daily_limit=1)
+            session.post.return_value = response(503)
+            with self.assertRaisesRegex(m.ProviderTransient, "http-503"):
+                provider.call(key, "public")
+            session.post.assert_called_once()
+            publish.assert_called_once()
+            self.assertEqual(provider.used, {key: 1})
+            self.assertEqual(provider.retries, {})
+            self.assertNotIn(key, provider.disabled)
+
+    def test_timeout_config_and_reasoning_output(self):
+        config = m.load_providers()
+        for row, timeout in zip(config, (90, 180, 180, 180)):
+            session = Mock()
+            raw = json.dumps(ANSWER)
+            if row["type"] == "gemini":
+                session.post.return_value = model_answer("gemini", raw)
+            else:
+                session.post.return_value = response(payload={"choices": [{"finish_reason": "stop",
+                    "message": {"reasoning": "secret reasoning", "content": "<think>{bad}</think>" + raw}}]})
+            provider = self.provider(session, config=[row])
+            result = provider.analyze(PUBLIC, NEWS, SEGMENTS)
+            self.assertEqual(result["affectedEarningsRatio"], 0.3)
+            self.assertNotIn("secret reasoning", json.dumps(result))
+            kwargs = session.post.call_args.kwargs
+            self.assertEqual(kwargs["timeout"], timeout)
+            if row["id"] == "groq-qwen":
+                self.assertEqual(kwargs["json"]["reasoning_format"], "hidden")
+                self.assertEqual(kwargs["json"]["reasoning_effort"], "low")
+                self.assertEqual(kwargs["json"]["max_completion_tokens"], 4500)
+            if row["id"] == "cloudflare-qwen":
+                self.assertEqual(kwargs["json"]["reasoning_effort"], "medium")
+                self.assertEqual(kwargs["json"]["max_tokens"], 4000)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "providers.json"
+            for timeout in (9, 301, True, 10.5, "180"):
+                m.write_json(path, [dict(config[0], timeout_seconds=timeout)])
+                with self.assertRaises(m.Invalid):
+                    m.load_providers(path)
+            for timeout in (10, 300):
+                m.write_json(path, [dict(config[0], timeout_seconds=timeout)])
+                self.assertEqual(m.load_providers(path)[0]["timeout_seconds"], timeout)
+            m.write_json(path, [dict(config[3], daily_limit=8)])
+            with self.assertRaises(m.Invalid):
+                m.load_providers(path)
+
+    def test_groq_estimate_prompt_trimming_and_daily_budget(self):
+        row = m.load_providers()[2]
+        self.assertEqual(m.request_tokens(row, "中"), 2 + 128 + 4500)
+        self.assertEqual(m.request_tokens(row, "abc"), 2 + 128 + 4500)
+        self.assertEqual(m.request_tokens(row, "a" * m.MAX_PROMPT_BYTES), 7728)
+        self.assertEqual(row["daily_limit"], 25)
+        # Force the TPM constraint to bind before the shared byte limit.
+        tight = dict(row, max_output_tokens=6500)
+        news = NEWS + [dict(NEWS[0], title="中" * 1000, url="https://example.com/extra")]
+        shared, _ = m.build_prompt(PUBLIC, news, SEGMENTS)
+        self.assertGreater(m.request_tokens(tight, shared), m.GROQ_MINUTE_TOKENS)
+        prompt, sources = m.build_prompt(PUBLIC, news, SEGMENTS, tight)
+        self.assertEqual(sources, NEWS)
+        self.assertLessEqual(m.request_tokens(tight, prompt), m.GROQ_MINUTE_TOKENS)
+        session = Mock()
+        session.post.return_value = model_answer("groq", json.dumps(ANSWER))
+        provider = self.provider(session, config=[tight])
+        provider.analyze(PUBLIC, news, SEGMENTS)
+        self.assertEqual(session.post.call_args.kwargs["json"]["messages"][0]["content"], prompt)
+        usage = m.provider_usage(provider.state, tight, NOW)
+        self.assertEqual(usage["tokens"], m.request_tokens(tight, prompt))
+        provider.state["windows"][m.quota_key(tight)]["tokens"] = m.GROQ_DAILY_TOKENS - 1
+        self.assertFalse(m.provider_available(provider.state, tight, NOW, prompt))
+        with self.assertRaises(m.Exhausted):
+            provider.call(tight["id"], prompt)
+        session.post.assert_called_once()
 
     def test_config_validation_and_news_pacing(self):
         config = m.load_providers()
