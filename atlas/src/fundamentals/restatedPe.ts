@@ -102,6 +102,7 @@ export function restatePeFigures(figures: PeFigures, history: FinancialHistory |
     const result = describePe(price, ttm.restated);
     next.peTtm = result.pe;
     next.peTtmLoss = result.negativeEarnings;
+    next.peTtmMissing = false;
     notes.push(`近四季 EPS 公告 ${text(ttm.reported)} → 還原 ${text(ttm.restated)}`);
   }
   const annual = figures.fiscalYear === null ? null : restatedAnnualEps(history, figures.fiscalYear);
@@ -112,7 +113,8 @@ export function restatePeFigures(figures: PeFigures, history: FinancialHistory |
     notes.push(`${figures.fiscalYear} 年 EPS 公告 ${text(annual.reported)} → 還原 ${text(annual.restated)}`);
   }
   if (!notes.length) return figures;
-  next.reason = next.peLoss || next.peTtmLoss ? '虧損，本益比不適用' : figures.reason;
+  next.reason = next.peTtmMissing ? '近四季 EPS 資料不足' : next.peLoss || next.peTtmLoss ? '虧損，本益比不適用'
+    : figures.peTtmMissing ? null : figures.reason;
   next.epsNote = `本益比以目前股數的${restatedEpsLabel(history)}計算：${notes.join('；')}`;
   return next;
 }

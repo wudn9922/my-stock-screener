@@ -65,7 +65,10 @@ describe('getPeFigures (chart header / screener P/E)', () => {
     expect(await getPeFigures('1101.TW', 22)).toMatchObject({ pe: null, peTtm: null, peLoss: true, peTtmLoss: false, reason: '近四季 EPS 資料不足' });
     const missing = await getPeFigures('2002.TW', 22);
     expect(missing).toMatchObject({ pe: 18.33, peLoss: false, peTtmLoss: false, peTtm: null, reason: '近四季 EPS 資料不足' });
+    expect(missing.peTtmMissing).toBe(true);
     expect(screenerPeValue(missing)).toBeNull();
+    // The flag, not the presentation text, controls screening.
+    expect(screenerPeValue({ ...missing, reason: null })).toBeNull();
     expect(await getPeFigures('AAPL', 223.8)).toMatchObject({ peLoss: false, peTtmLoss: false });
   });
 });
@@ -82,8 +85,10 @@ it('uses optional build-time financial EPS for all consumers and preserves legac
   expect(screenerPeValue(adjusted)).toBe(17.41);
   const loss = await getPeFigures('1101.TW', 100, source);
   expect(loss).toMatchObject({ peTtm: null, peTtmLoss: true, reason: '虧損，本益比不適用' });
+  expect(loss.peTtmMissing).toBe(false);
   expect(screenerPeValue(loss)).toBeNull();
   const legacy = await getPeFigures('2330.TW', 100, source);
   expect(legacy).toMatchObject({ pe: 20, peTtm: 12, reason: null });
+  expect(legacy.peTtmMissing).toBe(false);
   expect(screenerPeValue(legacy)).toBe(12);
 });

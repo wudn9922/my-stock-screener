@@ -56,9 +56,9 @@ describe('watchlist transition evidence', () => {
   it('distinguishes missing Taiwan TTM from proven losses in watchlist exit reasons', () => {
     const list = listOf('pe:10:20', 'TW');
     const items = [row('2330.TW'), row('2317.TW'), row('2002.TW')];
-    const base = { pe: 15, peTtm: null, peLoss: false, peTtmLoss: false, reason: null, fiscalYear: 2025, source: 'TWSE', asOf: '2026-10-30' };
+    const base = { pe: 15, peTtm: null, peLoss: false, peTtmLoss: false, peTtmMissing: false, reason: null, fiscalYear: 2025, source: 'TWSE', asOf: '2026-10-30' };
     const context = { market: 'TW' as const, pe: {
-      '2330.TW': { ...base, reason: '近四季 EPS 資料不足' },
+      '2330.TW': { ...base, peTtmMissing: true, reason: '近四季 EPS 資料不足' },
       '2317.TW': { ...base, peTtmLoss: true, reason: '虧損，本益比不適用' },
       '2002.TW': { ...base, peTtm: 15 },
     } };

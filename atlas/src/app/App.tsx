@@ -1262,7 +1262,7 @@ export function App({
     value !== null
       ? `${label}${peFigures?.source ? ` · ${peFigures.source}` : ''}${peFigures?.asOf ? ` · ${peFigures.asOf}` : ''}`
       : `${label}：${(ttm ? peFigures?.peTtmLoss : peFigures?.peLoss) ? '虧損，本益比不適用'
-        : peFigures?.reason === '近四季 EPS 資料不足' && !ttm ? '暫無 EPS 資料' : peFigures?.reason ?? '暫無資料'}`;
+        : peFigures?.peTtmMissing && !ttm ? '暫無 EPS 資料' : peFigures?.reason ?? '暫無資料'}`;
   const ticker = asset?.ticker ?? symbol;
   const compactTicker = ticker.startsWith(displayTicker(symbol)) ? displayTicker(symbol) : ticker;
   const dataStateLabel = providerId === 'demo' ? '模擬' : result?.dataState === 'live' ? '即時' : providerId === 'yahoo' ? '後端' : '延遲';

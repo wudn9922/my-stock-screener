@@ -244,7 +244,7 @@ function Row({
   const shownPills = compact
     ? [...metricPills.filter(({ pill }) => pill.growth), ...metricPills.filter(({ pill }) => !pill.growth)].slice(0, 2)
     : metricPills;
-  const ttmMissing = pe?.reason === '近四季 EPS 資料不足';
+  const ttmMissing = pe?.peTtmMissing;
   const hasPe = !!pe && (ttmMissing || pe.pe !== null || pe.peTtm !== null || pe.peTtmLoss || pe.peLoss);
   const compactTitle = compact
     ? [distances.length ? `距 ${distances.map(({ period, distance }) => `MA${period} ${formatPercent(distance, 1)}`).join('、')}` : '', note]

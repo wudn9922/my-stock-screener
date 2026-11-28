@@ -187,14 +187,22 @@ async function main() {
       const supplementalAnnual = parseTaiwanSupplementalAnnual(await readJson(join(OUT_DIR, 'tw-annual.json')));
       const items: Record<string, ValuationRecord> = {};
       const stats: Record<string, unknown> = {};
+      let loggedMismatches = 0;
       for (const exchange of ['TWSE', 'TPEx'] as const) {
         try {
           const result = await buildTaiwanExchange(fetcher, exchange, previous, supplementalAnnual, todayIso);
           // Preserve the original usable-exchange-record coverage gate: blank rows alone cannot pass it.
           const count = Object.values(result.items).filter(record => record.epsTtm !== null || record.epsAnnual !== null || record.exchangePeTtm != null).length;
           if (count < (offline ? 1 : 500)) throw new Error(`only ${count} records`);
-          Object.assign(items, await enrichTaiwanValuation(result.items, financialsDir, todayIso));
-          stats[exchange] = { records: count, ...result.stats };
+          const mismatches = { ttm: 0, annual: 0 };
+          Object.assign(items, await enrichTaiwanValuation(result.items, financialsDir, todayIso, mismatch => {
+            mismatches[mismatch.period]++;
+            if (loggedMismatches < 20) {
+              console.log(`[${exchange} ${mismatch.period}] ${mismatch.symbol} ${mismatch.market} ${mismatch.reported} ${mismatch.restated}`);
+              loggedMismatches++;
+            }
+          }));
+          stats[exchange] = { records: count, ...result.stats, ttmMismatches: mismatches.ttm, annualMismatches: mismatches.annual };
         } catch (error) {
           failed = true;
           const kept = Object.entries(previous).filter(([, record]) => record.source === exchange);

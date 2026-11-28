@@ -41,7 +41,7 @@ function actualValue(chip: FilterChip, item: GroupItem, state: FilterState, cont
   if (chip.id === 'pe') {
     const figures = context.pe?.[item.symbol];
     return figures?.peTtmLoss ? '近四季虧損，本益比不適用'
-      : figures?.reason === '近四季 EPS 資料不足' ? figures.reason : `本益比 ${number(screenerPeValue(figures), ' 倍')}`;
+      : figures?.peTtmMissing ? '近四季 EPS 資料不足' : `本益比 ${number(screenerPeValue(figures), ' 倍')}`;
   }
   const record = growthRecordFor(item, context.growth);
   if (chip.id === 'epss') {

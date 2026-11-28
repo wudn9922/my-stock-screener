@@ -11,6 +11,8 @@ export interface PeFigures {
   peLoss: boolean;
   /** True when TTM EPS is zero or negative. */
   peTtmLoss: boolean;
+  /** Taiwan TTM EPS is unknown: do not fall back to annual EPS for screening. */
+  peTtmMissing: boolean;
   /** Why a figure is missing, for the tooltip. */
   reason: string | null;
   fiscalYear: number | null;
@@ -26,6 +28,7 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
     peTtm: null,
     peLoss: false,
     peTtmLoss: false,
+    peTtmMissing: false,
     reason,
     fiscalYear: null,
     source: null,
@@ -52,6 +55,7 @@ export async function getPeFigures(symbol: string, price: number | null | undefi
     peTtm: ttm.pe,
     peLoss: annual.negativeEarnings,
     peTtmLoss: ttm.negativeEarnings,
+    peTtmMissing: ttmMissing,
     reason: ttmMissing ? '近四季 EPS 資料不足' : annual.negativeEarnings || ttm.negativeEarnings ? '虧損，本益比不適用' : reasonOf(annual) ?? reasonOf(ttm),
     ...(taiwan && valuation.epsNote ? { epsNote: valuation.epsNote } : {}),
     fiscalYear: valuation.fiscalYear,
@@ -64,7 +68,7 @@ export type ScreenerPeFigures = Readonly<Record<string, PeFigures>>;
 
 /** Same TTM-first, annual-fallback figure shown in the screener; losses never pass a numeric range. */
 export function screenerPeValue(figures: PeFigures | undefined): number | null {
-  if (!figures || figures.peTtmLoss || figures.reason === '近四季 EPS 資料不足') return null;
+  if (!figures || figures.peTtmLoss || figures.peTtmMissing) return null;
   const value = figures.peTtm ?? figures.pe;
   return value !== null && Number.isFinite(value) && value > 0 ? value : null;
 }
